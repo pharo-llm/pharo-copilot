@@ -1,0 +1,13 @@
+Class {
+	#name : 'BaselineOfAIPharoCopilot',
+	#superclass : 'BaselineOf',
+	#category : 'BaselineOfAIPharoCopilot',
+	#package : 'BaselineOfAIPharoCopilot'
+}
+
+{ #category : 'baselines' }
+BaselineOfAIPharoCopilot >> baseline: spec [
+
+	<baseline>
+	spec for: #common do: [ ]
+]
