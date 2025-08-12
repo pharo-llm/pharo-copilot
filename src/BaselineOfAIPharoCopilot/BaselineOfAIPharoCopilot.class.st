@@ -9,5 +9,7 @@ Class {
 BaselineOfAIPharoCopilot >> baseline: spec [
 
 	<baseline>
-	spec for: #common do: [ ]
+	spec for: #common do: [
+		spec package: 'AI-Pharo-Copilot'.
+		 ]
 ]
