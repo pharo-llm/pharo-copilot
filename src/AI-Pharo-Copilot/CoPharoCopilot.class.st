@@ -7,5 +7,5 @@ Class {
 
 { #category : 'accessing' }
 CoPharoCopilot >> completionBuilder [
-    ^ completionBuilder ifNil: [ completionBuilder := CoCopilotResultSetBuilder new ]
+    ^ completionBuilder ifNil: [ completionBuilder := CoOllamaResultSetBuilder new ]
 ]
