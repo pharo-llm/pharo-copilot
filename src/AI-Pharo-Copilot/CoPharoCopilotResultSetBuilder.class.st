@@ -1,19 +1,19 @@
 Class {
-	#name : 'CoOllamaResultSetBuilder',
+	#name : 'CoPharoCopilotResultSetBuilder',
 	#superclass : 'CoResultSetBuilder',
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
 }
 
 { #category : 'instance creation' }
-CoOllamaResultSetBuilder class >> initializeOnContext: aSystemCompletionContext [ 
+CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionContext [ 
     ^ self new
         initializeOnContext: aSystemCompletionContext;
         yourself
 ]
 
 { #category : 'API - building' }
-CoOllamaResultSetBuilder >> buildCompletion [
+CoPharoCopilotResultSetBuilder >> buildCompletion [
 
 	| textUpToCaret response suggestions completion api |
 	textUpToCaret := completionContext source
@@ -31,7 +31,7 @@ CoOllamaResultSetBuilder >> buildCompletion [
 ]
 
 { #category : 'initialization' }
-CoOllamaResultSetBuilder >> initializeOnContext: aSystemCompletionContext [ 
+CoPharoCopilotResultSetBuilder >> initializeOnContext: aSystemCompletionContext [ 
     "Store the passed-in context so we can access source, position, etc."
     completionContext := aSystemCompletionContext
 ]
