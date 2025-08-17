@@ -79,22 +79,6 @@ OllamaAPI >> buildQuery: aTextQuery [
 	^ aTextQuery
 ]
 
-{ #category : 'api' }
-OllamaAPI >> delete [
-	"Pull the model linked to this API"
-
-	| znClient paramDic |
-	znClient := ZnEasy client.
-	znClient forJsonREST.
-	znClient host: self host.
-	znClient port: self port.
-	znClient path: 'api/delete'.
-	paramDic := Dictionary new.
-	paramDic at: #name put: self model fullName.
-	znClient entity: (ZnEntity json: (NeoJSONWriter toString: paramDic)).
-	^ znClient delete
-]
-
 { #category : 'accessing' }
 OllamaAPI >> format [
 
@@ -185,23 +169,6 @@ OllamaAPI >> port [
 OllamaAPI >> port: anObject [
 
 	port := anObject
-]
-
-{ #category : 'api' }
-OllamaAPI >> pull [
-	"Pull the model linked to this API"
-
-	| znClient paramDic |
-	znClient := ZnEasy client.
-	znClient forJsonREST.
-	znClient host: self host.
-	znClient port: self port.
-	znClient path: 'api/pull'.
-	paramDic := Dictionary new.
-	paramDic at: #name put: self model fullName.
-	paramDic at: #stream put: false.
-	znClient entity: (ZnEntity json: (NeoJSONWriter toString: paramDic)).
-	^ znClient post at: #response
 ]
 
 { #category : 'api' }
