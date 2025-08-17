@@ -15,19 +15,26 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
 { #category : 'API - building' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
 
-	| textUpToCaret response suggestions completion api |
-	textUpToCaret := completionContext source
-		                 copyFrom: 1
-		                 to: completionContext position.
-	api := OllamaAPI new.
-	response := api query: textUpToCaret.
-	suggestions := OrderedCollection new.
-	(response at: #content ifAbsent: [ '' ]) ifNotEmpty: [ :someText |
-		suggestions add: someText ].
+  | textUpToCaret api response content entries fetcher |
+  textUpToCaret := completionContext source copyFrom: 1 to: completionContext position.
+  api := OllamaAPI new.
+  response := api query: textUpToCaret.  "Likely a String"
 
-	completion := CoCompletionEngine new.
-	completion items: suggestions.
-	^ completion
+  "Normalize to the text we want to show"
+  content := (response isKindOf: Dictionary)
+               ifTrue:  [ response at: #content ifAbsent: [''] ]
+               ifFalse: [ response asString ].
+
+  Transcript
+    show: 'Copilot raw response: ';
+    show: content; cr.
+
+  entries := content isEmpty
+               ifTrue:  [ #() ]
+               ifFalse: [ { CoCopilotEntry contents: content } ].
+
+  fetcher := CoCollectionFetcher onCollection: entries.
+  ^ CoResultSet fetcher: fetcher
 ]
 
 { #category : 'initialization' }
