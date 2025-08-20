@@ -40,25 +40,6 @@ OllamaAPI class >> defaultModel: anObject [
 	defaultModel := anObject
 ]
 
-{ #category : 'settings' }
-OllamaAPI class >> ollamaSettings: aBuilder [
-
-	<systemsettings>
-	(aBuilder group: #ChatPharo)
-		parent: #tools;
-		with: [
-			(aBuilder pickOne: #defaultModel)
-				order: -100000;
-				label: 'Ollama Default model';
-				target: self;
-				default: OCodeLlamaModel class >> #b7;
-				domainValues:
-					(((Pragma allNamed: #ollamaInit:) collect: [ :pragma |
-							  pragma arguments first -> pragma method ]) sorted: [ :a :b |
-							 a key < b key ]);
-				ghostHelp: 'Model name' ]
-]
-
 { #category : 'private' }
 OllamaAPI >> addParameterTo: paramDic [
 
