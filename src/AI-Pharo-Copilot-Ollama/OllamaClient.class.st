@@ -66,6 +66,30 @@ OllamaClient >> normalizeResponse: resp [
 ]
 
 { #category : 'operations' }
+OllamaClient >> optionAt: aKey [ 
+
+  ^ options ifNil: [ nil ] ifNotNil: [ options at: aKey ifAbsent: [ nil ] ]
+]
+
+{ #category : 'private' }
+OllamaClient >> optionAt: aKey put: aValue [
+
+  options ifNil: [ options := Dictionary new ].
+  ^ options at: aKey put: aValue
+]
+
+{ #category : 'operations' }
+OllamaClient >> options [ 
+
+    ^ options
+]
+
+{ #category : 'operations' }
+OllamaClient >> options: aDictionary [
+    options := aDictionary ifNil: [ Dictionary new ].
+]
+
+{ #category : 'operations' }
 OllamaClient >> useDefaultModel [
   modelSpec := OModelRegistry current specByFullName:
                  (self class defaultModelFullName).
