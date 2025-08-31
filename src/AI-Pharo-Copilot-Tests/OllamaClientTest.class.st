@@ -55,3 +55,32 @@ OllamaClientTest >> testOptionAtReturnsNil [
     client := OllamaClient new.
     self assert: (client optionAt: #missing) isNil.
 ]
+
+{ #category : 'tests' }
+OllamaClientTest >> testOptionsDefaultEmpty [
+
+    | client |
+    client := OllamaClient new.
+    self assert: client options isEmpty.
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testOptionsSetterNilCreatesEmptyDictionary [
+
+    | client |
+    client := OllamaClient new.
+    client options: nil.
+    self assert: client options isEmpty.
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testOptionsSetterStoresDictionary [
+
+    | client dict |
+    client := OllamaClient new.
+    dict := Dictionary new
+        at: #temperature put: 0.8;
+        yourself.
+    client options: dict.
+    self assert: client options identicalTo: dict.
+]
