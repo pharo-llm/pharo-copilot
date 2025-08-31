@@ -1,3 +1,6 @@
+"
+Holds global settings for Copilot and its Ollama backend.
+"
 Class {
 	#name : 'CopilotSettings',
 	#superclass : 'Object',

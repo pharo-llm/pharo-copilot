@@ -1,3 +1,6 @@
+"
+Registry that builds and looks up available model specs.
+"
 Class {
 	#name : 'OModelRegistry',
 	#superclass : 'Object',

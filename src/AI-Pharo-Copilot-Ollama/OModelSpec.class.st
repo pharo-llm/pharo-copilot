@@ -1,3 +1,6 @@
+"
+Represents an Ollama model identified by family, tag, and label.
+"
 Class {
 	#name : 'OModelSpec',
 	#superclass : 'Object',

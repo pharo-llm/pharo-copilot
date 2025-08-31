@@ -1,3 +1,6 @@
+"
+Performs HTTP JSON requests against the local Ollama server.
+"
 Class {
 	#name : 'OAHttpTransport',
 	#superclass : 'Object',

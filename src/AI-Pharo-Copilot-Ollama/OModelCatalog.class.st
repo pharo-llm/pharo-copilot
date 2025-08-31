@@ -1,3 +1,6 @@
+"
+Catalog of built-in Ollama model definitions.
+"
 Class {
 	#name : 'OModelCatalog',
 	#superclass : 'Object',

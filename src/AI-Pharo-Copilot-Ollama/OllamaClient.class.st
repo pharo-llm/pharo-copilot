@@ -1,3 +1,6 @@
+"
+Simple client for invoking the Ollama REST API.
+"
 Class {
 	#name : 'OllamaClient',
 	#superclass : 'Object',
