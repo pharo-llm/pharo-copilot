@@ -84,3 +84,13 @@ OllamaClientTest >> testOptionsSetterStoresDictionary [
     client options: dict.
     self assert: client options identicalTo: dict.
 ]
+
+{ #category : 'tests' }
+OllamaClientTest >> testUseDefaultModelSetsModelSpec [
+
+    | client spec |
+    client := OllamaClient new.
+    spec := client instVarNamed: 'modelSpec'.
+    self assert: spec notNil.
+    self assert: spec fullName equals: OllamaClient defaultModelFullName.
+]

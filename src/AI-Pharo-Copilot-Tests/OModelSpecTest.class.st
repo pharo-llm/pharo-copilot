@@ -6,6 +6,14 @@ Class {
 }
 
 { #category : 'tests' }
+OModelSpecTest >> testFamilyAccessor [
+
+    | spec |
+    spec := OModelSpec family: 'abc' tag: nil label: 'ABC'.
+    self assert: spec family equals: 'abc'.
+]
+
+{ #category : 'tests' }
 OModelSpecTest >> testFullNameWithTag [ 
 
     | spec |
@@ -19,4 +27,12 @@ OModelSpecTest >> testFullNameWithoutTag [
     | spec |
     spec := OModelSpec family: 'foo' tag: nil label: 'Foo'.
     self assert: spec fullName equals: 'foo'.
+]
+
+{ #category : 'tests' }
+OModelSpecTest >> testLabelAccessor [
+
+    | spec |
+    spec := OModelSpec family: 'abc' tag: nil label: 'ABC'.
+    self assert: spec label equals: 'ABC'.
 ]
