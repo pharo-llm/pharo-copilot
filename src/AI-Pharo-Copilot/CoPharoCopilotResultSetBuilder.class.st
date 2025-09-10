@@ -29,13 +29,32 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 client := OllamaClient new.
         response := client generateForPrefix: prefix suffix: suffix.
 
-content := response asString.
+content := self cleanedContentFrom: response asString.
 
 content isEmpty ifFalse: [ completionContext replaceTokenInEditorWith: content ].
 
 
 fetcher := CoCollectionFetcher onCollection: #(  ).
         ^ CoResultSet fetcher: fetcher
+]
+
+{ #category : 'API - building' }
+CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [ 
+    | start end delimiter idx segment |
+
+self halt.
+    start := aString indexOfSubCollection: '```' startingAt: 1 ifAbsent: [ 0 ].
+    start > 0 ifTrue: [
+        end := aString indexOfSubCollection: '```' startingAt: start + 3 ifAbsent: [ aString size + 1 ].
+        segment := aString copyFrom: start + 3 to: end - 1.
+        ^ segment trimBoth
+    ].
+    delimiter := String lf, String lf.
+    idx := aString indexOfSubCollection: delimiter startingAt: 1 ifAbsent: [ 0 ].
+    segment := idx = 0
+        ifTrue: [ aString ]
+        ifFalse: [ aString copyFrom: 1 to: idx - 1 ].
+    ^ segment trimBoth
 ]
 
 { #category : 'initialization' }

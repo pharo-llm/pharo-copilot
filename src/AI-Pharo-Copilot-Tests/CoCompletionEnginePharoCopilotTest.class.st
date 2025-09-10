@@ -6,6 +6,24 @@ Class {
 }
 
 { #category : 'tests' }
+CoCompletionEnginePharoCopilotTest >> testCleanedContentFromRemovesExplanation [
+    | builder raw cleaned |
+    builder := CoPharoCopilotResultSetBuilder new.
+    raw := 'line1', String lf, 'line2', String lf, String lf, 'Explanation'.
+    cleaned := builder cleanedContentFrom: raw.
+    self assert: cleaned equals: 'line1', String lf, 'line2'.
+]
+
+{ #category : 'tests' }
+CoCompletionEnginePharoCopilotTest >> testCleanedContentFromUsesCodeBlock [
+    | builder raw cleaned |
+    builder := CoPharoCopilotResultSetBuilder new.
+    raw := 'aaa```code', String lf, 'line```bbb'.
+    cleaned := builder cleanedContentFrom: raw.
+    self assert: cleaned equals: 'code', String lf, 'line'.
+]
+
+{ #category : 'tests' }
 CoCompletionEnginePharoCopilotTest >> testCompletionBuilderHasNilContext [
 
     | engine builder |
