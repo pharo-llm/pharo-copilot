@@ -6,6 +6,20 @@ Class {
 }
 
 { #category : 'tests' }
+OllamaClientTest >> testGenerateForPrefixSuffixBuildsPrompt [
+
+    | client mock prefix suffix payload |
+    client := OllamaClient new.
+    mock := OAHttpTransportMock new.
+    client instVarNamed: 'transport' put: mock.
+    prefix := 'foo'.
+    suffix := 'bar'.
+    client generateForPrefix: prefix suffix: suffix.
+    payload := mock lastBody.
+    self assert: (payload at: #prompt) equals: '<PRE>foo<SUF>bar<MID>'.
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testNormalizeResponsePrefersResponse [
 
     | client dict result |

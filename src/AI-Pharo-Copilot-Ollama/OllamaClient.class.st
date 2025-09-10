@@ -41,6 +41,13 @@ OllamaClient >> generate: aPromptString [
   ^ self normalizeResponse: resp
 ]
 
+{ #category : 'as yet unclassified' }
+OllamaClient >> generateForPrefix: prefixString suffix: suffixString [
+  | prompt |
+  prompt := '<PRE>', prefixString, '<SUF>', suffixString, '<MID>'.
+  ^ self generate: prompt
+]
+
 { #category : 'initialization' }
 OllamaClient >> initialize [ 
 

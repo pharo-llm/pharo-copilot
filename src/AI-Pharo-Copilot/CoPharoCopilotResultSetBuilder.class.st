@@ -19,18 +19,23 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
 { #category : 'API - building' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
 
-	| textUpToCaret client response content fetcher |
-	textUpToCaret := completionContext source copyFrom: 1 to: completionContext position.
+| prefix suffix client response content fetcher |
+        prefix := completionContext source copyFrom: 1 to: completionContext position.
+        suffix := completionContext position < completionContext source size
+                ifTrue: [ completionContext source copyFrom: completionContext position + 1 to: completionContext source size ]
+                ifFalse: [ '' ].
 
-	client := OllamaClient new.
-	response := client generate: textUpToCaret.
 
-	content := response asString.
+client := OllamaClient new.
+        response := client generateForPrefix: prefix suffix: suffix.
 
-	content isEmpty ifFalse: [ completionContext replaceTokenInEditorWith: content ].
+content := response asString.
 
-	fetcher := CoCollectionFetcher onCollection: #(  ).
-	^ CoResultSet fetcher: fetcher
+content isEmpty ifFalse: [ completionContext replaceTokenInEditorWith: content ].
+
+
+fetcher := CoCollectionFetcher onCollection: #(  ).
+        ^ CoResultSet fetcher: fetcher
 ]
 
 { #category : 'initialization' }
