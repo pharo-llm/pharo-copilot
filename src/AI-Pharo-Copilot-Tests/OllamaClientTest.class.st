@@ -33,6 +33,30 @@ OllamaClientTest >> testListModelsUsesApiTags [
 ]
 
 { #category : 'tests' }
+OllamaClientTest >> testNormalizeResponseHandlesStringContentKey [
+
+    | client dict result |
+    client := OllamaClient new.
+    dict := Dictionary new
+        at: 'content' put: 'bar';
+        yourself.
+    result := client normalizeResponse: dict.
+    self assert: result equals: 'bar'.
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testNormalizeResponseHandlesStringResponseKey [
+
+    | client dict result |
+    client := OllamaClient new.
+    dict := Dictionary new
+        at: 'response' put: 'foo';
+        yourself.
+    result := client normalizeResponse: dict.
+    self assert: result equals: 'foo'.
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testNormalizeResponsePrefersResponse [
 
     | client dict result |

@@ -75,7 +75,9 @@ OllamaClient >> normalizeResponse: resp [
   "If streaming=false, Ollama returns a dict; prefer #response or #content."
   (resp isKindOf: Dictionary) ifTrue: [
     ^ (resp at: #response ifAbsent: [
-        resp at: #content ifAbsent: [ resp asString ] ]) ].
+                resp at: 'response' ifAbsent: [
+            resp at: #content ifAbsent: [
+                resp at: 'content' ifAbsent: [ resp asString ] ] ] ]) ].
   ^ resp asString
 ]
 
