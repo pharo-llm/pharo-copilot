@@ -22,7 +22,7 @@ Class {
 OllamaClient class >> defaultModelFullName [ 
 
   ^ defaultModelFullName ifNil: [
-      defaultModelFullName := 'codellama:7b' ]  "safe fallback"
+      defaultModelFullName := 'codellama:7b-code' ]  "safe fallback"
 ]
 
 { #category : 'operations' }
@@ -43,9 +43,13 @@ OllamaClient >> generate: aPromptString [
 
 { #category : 'as yet unclassified' }
 OllamaClient >> generateForPrefix: prefixString suffix: suffixString [
-  | prompt |
+  | prompt originalOptions response |
   prompt := '<PRE>', prefixString, '<SUF>', suffixString, '<MID>'.
-  ^ self generate: prompt
+    originalOptions := options copy.
+  options at: #task put: 'fill-in-the-middle'.
+  response := self generate: prompt.
+  options := originalOptions.
+  ^ response
 ]
 
 { #category : 'initialization' }
@@ -101,7 +105,7 @@ OllamaClient >> options: aDictionary [
 
 { #category : 'operations' }
 OllamaClient >> useDefaultModel [
-  modelSpec := OModelRegistry current specByFullName:
-                 (self class defaultModelFullName).
-  modelSpec ifNil: [ modelSpec := OModelSpec family: 'codellama' tag: '7b' label: 'Code Llama 7B' ].
+
+	modelSpec := OModelRegistry current specByFullName: self class defaultModelFullName.
+	modelSpec ifNil: [ modelSpec := OModelSpec family: 'codellama' tag: '7b-code' label: 'Code Llama 7B Code' ]
 ]

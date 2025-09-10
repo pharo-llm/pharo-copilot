@@ -12,3 +12,8 @@ Class {
 OModelCatalog class >> codellama_7b [
   <ollamaModel: 'codellama' tag: '7b' label: 'Code Llama 7B'>
 ]
+
+{ #category : 'private - definitions' }
+OModelCatalog class >> codellama_7b_code [
+  <ollamaModel: 'codellama' tag: '7b-code' label: 'Code Llama 7B Code'>
+]
