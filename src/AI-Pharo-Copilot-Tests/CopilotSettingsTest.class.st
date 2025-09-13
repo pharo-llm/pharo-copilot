@@ -42,6 +42,15 @@ CopilotSettingsTest >> testCopilotProviderAccessor [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testFimTemplateAccessor [
+    | old |
+    old := CopilotSettings fimTemplate.
+    CopilotSettings fimTemplate: '<<PRE>>%1<<SUF>>%2<<MID>>'.
+    self assert: CopilotSettings fimTemplate equals: '<<PRE>>%1<<SUF>>%2<<MID>>'.
+    CopilotSettings fimTemplate: old.
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testMaxSuggestionsAccessor [
     | old |
     old := CopilotSettings maxSuggestions.

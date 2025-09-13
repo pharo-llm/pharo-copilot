@@ -43,13 +43,14 @@ OllamaClient >> generate: aPromptString [
 
 { #category : 'as yet unclassified' }
 OllamaClient >> generateForPrefix: prefixString suffix: suffixString [
-  | prompt originalOptions response |
-  prompt := '<PRE>', prefixString, '<SUF>', suffixString, '<MID>'.
-    originalOptions := options copy.
-  options at: #task put: 'fill-in-the-middle'.
-  response := self generate: prompt.
-  options := originalOptions.
-  ^ response
+
+	| prompt originalOptions response |
+	prompt := CopilotSettings fimTemplate format: { prefixString. suffixString }.
+	originalOptions := options copy.
+	options at: #task put: 'fill-in-the-middle'.
+	response := self generate: prompt.
+	options := originalOptions.
+	^ response
 ]
 
 { #category : 'initialization' }
