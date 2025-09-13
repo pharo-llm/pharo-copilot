@@ -22,6 +22,17 @@ OllamaClientTest >> testGenerateForPrefixSuffixBuildsPrompt [
 ]
 
 { #category : 'tests' }
+OllamaClientTest >> testInitializeUsesCopilotSettingsModel [
+    | old client |
+    old := CopilotSettings modelName.
+    [
+        CopilotSettings modelName: 'codellama:7b'.
+        client := OllamaClient new.
+        self assert: (client instVarNamed: 'modelSpec') fullName equals: 'codellama:7b'.
+    ] ensure: [ CopilotSettings modelName: old ].
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testListModelsUsesApiTags [
 
     | client mock |

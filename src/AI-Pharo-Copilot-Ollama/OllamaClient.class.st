@@ -59,7 +59,7 @@ OllamaClient >> initialize [
   transport := OAHttpTransport new.
   stream := false.
   options := Dictionary new.
-  self useDefaultModel.
+  self useModelNamed: CopilotSettings modelName.
 ]
 
 { #category : 'operations' }
@@ -108,6 +108,18 @@ OllamaClient >> options: aDictionary [
 { #category : 'operations' }
 OllamaClient >> useDefaultModel [
 
-	modelSpec := OModelRegistry current specByFullName: self class defaultModelFullName.
-	modelSpec ifNil: [ modelSpec := OModelSpec family: 'codellama' tag: '7b-code' label: 'Code Llama 7B Code' ]
+	self useModelNamed: self class defaultModelFullName
+]
+
+{ #category : 'operations' }
+OllamaClient >> useModelNamed: aString [
+
+        | tokens |
+        modelSpec := OModelRegistry current specByFullName: aString.
+        modelSpec ifNil: [
+                tokens := aString findTokens: ':'.
+                modelSpec := OModelSpec
+                        family: tokens first
+                        tag: (tokens size > 1 ifTrue: [ tokens second ] ifFalse: [ nil ])
+                        label: aString ]
 ]

@@ -11,6 +11,7 @@ CopilotSettingsTest >> testAvailableModelName [
     domain := CopilotSettings availableModelNames.
     self assert: domain size > 0.
     self assert: (domain anySatisfy: [:assoc | assoc key = 'Code Llama 7B' and: [assoc value = 'codellama:7b']]).
+self assert: (domain anySatisfy: [:assoc | assoc key = 'Code Llama 13B' and: [assoc value = 'codellama:13b']]).
 ]
 
 { #category : 'tests' }

@@ -12,8 +12,8 @@ OModelRegistryTest >> testDomainValuesForSettings [
     registry := OModelRegistry build.
     domain := registry domainValuesForSettings.
     self assert: domain size > 0.
-    self assert: domain first key equals: 'Code Llama 7B'.
-    self assert: domain first value equals: 'codellama:7b'.
+ self assert: (domain anySatisfy: [:assoc | assoc key = 'Code Llama 7B' and: [assoc value = 'codellama:7b']]).
+    self assert: (domain anySatisfy: [:assoc | assoc key = 'Code Llama 13B' and: [assoc value = 'codellama:13b']]).
 ]
 
 { #category : 'tests' }
@@ -28,12 +28,16 @@ OModelRegistryTest >> testDomainValuesForSettingsReturnAssociations [
 { #category : 'tests' }
 OModelRegistryTest >> testSpecLookupByFullNameAndLabel [
 
-    | registry spec |
-    registry := OModelRegistry build.
-    spec := registry specByFullName: 'codellama:7b'.
+	| registry spec |
+	registry := OModelRegistry build.
+	spec := registry specByFullName: 'codellama:7b'.
+	self assert: spec notNil.
+	self assert: spec label equals: 'Code Llama 7B'.
+	self assert: (registry specByLabel: 'Code Llama 7B') == spec.
+	    spec := registry specByFullName: 'codellama:13b'.
     self assert: spec notNil.
-    self assert: spec label equals: 'Code Llama 7B'.
-    self assert: (registry specByLabel: 'Code Llama 7B') == spec.
+    self assert: spec label equals: 'Code Llama 13B'.
+    self assert: (registry specByLabel: 'Code Llama 13B') == spec.
 ]
 
 { #category : 'tests' }
