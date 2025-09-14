@@ -48,17 +48,18 @@ ConcurrencyTest >> testConcurrentSettingsModification [
 	| oldModel results |
 	oldModel := CopilotSettings modelName.
 	results := OrderedCollection new.
-	
+
 	[
-		"Simulate concurrent modifications"
-		10 timesRepeat: [ :i |
+		1 to: 10 do: [:i |
 			CopilotSettings modelName: 'model', i asString.
 			results add: CopilotSettings modelName ].
-		
-		"Should have consistent results"
-		results do: [ :modelName |
+
+		results do: [:modelName |
 			self assert: modelName isString ]
-	] ensure: [ CopilotSettings modelName: oldModel ]
+	] ensure: [
+		CopilotSettings modelName: oldModel
+	].
+
 ]
 
 { #category : 'tests' }
