@@ -6,6 +6,31 @@ Class {
 }
 
 { #category : 'tests' }
+OllamaClientTest >> testGenerateBuildsCorrectPayload [
+    | client mock payload |
+    client := OllamaClient new.
+    mock := OAHttpTransportMockExtended new.
+    client instVarNamed: 'transport' put: mock.
+
+    client generate: 'test prompt'.
+
+    payload := mock lastBody.
+
+    "Model"
+    self assert: (payload at: #model)
+         equals: (client instVarNamed: 'modelSpec') fullName.
+
+    "Prompt"
+    self assert: (payload at: #prompt)
+         equals: 'test prompt'.
+
+    "Stream flag"
+    self assert: (payload at: #stream)
+         equals: false
+
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testGenerateForPrefixSuffixBuildsPrompt [
 
 	| client mock prefix suffix payload expected |
@@ -42,6 +67,46 @@ OllamaClientTest >> testGenerateForPrefixSuffixUsesCustomTemplate [
 ]
 
 { #category : 'tests' }
+OllamaClientTest >> testGenerateIncludesFormatWhenSet [
+	| client mock payload |
+	client := OllamaClient new.
+	client instVarNamed: 'format' put: 'json'.
+	mock := OAHttpTransportMockExtended new.
+	client instVarNamed: 'transport' put: mock.
+	
+	client generate: 'test'.
+	
+	payload := mock lastBody.
+	self assert: (payload at: #format) equals: 'json'
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testGenerateIncludesOptionsWhenNotEmpty [
+	| client mock payload |
+	client := OllamaClient new.
+	client optionAt: #temperature put: 0.7.
+	mock := OAHttpTransportMockExtended new.
+	client instVarNamed: 'transport' put: mock.
+	
+	client generate: 'test'.
+	
+	payload := mock lastBody.
+	self assert: ((payload at: #options) at: #temperature) equals: 0.7
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testGenerateUsesCorrectEndpoint [
+	| client mock |
+	client := OllamaClient new.
+	mock := OAHttpTransportMockExtended new.
+	client instVarNamed: 'transport' put: mock.
+	
+	client generate: 'test'.
+	
+	self assert: mock lastPath equals: 'api/generate'
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testInitializeUsesCopilotSettingsModel [
     | old client |
     old := CopilotSettings modelName.
@@ -61,6 +126,49 @@ OllamaClientTest >> testListModelsUsesApiTags [
     client instVarNamed: 'transport' put: mock.
     client listModels.
     self assert: mock lastPath equals: 'api/tags'.
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testNormalizeResponseHandlesComplexDictionary [
+	| client response result |
+	client := OllamaClient new.
+	response := Dictionary new
+		at: #model put: 'codellama';
+		at: #response put: 'actual content';
+		at: #done put: true;
+		yourself.
+		
+	result := client normalizeResponse: response.
+	self assert: result equals: 'actual content'
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testNormalizeResponseHandlesJsonString [
+	| client jsonString result |
+	client := OllamaClient new.
+	jsonString := '{"response": "parsed content", "done": true}'.
+	
+	result := client normalizeResponse: jsonString.
+	self assert: result equals: 'parsed content'
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testNormalizeResponseHandlesMalformedJson [
+	| client malformedJson result |
+	client := OllamaClient new.
+	malformedJson := '{"response": unclosed'.
+	
+	result := client normalizeResponse: malformedJson.
+	self assert: result equals: malformedJson
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testNormalizeResponseHandlesNonDictionary [
+	| client result |
+	client := OllamaClient new.
+	
+	result := client normalizeResponse: 123.
+	self assert: result equals: '123'
 ]
 
 { #category : 'tests' }
@@ -175,4 +283,28 @@ OllamaClientTest >> testUseDefaultModelSetsModelSpec [
     spec := client instVarNamed: 'modelSpec'.
     self assert: spec notNil.
     self assert: spec fullName equals: OllamaClient defaultModelFullName.
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testUseModelNamedWithComplexName [
+	| client spec |
+	client := OllamaClient new.
+	client useModelNamed: 'llama2:13b-chat'.
+	
+	spec := client instVarNamed: 'modelSpec'.
+	self assert: spec family equals: 'llama2'.
+	self assert: spec tag equals: '13b-chat'.
+	self assert: spec fullName equals: 'llama2:13b-chat'
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testUseModelNamedWithSimpleName [
+	| client spec |
+	client := OllamaClient new.
+	client useModelNamed: 'llama2'.
+	
+	spec := client instVarNamed: 'modelSpec'.
+	self assert: spec family equals: 'llama2'.
+	self assert: spec tag isNil.
+	self assert: spec fullName equals: 'llama2'
 ]

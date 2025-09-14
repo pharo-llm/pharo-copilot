@@ -15,6 +15,16 @@ self assert: (domain anySatisfy: [:assoc | assoc key = 'Code Llama 13B' and: [as
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testAvailableProvidersContainsOnlyValidSymbols [
+	| providers |
+	providers := CopilotSettings availableProviders.
+	
+	self assert: providers isCollection.
+	providers do: [ :provider |
+		self assert: provider isSymbol ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testAvailableProvidersIncludesOllama [
     self assert: (CopilotSettings availableProviders includes: #ollama).
 ]
@@ -42,12 +52,42 @@ CopilotSettingsTest >> testCopilotProviderAccessor [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testDefaultValues [
+	"Test that defaults are sensible without changing global state"
+
+	| enabled provider model useEnter template |
+	"Store current values"
+	enabled := CopilotSettings copilotEnabled.
+	provider := CopilotSettings copilotProvider.
+	model := CopilotSettings modelName.
+	useEnter := CopilotSettings useEnterToAccept.
+	template := CopilotSettings fimTemplate. "Check defaults are reasonable"
+	self assert: (enabled isKindOf: Boolean ).
+	self assert: provider isSymbol.
+	self assert: model isString.
+	self assert: (useEnter isKindOf: Boolean).
+	self assert: template isString.
+	self assert: (template includesSubstring: '%1').
+	self assert: (template includesSubstring: '%2')
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testFimTemplateAccessor [
     | old |
     old := CopilotSettings fimTemplate.
     CopilotSettings fimTemplate: '<<PRE>>%1<<SUF>>%2<<MID>>'.
     self assert: CopilotSettings fimTemplate equals: '<<PRE>>%1<<SUF>>%2<<MID>>'.
     CopilotSettings fimTemplate: old.
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testFimTemplateValidation [
+	| template |
+	template := CopilotSettings fimTemplate.
+	
+	"Template should contain placeholders for prefix and suffix"
+	self assert: (template includesSubstring: '%1').
+	self assert: (template includesSubstring: '%2')
 ]
 
 { #category : 'tests' }
@@ -58,6 +98,15 @@ CopilotSettingsTest >> testModelNameAccessor [
     CopilotSettings modelName: 'foo'.
     self assert: CopilotSettings modelName equals: 'foo'.
     CopilotSettings modelName: old.
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testModelNameReturnsString [
+	| modelName |
+	modelName := CopilotSettings modelName.
+	
+	self assert: modelName isString.
+	self deny: modelName isEmpty
 ]
 
 { #category : 'tests' }

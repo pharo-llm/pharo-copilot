@@ -47,23 +47,22 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 { #category : 'API - building' }
 CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
 
-| start end delimiter idx segment firstLine |
-start := aString indexOfSubCollection: '```' startingAt: 1 ifAbsent: [ 0 ].
-start > 0 ifTrue: [
-end := aString indexOfSubCollection: '```' startingAt: start + 3 ifAbsent: [ aString size + 1 ].
-segment := aString copyFrom: start + 3 to: end - 1.
-idx := segment indexOf: Character lf ifAbsent: [ 0 ].
-idx > 0 ifTrue: [
-firstLine := segment copyFrom: 1 to: idx - 1.
-(firstLine isEmpty or: [ self isLanguageSpec: firstLine ]) ifTrue: [
-segment := segment copyFrom: idx + 1 to: segment size ] ].
-^ segment trimBoth ].
-delimiter := String lf , String lf.
-idx := aString indexOfSubCollection: delimiter startingAt: 1 ifAbsent: [ 0 ].
-segment := idx = 0
-   ifTrue: [ aString ]
-   ifFalse: [ aString copyFrom: 1 to: idx - 1 ].
-^ segment trimBoth
+	| start end delimiter idx segment firstLine |
+	start := aString indexOfSubCollection: '```' startingAt: 1 ifAbsent: [ 0 ].
+	start > 0 ifTrue: [
+			end := aString indexOfSubCollection: '```' startingAt: start + 3 ifAbsent: [ aString size + 1 ].
+			segment := aString copyFrom: start + 3 to: end - 1.
+			idx := segment indexOf: Character lf ifAbsent: [ 0 ].
+			idx > 0 ifTrue: [
+					firstLine := segment copyFrom: 1 to: idx - 1.
+					(firstLine isEmpty or: [ self isLanguageSpec: firstLine ]) ifTrue: [ segment := segment copyFrom: idx + 1 to: segment size ] ].
+			^ segment trimBoth ].
+	delimiter := String lf , String lf.
+	idx := aString indexOfSubCollection: delimiter startingAt: 1 ifAbsent: [ 0 ].
+	segment := idx = 0
+		           ifTrue: [ aString ]
+		           ifFalse: [ aString copyFrom: 1 to: idx - 1 ].
+	^ segment trimBoth
 ]
 
 { #category : 'initialization' }
