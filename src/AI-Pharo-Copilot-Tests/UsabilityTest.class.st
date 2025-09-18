@@ -6,6 +6,22 @@ Class {
 }
 
 { #category : 'tests' }
+UsabilityTest >> testAvailableModelNamesAreUserFriendly [
+        | modelNames |
+        modelNames := CopilotSettings availableModelNames.
+
+        modelNames do: [ :assoc |
+                "Keys should be human-readable labels"
+                self assert: assoc key isString.
+                self deny: assoc key isEmpty.
+                "Values should be valid model identifiers"
+                self assert: assoc value isString.
+                self deny: assoc value isEmpty.
+                "Labels should be more readable than identifiers"
+                self deny: assoc key equals: assoc value ]
+]
+
+{ #category : 'tests' }
 UsabilityTest >> testContextBuilderIntuitiveAPI [
 	| context |
 	context := CoPharoCopilotContext new.
