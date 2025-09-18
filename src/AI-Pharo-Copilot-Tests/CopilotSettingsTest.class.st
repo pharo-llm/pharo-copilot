@@ -52,12 +52,50 @@ CopilotSettingsTest >> testCopilotProviderAccessor [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testDefaultValues [
+    "Test that defaults are sensible without changing global state"
+
+    | enabled provider model useEnter template |
+    enabled := CopilotSettings copilotEnabled.
+    provider := CopilotSettings copilotProvider.
+    model := CopilotSettings modelName.
+    useEnter := CopilotSettings useEnterToAccept.
+    template := CopilotSettings fimTemplate.
+
+    self assert: (enabled isKindOf: Boolean).
+    self assert: provider isSymbol.
+    self assert: model isString.
+    self assert: (useEnter isKindOf: Boolean).
+    self assert: template isString.
+    self assert: (template includesSubstring: '%1').
+    self assert: (template includesSubstring: '%2').
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testFimTemplateAccessor [
     | old |
     old := CopilotSettings fimTemplate.
     CopilotSettings fimTemplate: '<<PRE>>%1<<SUF>>%2<<MID>>'.
     self assert: CopilotSettings fimTemplate equals: '<<PRE>>%1<<SUF>>%2<<MID>>'.
     CopilotSettings fimTemplate: old.
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testFimTemplateValidation [
+    | template |
+    template := CopilotSettings fimTemplate.
+    self assert: (template includesSubstring: '%1').
+    self assert: (template includesSubstring: '%2').
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testModelNameAccessor [
+    | old |
+    old := CopilotSettings modelName.
+    self assert: old equals: OllamaClient defaultModelFullName.
+    CopilotSettings modelName: 'foo'.
+    self assert: CopilotSettings modelName equals: 'foo'.
+    CopilotSettings modelName: old
 ]
 
 { #category : 'tests' }
