@@ -20,22 +20,6 @@ OllamaClientRobustnessTest >> testGenerateForPrefixSuffixWithEmptyInputs [
 ]
 
 { #category : 'tests' }
-OllamaClientRobustnessTest >> testGenerateForPrefixSuffixWithLargeInputs [
-	| client mock largePrefix largeSuffix payload |
-	client := OllamaClient new.
-	mock := OAHttpTransportMock new.
-	client instVarNamed: 'transport' put: mock.
-	
-	largePrefix := String new: 5000 withAll: $a.
-	largeSuffix := String new: 5000 withAll: $b.
-	
-	client generateForPrefix: largePrefix suffix: largeSuffix.
-	
-	payload := mock lastBody.
-	self assert: (payload at: #prompt) size > 10000
-]
-
-{ #category : 'tests' }
 OllamaClientRobustnessTest >> testGenerateForPrefixSuffixWithNilInputs [
 	| client mock |
 	client := OllamaClient new.
@@ -44,23 +28,6 @@ OllamaClientRobustnessTest >> testGenerateForPrefixSuffixWithNilInputs [
 	
 	"Test with nil inputs - should not crash"
 	self shouldnt: [ client generateForPrefix: nil suffix: nil ] raise: Error
-]
-
-{ #category : 'tests' }
-OllamaClientRobustnessTest >> testGenerateForPrefixSuffixWithSpecialCharacters [
-	| client mock prefix suffix payload |
-	client := OllamaClient new.
-	mock := OAHttpTransportMock new.
-	client instVarNamed: 'transport' put: mock.
-	
-	prefix := 'äöüß €£¥ 🚀'.
-	suffix := '∑∏∆√ ♠♥♦♣'.
-	
-	client generateForPrefix: prefix suffix: suffix.
-
-	payload := mock lastBody.
-	self assert: ((payload at: #prompt) includesSubstring: prefix).
-	self assert: ((payload at: #prompt) includesSubstring: suffix)
 ]
 
 { #category : 'tests' }

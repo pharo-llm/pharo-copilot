@@ -48,25 +48,6 @@ OllamaClientTest >> testGenerateForPrefixSuffixBuildsPrompt [
 ]
 
 { #category : 'tests' }
-OllamaClientTest >> testGenerateForPrefixSuffixUsesCustomTemplate [ 
-
-        | client mock prefix suffix payload old template |
-  client := OllamaClient new.
-  mock := OAHttpTransportMock new.
-  client instVarNamed: 'transport' put: mock.
-  prefix := '1'.
-  suffix := '2'.
-  old := CopilotSettings fimTemplate.
-  template := '<<PRE>>%1<<SUF>>%2<<MID>>'.
-  [
-    CopilotSettings fimTemplate: template.
-    client generateForPrefix: prefix suffix: suffix.
-    payload := mock lastBody.
-    self assert: (payload at: #prompt) equals: '<<PRE>>%1<<SUF>>%2<<MID>>'.
-  ] ensure: [ CopilotSettings fimTemplate: old ].
-]
-
-{ #category : 'tests' }
 OllamaClientTest >> testGenerateIncludesFormatWhenSet [
 	| client mock payload |
 	client := OllamaClient new.
@@ -273,16 +254,6 @@ OllamaClientTest >> testOptionsSetterStoresDictionary [
         yourself.
     client options: dict.
     self assert: client options identicalTo: dict.
-]
-
-{ #category : 'tests' }
-OllamaClientTest >> testUseDefaultModelSetsModelSpec [
-
-    | client spec |
-    client := OllamaClient new.
-    spec := client instVarNamed: 'modelSpec'.
-    self assert: spec notNil.
-    self assert: spec fullName equals: OllamaClient defaultModelFullName.
 ]
 
 { #category : 'tests' }

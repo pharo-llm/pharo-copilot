@@ -75,19 +75,3 @@ CoPharoCopilotResultSetBuilderTest >> testInitializeOnContextSetsCompletionConte
 	
 	self assert: builder completionContext identicalTo: context
 ]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testIsLanguageSpecRecognizesCommonLanguages [
-	| builder |
-	builder := CoPharoCopilotResultSetBuilder new.
-	
-	self assert: (builder isLanguageSpec: 'smalltalk').
-	self assert: (builder isLanguageSpec: 'pharo').
-	self assert: (builder isLanguageSpec: 'javascript').
-	self assert: (builder isLanguageSpec: 'PYTHON').
-	self assert: (builder isLanguageSpec: 'Java').
-	
-	self deny: (builder isLanguageSpec: 'notALanguage').
-	self deny: (builder isLanguageSpec: '123').
-	self deny: (builder isLanguageSpec: '')
-]

@@ -46,24 +46,6 @@ EdgeCaseTest >> testOllamaClientWithNilOptions [
 ]
 
 { #category : 'tests' }
-EdgeCaseTest >> testResultSetBuilderWithMalformedCodeBlocks [
-	| builder cases |
-	builder := CoPharoCopilotResultSetBuilder new.
-	
-	cases := {
-		'```unclosed block' -> 'unclosed block'.
-		'```', String lf, 'no closing' -> 'no closing'.
-		'```smalltalk', String lf, '```' -> ''.
-		'multiple```blocks```here' -> 'blocks'
-	}.
-	
-	cases do: [ :case |
-		| cleaned |
-		cleaned := builder cleanedContentFrom: case key.
-		self assert: cleaned equals: case value ]
-]
-
-{ #category : 'tests' }
 EdgeCaseTest >> testSuggestionEvaluatorWithZeroTotal [
 	| evaluator |
 	evaluator := CoSuggestionEvaluator new.

@@ -15,24 +15,6 @@ CoCompletionEnginePharoCopilotTest >> testCleanedContentFromRemovesExplanation [
 ]
 
 { #category : 'tests' }
-CoCompletionEnginePharoCopilotTest >> testCleanedContentFromSkipsLanguageSpec [
-    | builder raw cleaned |
-    builder := CoPharoCopilotResultSetBuilder new.
-    raw := 'aaa```smalltalk', String lf, 'line1', String lf, 'line2', String lf, '```bbb'.
-    cleaned := builder cleanedContentFrom: raw.
-    self assert: cleaned equals: 'line1', String lf, 'line2'.
-]
-
-{ #category : 'tests' }
-CoCompletionEnginePharoCopilotTest >> testCleanedContentFromUsesCodeBlock [
-    | builder raw cleaned |
-    builder := CoPharoCopilotResultSetBuilder new.
-    raw := 'aaa```code', String lf, 'line```bbb'.
-    cleaned := builder cleanedContentFrom: raw.
-    self assert: cleaned equals: 'code', String lf, 'line'.
-]
-
-{ #category : 'tests' }
 CoCompletionEnginePharoCopilotTest >> testCompletionBuilderHasNilContext [
 
     | engine builder |

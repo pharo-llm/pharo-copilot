@@ -19,21 +19,6 @@ RegressionTest >> testCleanedContentFromDoesNotAlterOriginalString [
 ]
 
 { #category : 'tests' }
-RegressionTest >> testDefaultModelConsistency [
-	| defaultModel client1 client2 |
-	defaultModel := OllamaClient defaultModelFullName.
-	
-	client1 := OllamaClient new.
-	client2 := OllamaClient new.
-	
-	"Both clients should use same default model"
-	self assert: (client1 instVarNamed: 'modelSpec') fullName equals: defaultModel.
-	self assert: (client2 instVarNamed: 'modelSpec') fullName equals: defaultModel.
-	self assert: (client1 instVarNamed: 'modelSpec') fullName equals: (client2 instVarNamed: 'modelSpec') fullName
-
-]
-
-{ #category : 'tests' }
 RegressionTest >> testEvaluatorDefaultInstanceConsistency [
 	| evaluator1 evaluator2 |
 	

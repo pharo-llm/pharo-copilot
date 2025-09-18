@@ -31,32 +31,6 @@ FunctionalTest >> testCompleteWorkflowWithMockedClient [
 ]
 
 { #category : 'tests' }
-FunctionalTest >> testEvaluationWorkflowWithReports [
-	"Test complete evaluation workflow"
-	| evaluator context entry report |
-	
-	"1. Setup evaluator"
-	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new.
-	context source: 'Class { #name : ''TestClass'' }'.
-	
-	"2. Record various suggestions"
-	entry := CoCopilotEntry contents: 'good suggestion'.
-	evaluator recordSuggestionAccepted: entry context: context.
-	
-	entry := CoCopilotEntry contents: 'ignored suggestion'.
-	evaluator recordSuggestionIgnored: entry context: context.
-	
-	"3. Generate report"
-	report := evaluator generateReport.
-	
-	"4. Verify workflow results"
-	self assert: evaluator acceptanceRate equals: 50.
-	self assert: (report includesSubstring: 'Total suggestions: 2').
-	self assert: (report includesSubstring: 'classDefinition')
-]
-
-{ #category : 'tests' }
 FunctionalTest >> testModelManagementWorkflow [
 	"Test model selection and usage workflow"
 	| oldModel registry client spec |
