@@ -221,6 +221,35 @@ CoSuggestionEvaluator >> iterationSelectors [
 ]
 
 { #category : 'initialization' }
+CoSuggestionEvaluator >> jsonSafeObject: anObject [
+        anObject isNil ifTrue: [ ^ nil ].
+
+        (anObject isString or: [ anObject isKindOf: Text ]) ifTrue: [ ^ anObject asString ].
+        (anObject isKindOf: DateAndTime) ifTrue: [ ^ anObject asString ].
+        (anObject isKindOf: Number) ifTrue: [ ^ anObject ].
+        (anObject isKindOf: Boolean) ifTrue: [ ^ anObject ].
+
+        (anObject isKindOf: Dictionary) ifTrue: [
+                | jsonDict |
+                jsonDict := Dictionary new.
+                anObject keysAndValuesDo: [ :key :value |
+                        | jsonKey |
+                        jsonKey := key ifNil: [ 'nil' ] ifNotNil: [ key asString ].
+                        jsonDict at: jsonKey put: (self jsonSafeObject: value) ].
+                ^ jsonDict ].
+
+        (anObject isKindOf: SequenceableCollection) ifTrue: [
+                ^ anObject collect: [ :each | self jsonSafeObject: each ] ].
+
+        (anObject isKindOf: Set) ifTrue: [
+                ^ anObject asArray collect: [ :each | self jsonSafeObject: each ] ].
+
+        (anObject respondsTo: #asString) ifTrue: [ ^ anObject asString ].
+
+        ^ anObject printString
+]
+
+{ #category : 'initialization' }
 CoSuggestionEvaluator >> loadPersistentStats [
         "Load previous evaluation data if available"
         [ | evaluationFile |
@@ -290,27 +319,31 @@ CoSuggestionEvaluator >> rejectionRate [
 
 { #category : 'initialization' }
 CoSuggestionEvaluator >> savePersistentStats [
-        "Save evaluation data to file for long-term analysis"
-        | evaluationFile data |
+	"Save evaluation data to file for long-term analysis"
 
-        evaluationFile := CoCopilotLogger evaluationLogFileReference.
-        data := Dictionary new
-                at: #acceptedCount put: acceptedEntries size;
-                at: #rejectedCount put: rejectedEntries size;
-                at: #sessionStats put: sessionStats;
-                at: #timestamp put: DateAndTime now;
-                at: #modelName put: CopilotSettings modelName;
-                yourself.
+	| evaluationFile data |
+	evaluationFile := CoCopilotLogger evaluationLogFileReference.
+	data := Dictionary new
+		        at: #acceptedCount put: acceptedEntries size;
+		        at: #rejectedCount put: rejectedEntries size;
+		        at: #sessionStats put: sessionStats;
+		        at: #timestamp put: DateAndTime now;
+		        at: #modelName put: CopilotSettings modelName;
+		        yourself.
 
-        [
-                CoCopilotLogger ensureEvaluationLogFileInitialized.
-                evaluationFile writeStreamDo: [ :stream |
-                        stream setToEnd.
-                        stream nextPutAll: (STONJSON toString: data).
-                        stream nextPut: Character lf ]
-        ] on: Error do: [ :ex |
-                "Silently ignore file write errors"
-                Transcript show: 'Could not save evaluation stats: ', ex messageText; cr ].
+	[
+		CoCopilotLogger ensureEvaluationLogFileInitialized.
+		evaluationFile writeStreamDo: [ :stream |
+			| safeData |
+                        safeData := self jsonSafeObject: data.
+				stream setToEnd.
+				stream nextPutAll: (STONJSON toString: safeData).
+				stream nextPut: Character lf ] ]
+		on: Error
+		do: [ :ex | "Silently ignore file write errors"
+				Transcript
+					show: 'Could not save evaluation stats: ' , ex messageText;
+					cr ]
 ]
 
 { #category : 'initialization' }

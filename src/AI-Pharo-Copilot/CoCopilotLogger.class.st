@@ -82,6 +82,11 @@ CoCopilotLogger class >> evaluationLogFileReference [
 ]
 
 { #category : 'class initialization' }
+CoCopilotLogger class >> evaluationLogFileReference: aFileReference [
+        evaluationLogFileReference := aFileReference
+]
+
+{ #category : 'class initialization' }
 CoCopilotLogger class >> formatValue: anObject [
 
         anObject isNil ifTrue: [ ^ 'nil' ].
