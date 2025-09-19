@@ -52,6 +52,20 @@ CopilotSettingsTest >> testCopilotProviderAccessor [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testCustomFimTemplateFilePathAccessor [
+    | oldPath tempFile |
+    oldPath := CopilotSettings customFimTemplateFilePath.
+    tempFile := FileLocator temp / 'copilot-custom-fim-template-path.tmpl'.
+    [
+        CopilotSettings customFimTemplateFilePath: tempFile fullName.
+        self assert: CopilotSettings customFimTemplateFilePath equals: tempFile fullName.
+    ] ensure: [
+        CopilotSettings customFimTemplateFilePath: oldPath.
+        tempFile exists ifTrue: [ tempFile ensureDelete ].
+    ].
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testDefaultValues [
 	"Test that defaults are sensible without changing global state"
 
@@ -80,6 +94,38 @@ CopilotSettingsTest >> testFimTemplateAccessor [
     CopilotSettings fimTemplate: '<<PRE>>%1<<SUF>>%2<<MID>>'.
     self assert: CopilotSettings fimTemplate equals: '<<PRE>>%1<<SUF>>%2<<MID>>'.
     CopilotSettings fimTemplate: old.
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testFimTemplateOptionCreatesFileWhenMissing [
+
+	| oldOption oldTemplate oldFile tempFile |
+	oldOption := CopilotSettings fimTemplateOption.
+	oldTemplate := CopilotSettings fimTemplate.
+	oldFile := CopilotSettings customFimTemplateFile.
+	tempFile := FileLocator temp / 'copilot-custom-fim-template-missing.tmpl'.
+	[
+		tempFile exists ifTrue: [ tempFile ensureDelete ].
+		CopilotSettings customFimTemplateFile: tempFile.
+		CopilotSettings fimTemplateOption: #customFile.
+		self assert: tempFile exists.
+		self assert: (CopilotSettings fimTemplate includesSubstring: '%1').
+		self assert: (CopilotSettings fimTemplate includesSubstring: '%2' )] ensure: [
+			tempFile exists ifTrue: [ tempFile ensureDelete ].
+			CopilotSettings fimTemplate: oldTemplate.
+			CopilotSettings customFimTemplateFile: oldFile.
+			CopilotSettings fimTemplateOption: oldOption ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testFimTemplateOptionDefault [
+    | oldOption |
+    oldOption := CopilotSettings fimTemplateOption.
+    [
+        self assert: CopilotSettings fimTemplateOption equals: #inline.
+        CopilotSettings fimTemplateOption: #inline.
+        self assert: CopilotSettings fimTemplateOption equals: #inline
+    ] ensure: [ CopilotSettings fimTemplateOption: oldOption ].
 ]
 
 { #category : 'tests' }
@@ -127,6 +173,35 @@ CopilotSettingsTest >> testPortAccessor [
         CopilotSettings port: 12345.
         self assert: CopilotSettings port equals: 12345.
     ] ensure: [ CopilotSettings port: old ].
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testSwitchBetweenInlineAndCustomFimTemplates [
+    | oldOption oldTemplate oldFile tempFile inlineTemplate customTemplate |
+    oldOption := CopilotSettings fimTemplateOption.
+    oldTemplate := CopilotSettings fimTemplate.
+    oldFile := CopilotSettings customFimTemplateFile.
+    tempFile := FileLocator temp / 'copilot-switch-custom-fim-template.tmpl'.
+    inlineTemplate := 'INLINE<PRE>%1<SUF>%2<MID>'.
+    customTemplate := 'CUSTOM<PRE>%1<SUF>%2<MID>'.
+    [
+        tempFile exists ifTrue: [ tempFile ensureDelete ].
+        CopilotSettings fimTemplate: inlineTemplate.
+        CopilotSettings fimTemplateOption: #inline.
+        CopilotSettings customFimTemplateFile: tempFile.
+        tempFile parent ensureCreateDirectory.
+        tempFile exists ifFalse: [ tempFile ensureCreateFile ].
+        tempFile writeStreamDo: [ :stream | stream nextPutAll: customTemplate ].
+        CopilotSettings fimTemplateOption: #customFile.
+        self assert: CopilotSettings fimTemplate equals: customTemplate.
+        CopilotSettings fimTemplateOption: #inline.
+        self assert: CopilotSettings fimTemplate equals: inlineTemplate.
+    ] ensure: [
+        tempFile exists ifTrue: [ tempFile ensureDelete ].
+        CopilotSettings fimTemplate: oldTemplate.
+        CopilotSettings customFimTemplateFile: oldFile.
+        CopilotSettings fimTemplateOption: oldOption.
+    ].
 ]
 
 { #category : 'tests' }
