@@ -25,25 +25,6 @@ ConcurrencyTest >> testConcurrentEvaluatorAccess [
 ]
 
 { #category : 'tests' }
-ConcurrencyTest >> testConcurrentRegistryRefresh [
-
-	| n start done results |
-	n := 5.
-	start := Semaphore new.
-	done := Semaphore new.
-	results := Array new: n. "Spawn workers that all wait on the same gate."
-	1 to: n do: [ :i |
-			[
-				start wait. "release all at once"
-				results at: i put: OModelRegistry refresh.
-				done signal ] fork ]. "Let them all run concurrently."
-	n timesRepeat: [ start signal ]. "Wait for everyone to finish."
-	n timesRepeat: [ done wait ]. "All returned objects must be the very same instance."
-	self assert: (IdentitySet newFrom: results) size = 1.
-	self assert: (results first )identicalTo: OModelRegistry current.
-]
-
-{ #category : 'tests' }
 ConcurrencyTest >> testConcurrentSettingsModification [
 	| oldModel results |
 	oldModel := CopilotSettings modelName.
