@@ -69,11 +69,10 @@ CopilotSettingsTest >> testCustomFimTemplateFilePathAccessor [
 CopilotSettingsTest >> testDefaultValues [
 	"Test that defaults are sensible without changing global state"
 
-	| enabled provider model useEnter template host port |
+	| enabled provider model template host port |
 	enabled := CopilotSettings copilotEnabled.
 	provider := CopilotSettings copilotProvider.
 	model := CopilotSettings modelName.
-	useEnter := CopilotSettings useEnterToAccept.
 	template := CopilotSettings fimTemplate.
 	host := CopilotSettings host.
     port := CopilotSettings port.
@@ -81,7 +80,6 @@ CopilotSettingsTest >> testDefaultValues [
 	self assert: (enabled isKindOf: Boolean).
 	self assert: provider isSymbol.
 	self assert: model isString.
-	self assert: (useEnter isKindOf: Boolean).
 	self assert: template isString.
 	self assert: (template includesSubstring: '%1').
 	self assert: (template includesSubstring: '%2')
@@ -202,14 +200,4 @@ CopilotSettingsTest >> testSwitchBetweenInlineAndCustomFimTemplates [
         CopilotSettings customFimTemplateFile: oldFile.
         CopilotSettings fimTemplateOption: oldOption.
     ].
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testUseEnterToAcceptAccessor [
-    | old |
-    old := CopilotSettings useEnterToAccept.
-    self assert: old equals: true.
-    CopilotSettings useEnterToAccept: false.
-    self assert: CopilotSettings useEnterToAccept equals: false.
-    CopilotSettings useEnterToAccept: old.
 ]

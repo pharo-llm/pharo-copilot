@@ -8,7 +8,6 @@ Class {
 		'Enabled',
 		'Provider',
 		'ModelName',
-		'UseEnterToAccept',
 		'FimTemplate',
 		'Host',
 		'Port',
@@ -273,24 +272,5 @@ CopilotSettings class >> settingsOn: aBuilder [
                                         getSelector: #customFimTemplateFilePath;
                                         setSelector: #customFimTemplateFilePath:;
                                         default: self customFimTemplateFilePath;
-                                        description: 'Used when the source is set to "Custom template file". The file is created automatically if it does not exist.'.
-
-				(aBuilder setting: #useEnterToAccept)
-					label: 'Use ENTER to accept a suggestion';
-					target: self;
-					getSelector: #useEnterToAccept;
-					setSelector: #useEnterToAccept:;
-					default: self useEnterToAccept ]
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> useEnterToAccept [
-
-    ^ UseEnterToAccept ifNil: [ UseEnterToAccept := true ].
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> useEnterToAccept: aBool [
-
-    UseEnterToAccept := aBool.
+                                        description: 'Used when the source is set to "Custom template file". The file is created automatically if it does not exist.'. ]
 ]

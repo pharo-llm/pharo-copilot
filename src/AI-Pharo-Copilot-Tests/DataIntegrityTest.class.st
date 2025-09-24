@@ -87,7 +87,6 @@ originalStates := Dictionary new
                 at: #enabled put: CopilotSettings copilotEnabled;
                 at: #provider put: CopilotSettings copilotProvider;
                 at: #model put: CopilotSettings modelName;
-                at: #enter put: CopilotSettings useEnterToAccept;
                 at: #template put: CopilotSettings fimTemplate;
                 at: #host put: CopilotSettings host;
                 at: #port put: CopilotSettings port;
@@ -98,7 +97,6 @@ originalStates := Dictionary new
                 CopilotSettings copilotEnabled: (originalStates at: #enabled) not.
                 CopilotSettings copilotProvider: #modified.
                 CopilotSettings modelName: 'modified:model'.
-                CopilotSettings useEnterToAccept: (originalStates at: #enter) not.
                 CopilotSettings fimTemplate: 'MODIFIED%1%2'.
                 CopilotSettings host: 'modified.host'.
                 CopilotSettings port: (originalStates at: #port) + 1.
@@ -107,7 +105,6 @@ originalStates := Dictionary new
                 self assert: CopilotSettings copilotEnabled equals: (originalStates at: #enabled) not.
                 self assert: CopilotSettings copilotProvider equals: #modified.
                 self assert: CopilotSettings modelName equals: 'modified:model'.
-                self assert: CopilotSettings useEnterToAccept equals: (originalStates at: #enter) not.
                 self assert: CopilotSettings fimTemplate equals: 'MODIFIED%1%2'.
                 self assert: CopilotSettings host equals: 'modified.host'.
                 self assert: CopilotSettings port equals: (originalStates at: #port) + 1.
@@ -116,7 +113,6 @@ originalStates := Dictionary new
                 CopilotSettings copilotEnabled: (originalStates at: #enabled).
                 CopilotSettings copilotProvider: (originalStates at: #provider).
                 CopilotSettings modelName: (originalStates at: #model).
-                CopilotSettings useEnterToAccept: (originalStates at: #enter).
                 CopilotSettings fimTemplate: (originalStates at: #template).
                 CopilotSettings host: (originalStates at: #host).
                 CopilotSettings port: (originalStates at: #port) ]

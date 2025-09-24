@@ -73,7 +73,6 @@ CopilotSettingsValidationTest >> testSettingsConsistencyAfterMultipleChanges [
         oldEnabled := CopilotSettings copilotEnabled.
         oldProvider := CopilotSettings copilotProvider.
         oldModel := CopilotSettings modelName.
-        oldEnter := CopilotSettings useEnterToAccept.
         oldTemplate := CopilotSettings fimTemplate.
         oldHost := CopilotSettings host.
         oldPort := CopilotSettings port.
@@ -84,7 +83,6 @@ CopilotSettingsValidationTest >> testSettingsConsistencyAfterMultipleChanges [
                         CopilotSettings copilotEnabled: true.
                         CopilotSettings copilotProvider: #test.
                         CopilotSettings modelName: 'test:model'.
-                        CopilotSettings useEnterToAccept: false.
                         CopilotSettings fimTemplate: 'TEST%1TEST%2TEST'.
                         CopilotSettings host: 'loop.host'.
                         CopilotSettings port: 54321.
@@ -93,7 +91,6 @@ CopilotSettingsValidationTest >> testSettingsConsistencyAfterMultipleChanges [
                         self assert: CopilotSettings copilotEnabled equals: true.
                         self assert: CopilotSettings copilotProvider equals: #test.
                         self assert: CopilotSettings modelName equals: 'test:model'.
-                        self assert: CopilotSettings useEnterToAccept equals: false.
                         self assert: CopilotSettings fimTemplate equals: 'TEST%1TEST%2TEST'.
                         self assert: CopilotSettings host equals: 'loop.host'.
                         self assert: CopilotSettings port equals: 54321 ]
@@ -102,7 +99,6 @@ CopilotSettingsValidationTest >> testSettingsConsistencyAfterMultipleChanges [
                 CopilotSettings copilotEnabled: oldEnabled.
                 CopilotSettings copilotProvider: oldProvider.
                 CopilotSettings modelName: oldModel.
-                CopilotSettings useEnterToAccept: oldEnter.
                 CopilotSettings fimTemplate: oldTemplate.
                 CopilotSettings host: oldHost.
                 CopilotSettings port: oldPort ]
