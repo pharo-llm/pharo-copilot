@@ -20,8 +20,6 @@ Metacello new
 
 Make sure you are connected to the internet before loading, as the engine may require online requests for AI completions.
 
----
-
 ## Usage
 
 Once installed, you can enable **Pharo-Copilot** as your completion engine:
