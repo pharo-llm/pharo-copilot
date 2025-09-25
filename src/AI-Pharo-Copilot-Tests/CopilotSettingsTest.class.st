@@ -6,6 +6,19 @@ Class {
 }
 
 { #category : 'tests' }
+CopilotSettingsTest >> testAvailableFimTemplateOptionsIncludesInlineAndCustom [
+    | options inline custom |
+    options := CopilotSettings availableFimTemplateOptions.
+    self assert: options size equals: 2.
+    inline := options detect: [ :assoc | assoc value = #inline ] ifNone: [ nil ].
+    custom := options detect: [ :assoc | assoc value = #customFile ] ifNone: [ nil ].
+    self assert: inline notNil.
+    self assert: (inline key includesSubstring: 'Inline').
+    self assert: custom notNil.
+    self assert: (custom key includesSubstring: 'Custom').
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testAvailableModelName [
     | domain |
     domain := CopilotSettings availableModelNames.
@@ -27,6 +40,28 @@ CopilotSettingsTest >> testAvailableProvidersContainsOnlyValidSymbols [
 { #category : 'tests' }
 CopilotSettingsTest >> testAvailableProvidersIncludesOllama [
     self assert: (CopilotSettings availableProviders includes: #ollama).
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testClearCachedModelMetadataForcesNextFetch [
+    | stub oldFactory first second |
+    stub := OllamaClientStub new withResponse: (Dictionary new
+        at: #template put: 'TEMPLATE';
+        yourself).
+    oldFactory := CopilotSettings ollamaClientFactory.
+    [
+        CopilotSettings ollamaClientFactory: [ stub ].
+        CopilotSettings clearCachedModelMetadata.
+        first := CopilotSettings modelTemplate.
+        CopilotSettings clearCachedModelMetadata.
+        second := CopilotSettings modelTemplate.
+        self assert: first equals: 'TEMPLATE'.
+        self assert: second equals: 'TEMPLATE'.
+        self assert: stub callCount equals: 2.
+    ] ensure: [
+        CopilotSettings ollamaClientFactory: oldFactory.
+        CopilotSettings clearCachedModelMetadata.
+    ].
 ]
 
 { #category : 'tests' }
@@ -260,6 +295,14 @@ CopilotSettingsTest >> testHostAccessor [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testMetadataStringForKeyDefaultWhenMissing [
+    | value |
+    CopilotSettings clearCachedModelMetadata.
+    value := CopilotSettings metadataStringForKey: #unknown default: 'Missing'.
+    self assert: value equals: 'Missing'.
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testModelNameAccessor [
     | old |
     old := CopilotSettings modelName.
@@ -276,6 +319,28 @@ CopilotSettingsTest >> testModelNameReturnsString [
 	
 	self assert: modelName isString.
 	self deny: modelName isEmpty
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testModelParametersReadOnly [
+    | stub oldFactory oldModel |
+    stub := OllamaClientStub new withResponse: (Dictionary new
+        at: #parameters put: 'READ ONLY';
+        yourself).
+    oldFactory := CopilotSettings ollamaClientFactory.
+    oldModel := CopilotSettings modelName.
+    [
+        CopilotSettings ollamaClientFactory: [ stub ].
+        CopilotSettings clearCachedModelMetadata.
+        CopilotSettings modelName: oldModel.
+        self assert: CopilotSettings modelParameters equals: 'READ ONLY'.
+        CopilotSettings modelParameters: 'IGNORED'.
+        self assert: CopilotSettings modelParameters equals: 'READ ONLY'.
+    ] ensure: [
+        CopilotSettings modelName: oldModel.
+        CopilotSettings ollamaClientFactory: oldFactory.
+        CopilotSettings clearCachedModelMetadata.
+    ].
 ]
 
 { #category : 'tests' }
@@ -403,6 +468,20 @@ CopilotSettingsTest >> testModelTemplateHandlesNonStringValues [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testNewOllamaClientUsesConfiguredFactory [
+    | oldFactory marker |
+    oldFactory := CopilotSettings ollamaClientFactory.
+    marker := Object new.
+    [
+        CopilotSettings ollamaClientFactory: [ marker ].
+        self assert: CopilotSettings newOllamaClient identicalTo: marker.
+    ] ensure: [
+        CopilotSettings ollamaClientFactory: oldFactory.
+        CopilotSettings clearCachedModelMetadata.
+    ].
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testPortAccessor [
     | old |
     old := CopilotSettings port.
@@ -410,6 +489,32 @@ CopilotSettingsTest >> testPortAccessor [
         CopilotSettings port: 12345.
         self assert: CopilotSettings port equals: 12345.
     ] ensure: [ CopilotSettings port: old ].
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testPortStringInputParsesToNumber [
+    | old |
+    old := CopilotSettings port.
+    [
+        CopilotSettings port: '54321'.
+        self assert: CopilotSettings port equals: 54321.
+    ] ensure: [
+        CopilotSettings port: old.
+    ].
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testShouldShowDetailedSettingsReflectsCopilotEnabled [ 
+    | old |
+    old := CopilotSettings copilotEnabled.
+    [
+        CopilotSettings copilotEnabled: false.
+        self deny: CopilotSettings shouldShowDetailedSettings.
+        CopilotSettings copilotEnabled: true.
+        self assert: CopilotSettings shouldShowDetailedSettings.
+    ] ensure: [
+        CopilotSettings copilotEnabled: old.
+    ].
 ]
 
 { #category : 'tests' }
