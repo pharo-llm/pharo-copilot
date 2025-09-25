@@ -137,8 +137,10 @@ CopilotSettings class >> ensureCustomFimTemplateFile [
     file := self customFimTemplateFile.
     [ file parent ensureCreateDirectory ] on: Error do: [ :ignored | ].
     file exists ifFalse: [
+	        | initialTemplate |
+        initialTemplate := FimTemplate ifNil: [ self defaultFimTemplate ].
         [ file ensureCreateFile ] on: Error do: [ :ignored | ].
-        [ file writeStreamDo: [ :stream | stream nextPutAll: self defaultFimTemplate ] ] on: Error do: [ :ignored | ].
+        [ file writeStreamDo: [ :stream | stream nextPutAll: initialTemplate ] ] on: Error do: [ :ignored | ].
     ].
     ^ file
 ]
