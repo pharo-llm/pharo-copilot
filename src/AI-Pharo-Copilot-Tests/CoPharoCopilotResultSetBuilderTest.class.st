@@ -40,6 +40,16 @@ CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromHandlesEmptyCodeBloc
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromHandlesInlineFenceWithoutLineBreaks [
+        | builder raw cleaned |
+        builder := CoPharoCopilotResultSetBuilder new.
+        raw := '```code``` trailing text'.
+        cleaned := builder cleanedContentFrom: raw.
+
+        self assert: cleaned equals: 'code``` trailing text'
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromHandlesMultipleDoubleNewlines [
 	| builder raw cleaned |
 	builder := CoPharoCopilotResultSetBuilder new.
@@ -47,6 +57,14 @@ CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromHandlesMultipleDoubl
 	       'This is explanation', String lf, String lf, 'More explanation'.
 	cleaned := builder cleanedContentFrom: raw.
 	self assert: cleaned equals: 'line1', String lf, 'line2'
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromHandlesNilInput [
+        | builder |
+        builder := CoPharoCopilotResultSetBuilder new.
+
+        self assert: (builder cleanedContentFrom: nil) equals: ''
 ]
 
 { #category : 'tests' }
@@ -65,6 +83,16 @@ CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromTrimsWhitespace [
 	raw := '   ', String lf, 'code here', String lf, '   '.
 	cleaned := builder cleanedContentFrom: raw.
 	self assert: cleaned equals: 'code here'
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromWithTextInput [
+        | builder raw cleaned |
+        builder := CoPharoCopilotResultSetBuilder new.
+        raw := Text fromString: '```pharo', String lf, '^ 1', String lf, '```'.
+        cleaned := builder cleanedContentFrom: raw.
+
+        self assert: cleaned equals: '^ 1'
 ]
 
 { #category : 'tests' }
