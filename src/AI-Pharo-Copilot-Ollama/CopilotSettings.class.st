@@ -227,29 +227,27 @@ CopilotSettings class >> ensureSelectedModelAvailable [
 
 { #category : 'accessing' }
 CopilotSettings class >> fetchModelMetadata [
-    | client response metadata |
-    metadata := Dictionary new.
-    [
-        client := self newOllamaClient.
-        response := client showModelNamed: self modelName.
-        response ifNil: [ ^ metadata ].
-        self populateMetadata: metadata fromResponse: response.
-        CoCopilotLogger
-            logBackEndEvent: 'Fetched Ollama model metadata'
-            details: (Dictionary new
-                at: #model put: (metadata at: #model ifAbsent: [ self modelName ]);
-                at: #keys put: metadata keys asArray;
-                yourself).
-    ] on: Error do: [ :ex |
-        CoCopilotLogger
-            logBackEndEvent: 'Failed to fetch Ollama model metadata'
-            details: (Dictionary new
-                at: #model put: self modelName;
-                at: #errorClass put: ex class name;
-                at: #error put: ex description;
-                yourself).
-    ].
-    ^ metadata
+
+	| client response metadata |
+	metadata := Dictionary new.
+	(self ensureSelectedModelAvailable) ifFalse: [ ^ metadata ].
+	[
+		client := self newOllamaClient.
+		response := client showModelNamed: self modelName.
+		response ifNil: [ ^ metadata ].
+		self populateMetadata: metadata fromResponse: response.
+		CoCopilotLogger logBackEndEvent: 'Fetched Ollama model metadata' details: (Dictionary new
+				 at: #model put: (metadata at: #model ifAbsent: [ self modelName ]);
+				 at: #keys put: metadata keys asArray;
+				 yourself) ]
+		on: Error
+		do: [ :ex |
+				CoCopilotLogger logBackEndEvent: 'Failed to fetch Ollama model metadata' details: (Dictionary new
+						 at: #model put: self modelName;
+						 at: #errorClass put: ex class name;
+						 at: #error put: ex description;
+						 yourself) ].
+	^ metadata
 ]
 
 { #category : 'accessing' }
