@@ -164,6 +164,67 @@ CopilotSettings class >> ensureDefaultFimTemplateFile [
     ^ file
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> ensureOllamaServiceAvailable [
+
+    | response |
+    [
+        response := self newOllamaClient listModels.
+    ]
+        on: Error
+        do: [ :ex |
+            CoCopilotLogger
+                logError: 'Ollama service unavailable'
+                origin: #CopilotSettings
+                exception: ex
+                payload: (Dictionary new
+                    at: #host put: self host;
+                    at: #port put: self port;
+                    yourself).
+            self notifyUser: 'Ollama is not configured. Please configure it.'.
+            ^ nil
+        ].
+    response ifNil: [
+        CoCopilotLogger
+            logBackEndEvent: 'Missing response from Ollama service'
+            details: (Dictionary new
+                at: #host put: self host;
+                at: #port put: self port;
+                yourself).
+        self notifyUser: 'Ollama is not configured. Please configure it.'.
+        ^ nil
+    ].
+    ^ response
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> ensureSelectedModelAvailable [
+
+    | modelName response availableModels |
+    modelName := self modelName.
+    response := self ensureOllamaServiceAvailable.
+    response ifNil: [ ^ false ].
+    availableModels := self modelNamesFromResponse: response.
+    CoCopilotLogger
+        logBackEndEvent: 'Validated Ollama model availability'
+        details: (Dictionary new
+            at: #model put: modelName;
+            at: #availableModelCount put: availableModels size;
+            yourself).
+    (availableModels includes: modelName) ifTrue: [ ^ true ].
+    CoCopilotLogger
+        logBackEndEvent: 'Missing Ollama model'
+        details: (Dictionary new
+            at: #model put: modelName;
+            at: #availableModels put: availableModels;
+            yourself).
+    self
+        notifyUser:
+            ('We could not find the model "{1}" in your Ollama installation. Do you want to install it?'
+                format: { modelName }).
+    ^ false
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> fetchModelMetadata [
     | client response metadata |
@@ -295,6 +356,25 @@ CopilotSettings class >> modelName: aString [
 	self clearCachedModelMetadata.
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> modelNamesFromResponse: response [
+
+    | models names |
+    response ifNil: [ ^ #() ].
+    (response respondsTo: #at:ifAbsent:) ifFalse: [ ^ #() ].
+    models := response at: #models ifAbsent: [ response at: 'models' ifAbsent: [ #() ] ].
+    (models respondsTo: #do:) ifFalse: [ ^ #() ].
+    names := OrderedCollection new.
+    models do: [ :each |
+        | name |
+        name := each.
+        (each respondsTo: #at:ifAbsent:)
+            ifTrue: [ name := each at: #name ifAbsent: [ each at: 'name' ifAbsent: [ nil ] ] ].
+        name ifNotNil: [ names add: name ].
+    ].
+    ^ names asArray
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> modelParameters [
     ^ self metadataStringForKey: #parameters default: 'Not provided by model.'
@@ -328,6 +408,26 @@ CopilotSettings class >> modelTemplate: ignored [
 { #category : 'accessing' }
 CopilotSettings class >> newOllamaClient [
     ^ self ollamaClientFactory value
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> notifyUser: aString [
+
+    | uiClass uiManager transcript |
+    uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
+    uiClass ifNotNil: [
+        (uiClass respondsTo: #default)
+            ifTrue: [
+                uiManager := uiClass default.
+                (uiManager respondsTo: #inform:)
+                    ifTrue: [ uiManager inform: aString. ^ self ].
+            ].
+    ].
+    transcript := Smalltalk globals at: #Transcript ifAbsent: [ nil ].
+    transcript ifNotNil: [
+        (transcript respondsTo: #show:)
+            ifTrue: [ transcript show: aString; cr ].
+    ].
 ]
 
 { #category : 'accessing' }
