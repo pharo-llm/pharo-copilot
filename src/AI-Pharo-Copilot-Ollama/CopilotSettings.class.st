@@ -268,6 +268,8 @@ CopilotSettings class >> ensureSelectedModelAvailable [
             at: #availableModelCount put: availableModels size;
             yourself).
     (availableModels includes: modelName) ifTrue: [ ^ true ].
+    (self attemptAutoInstallForModelNamed: modelName usingInitialResponse: response)
+        ifTrue: [ ^ true ].
     CoCopilotLogger
         logBackEndEvent: 'Missing Ollama model'
         details: (Dictionary new
