@@ -36,6 +36,7 @@ OModelRegistry class >> current [
 OModelRegistry class >> fetchModelsResponse [
 
     | client |
+ modelsFetcher ifNotNil: [ ^ modelsFetcher value ].
     client := CopilotSettings newOllamaClient.
     (client respondsTo: #listModels) ifFalse: [ ^ Dictionary new ].
     ^ client listModels
