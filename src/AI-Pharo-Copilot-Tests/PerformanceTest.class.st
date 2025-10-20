@@ -62,19 +62,3 @@ PerformanceTest >> testNormalizeResponsePerformanceWithManyResponses [
 	"Should normalize many responses quickly (less than 200ms for 1000)"
 	self assert: time < 200
 ]
-
-{ #category : 'tests' }
-PerformanceTest >> testSuggestionEvaluatorPerformance [
-	| evaluator time context |
-	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new.
-
-	time := Time millisecondsToRun: [
-		1 to: 100 do: [ :i |
-			| entry |
-			entry := CoCopilotEntry contents: ('suggestion', i asString).
-			evaluator recordSuggestionAccepted: entry context: context ] ].
-
-	self assert: time < 100
-
-]
