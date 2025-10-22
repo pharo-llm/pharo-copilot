@@ -15,7 +15,8 @@ Class {
 		'CustomFimTemplateFile',
 		'ModelMetadata',
 		'OllamaClientFactory',
-		'AutoInstallModelScriptEnabled'
+		'AutoInstallModelScriptEnabled',
+		'LoggingEnabled'
 	],
 	#category : 'AI-Pharo-Copilot-Ollama',
 	#package : 'AI-Pharo-Copilot-Ollama'
@@ -408,6 +409,18 @@ CopilotSettings class >> isNullModelName: aString [
 ]
 
 { #category : 'accessing' }
+CopilotSettings class >> loggingEnabled [
+
+    ^ LoggingEnabled ifNil: [ LoggingEnabled := true ]
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> loggingEnabled: aBoolean [
+
+    LoggingEnabled := aBoolean.
+]
+
+{ #category : 'accessing' }
 CopilotSettings class >> metadataStringForKey: aKey default: defaultString [
     | metadata value |
     metadata := self modelMetadata.
@@ -586,21 +599,25 @@ CopilotSettings class >> port: aNumber [
 
 { #category : 'accessing' }
 CopilotSettings class >> resetToDefaultSettings [
+
 	<script>
-    Enabled := nil.
-    Provider := nil.
-    ModelName := nil.
-    FimTemplate := nil.
-    Host := nil.
-    Port := nil.
-    FimTemplateOption := nil.
-    CustomFimTemplateFile := nil.
-    ModelMetadata := nil.
-    OllamaClientFactory := nil.
+	Enabled := nil.
+	Provider := nil.
+	ModelName := nil.
+	FimTemplate := nil.
+	Host := nil.
+	Port := nil.
+	FimTemplateOption := nil.
+	CustomFimTemplateFile := nil.
+	ModelMetadata := nil.
+	OllamaClientFactory := nil.
+	    AutoInstallModelScriptEnabled := nil.
+    LoggingEnabled := nil.
 ]
 
 { #category : 'accessing' }
 CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
+
 	Enabled := aDictionary at: #Enabled ifAbsent: [ nil ].
 	Provider := aDictionary at: #Provider ifAbsent: [ nil ].
 	ModelName := aDictionary at: #ModelName ifAbsent: [ nil ].
@@ -611,8 +628,8 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	CustomFimTemplateFile := aDictionary at: #CustomFimTemplateFile ifAbsent: [ nil ].
 	ModelMetadata := aDictionary at: #ModelMetadata ifAbsent: [ nil ].
 	OllamaClientFactory := aDictionary at: #OllamaClientFactory ifAbsent: [ nil ].
-	    AutoInstallModelScriptEnabled := aDictionary at: #AutoInstallModelScriptEnabled ifAbsent: [ nil ]
-
+	AutoInstallModelScriptEnabled := aDictionary at: #AutoInstallModelScriptEnabled ifAbsent: [ nil ].
+	        LoggingEnabled := aDictionary at: #LoggingEnabled ifAbsent: [ nil ].
 ]
 
 { #category : 'settings' }
@@ -647,15 +664,25 @@ CopilotSettings class >> settingsOn: aBuilder [
 					default: self modelName;
 					domainValues: self availableModelNames.
 					
-				(aBuilder setting: #autoInstallModelScriptEnabled)
-                                        order: 0.4;
-                                        label: 'Auto-install Pharo coder model';
+                                (aBuilder setting: #loggingEnabled)
+                                        order: 0.3;
+                                        label: 'Enable logging';
                                         target: self;
-                                        getSelector: #autoInstallModelScriptEnabled;
-                                        setSelector: #autoInstallModelScriptEnabled:;
-                                        default: self autoInstallModelScriptEnabled;
-                                        description:
-                                                'When enabled, Pharo Copilot automatically runs the installation script if the "pharo-coder-1.5b-fim-f16.gguf:latest" model is missing.'.
+                                        getSelector: #loggingEnabled;
+                                        setSelector: #loggingEnabled:;
+                                        default: self loggingEnabled;
+                                        description: 'When disabled, Copilot will not record activity or evaluation logs.'.
+
+
+				(aBuilder setting: #autoInstallModelScriptEnabled)
+					order: 0.4;
+					label: 'Auto-install Pharo coder model';
+					target: self;
+					getSelector: #autoInstallModelScriptEnabled;
+					setSelector: #autoInstallModelScriptEnabled:;
+					default: self autoInstallModelScriptEnabled;
+					description:
+						'When enabled, Pharo Copilot automatically runs the installation script if the "pharo-coder-1.5b-fim-f16.gguf:latest" model is missing.'.
 
 				(aBuilder setting: #modelTemplate)
 					order: 0.5;
@@ -730,18 +757,20 @@ CopilotSettings class >> settingsOn: aBuilder [
 { #category : 'accessing' }
 CopilotSettings class >> settingsSnapshot [
 
-    ^ Dictionary new
-        at: #Enabled put: Enabled;
-        at: #Provider put: Provider;
-        at: #ModelName put: ModelName;
-        at: #FimTemplate put: FimTemplate;
-        at: #Host put: Host;
-        at: #Port put: Port;
-        at: #FimTemplateOption put: FimTemplateOption;
-        at: #CustomFimTemplateFile put: CustomFimTemplateFile;
-        at: #ModelMetadata put: ModelMetadata;
-        at: #OllamaClientFactory put: OllamaClientFactory;
-        yourself
+	^ Dictionary new
+		  at: #Enabled put: Enabled;
+		  at: #Provider put: Provider;
+		  at: #ModelName put: ModelName;
+		  at: #FimTemplate put: FimTemplate;
+		  at: #Host put: Host;
+		  at: #Port put: Port;
+		  at: #FimTemplateOption put: FimTemplateOption;
+		  at: #CustomFimTemplateFile put: CustomFimTemplateFile;
+		  at: #ModelMetadata put: ModelMetadata;
+		  at: #OllamaClientFactory put: OllamaClientFactory;
+		        at: #AutoInstallModelScriptEnabled put: AutoInstallModelScriptEnabled;
+        at: #LoggingEnabled put: LoggingEnabled;
+		  yourself
 ]
 
 { #category : 'accessing' }

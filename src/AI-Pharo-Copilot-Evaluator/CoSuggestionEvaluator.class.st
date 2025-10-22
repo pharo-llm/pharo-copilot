@@ -251,21 +251,24 @@ CoSuggestionEvaluator >> jsonSafeObject: anObject [
 
 { #category : 'initialization' }
 CoSuggestionEvaluator >> loadPersistentStats [
-        "Load previous evaluation data if available"
-        [ | evaluationFile |
-                evaluationFile := CoCopilotLogger evaluationLogFileReference.
+	"Load previous evaluation data if available"
+CoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
+	[
+		| evaluationFile |
+		evaluationFile := CoCopilotLogger evaluationLogFileReference.
 
-                (evaluationFile exists and: [ evaluationFile isFile ]) ifTrue: [
-                        persistentStats := OrderedCollection new.
-                        evaluationFile readStreamDo: [ :stream |
-                                [ stream atEnd ] whileFalse: [
-                                        | line |
-                                        line := stream nextLine.
-                                        (line isNil or: [ line isEmpty ])
-                                                ifFalse: [
-                                                        [ persistentStats add: (STONJSON fromString: line) ]
-                                                                on: Error do: [ "Ignore invalid entries" ] ] ] ] ]
-        ] on: Error do: [ "Ignore if can't access files" ].
+		(evaluationFile exists and: [ evaluationFile isFile ]) ifTrue: [
+				persistentStats := OrderedCollection new.
+				evaluationFile readStreamDo: [ :stream |
+						[ stream atEnd ] whileFalse: [
+								| line |
+								line := stream nextLine.
+								(line isNil or: [ line isEmpty ]) ifFalse: [
+										[ persistentStats add: (STONJSON fromString: line) ]
+											on: Error
+											do: [ "Ignore invalid entries" ] ] ] ] ] ]
+		on: Error
+		do: [ "Ignore if can't access files" ]
 ]
 
 { #category : 'initialization' }
@@ -320,11 +323,12 @@ CoSuggestionEvaluator >> rejectionRate [
 { #category : 'initialization' }
 CoSuggestionEvaluator >> savePersistentStats [
 	"Save evaluation data to file for long-term analysis"
+        | evaluationFile data |
+        CoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
 
-	| evaluationFile data |
-	evaluationFile := CoCopilotLogger evaluationLogFileReference.
-	data := Dictionary new
-		        at: #acceptedCount put: acceptedEntries size;
+        evaluationFile := CoCopilotLogger evaluationLogFileReference.
+        data := Dictionary new
+                        at: #acceptedCount put: acceptedEntries size;
 		        at: #rejectedCount put: rejectedEntries size;
 		        at: #sessionStats put: sessionStats;
 		        at: #timestamp put: DateAndTime now;
@@ -334,8 +338,8 @@ CoSuggestionEvaluator >> savePersistentStats [
 	[
 		CoCopilotLogger ensureEvaluationLogFileInitialized.
 		evaluationFile writeStreamDo: [ :stream |
-			| safeData |
-                        safeData := self jsonSafeObject: data.
+				| safeData |
+				safeData := self jsonSafeObject: data.
 				stream setToEnd.
 				stream nextPutAll: (STONJSON toString: safeData).
 				stream nextPut: Character lf ] ]
