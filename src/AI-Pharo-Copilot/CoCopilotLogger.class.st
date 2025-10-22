@@ -48,24 +48,32 @@ self loggingEnabled ifFalse: [ ^ self ].
 
 { #category : 'class initialization' }
 CoCopilotLogger class >> ensureEvaluationLogFileInitialized [
-self loggingEnabled ifFalse: [ ^ self ].
-	[ self evaluationLogFileReference ensureCreateFile ]
-		on: Error
-		do: [ :ex |
-				Transcript
-					show: 'Copilot evaluation log file could not be created: ' , ex messageText;
-					cr ]
+
+	self loggingEnabled ifFalse: [ ^ self ].
+        [ | file |
+                file := self evaluationLogFileReference.
+                file parent ifNotNil: [ :parent | parent ensureCreateDirectory ].
+                file ensureCreateFile ]
+                on: Error
+                do: [ :ex |
+                                Transcript
+                                        show: 'Copilot evaluation log file could not be created: ' , ex messageText;
+                                        cr ]
 ]
 
 { #category : 'class initialization' }
 CoCopilotLogger class >> ensureLogFileInitialized [
-self loggingEnabled ifFalse: [ ^ self ].
-	[ self logFileReference ensureCreateFile ]
-		on: Error
-		do: [ :ex |
-				Transcript
-					show: 'Copilot log file could not be created: ' , ex messageText;
-					cr ]
+
+	self loggingEnabled ifFalse: [ ^ self ].
+        [ | file |
+                file := self logFileReference.
+                file parent ifNotNil: [ :parent | parent ensureCreateDirectory ].
+                file ensureCreateFile ]
+                on: Error
+                do: [ :ex |
+                                Transcript
+                                        show: 'Copilot log file could not be created: ' , ex messageText;
+                                        cr ]
 ]
 
 { #category : 'class initialization' }
@@ -128,6 +136,28 @@ CoCopilotLogger class >> initialize [
         self ensureLogsDirectory.
         self ensureLogFileInitialized.
         self ensureEvaluationLogFileInitialized
+]
+
+{ #category : 'class initialization' }
+CoCopilotLogger class >> instVarNamed: aStringOrSymbol [ 
+
+        | name |
+        name := aStringOrSymbol asSymbol.
+        name = #logFileReference ifTrue: [ ^ logFileReference ].
+        name = #logsDirectoryReference ifTrue: [ ^ logsDirectoryReference ].
+        name = #evaluationLogFileReference ifTrue: [ ^ evaluationLogFileReference ].
+        ^ super instVarNamed: aStringOrSymbol
+]
+
+{ #category : 'class initialization' }
+CoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
+
+        | name |
+        name := aStringOrSymbol asSymbol.
+        name = #logFileReference ifTrue: [ logFileReference := aValue. ^ aValue ].
+        name = #logsDirectoryReference ifTrue: [ logsDirectoryReference := aValue. ^ aValue ].
+        name = #evaluationLogFileReference ifTrue: [ evaluationLogFileReference := aValue. ^ aValue ].
+        ^ super instVarNamed: aStringOrSymbol put: aValue
 ]
 
 { #category : 'class initialization' }
