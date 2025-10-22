@@ -152,18 +152,18 @@ CoCopilotLogger class >> instVarNamed: aStringOrSymbol [
 { #category : 'class initialization' }
 CoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
 
-	| name |
-	name := aStringOrSymbol asSymbol.
-	name = #logFileReference ifTrue: [
-			logFileReference := aValue.
-			^ aValue ].
-	name = #logsDirectoryReference ifTrue: [
-			logsDirectoryReference := aValue.
-			^ aValue ].
-	name = #evaluationLogFileReference ifTrue: [
-			evaluationLogFileReference := aValue.
-			^ aValue ].
-	^ super instVarNamed: name put: aValue
+        | name |
+        name := aStringOrSymbol asSymbol.
+        name = #logFileReference ifTrue: [
+                        logFileReference := aValue.
+                        ^ aValue ].
+        name = #logsDirectoryReference ifTrue: [
+                        logsDirectoryReference := aValue.
+                        ^ aValue ].
+        name = #evaluationLogFileReference ifTrue: [
+                        evaluationLogFileReference := aValue.
+                        ^ aValue ].
+        ^ super instVarNamed: name put: aValue
 ]
 
 { #category : 'class initialization' }
@@ -260,4 +260,40 @@ CoCopilotLogger class >> logsDirectoryReference [
 { #category : 'class initialization' }
 CoCopilotLogger class >> pharoCopilotDirectoryName [
         ^ 'pharo-copilot'
+]
+
+{ #category : 'class initialization' }
+CoCopilotLogger class >> rawEvaluationLogFileReference [
+
+        ^ evaluationLogFileReference
+]
+
+{ #category : 'class initialization' }
+CoCopilotLogger class >> rawEvaluationLogFileReference: aFileReference [
+
+        evaluationLogFileReference := aFileReference
+]
+
+{ #category : 'class initialization' }
+CoCopilotLogger class >> rawLogFileReference [
+
+        ^ logFileReference
+]
+
+{ #category : 'class initialization' }
+CoCopilotLogger class >> rawLogFileReference: aFileReference [
+
+        logFileReference := aFileReference
+]
+
+{ #category : 'class initialization' }
+CoCopilotLogger class >> rawLogsDirectoryReference [
+
+        ^ logsDirectoryReference
+]
+
+{ #category : 'class initialization' }
+CoCopilotLogger class >> rawLogsDirectoryReference: aDirectoryReference [
+
+        logsDirectoryReference := aDirectoryReference
 ]

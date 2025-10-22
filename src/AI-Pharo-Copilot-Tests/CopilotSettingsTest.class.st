@@ -208,37 +208,34 @@ CopilotSettings withDefaultSettingsDo: [
 { #category : 'tests' }
 CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
 
-    CopilotSettings withDefaultSettingsDo: [
-        | tempDir tempLogFile tempEvalFile originalLogRef originalDirRef originalEvalRef evaluator |
-        tempDir := FileLocator temp / ('copilot-logger-test-', UUID new asString).
-        tempLogFile := tempDir / CoCopilotLogger logFileName.
-        tempEvalFile := tempDir / CoCopilotLogger evaluationLogFileName.
-        originalLogRef := CoCopilotLogger class instVarNamed: 'logFileReference'.
-        originalDirRef := CoCopilotLogger class instVarNamed: 'logsDirectoryReference'.
-        originalEvalRef := CoCopilotLogger class instVarNamed: 'evaluationLogFileReference'.
-        [
-            CopilotSettings loggingEnabled: false.
-            CoCopilotLogger class instVarNamed: 'logsDirectoryReference' put: tempDir.
-            CoCopilotLogger class instVarNamed: 'logFileReference' put: tempLogFile.
-            CoCopilotLogger class instVarNamed: 'evaluationLogFileReference' put: tempEvalFile.
-            tempLogFile exists ifTrue: [ tempLogFile ensureDelete ].
-            tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-            CoCopilotLogger ensureLogFileInitialized.
-            CoCopilotLogger ensureEvaluationLogFileInitialized.
-            CoCopilotLogger logFrontEndEvent: 'Logging disabled test' details: Dictionary new.
-            evaluator := CoSuggestionEvaluator new.
-            evaluator savePersistentStats.
-            self deny: tempLogFile exists.
-            self deny: tempEvalFile exists.
-        ] ensure: [
-            tempLogFile exists ifTrue: [ tempLogFile ensureDelete ].
-            tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-            tempDir exists ifTrue: [ tempDir ensureDelete ].
-            CoCopilotLogger class instVarNamed: 'logFileReference' put: originalLogRef.
-            CoCopilotLogger class instVarNamed: 'logsDirectoryReference' put: originalDirRef.
-            CoCopilotLogger class instVarNamed: 'evaluationLogFileReference' put: originalEvalRef.
-        ].
-    ].
+	CopilotSettings withDefaultSettingsDo: [
+			| tempDir tempLogFile tempEvalFile originalLogRef originalDirRef originalEvalRef evaluator |
+			tempDir := FileLocator temp / ('copilot-logger-test-' , UUID new asString).
+			tempLogFile := tempDir / CoCopilotLogger logFileName.
+			tempEvalFile := tempDir / CoCopilotLogger evaluationLogFileName.
+			originalLogRef := CoCopilotLogger rawLogFileReference.
+			originalDirRef := CoCopilotLogger rawLogsDirectoryReference.
+			originalEvalRef := CoCopilotLogger rawEvaluationLogFileReference.
+			[
+				CopilotSettings loggingEnabled: false.
+				CoCopilotLogger rawLogsDirectoryReference: tempDir.
+				CoCopilotLogger rawLogFileReference: tempLogFile.
+				CoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
+				tempLogFile exists ifTrue: [ tempLogFile ensureDelete ].
+				tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+				CoCopilotLogger ensureLogFileInitialized.
+				CoCopilotLogger ensureEvaluationLogFileInitialized.
+				CoCopilotLogger logFrontEndEvent: 'Logging disabled test' details: Dictionary new.
+				evaluator := CoSuggestionEvaluator new.
+				evaluator savePersistentStats.
+				self deny: tempLogFile exists.
+				self deny: tempEvalFile exists ] ensure: [
+					tempLogFile exists ifTrue: [ tempLogFile ensureDelete ].
+					tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+					tempDir exists ifTrue: [ tempDir ensureDelete ].
+					CoCopilotLogger rawLogFileReference: originalLogRef.
+					CoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+					CoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
 ]
 
 { #category : 'tests' }
