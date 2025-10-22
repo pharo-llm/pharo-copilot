@@ -9,25 +9,29 @@ Class {
 { #category : 'as yet unclassified' }
 OTestModelSupport class >> beginMockModels [
 
-    | context |
-    context := Dictionary new
-        at: #modelsFetcher put: OModelRegistry modelsFetcher;
-        yourself.
-    CopilotSettings clearCachedModelMetadata.
-    OModelRegistry modelsFetcher: [ self mockModelsResponse ].
-    OModelRegistry refresh.
-    ^ context
+	| context |
+	context := Dictionary new
+		           at: #modelsFetcher put: OModelRegistry modelsFetcher;
+		           at: #modelName put: CopilotSettings modelName;
+		           yourself.
+	CopilotSettings clearCachedModelMetadata.
+	CopilotSettings modelName: self mockModelName.
+	OModelRegistry modelsFetcher: [ self mockModelsResponse ].
+	OModelRegistry refresh.
+	^ context
 ]
 
 { #category : 'as yet unclassified' }
 OTestModelSupport class >> endMockModels: context [
 
-    | previousFetcher |
-    context ifNil: [ ^ self ].
-    previousFetcher := context at: #modelsFetcher ifAbsent: [ nil ].
-    OModelRegistry modelsFetcher: previousFetcher.
-    OModelRegistry reset.
-    CopilotSettings clearCachedModelMetadata.
+	| previousFetcher |
+	context ifNil: [ ^ self ].
+	previousFetcher := context at: #modelsFetcher ifAbsent: [ nil ].
+	OModelRegistry modelsFetcher: previousFetcher.
+	OModelRegistry reset.
+	    CopilotSettings modelName: ((context at: #modelName ifAbsent: [ nil ])
+            ifNil: [ CopilotSettings nullModelFullName ]).
+	CopilotSettings clearCachedModelMetadata
 ]
 
 { #category : 'as yet unclassified' }

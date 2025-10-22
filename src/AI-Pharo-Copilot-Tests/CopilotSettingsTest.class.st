@@ -230,6 +230,16 @@ CopilotSettingsTest >> testEnsureCustomFimTemplateFileSeedsWithCurrentTemplate [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testEnsureSelectedModelAvailableShortCircuitsForNullModel [
+
+    CopilotSettings withDefaultSettingsDo: [
+        CopilotSettings ollamaClientFactory: [ self fail ].
+        CopilotSettings modelName: CopilotSettings nullModelFullName.
+        self assert: CopilotSettings ensureSelectedModelAvailable.
+    ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testFimTemplateAccessor [
     | old |
     old := CopilotSettings fimTemplate.

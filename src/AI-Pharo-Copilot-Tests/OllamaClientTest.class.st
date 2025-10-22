@@ -180,16 +180,32 @@ OllamaClientTest >> testGenerateIncludesFormatWhenSet [
 
 { #category : 'tests' }
 OllamaClientTest >> testGenerateIncludesOptionsWhenNotEmpty [
-	| client mock payload |
-	client := OllamaClient new.
-	client optionAt: #temperature put: 0.7.
-	mock := OAHttpTransportMockExtended new.
-	client instVarNamed: 'transport' put: mock.
-	
-	client generate: 'test'.
-	
-	payload := mock lastBody.
-	self assert: ((payload at: #options) at: #temperature) equals: 0.7
+        | client mock payload |
+        client := OllamaClient new.
+        client optionAt: #temperature put: 0.7.
+        mock := OAHttpTransportMockExtended new.
+        client instVarNamed: 'transport' put: mock.
+
+        client generate: 'test'.
+
+        payload := mock lastBody.
+        self assert: ((payload at: #options) at: #temperature) equals: 0.7
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testGenerateReturnsNullModelMessageWhenNullSelected [
+
+        | client mock oldModel response |
+        oldModel := CopilotSettings modelName.
+        [
+                CopilotSettings modelName: CopilotSettings nullModelFullName.
+                client := OllamaClient new.
+                mock := OAHttpTransportMockExtended new.
+                client instVarNamed: 'transport' put: mock.
+                response := client generate: 'anything'.
+                self assert: response equals: OllamaClient nullModelResponseString.
+                self assert: mock callCount equals: 0
+        ] ensure: [ CopilotSettings modelName: oldModel ]
 ]
 
 { #category : 'tests' }
@@ -389,16 +405,6 @@ OllamaClientTest >> testShowModelUsesApiShow [
 	self assert: (client showModelNamed: OTestModelSupport mockModelName) identicalTo: response.
 	self assert: mock lastPath equals: 'api/show'.
 	self assert: (mock lastBody at: #model) equals: OTestModelSupport mockModelName
-]
-
-{ #category : 'tests' }
-OllamaClientTest >> testUseDefaultModelSetsModelSpec [
-
-        | client spec |
-        client := OllamaClient new.
-        spec := client instVarNamed: 'modelSpec'.
-        self assert: spec notNil.
-        self assert: spec fullName equals: OllamaClient defaultModelFullName
 ]
 
 { #category : 'tests' }

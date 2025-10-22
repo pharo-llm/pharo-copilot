@@ -19,10 +19,21 @@ Class {
 }
 
 { #category : 'accessing' }
-OllamaClient class >> defaultModelFullName [ 
+OllamaClient class >> defaultModelFullName [
 
-  ^ defaultModelFullName ifNil: [
-      defaultModelFullName := 'codellama:7b-code' ]  "safe fallback"
+	^ defaultModelFullName ifNil: [ defaultModelFullName := self nullModelFullName  ]
+]
+
+{ #category : 'accessing' }
+OllamaClient class >> nullModelFullName [
+
+  ^ 'pharo-copilot-null'
+]
+
+{ #category : 'accessing' }
+OllamaClient class >> nullModelResponseString [
+
+  ^ 'no output, please configure.'
 ]
 
 { #category : 'private' }
@@ -56,39 +67,42 @@ OllamaClient >> ensureStringFromResponse: container fallback: fallbackString [
 { #category : 'operations' }
 OllamaClient >> generate: aPromptString [
 
-	| payload resp normalized |
-	payload := Dictionary new
-		           at: #model put: modelSpec fullName;
-		           at: #prompt put: aPromptString;
-		           at: #stream put: stream;
-		           yourself.
+        | payload resp normalized |
+        self isNullModel ifTrue: [
+                CoCopilotLogger
+                        logBackEndEvent: 'Null model responded to completion request'
+                        details: (Dictionary new
+                                at: #modelFullName put: (modelSpec ifNil: [ self class nullModelFullName ] ifNotNil: [ modelSpec fullName ]);
+                                yourself).
+                ^ self class nullModelResponseString ].
+        payload := Dictionary new
+                           at: #model put: modelSpec fullName;
+                           at: #prompt put: aPromptString;
+                           at: #stream put: stream;
+                           yourself.
 	format ifNotNil: [ payload at: #format put: format ].
 	options isEmpty ifFalse: [ payload at: #options put: options ].
-	  CoCopilotLogger
-        logBackEndEvent: 'Dispatching generate request'
-        details: (Dictionary new
-                at: #endpoint put: 'api/generate';
-                at: #modelFullName put: modelSpec fullName;
-                at: #payload put: payload;
-                at: #optionsSnapshot put: options copy;
-                yourself).
+	CoCopilotLogger logBackEndEvent: 'Dispatching generate request' details: (Dictionary new
+			 at: #endpoint put: 'api/generate';
+			 at: #modelFullName put: modelSpec fullName;
+			 at: #payload put: payload;
+			 at: #optionsSnapshot put: options copy;
+			 yourself).
 
 	resp := transport postJsonAt: 'api/generate' body: payload.
-	  CoCopilotLogger
-        logBackEndEvent: 'Received generate response'
-        details: (Dictionary new
-                at: #responseClass put: resp class name;
-                at: #rawResponse put: ([ resp asString ] on: Error do: [ resp printString ]);
-                yourself).
+	CoCopilotLogger logBackEndEvent: 'Received generate response' details: (Dictionary new
+			 at: #responseClass put: resp class name;
+			 at: #rawResponse put: ([ resp asString ]
+					  on: Error
+					  do: [ resp printString ]);
+			 yourself).
 
-  normalized := self normalizeResponse: resp.
-  CoCopilotLogger
-        logBackEndEvent: 'Normalized generate response'
-        details: (Dictionary new
-                at: #normalizedResponse put: normalized;
-                at: #normalizedLength put: normalized size;
-                yourself).
-  ^ normalized
+	normalized := self normalizeResponse: resp.
+	CoCopilotLogger logBackEndEvent: 'Normalized generate response' details: (Dictionary new
+			 at: #normalizedResponse put: normalized;
+			 at: #normalizedLength put: normalized size;
+			 yourself).
+	^ normalized
 ]
 
 { #category : 'as yet unclassified' }
@@ -137,6 +151,13 @@ OllamaClient >> initialize [
 				ifNotNil: [ modelSpec fullName ]);
 			yourself).
 
+]
+
+{ #category : 'operations' }
+OllamaClient >> isNullModel [
+
+        modelSpec ifNil: [ ^ false ].
+        ^ modelSpec fullName = self class nullModelFullName
 ]
 
 { #category : 'operations' }

@@ -1,6 +1,6 @@
 Class {
 	#name : 'OllamaClientRobustnessTest',
-	#superclass : 'TestCase',
+	#superclass : 'CopilotMockModelTestCase',
 	#category : 'AI-Pharo-Copilot-Tests',
 	#package : 'AI-Pharo-Copilot-Tests'
 }

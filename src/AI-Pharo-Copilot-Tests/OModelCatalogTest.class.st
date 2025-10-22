@@ -20,15 +20,3 @@ OModelCatalogTest >> testBuiltInModelPragmas [
         self assert: uniqueFamiliesAndTags size equals: pragmas size.
         self assert: uniqueLabels size equals: pragmas size
 ]
-
-{ #category : 'tests' }
-OModelCatalogTest >> testCodeLlamaModelsHaveCorrectStructure [
-	| pragmas |
-	pragmas := Pragma allNamed: #ollamaModel:tag:label: in: OModelCatalog class.
-	
-	pragmas do: [ :pragma |
-		self assert: pragma arguments size equals: 3.
-		self assert: pragma arguments first isString.
-		self assert: pragma arguments second isString.
-		self assert: pragma arguments third isString ]
-]

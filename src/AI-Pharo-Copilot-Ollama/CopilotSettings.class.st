@@ -258,6 +258,7 @@ CopilotSettings class >> ensureSelectedModelAvailable [
 
     | modelName response availableModels |
     modelName := self modelName.
+(self isNullModelName: modelName) ifTrue: [ ^ true ].
     response := self ensureOllamaServiceAvailable.
     response ifNil: [ ^ false ].
     availableModels := self modelNamesFromResponse: response.
@@ -401,6 +402,12 @@ CopilotSettings class >> isCopilotEngineSelected [
 ]
 
 { #category : 'accessing' }
+CopilotSettings class >> isNullModelName: aString [
+
+        ^ aString = self nullModelFullName
+]
+
+{ #category : 'accessing' }
 CopilotSettings class >> metadataStringForKey: aKey default: defaultString [
     | metadata value |
     metadata := self modelMetadata.
@@ -514,6 +521,12 @@ CopilotSettings class >> notifyUser: aString [
         (transcript respondsTo: #show:)
             ifTrue: [ transcript show: aString; cr ].
     ].
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> nullModelFullName [
+
+        ^ OllamaClient nullModelFullName
 ]
 
 { #category : 'accessing' }

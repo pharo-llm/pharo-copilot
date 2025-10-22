@@ -107,14 +107,19 @@ OModelRegistryTest >> testRebuildHandlesEmptyPragmas [
 
 { #category : 'tests' }
 OModelRegistryTest >> testRebuildWithoutRemoteModelsDoesNotIncludeCatalogEntries [
-    | registry |
-    OModelRegistry modelsFetcher: [ Dictionary new at: #models put: #(  ); yourself ].
-    OModelRegistry refresh.
-    registry := OModelRegistry current.
-    self assert: registry byFullName isEmpty.
-    self assert: registry byLabel isEmpty.
-    OModelRegistry modelsFetcher: [ self defaultModelsResponse ].
-    OModelRegistry refresh
+
+	| registry |
+	OModelRegistry modelsFetcher: [
+			Dictionary new
+				at: #models put: #(  );
+				yourself ].
+	OModelRegistry refresh.
+	registry := OModelRegistry current.
+    self assert: registry byFullName size equals: 1.
+    self assert: registry byLabel size equals: 1.
+    self assert: (registry specByFullName: CopilotSettings nullModelFullName) notNil.
+	OModelRegistry modelsFetcher: [ self defaultModelsResponse ].
+	OModelRegistry refresh
 ]
 
 { #category : 'tests' }
@@ -125,6 +130,17 @@ OModelRegistryTest >> testRefreshRebuildsCurrent [
 	new := OModelRegistry refresh.
 	self deny: old identicalTo: new.
 	self assert: OModelRegistry current identicalTo: new
+]
+
+{ #category : 'tests' }
+OModelRegistryTest >> testRegistryAlwaysIncludesNullModel [
+
+    | registry spec |
+    registry := OModelRegistry build.
+    self assert: (registry specByFullName: CopilotSettings nullModelFullName) notNil.
+    spec := registry specByLabel: 'Pharo Copilot (not configured)'.
+    self assert: spec notNil.
+    self assert: spec fullName equals: CopilotSettings nullModelFullName
 ]
 
 { #category : 'tests' }
