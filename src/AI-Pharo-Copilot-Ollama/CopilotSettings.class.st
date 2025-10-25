@@ -755,6 +755,7 @@ CopilotSettings class >> settingsOn: aBuilder [
                                         default: self loggingEnabled;
                                         description: 'When disabled, Copilot will not record activity or evaluation logs.'.
 
+
 				(aBuilder setting: #autoInstallModelScriptEnabled)
 					order: 0.4;
 					label: 'Auto-install Pharo coder model';
@@ -764,6 +765,34 @@ CopilotSettings class >> settingsOn: aBuilder [
 					default: self autoInstallModelScriptEnabled;
 					description:
 						'When enabled, Pharo Copilot automatically runs the installation script if the "pharo-coder-1.5b-fim-f16.gguf:latest" model is missing.'.
+
+				(aBuilder setting: #modelTemplate)
+					order: 0.5;
+					label: 'Model template (read only)';
+					target: self;
+					getSelector: #modelTemplate;
+					setSelector: #modelTemplate:;
+					default: self modelTemplate;
+					description: 'Template provided by the selected Ollama model. This value is fetched from the server and cannot be edited.'.
+
+				(aBuilder setting: #modelSystemPrompt)
+					order: 0.6;
+					label: 'Model system prompt (read only)';
+					target: self;
+					getSelector: #modelSystemPrompt;
+					setSelector: #modelSystemPrompt:;
+					default: self modelSystemPrompt;
+					description: 'System prompt defined by the selected Ollama model, when available.'.
+
+
+				(aBuilder setting: #modelParameters)
+					order: 0.7;
+					label: 'Model parameters (read only)';
+					target: self;
+					getSelector: #modelParameters;
+					setSelector: #modelParameters:;
+					default: self modelParameters;
+					description: 'Model parameters provided by the Ollama model definition.'.
 
 
 				(aBuilder setting: #host)
@@ -781,7 +810,30 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #port;
 					setSelector: #port:;
 					default: self port.
- ]
+
+				(aBuilder pickOne: #fimTemplateOption)
+					label: 'FIM template source';
+					target: self;
+					getSelector: #fimTemplateOption;
+					setSelector: #fimTemplateOption:;
+					default: self fimTemplateOption;
+					domainValues: self availableFimTemplateOptions.
+
+				(aBuilder setting: #fimTemplate)
+					label: 'FIM template';
+					target: self;
+					getSelector: #fimTemplate;
+					setSelector: #fimTemplate:;
+					default: self fimTemplate;
+					description: 'Inline template used when the source is set to "Inline (edit below)".'.
+
+				(aBuilder setting: #customFimTemplateFilePath)
+					label: 'Custom FIM template file';
+					target: self;
+					getSelector: #customFimTemplateFilePath;
+					setSelector: #customFimTemplateFilePath:;
+					default: self customFimTemplateFilePath;
+					description: 'Used when the source is set to "Custom template file". The file is created automatically if it does not exist.' ]
 ]
 
 { #category : 'accessing' }
