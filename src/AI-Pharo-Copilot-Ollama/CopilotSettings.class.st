@@ -288,29 +288,40 @@ CopilotSettings class >> ensureSelectedModelAvailable [
 { #category : 'accessing' }
 CopilotSettings class >> fetchModelMetadata [
 
-	| client response metadata |
-	metadata := Dictionary new.
-	(self ensureSelectedModelAvailable) ifFalse: [ ^ metadata ].
-	[
-		client := self newOllamaClient.
-		response := client showModelNamed: self modelName.
-		response ifNil: [ ^ metadata ].
-		self populateMetadata: metadata fromResponse: response.
-		self saveModelMetadataFilesFor: metadata.
-		CoCopilotLogger
-			logBackEndEvent: 'Fetched Ollama model metadata'
-			details: (Dictionary new
-				at: #model put: (metadata at: #model ifAbsent: [ self modelName ]);
-				at: #keys put: metadata keys asArray;
-				yourself) ]
-		on: Error
-		do: [ :ex |
-				CoCopilotLogger logBackEndEvent: 'Failed to fetch Ollama model metadata' details: (Dictionary new
-						 at: #model put: self modelName;
-						 at: #errorClass put: ex class name;
-						 at: #error put: ex description;
-						 yourself) ].
-	^ metadata
+| client response metadata modelName |
+metadata := Dictionary new.
+(self ensureSelectedModelAvailable) ifFalse: [ ^ metadata ].
+modelName := self modelName.
+(self isNullModelName: modelName) ifTrue: [
+metadata := self nullModelMetadata.
+self saveModelMetadataFilesFor: metadata.
+CoCopilotLogger
+logBackEndEvent: 'Generated null model metadata'
+details: (Dictionary new
+at: #model put: modelName;
+at: #keys put: metadata keys asArray;
+yourself).
+^ metadata ].
+[
+client := self newOllamaClient.
+response := client showModelNamed: modelName.
+response ifNil: [ ^ metadata ].
+self populateMetadata: metadata fromResponse: response.
+self saveModelMetadataFilesFor: metadata.
+CoCopilotLogger
+logBackEndEvent: 'Fetched Ollama model metadata'
+details: (Dictionary new
+at: #model put: (metadata at: #model ifAbsent: [ modelName ]);
+at: #keys put: metadata keys asArray;
+yourself) ]
+on: Error
+do: [ :ex |
+CoCopilotLogger logBackEndEvent: 'Failed to fetch Ollama model metadata' details: (Dictionary new
+at: #model put: modelName;
+at: #errorClass put: ex class name;
+at: #error put: ex description;
+yourself) ].
+^ metadata
 ]
 
 { #category : 'accessing' }
@@ -552,6 +563,28 @@ CopilotSettings class >> notifyUser: aString [
 CopilotSettings class >> nullModelFullName [
 
         ^ OllamaClient nullModelFullName
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> nullModelMetadata [
+
+| details modelfile |
+details := Dictionary new
+at: #family put: 'pharo-copilot';
+at: #description put: 'Placeholder metadata for the Pharo Copilot null model. Configure an Ollama model to enable completions.';
+at: #status put: 'inactive';
+yourself.
+modelfile := String streamContents: [ :stream |
+stream nextPutAll: '# Modelfile placeholder for the Pharo Copilot null model'.
+stream nextPutAll: String crlf.
+stream nextPutAll: '# Configure an Ollama model in the settings to enable completions.' ].
+^ Dictionary new
+at: #model put: self nullModelFullName;
+at: #details put: details;
+at: #modelfile put: modelfile;
+at: #system put: 'Pharo Copilot is not configured. This null model intentionally produces no output until a real Ollama model is selected.';
+at: #template put: 'No completion template is available because Pharo Copilot is not configured with an Ollama model.';
+yourself
 ]
 
 { #category : 'accessing' }

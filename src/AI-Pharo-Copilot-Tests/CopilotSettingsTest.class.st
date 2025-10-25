@@ -582,6 +582,49 @@ CopilotSettingsTest >> testNewOllamaClientUsesConfiguredFactory [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testNullModelGeneratesMetadataFiles [
+
+    CopilotSettings withDefaultSettingsDo: [
+        | tempDir originalDirRef originalFactory metadata modelDir detailsFile systemFile templateFile modelfileFile modelFile parsedDetails |
+        tempDir := FileLocator temp / ('copilot-null-metadata-' , UUID new asString).
+        originalDirRef := CoCopilotLogger rawLogsDirectoryReference.
+        originalFactory := CopilotSettings ollamaClientFactory.
+        [
+            tempDir exists ifTrue: [ tempDir ensureDelete ].
+            CoCopilotLogger rawLogsDirectoryReference: tempDir.
+            CopilotSettings loggingEnabled: true.
+            CopilotSettings clearCachedModelMetadata.
+            CopilotSettings modelName: CopilotSettings nullModelFullName.
+            CopilotSettings ollamaClientFactory: [ self fail: 'Null model should not request Ollama metadata.' ].
+            metadata := CopilotSettings modelMetadata.
+            self assert: metadata equals: CopilotSettings nullModelMetadata.
+            modelDir := tempDir / (CopilotSettings sanitizedFileComponentFor: CopilotSettings nullModelFullName default: 'unknown-model').
+            self assert: modelDir exists.
+            detailsFile := modelDir / 'details.txt'.
+            systemFile := modelDir / 'system.txt'.
+            templateFile := modelDir / 'template.txt'.
+            modelfileFile := modelDir / 'modelfile.txt'.
+            modelFile := modelDir / 'model.txt'.
+            { detailsFile. systemFile. templateFile. modelfileFile. modelFile } do: [ :each | self assert: each exists ].
+            parsedDetails := STONJSON fromString: detailsFile contents.
+            self assert: parsedDetails equals: (metadata at: #details).
+            self assert: systemFile contents equals: (metadata at: #system).
+            self assert: templateFile contents equals: (metadata at: #template).
+            self assert: modelfileFile contents equals: (metadata at: #modelfile).
+            self assert: modelFile contents equals: (metadata at: #model).
+        ] ensure: [
+            CopilotSettings ollamaClientFactory: originalFactory.
+            CoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+            CopilotSettings clearCachedModelMetadata.
+            modelDir notNil ifTrue: [
+                [ modelDir children do: [ :child | child ensureDelete ] ] on: Error do: [ :ignored | ].
+                modelDir exists ifTrue: [ modelDir ensureDelete ] ].
+            tempDir exists ifTrue: [ tempDir ensureDelete ].
+        ]
+    ].
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testPortAccessor [
     | old |
     old := CopilotSettings port.
