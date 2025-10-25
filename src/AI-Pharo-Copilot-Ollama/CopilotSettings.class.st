@@ -296,10 +296,13 @@ CopilotSettings class >> fetchModelMetadata [
 		response := client showModelNamed: self modelName.
 		response ifNil: [ ^ metadata ].
 		self populateMetadata: metadata fromResponse: response.
-		CoCopilotLogger logBackEndEvent: 'Fetched Ollama model metadata' details: (Dictionary new
-				 at: #model put: (metadata at: #model ifAbsent: [ self modelName ]);
-				 at: #keys put: metadata keys asArray;
-				 yourself) ]
+		self saveModelMetadataFilesFor: metadata.
+		CoCopilotLogger
+			logBackEndEvent: 'Fetched Ollama model metadata'
+			details: (Dictionary new
+				at: #model put: (metadata at: #model ifAbsent: [ self modelName ]);
+				at: #keys put: metadata keys asArray;
+				yourself) ]
 		on: Error
 		do: [ :ex |
 				CoCopilotLogger logBackEndEvent: 'Failed to fetch Ollama model metadata' details: (Dictionary new
@@ -418,6 +421,15 @@ CopilotSettings class >> loggingEnabled [
 CopilotSettings class >> loggingEnabled: aBoolean [
 
     LoggingEnabled := aBoolean.
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> metadataFileContentsFor: value [
+
+    | formatted |
+    formatted := CoCopilotLogger formatValue: value.
+    formatted ifNil: [ ^ '' ].
+    ^ formatted asString
 ]
 
 { #category : 'accessing' }
@@ -598,6 +610,17 @@ CopilotSettings class >> port: aNumber [
 ]
 
 { #category : 'accessing' }
+CopilotSettings class >> removeMetadataTextFilesFrom: aDirectory [
+
+    (aDirectory exists) ifFalse: [ ^ self ].
+    [
+        aDirectory children do: [ :child |
+            (child isFile and: [ ((child extension ifNil: [ '' ]) asLowercase) = 'txt' ]) ifTrue: [
+                [ child ensureDelete ] on: Error do: [ :ignored | ] ] ]
+        ] on: Error do: [ :ignored | ]
+]
+
+{ #category : 'accessing' }
 CopilotSettings class >> resetToDefaultSettings [
 
 	<script>
@@ -630,6 +653,65 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	OllamaClientFactory := aDictionary at: #OllamaClientFactory ifAbsent: [ nil ].
 	AutoInstallModelScriptEnabled := aDictionary at: #AutoInstallModelScriptEnabled ifAbsent: [ nil ].
 	        LoggingEnabled := aDictionary at: #LoggingEnabled ifAbsent: [ nil ].
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> sanitizedFileComponentFor: anObject default: defaultString [
+
+    | candidate |
+    anObject isNil ifTrue: [ ^ defaultString asFileName ].
+    candidate := [ anObject asString ] on: Error do: [ anObject printString ].
+    (candidate isNil or: [ candidate isEmpty ]) ifTrue: [ ^ defaultString asFileName ].
+    ^ candidate asFileName
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> saveModelMetadataFilesFor: metadata [
+
+    | modelNameValue modelNameString logsDirectory modelDirectory |
+    (self loggingEnabled and: [ metadata notNil ]) ifFalse: [ ^ self ].
+    metadata isEmpty ifTrue: [ ^ self ].
+    modelNameValue := metadata at: #model ifAbsent: [ self modelName ].
+    modelNameString := modelNameValue ifNil: [ self modelName ].
+    modelNameString isNil ifTrue: [ modelNameString := 'unknown-model' ].
+    modelNameString := modelNameString asString.
+    logsDirectory := CoCopilotLogger ensureLogsDirectory.
+    modelDirectory := logsDirectory / (self sanitizedFileComponentFor: modelNameString default: 'unknown-model').
+    [
+        modelDirectory ensureCreateDirectory
+    ] on: Error do: [ :ex |
+        CoCopilotLogger
+            logBackEndEvent: 'Failed to prepare metadata directory'
+            details: (Dictionary new
+                at: #model put: modelNameString;
+                at: #errorClass put: ex class name;
+                at: #error put: ex description;
+                yourself).
+        ^ self
+    ].
+    self removeMetadataTextFilesFrom: modelDirectory.
+    metadata associationsDo: [ :assoc |
+        | fileName fileRef contents keyLabel |
+        fileName := (self sanitizedFileComponentFor: assoc key default: 'metadata') , '.txt'.
+        fileRef := modelDirectory / fileName.
+        contents := self metadataFileContentsFor: assoc value.
+        keyLabel := (assoc key ifNil: [ 'metadata' ]) asString.
+        [
+            fileRef ensureCreateFile.
+            fileRef writeStreamDo: [ :stream |
+                stream truncate.
+                stream nextPutAll: contents ]
+        ] on: Error do: [ :ex |
+            CoCopilotLogger
+                logBackEndEvent: 'Failed to write Ollama metadata file'
+                details: (Dictionary new
+                    at: #model put: modelNameString;
+                    at: #key put: keyLabel;
+                    at: #file put: fileRef basename;
+                    at: #errorClass put: ex class name;
+                    at: #error put: ex description;
+                    yourself) ]
+    ]
 ]
 
 { #category : 'settings' }
