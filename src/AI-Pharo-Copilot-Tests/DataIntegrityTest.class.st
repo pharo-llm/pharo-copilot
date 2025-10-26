@@ -82,38 +82,32 @@ DataIntegrityTest >> testSessionStatsConsistency [
 
 { #category : 'tests' }
 DataIntegrityTest >> testSettingsStateConsistency [
-        | originalStates |
-originalStates := Dictionary new
-                at: #enabled put: CopilotSettings copilotEnabled;
-                at: #provider put: CopilotSettings copilotProvider;
-                at: #model put: CopilotSettings modelName;
-                at: #template put: CopilotSettings fimTemplate;
-                at: #host put: CopilotSettings host;
-                at: #port put: CopilotSettings port;
-                yourself.
 
-        [
-                "Modify all settings"
-                CopilotSettings copilotEnabled: (originalStates at: #enabled) not.
-                CopilotSettings copilotProvider: #modified.
-                CopilotSettings modelName: 'modified:model'.
-                CopilotSettings fimTemplate: 'MODIFIED%1%2'.
-                CopilotSettings host: 'modified.host'.
-                CopilotSettings port: (originalStates at: #port) + 1.
-
-                "Verify changes took effect"
-                self assert: CopilotSettings copilotEnabled equals: (originalStates at: #enabled) not.
-                self assert: CopilotSettings copilotProvider equals: #modified.
-                self assert: CopilotSettings modelName equals: 'modified:model'.
-                self assert: CopilotSettings fimTemplate equals: 'MODIFIED%1%2'.
-                self assert: CopilotSettings host equals: 'modified.host'.
-                self assert: CopilotSettings port equals: (originalStates at: #port) + 1.
-        ] ensure: [
-                "Restore original states"
-                CopilotSettings copilotEnabled: (originalStates at: #enabled).
-                CopilotSettings copilotProvider: (originalStates at: #provider).
-                CopilotSettings modelName: (originalStates at: #model).
-                CopilotSettings fimTemplate: (originalStates at: #template).
-                CopilotSettings host: (originalStates at: #host).
-                CopilotSettings port: (originalStates at: #port) ]
+	| originalStates originalTemplate |
+	originalStates := Dictionary new
+		                  at: #enabled put: CopilotSettings copilotEnabled;
+		                  at: #provider put: CopilotSettings copilotProvider;
+		                  at: #model put: CopilotSettings modelName;
+		                  at: #host put: CopilotSettings host;
+		                  at: #port put: CopilotSettings port;
+		                  yourself.
+	originalTemplate := CopilotSettings fimTemplate.
+	[ "Modify all settings"
+		CopilotSettings copilotEnabled: (originalStates at: #enabled) not.
+		CopilotSettings copilotProvider: #modified.
+		CopilotSettings modelName: 'modified:model'.
+		CopilotSettings host: 'modified.host'.
+		CopilotSettings port: (originalStates at: #port) + 1. "Verify changes took effect"
+		self assert: CopilotSettings copilotEnabled equals: (originalStates at: #enabled) not.
+		self assert: CopilotSettings copilotProvider equals: #modified.
+		self assert: CopilotSettings modelName equals: 'modified:model'.
+		CopilotSettings fimTemplate: 'MODIFIED%1%2'.
+		self assert: CopilotSettings fimTemplate equals: originalTemplate.
+		self assert: CopilotSettings host equals: 'modified.host'.
+		self assert: CopilotSettings port equals: (originalStates at: #port) + 1 ] ensure: [ "Restore original states"
+			CopilotSettings copilotEnabled: (originalStates at: #enabled).
+			CopilotSettings copilotProvider: (originalStates at: #provider).
+			CopilotSettings modelName: (originalStates at: #model).
+			CopilotSettings host: (originalStates at: #host).
+			CopilotSettings port: (originalStates at: #port) ]
 ]

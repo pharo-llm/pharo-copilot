@@ -8,11 +8,8 @@ Class {
 		'Enabled',
 		'Provider',
 		'ModelName',
-		'FimTemplate',
 		'Host',
 		'Port',
-		'FimTemplateOption',
-		'CustomFimTemplateFile',
 		'ModelMetadata',
 		'OllamaClientFactory',
 		'AutoInstallModelScriptEnabled',
@@ -77,15 +74,6 @@ CopilotSettings class >> autoInstallModelScriptEnabled: aBoolean [
     AutoInstallModelScriptEnabled := aBoolean.
 ]
 
-{ #category : 'accessing' }
-CopilotSettings class >> availableFimTemplateOptions [
-
-    ^ {
-        'Inline (edit below)' -> #inline.
-        'Custom template file' -> #customFile
-    }
-]
-
 { #category : 'settings' }
 CopilotSettings class >> availableModelNames [
 
@@ -128,53 +116,6 @@ CopilotSettings class >> copilotProvider: aSymbol [
 ]
 
 { #category : 'accessing' }
-CopilotSettings class >> customFimTemplateFile [
-
-    ^ (CustomFimTemplateFile ifNil: [ CustomFimTemplateFile := self defaultCustomFimTemplateFile ]) asFileReference
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> customFimTemplateFile: aFileReferenceOrString [
-
-    CustomFimTemplateFile := aFileReferenceOrString asFileReference.
-    ^ CustomFimTemplateFile
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> customFimTemplateFilePath [
-
-    ^ self customFimTemplateFile fullName
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> customFimTemplateFilePath: aString [
-
-    aString ifNil: [ ^ self ].
-    aString isEmpty ifTrue: [ ^ self ].
-    self customFimTemplateFile: aString.
-    self fimTemplateOption = #customFile ifTrue: [ self ensureCustomFimTemplateFile ].
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> customFimTemplateFromFile [
-
-    | file contents |
-    file := self ensureCustomFimTemplateFile.
-    contents := [ file contents ]
-        on: Error
-        do: [ ^ FimTemplate ifNil: [ self defaultFimTemplate ] ].
-    contents ifNil: [ ^ FimTemplate ifNil: [ self defaultFimTemplate ] ].
-    contents isEmpty ifTrue: [ ^ FimTemplate ifNil: [ self defaultFimTemplate ] ].
-    ^ contents
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> defaultCustomFimTemplateFile [
-
-	^ (self templatesDirectory / 'custom-fim-template.tmpl') asFileReference
-]
-
-{ #category : 'accessing' }
 CopilotSettings class >> defaultFimTemplate [
 
 	    | file contents |
@@ -192,21 +133,6 @@ CopilotSettings class >> defaultFimTemplateFile [
 { #category : 'accessing' }
 CopilotSettings class >> defaultFimTemplateString [
     ^ '<PRE>%1<SUF>%2<MID>'
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> ensureCustomFimTemplateFile [
-
-	| file |
-    file := self customFimTemplateFile.
-    [ file parent ensureCreateDirectory ] on: Error do: [ :ignored | ].
-    file exists ifFalse: [
-	        | initialTemplate |
-        initialTemplate := FimTemplate ifNil: [ self defaultFimTemplate ].
-        [ file ensureCreateFile ] on: Error do: [ :ignored | ].
-        [ file writeStreamDo: [ :stream | stream nextPutAll: initialTemplate ] ] on: Error do: [ :ignored | ].
-    ].
-    ^ file
 ]
 
 { #category : 'accessing' }
@@ -327,38 +253,17 @@ yourself) ].
 { #category : 'accessing' }
 CopilotSettings class >> fimTemplate [
 
-	self fimTemplateOption = #customFile ifTrue: [ ^ self customFimTemplateFromFile ].
-    ^ FimTemplate ifNil: [ FimTemplate := self defaultFimTemplate ].
+	self defaultFimTemplate
 ]
 
 { #category : 'accessing' }
-CopilotSettings class >> fimTemplate: aString [
-
-	FimTemplate := aString.
-	self fimTemplateOption: #inline.
+CopilotSettings class >> fimTemplate: ignored [
 ]
 
 { #category : 'accessing' }
-CopilotSettings class >> fimTemplateOption [
+CopilotSettings class >> fimTemplateOption: aString [
 
-    ^ FimTemplateOption ifNil: [ FimTemplateOption := #inline ].
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> fimTemplateOption: aSymbol [
-
-    | normalized |
-    normalized := aSymbol ifNil: [ #inline ].
-    (normalized isSymbol) ifFalse: [
-        (normalized respondsTo: #asSymbol)
-            ifTrue: [ normalized := normalized asSymbol ]
-            ifFalse: [ normalized := #inline ]
-    ].
-    (#(#inline #customFile) includes: normalized)
-        ifFalse: [ normalized := #inline ].
-    FimTemplateOption := normalized.
-    normalized = #inline ifTrue: [ FimTemplate ifNil: [ FimTemplate := self defaultFimTemplate ] ].
-    normalized = #customFile ifTrue: [ self ensureCustomFimTemplateFile ].
+	"The inline FIM template is sourced from the templates repository."
 ]
 
 { #category : 'accessing' }
@@ -660,15 +565,12 @@ CopilotSettings class >> resetToDefaultSettings [
 	Enabled := nil.
 	Provider := nil.
 	ModelName := nil.
-	FimTemplate := nil.
 	Host := nil.
 	Port := nil.
-	FimTemplateOption := nil.
-	CustomFimTemplateFile := nil.
 	ModelMetadata := nil.
 	OllamaClientFactory := nil.
-	    AutoInstallModelScriptEnabled := nil.
-    LoggingEnabled := nil.
+	AutoInstallModelScriptEnabled := nil.
+	LoggingEnabled := nil
 ]
 
 { #category : 'accessing' }
@@ -677,15 +579,12 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	Enabled := aDictionary at: #Enabled ifAbsent: [ nil ].
 	Provider := aDictionary at: #Provider ifAbsent: [ nil ].
 	ModelName := aDictionary at: #ModelName ifAbsent: [ nil ].
-	FimTemplate := aDictionary at: #FimTemplate ifAbsent: [ nil ].
 	Host := aDictionary at: #Host ifAbsent: [ nil ].
 	Port := aDictionary at: #Port ifAbsent: [ nil ].
-	FimTemplateOption := aDictionary at: #FimTemplateOption ifAbsent: [ nil ].
-	CustomFimTemplateFile := aDictionary at: #CustomFimTemplateFile ifAbsent: [ nil ].
 	ModelMetadata := aDictionary at: #ModelMetadata ifAbsent: [ nil ].
 	OllamaClientFactory := aDictionary at: #OllamaClientFactory ifAbsent: [ nil ].
 	AutoInstallModelScriptEnabled := aDictionary at: #AutoInstallModelScriptEnabled ifAbsent: [ nil ].
-	        LoggingEnabled := aDictionary at: #LoggingEnabled ifAbsent: [ nil ].
+	LoggingEnabled := aDictionary at: #LoggingEnabled ifAbsent: [ nil ]
 ]
 
 { #category : 'accessing' }
@@ -778,15 +677,15 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #modelName:;
 					default: self modelName;
 					domainValues: self availableModelNames.
-					
-                                (aBuilder setting: #loggingEnabled)
-                                        order: 0.3;
-                                        label: 'Enable logging';
-                                        target: self;
-                                        getSelector: #loggingEnabled;
-                                        setSelector: #loggingEnabled:;
-                                        default: self loggingEnabled;
-                                        description: 'When disabled, Copilot will not record activity or evaluation logs.'.
+
+				(aBuilder setting: #loggingEnabled)
+					order: 0.3;
+					label: 'Enable logging';
+					target: self;
+					getSelector: #loggingEnabled;
+					setSelector: #loggingEnabled:;
+					default: self loggingEnabled;
+					description: 'When disabled, Copilot will not record activity or evaluation logs.'.
 
 
 				(aBuilder setting: #autoInstallModelScriptEnabled)
@@ -842,31 +741,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					target: self;
 					getSelector: #port;
 					setSelector: #port:;
-					default: self port.
-
-				(aBuilder pickOne: #fimTemplateOption)
-					label: 'FIM template source';
-					target: self;
-					getSelector: #fimTemplateOption;
-					setSelector: #fimTemplateOption:;
-					default: self fimTemplateOption;
-					domainValues: self availableFimTemplateOptions.
-
-				(aBuilder setting: #fimTemplate)
-					label: 'FIM template';
-					target: self;
-					getSelector: #fimTemplate;
-					setSelector: #fimTemplate:;
-					default: self fimTemplate;
-					description: 'Inline template used when the source is set to "Inline (edit below)".'.
-
-				(aBuilder setting: #customFimTemplateFilePath)
-					label: 'Custom FIM template file';
-					target: self;
-					getSelector: #customFimTemplateFilePath;
-					setSelector: #customFimTemplateFilePath:;
-					default: self customFimTemplateFilePath;
-					description: 'Used when the source is set to "Custom template file". The file is created automatically if it does not exist.' ]
+					default: self port.]
 ]
 
 { #category : 'accessing' }
@@ -876,15 +751,12 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #Enabled put: Enabled;
 		  at: #Provider put: Provider;
 		  at: #ModelName put: ModelName;
-		  at: #FimTemplate put: FimTemplate;
 		  at: #Host put: Host;
 		  at: #Port put: Port;
-		  at: #FimTemplateOption put: FimTemplateOption;
-		  at: #CustomFimTemplateFile put: CustomFimTemplateFile;
 		  at: #ModelMetadata put: ModelMetadata;
 		  at: #OllamaClientFactory put: OllamaClientFactory;
-		        at: #AutoInstallModelScriptEnabled put: AutoInstallModelScriptEnabled;
-        at: #LoggingEnabled put: LoggingEnabled;
+		  at: #AutoInstallModelScriptEnabled put: AutoInstallModelScriptEnabled;
+		  at: #LoggingEnabled put: LoggingEnabled;
 		  yourself
 ]
 

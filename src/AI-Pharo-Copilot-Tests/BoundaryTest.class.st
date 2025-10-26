@@ -25,26 +25,6 @@ BoundaryTest >> testDisplayStringBoundaryConditions [
 ]
 
 { #category : 'tests' }
-BoundaryTest >> testFimTemplateBoundaryValues [
-        | old result longTemplate |
-        old := CopilotSettings fimTemplate.
-
-        [
-                "Test with minimal template"
-                CopilotSettings fimTemplate: '%1%2'.
-                result := CopilotSettings fimTemplate format: { 'A'. 'B' }.
-                self assert: result equals: 'AB'.
-
-                "Test with very long template"
-                longTemplate := (String new: 1000 withAll: $x) , '%1' , (String new: 1000 withAll: $y) , '%2'.
-                CopilotSettings fimTemplate: longTemplate.
-                result := CopilotSettings fimTemplate format: { 'PREFIX'. 'SUFFIX' }.
-                self assert: (result includesSubstring: 'PREFIX').
-                self assert: (result includesSubstring: 'SUFFIX')
-        ] ensure: [ CopilotSettings fimTemplate: old ]
-]
-
-{ #category : 'tests' }
 BoundaryTest >> testLengthStatsBoundaryValues [
 	| evaluator context testCases lengthStats bucket |
 	evaluator := CoSuggestionEvaluator new.
