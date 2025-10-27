@@ -253,7 +253,17 @@ yourself) ].
 { #category : 'accessing' }
 CopilotSettings class >> fimTemplate [
 
-	self defaultFimTemplate
+	    | metadata template |
+    metadata := self modelMetadata.
+    metadata ifNil: [ ^ self defaultFimTemplate ].
+    template := metadata at: #template ifAbsent: [ metadata at: 'template' ifAbsent: [ nil ] ].
+    template ifNil: [ ^ self defaultFimTemplate ].
+    (template respondsTo: #asString) ifFalse: [ ^ self defaultFimTemplate ].
+    template := template asString.
+    (template isEmpty or: [
+        (template includesSubstring: '%1') not or: [ (template includesSubstring: '%2') not ] ])
+        ifTrue: [ ^ self defaultFimTemplate ].
+    ^ template
 ]
 
 { #category : 'accessing' }
@@ -698,33 +708,6 @@ CopilotSettings class >> settingsOn: aBuilder [
 					description:
 						'When enabled, Pharo Copilot automatically runs the installation script if the "pharo-coder-1.5b-fim-f16.gguf:latest" model is missing.'.
 
-				(aBuilder setting: #modelTemplate)
-					order: 0.5;
-					label: 'Model template (read only)';
-					target: self;
-					getSelector: #modelTemplate;
-					setSelector: #modelTemplate:;
-					default: self modelTemplate;
-					description: 'Template provided by the selected Ollama model. This value is fetched from the server and cannot be edited.'.
-
-				(aBuilder setting: #modelSystemPrompt)
-					order: 0.6;
-					label: 'Model system prompt (read only)';
-					target: self;
-					getSelector: #modelSystemPrompt;
-					setSelector: #modelSystemPrompt:;
-					default: self modelSystemPrompt;
-					description: 'System prompt defined by the selected Ollama model, when available.'.
-
-
-				(aBuilder setting: #modelParameters)
-					order: 0.7;
-					label: 'Model parameters (read only)';
-					target: self;
-					getSelector: #modelParameters;
-					setSelector: #modelParameters:;
-					default: self modelParameters;
-					description: 'Model parameters provided by the Ollama model definition.'.
 
 
 				(aBuilder setting: #host)
