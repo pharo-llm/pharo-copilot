@@ -119,11 +119,15 @@ OllamaClient >> generateForPrefix: prefixString suffix: suffixString [
 	prompt := CopilotSettings fimTemplate format: {
 			          prefixString.
 			          suffixString }.
-	originalOptions := options copy.
-	options at: #task put: 'fill-in-the-middle'.
-	CoCopilotLogger logBackEndEvent: 'Augmented Ollama options for fill-in-the-middle' details: (Dictionary new
-			 at: #optionsAfter put: options;
-			 yourself).
+        originalOptions := options copy.
+        options at: #task put: 'fill-in-the-middle'.
+        CoCopilotLogger logBackEndEvent: 'Prepared fill-in-the-middle prompt' details: (Dictionary new
+                         at: #finalPrompt put: prompt;
+                         at: #promptLength put: prompt size;
+                         yourself).
+        CoCopilotLogger logBackEndEvent: 'Augmented Ollama options for fill-in-the-middle' details: (Dictionary new
+                         at: #optionsAfter put: options;
+                         yourself).
 	response := self generate: prompt.
 	options := originalOptions.
 	CoCopilotLogger logBackEndEvent: 'Restored Ollama options after fill-in-the-middle' details: (Dictionary new

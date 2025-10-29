@@ -31,6 +31,43 @@ OllamaClientTest >> testGenerateBuildsCorrectPayload [
 ]
 
 { #category : 'tests' }
+OllamaClientTest >> testGenerateForPrefixLogsFinalPrompt [
+    | client mock tempDir tempLogFile originalLogRef originalLogsDir originalLoggingEnabled logContents expectedPrompt |
+    client := OllamaClient new.
+    mock := OAHttpTransportMockExtended new.
+    client instVarNamed: 'transport' put: mock.
+
+    tempDir := FileLocator temp / ('ollama-client-prompt-log-' , UUID new asString).
+    tempLogFile := tempDir / CoCopilotLogger logFileName.
+    originalLogRef := CoCopilotLogger rawLogFileReference.
+    originalLogsDir := CoCopilotLogger rawLogsDirectoryReference.
+    originalLoggingEnabled := CopilotSettings loggingEnabled.
+
+    [
+        CopilotSettings loggingEnabled: true.
+        tempDir ensureCreateDirectory.
+        tempLogFile exists ifTrue: [ tempLogFile ensureDelete ].
+        CoCopilotLogger rawLogsDirectoryReference: tempDir.
+        CoCopilotLogger rawLogFileReference: tempLogFile.
+        CoCopilotLogger ensureLogFileInitialized.
+
+        client generateForPrefix: 'prefix' suffix: 'suffix'.
+
+        logContents := tempLogFile readStreamDo: [ :stream | stream upToEnd ].
+        logContents := logContents asString.
+        expectedPrompt := CopilotSettings fimTemplate format: { 'prefix'. 'suffix' }.
+        self assert: (logContents includesSubstring: 'Prepared fill-in-the-middle prompt').
+        self assert: (logContents includesSubstring: expectedPrompt).
+    ] ensure: [
+        CopilotSettings loggingEnabled: originalLoggingEnabled.
+        CoCopilotLogger rawLogFileReference: originalLogRef.
+        CoCopilotLogger rawLogsDirectoryReference: originalLogsDir.
+        tempLogFile exists ifTrue: [ tempLogFile ensureDelete ].
+        tempDir exists ifTrue: [ tempDir ensureDelete ].
+    ].
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testGenerateIncludesFormatWhenSet [
 	| client mock payload |
 	client := OllamaClient new.
