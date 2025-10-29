@@ -119,21 +119,19 @@ CopilotSettings class >> copilotProvider: aSymbol [
 { #category : 'accessing' }
 CopilotSettings class >> defaultFimTemplate [
 
-    | template cacheFile |
-    cacheFile := self templateFileForModelNamed: self modelName.
-    template := self fimTemplateFromFile: cacheFile.
-    template ifNotNil: [
-        CoCopilotLogger
-            logBackEndEvent: 'Using cached FIM template from logs'
-            details: (Dictionary new
-                at: #model put: (self modelName ifNil: [ 'unknown-model' ]);
-                at: #source put: cacheFile pathString;
-                yourself).
-        ^ template ].
-    template := self fimTemplateFromBundledTemplates.
-    template ifNotNil: [ ^ template ].
-    self logMissingFimTemplate.
-    ^ self error: 'No fill-in-the-middle template is available for the current Copilot model.'
+	| template cacheFile |
+	cacheFile := self templateFileForModelNamed: self modelName.
+	template := self fimTemplateFromFile: cacheFile.
+	template ifNotNil: [
+			CoCopilotLogger logBackEndEvent: 'Using cached FIM template from logs' details: (Dictionary new
+					 at: #model put: (self modelName ifNil: [ 'unknown-model' ]);
+					 at: #source put: cacheFile pathString;
+					 yourself).
+			^ template ].
+	template := self fimTemplateFromBundledTemplates.
+	template ifNotNil: [ ^ template ].
+	self logMissingFimTemplate.
+	^ self fallbackFimTemplate
 ]
 
 { #category : 'settings' }
@@ -198,6 +196,17 @@ CopilotSettings class >> ensureSelectedModelAvailable [
             ('We could not find the model "{1}" in your Ollama installation. Do you want to install it?'
                 format: { modelName }).
     ^ false
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> fallbackFimTemplate [
+
+    CoCopilotLogger
+        logBackEndEvent: 'Using fallback FIM template'
+        details: (Dictionary new
+            at: #model put: (self modelName ifNil: [ 'unknown-model' ]);
+            yourself).
+    ^ '<fim_prefix>%1<fim_suffix>%2<fim_middle>'
 ]
 
 { #category : 'accessing' }
