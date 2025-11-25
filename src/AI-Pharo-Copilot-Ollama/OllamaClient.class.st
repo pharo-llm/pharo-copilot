@@ -64,20 +64,28 @@ OllamaClient >> ensureStringFromResponse: container fallback: fallbackString [
         ^ self coerceResponseValueToString: value default: fallbackString
 ]
 
-{ #category : 'operations' }
-OllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: suffixString [
+{ #category : 'as yet unclassified' }
+OllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: suffixString context: contextString [ 
 
-        | prompt safePrefix safeSuffix |
+        | prompt safePrefix safeSuffix safeContext includesContextPlaceholder |
         safePrefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
         safeSuffix := suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ].
+        safeContext := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
         prompt := templateString ifNil: [ '' ].
+        includesContextPlaceholder := (prompt includesSubstring: '{{ .Context }}')
+                or: [ (prompt includesSubstring: '{{.Context}}') or: [ prompt includesSubstring: '{3}' ] ].
         prompt := prompt copyReplaceAll: '{{ .Prompt }}' with: safePrefix.
         prompt := prompt copyReplaceAll: '{{.Prompt}}' with: safePrefix.
         prompt := prompt copyReplaceAll: '{{ .Suffix }}' with: safeSuffix.
         prompt := prompt copyReplaceAll: '{{.Suffix}}' with: safeSuffix.
+        prompt := prompt copyReplaceAll: '{{ .Context }}' with: safeContext.
+        prompt := prompt copyReplaceAll: '{{.Context}}' with: safeContext.
         prompt := prompt format: {
                 safePrefix.
-                safeSuffix }.
+                safeSuffix.
+                safeContext }.
+        (includesContextPlaceholder not and: [ safeContext isEmpty not ]) ifTrue: [
+                prompt := self prependContext: safeContext toPrompt: prompt ].
         ^ prompt
 ]
 
@@ -123,11 +131,13 @@ OllamaClient >> generate: aPromptString [
 ]
 
 { #category : 'as yet unclassified' }
-OllamaClient >> generateForPrefix: prefixString suffix: suffixString [
+OllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
+
 | prompt originalOptions response |
         CoCopilotLogger logBackEndEvent: 'Preparing fill-in-the-middle request' details: (Dictionary new
                          at: #prefix put: prefixString;
                          at: #suffix put: suffixString;
+                         at: #contextBytes put: contextString size;
                          at: #template put: CopilotSettings fimTemplate;
                          at: #optionsBefore put: options copy;
                          yourself).
@@ -135,7 +145,9 @@ OllamaClient >> generateForPrefix: prefixString suffix: suffixString [
         prompt := self
                         expandFimTemplate: CopilotSettings fimTemplate
                         prefix: prefixString
-                        suffix: suffixString.
+                        suffix: suffixString
+                        context: contextString.
+
         CoCopilotLogger logBackEndEvent: 'Expanded fill-in-the-middle template' details: (Dictionary new
                          at: #prompt put: prompt;
                          yourself).
@@ -269,6 +281,20 @@ OllamaClient >> options: aDictionary [
 OllamaClient >> parseJsonSafely: aString [
 
         ^ [ STONJSON fromString: aString ] on: Error do: [ nil ]
+]
+
+{ #category : 'as yet unclassified' }
+OllamaClient >> prependContext: contextString toPrompt: promptString [
+
+        | delimiter | 
+        delimiter := String lf , String lf.
+        ^ String streamContents: [ :stream |
+                stream
+                        nextPutAll: 'Class context provided by Pharo Copilot:';
+                        nextPutAll: delimiter;
+                        nextPutAll: contextString;
+                        nextPutAll: delimiter;
+                        nextPutAll: promptString ]
 ]
 
 { #category : 'operations' }

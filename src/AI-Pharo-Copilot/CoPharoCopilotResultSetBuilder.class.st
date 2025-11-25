@@ -52,6 +52,55 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 ]
 
 { #category : 'API - building' }
+CoPharoCopilotResultSetBuilder >> classContextFor: aContext [
+
+        | behavior compiledMethod methodClass classDefinition instanceSide classSide |
+        behavior := (aContext respondsTo: #behavior)
+                ifTrue: [ [ aContext behavior ] on: Error do: [ nil ] ]
+                ifFalse: [ nil ].
+        compiledMethod := (aContext respondsTo: #method)
+                ifTrue: [ [ aContext method ] on: Error do: [ nil ] ]
+                ifFalse: [ nil ].
+        methodClass := behavior ifNil: [ compiledMethod ifNotNil: [ compiledMethod methodClass ] ] ifNotNil: [ behavior ].
+        classDefinition := self safeDefinitionStringFor: methodClass.
+        instanceSide := self methodSourcesFor: methodClass.
+        classSide := self methodSourcesFor: (methodClass ifNotNil: [ methodClass class ]).
+        ^ self
+                classDefinition: classDefinition
+                instanceMethods: instanceSide
+                classMethods: classSide
+]
+
+{ #category : 'API - building' }
+CoPharoCopilotResultSetBuilder >> classDefinition: classDefinitionString instanceMethods: instanceMethodsString classMethods: classMethodsString [
+
+        | hasDefinition hasInstance hasClass |
+        hasDefinition := classDefinitionString isEmpty not.
+        hasInstance := instanceMethodsString isEmpty not.
+        hasClass := classMethodsString isEmpty not.
+        (hasDefinition or: [ hasInstance or: hasClass ]) ifFalse: [ ^ '' ].
+        ^ String streamContents: [ :stream |
+                hasDefinition ifTrue: [
+                        stream
+                                nextPutAll: 'Class Definition:';
+                                cr;
+                                nextPutAll: classDefinitionString;
+                                cr;
+                                cr ].
+                hasInstance ifTrue: [
+                        stream
+                                nextPutAll: 'Instance Side Methods:';
+                                cr;
+                                nextPutAll: instanceMethodsString;
+                                cr ].
+                hasClass ifTrue: [
+                        stream
+                                nextPutAll: 'Class Side Methods:';
+                                cr;
+                                nextPutAll: classMethodsString ] ]
+]
+
+{ #category : 'API - building' }
 CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
 
 	| text start rest closingIndex body newlineIndex firstLine delimiter idx |
@@ -141,83 +190,101 @@ CoPharoCopilotResultSetBuilder >> isLanguageSpec: aString [
 ]
 
 { #category : 'API - building' }
+CoPharoCopilotResultSetBuilder >> methodSourcesFor: aBehavior [
+
+        aBehavior ifNil: [ ^ '' ].
+        ^ String streamContents: [ :stream |
+                [ (aBehavior selectors asSortedCollection) do: [ :selector |
+                        | source |
+                        source := [ aBehavior sourceCodeAt: selector ] on: Error do: [ nil ].
+                        source ifNotNil: [
+                                stream
+                                        nextPutAll: source;
+                                        cr;
+                                        cr ] ] ]
+                        on: Error
+                        do: [ ] ]
+]
+
+{ #category : 'API - building' }
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
-        [
-                | client rawResponse rawResponseString content |
-                CoCopilotLogger
-                        logFrontEndEvent: 'Preparing completion request'
-                        details: contextInfo.
+	| classContext |
+	[
+		| client rawResponse rawResponseString content |
+		CoCopilotLogger logFrontEndEvent: 'Preparing completion request' details: contextInfo.
 
-                client := OllamaClient new.
-                rawResponse := client generateForPrefix: prefixString suffix: suffixString.
-                rawResponseString := [ rawResponse asString ]
-                        on: Error
-                        do: [ rawResponse printString ].
-                CoCopilotLogger
-                        logBackEndEvent: 'Received raw suggestion payload'
-                        details: (Dictionary new
-                                at: #rawResponseClass put: rawResponse class name;
-                                at: #rawResponse put: rawResponseString;
-                                yourself).
-                content := rawResponseString.
-                [
-                        | parsed |
-                        parsed := STONJSON fromString: rawResponseString.
-                        (parsed isKindOf: Dictionary) ifTrue: [
-                                content := parsed
-                                        at: #response
-                                        ifAbsent: [ parsed at: 'response' ifAbsent: [ rawResponseString ] ] ] ]
-                        on: Error
-                        do: [ :ex |
-                                CoCopilotLogger
-                                        logBackEndEvent: 'Failed to parse suggestion payload as JSON'
-                                        details: (Dictionary new
-                                                at: #error put: ex messageText;
-                                                at: #rawResponse put: rawResponseString;
-                                                yourself) ].
+		client := OllamaClient new.
+		                classContext := self classContextFor: aContext.
+                contextInfo
+                        at: #classContextLength put: classContext size;
+                        at: #classContextPresent put: classContext isEmpty not.
+                rawResponse := client
+                        generateForPrefix: prefixString
+                        suffix: suffixString
+                        context: classContext.
+		rawResponseString := [ rawResponse asString ]
+			                     on: Error
+			                     do: [ rawResponse printString ].
+		CoCopilotLogger logBackEndEvent: 'Received raw suggestion payload' details: (Dictionary new
+				 at: #rawResponseClass put: rawResponse class name;
+				 at: #rawResponse put: rawResponseString;
+				 yourself).
+		content := rawResponseString.
+		[
+			| parsed |
+			parsed := STONJSON fromString: rawResponseString.
+			(parsed isKindOf: Dictionary) ifTrue: [
+				content := parsed at: #response ifAbsent: [ parsed at: 'response' ifAbsent: [ rawResponseString ] ] ] ]
+			on: Error
+			do: [ :ex |
+					CoCopilotLogger logBackEndEvent: 'Failed to parse suggestion payload as JSON' details: (Dictionary new
+							 at: #error put: ex messageText;
+							 at: #rawResponse put: rawResponseString;
+							 yourself) ].
 
-                content := self cleanedContentFrom: content asString.
-                CoCopilotLogger
-                        logBackEndEvent: 'Normalized suggestion content'
-                        details: (Dictionary new
-                                at: #cleanedContent put: content;
-                                at: #cleanedLength put: content size;
-                                yourself).
+		content := self cleanedContentFrom: content asString.
+		CoCopilotLogger logBackEndEvent: 'Normalized suggestion content' details: (Dictionary new
+				 at: #cleanedContent put: content;
+				 at: #cleanedLength put: content size;
+				 yourself).
 
-                content isEmpty
-ifFalse: [
-aContext
-                                ifNil: [
-                                        CoCopilotLogger
-                                                logFrontEndEvent: 'Skipped applying suggestion - missing context'
-                                                details: (Dictionary new
-                                                        at: #appliedContent put: content;
-                                                        at: #appliedLength put: content size;
-                                                        at: #reason put: 'Completion context was nil';
-                                                        yourself) ]
-                                ifNotNil: [
-                                        aContext replaceTokenInEditorWith: content.
-                                        CoCopilotLogger
-                                                logFrontEndEvent: 'Applied suggestion to editor'
-                                                details: (Dictionary new
-                                                        at: #appliedContent put: content;
-                                                        at: #appliedLength put: content size;
-                                                        yourself) ] ]
-                ifTrue: [
-                        CoCopilotLogger
-                                logFrontEndEvent: 'No suggestion content to apply'
-                                details: (Dictionary new
-                                        at: #reason put: 'Generated content was empty';
-                                        at: #rawResponse put: rawResponseString;                                        yourself) ]
-        ] on: Error do: [ :ex |
-                CoCopilotLogger
-                        logError: 'Asynchronous completion failed'
-                        origin: #CoPharoCopilotResultSetBuilder
-                        exception: ex
-                        payload: (Dictionary new
-                                at: #requestDetails put: contextInfo copy;
-                                at: #prefixLength put: prefixString size;
-                                at: #suffixLength put: suffixString size;
-                                yourself) ]
+		content isEmpty
+			ifFalse: [
+					aContext
+						ifNil: [
+								CoCopilotLogger logFrontEndEvent: 'Skipped applying suggestion - missing context' details: (Dictionary new
+										 at: #appliedContent put: content;
+										 at: #appliedLength put: content size;
+										 at: #reason put: 'Completion context was nil';
+										 yourself) ]
+						ifNotNil: [
+								aContext replaceTokenInEditorWith: content.
+								CoCopilotLogger logFrontEndEvent: 'Applied suggestion to editor' details: (Dictionary new
+										 at: #appliedContent put: content;
+										 at: #appliedLength put: content size;
+										 yourself) ] ]
+			ifTrue: [
+					CoCopilotLogger logFrontEndEvent: 'No suggestion content to apply' details: (Dictionary new
+							 at: #reason put: 'Generated content was empty';
+							 at: #rawResponse put: rawResponseString;
+							 yourself) ] ]
+		on: Error
+		do: [ :ex |
+				CoCopilotLogger
+					logError: 'Asynchronous completion failed'
+					origin: #CoPharoCopilotResultSetBuilder
+					exception: ex
+					payload: (Dictionary new
+							 at: #requestDetails put: contextInfo copy;
+							 at: #prefixLength put: prefixString size;
+							 at: #suffixLength put: suffixString size;
+							 yourself) ]
+]
+
+{ #category : 'API - building' }
+CoPharoCopilotResultSetBuilder >> safeDefinitionStringFor: aBehavior [
+
+        aBehavior ifNil: [ ^ '' ].
+        ^ [ aBehavior definition asString ] on: Error do: [ '' ]
 ]
