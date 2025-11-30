@@ -6,7 +6,7 @@
 - Include the affected Pharo version, any relevant logs, and whether you have a working proof of concept.
 
 ## What to expect
-- We will acknowledge receipt within **3 business days**.
+- We will acknowledge receipt within **3 days**.
 - After triage, we will work with you to validate the impact and develop a fix.
 - Please allow us time to prepare a release before publicly disclosing details.
 
