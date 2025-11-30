@@ -72,6 +72,4 @@ BaselineOfAIPharoCopilot >> postLoad [
 	self class loadBackgroundImage.
 	KMRepository reset.
 	SystemAnnouncer uniqueInstance when: UIThemeChanged send: #loadBackgroundImage to: self class.
-	RubSmalltalkEditor completionEngineClass: CoCompletionEnginePharoCopilot.
-	CopilotSettings showInstallCompletionDialog
 ]
