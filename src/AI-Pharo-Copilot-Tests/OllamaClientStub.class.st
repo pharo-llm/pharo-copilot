@@ -10,9 +10,6 @@ Class {
 		'callCount',
 		'lastRequestedModel',
 		'modelsResponse',
-		'pullBlock',
-		'pullCount',
-		'lastPulledModel',
 		'modelsResponses'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
@@ -36,12 +33,6 @@ OllamaClientStub >> defaultModelsResponse [
 ]
 
 { #category : 'accessing' }
-OllamaClientStub >> lastPulledModel [
-
-    ^ lastPulledModel
-]
-
-{ #category : 'accessing' }
 OllamaClientStub >> lastRequestedModel [
     ^ lastRequestedModel
 ]
@@ -52,23 +43,6 @@ OllamaClientStub >> listModels [
         ^ modelsResponses removeFirst
     ].
 	^ modelsResponse ifNil: [ self defaultModelsResponse ]
-]
-
-{ #category : 'accessing' }
-OllamaClientStub >> pullCount [
-
-    ^ pullCount ifNil: [ 0 ]
-]
-
-{ #category : 'accessing' }
-OllamaClientStub >> pullModelNamed: aModelName [
-
-    lastPulledModel := aModelName.
-    pullCount := self pullCount + 1.
-    pullBlock ifNotNil: [ ^ pullBlock value: aModelName ].
-    ^ Dictionary new
-        at: #status put: 'ok';
-        yourself
 ]
 
 { #category : 'accessing' }
@@ -92,13 +66,6 @@ OllamaClientStub >> withModelsResponses: aCollection [
     modelsResponses := OrderedCollection withAll: aCollection.
     modelsResponse := nil.
 ^self
-]
-
-{ #category : 'accessing' }
-OllamaClientStub >> withPullBlock: aBlockClosure [
-
-    pullBlock := aBlockClosure.
-    ^ self
 ]
 
 { #category : 'accessing' }

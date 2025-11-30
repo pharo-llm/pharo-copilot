@@ -64,7 +64,7 @@ OllamaClient >> ensureStringFromResponse: container fallback: fallbackString [
         ^ self coerceResponseValueToString: value default: fallbackString
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'generate' }
 OllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: suffixString context: contextString [ 
 
         | prompt safePrefix safeSuffix safeContext includesContextPlaceholder |
@@ -130,7 +130,7 @@ OllamaClient >> generate: aPromptString [
 	^ normalized
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'generate' }
 OllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
 
 | prompt originalOptions response |
@@ -283,7 +283,7 @@ OllamaClient >> parseJsonSafely: aString [
         ^ [ STONJSON fromString: aString ] on: Error do: [ nil ]
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'generate' }
 OllamaClient >> prependContext: contextString toPrompt: promptString [
 
         | delimiter | 
@@ -297,31 +297,7 @@ OllamaClient >> prependContext: contextString toPrompt: promptString [
                         nextPutAll: promptString ]
 ]
 
-{ #category : 'operations' }
-OllamaClient >> pullModelNamed: aString [
-
-  | payload response |
-  payload := Dictionary new
-                 at: #name put: aString;
-                 yourself.
-  CoCopilotLogger
-        logBackEndEvent: 'Requesting Ollama model install'
-        details: (Dictionary new
-                at: #endpoint put: 'api/pull';
-                at: #model put: aString;
-                at: #payload put: payload;
-                yourself).
-  response := transport postJsonAt: 'api/pull' body: payload.
-  CoCopilotLogger
-        logBackEndEvent: 'Ollama model install request acknowledged'
-        details: (Dictionary new
-                at: #model put: aString;
-                at: #responseClass put: (response ifNotNil: [ response class name ] ifNil: [ 'nil' ]);
-                yourself).
-  ^ response
-]
-
-{ #category : 'as yet unclassified' }
+{ #category : 'generate' }
 OllamaClient >> showModelNamed: aModelFullName [
 
     | payload response |
