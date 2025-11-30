@@ -24,3 +24,12 @@ CoCompletionEnginePharoCopilot >> completionBuilder [
                         yourself).
         ^ completionBuilder ifNil: [ completionBuilder := CoPharoCopilotResultSetBuilder new ]
 ]
+
+{ #category : 'replacement' }
+CoCompletionEnginePharoCopilot >> replaceTokenInEditorWith: newString [
+
+    | originalCaretPosition |
+    originalCaretPosition := self editor caret.
+    super replaceTokenInEditorWith: newString.
+    self editor selectAt: originalCaretPosition.
+]
