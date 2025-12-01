@@ -20,7 +20,7 @@ CoCopilotEntry class >> contents: aString [
 { #category : 'accessing' }
 CoCopilotEntry >> activateOn: aCoCompletionContext [
 
-	aCoCompletionContext replaceTokenInEditorWith: text
+	aCoCompletionContext replaceTokenInEditorWith: text.
 ]
 
 { #category : 'accessing' }

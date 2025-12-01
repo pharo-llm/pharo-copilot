@@ -136,36 +136,28 @@ CopilotSettings class >> ensureOllamaServiceAvailable [
 { #category : 'settings' }
 CopilotSettings class >> ensureSelectedModelAvailable [
 
-    | modelName response availableModels |
-    modelName := self modelName.
-(self isNullModelName: modelName) ifTrue: [ ^ true ].
-    response := self ensureOllamaServiceAvailable.
-    response ifNil: [ ^ false ].
-    availableModels := self modelNamesFromResponse: response.
-    CoCopilotLogger
-        logBackEndEvent: 'Validated Ollama model availability'
-        details: (Dictionary new
-            at: #model put: modelName;
-            at: #availableModelCount put: availableModels size;
-            yourself).
-    (availableModels includes: modelName) ifTrue: [ ^ true ].
-    (self attemptAutoInstallForModelNamed: modelName usingInitialResponse: response)
-        ifTrue: [ ^ true ].
-    (self promptToInstallMissingModelNamed: modelName availableModels: availableModels)
-        ifTrue: [
-            (self performInstallOfModelNamed: modelName usingInitialResponse: response)
-                ifTrue: [ ^ true ] ].
-    CoCopilotLogger
-        logBackEndEvent: 'Missing Ollama model'
-        details: (Dictionary new
-            at: #model put: modelName;
-            at: #availableModels put: availableModels;
-            yourself).
-    self
-        notifyUser:
-            ('We could not find the model "{1}" in your Ollama installation. Do you want to install it?'
-                format: { modelName }).
-    ^ false
+	| modelName response availableModels |
+	modelName := self modelName.
+	(self isNullModelName: modelName) ifTrue: [ ^ true ].
+	response := self ensureOllamaServiceAvailable.
+	response ifNil: [ ^ false ].
+	availableModels := self modelNamesFromResponse: response.
+	CoCopilotLogger logBackEndEvent: 'Validated Ollama model availability' details: (Dictionary new
+			 at: #model put: modelName;
+			 at: #availableModelCount put: availableModels size;
+			 yourself).
+	(availableModels includes: modelName) ifTrue: [ ^ true ].
+	 self autoInstallModelScriptEnabled ifFalse: [ ^ false ].
+	(self attemptAutoInstallForModelNamed: modelName usingInitialResponse: response) ifTrue: [ ^ true ].
+	(self promptToInstallMissingModelNamed: modelName availableModels: availableModels) ifTrue: [
+		(self performInstallOfModelNamed: modelName usingInitialResponse: response) ifTrue: [ ^ true ] ].
+	CoCopilotLogger logBackEndEvent: 'Missing Ollama model' details: (Dictionary new
+			 at: #model put: modelName;
+			 at: #availableModels put: availableModels;
+			 yourself).
+	self notifyUser:
+		('We could not find the model "{1}" in your Ollama installation. Do you want to install it?' format: { modelName }).
+	^ false
 ]
 
 { #category : 'accessing' }
