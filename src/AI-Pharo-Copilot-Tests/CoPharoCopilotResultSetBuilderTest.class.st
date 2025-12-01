@@ -97,10 +97,73 @@ CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromWithTextInput [
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testContextSnapshotIncludesPrefixAndSuffix [
+
+        | builder context snapshot |
+        builder := CoPharoCopilotResultSetBuilder new.
+        context := CoCopilotContextMock new.
+        context
+                source: 'hello world';
+                position: 5.
+
+        snapshot := builder contextSnapshotFor: context.
+
+        self assert: (snapshot at: #prefix) equals: 'hello'.
+        self assert: (snapshot at: #suffix) equals: ' world'.
+        self assert: (snapshot at: #position) equals: 5
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testInitializeOnContextSetsCompletionContext [
+
 	| builder context |
 	context := CoPharoCopilotContext new.
 	builder := CoPharoCopilotResultSetBuilder initializeOnContext: context.
-	
 	self assert: builder completionContext identicalTo: context
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSkipsApplyingWhenContextChanged [
+
+        | builder context contextInfo |
+        builder := CoPharoCopilotResultSetBuilder new.
+        context := CoCopilotContextMock new.
+        context
+                source: 'prefixBodyChanged';
+                position: 6.
+        contextInfo := Dictionary new
+                                at: #cursorPosition put: 6;
+                                yourself.
+
+        builder
+                applyContent: 'suggestion'
+                toContext: context
+                expectedPrefix: 'prefix'
+                suffix: 'Body'
+                contextInfo: contextInfo.
+
+        self assert: context replacedToken isNil
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testUsesSuggestionWhenContextMatches [
+
+        | builder context contextInfo |
+        builder := CoPharoCopilotResultSetBuilder new.
+        context := CoCopilotContextMock new.
+        context
+                source: 'sample code';
+                position: 6.
+        contextInfo := Dictionary new
+                                at: #cursorPosition put: 6;
+                                yourself.
+
+        builder
+                applyContent: 'suggestion'
+                toContext: context
+                expectedPrefix: 'sample'
+                suffix: ' code'
+                contextInfo: contextInfo.
+
+        self assert: context replacedToken equals: 'suggestion'
 ]
