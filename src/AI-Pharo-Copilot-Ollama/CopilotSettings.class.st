@@ -147,7 +147,7 @@ CopilotSettings class >> ensureSelectedModelAvailable [
 			 at: #availableModelCount put: availableModels size;
 			 yourself).
 	(availableModels includes: modelName) ifTrue: [ ^ true ].
-	 self autoInstallModelScriptEnabled ifFalse: [ ^ false ].
+	self autoInstallModelScriptEnabled ifFalse: [ ^ false ].
 	(self attemptAutoInstallForModelNamed: modelName usingInitialResponse: response) ifTrue: [ ^ true ].
 	(self promptToInstallMissingModelNamed: modelName availableModels: availableModels) ifTrue: [
 		(self performInstallOfModelNamed: modelName usingInitialResponse: response) ifTrue: [ ^ true ] ].
@@ -156,7 +156,7 @@ CopilotSettings class >> ensureSelectedModelAvailable [
 			 at: #availableModels put: availableModels;
 			 yourself).
 	self notifyUser:
-		('We could not find the model "{1}" in your Ollama installation. Do you want to install it?' format: { modelName }).
+		('We could not find this model in your Ollama installation. If you recently requested its installation, please wait while it completes.' format: { modelName }).
 	^ false
 ]
 
@@ -213,10 +213,6 @@ CopilotSettings class >> fimTemplate [
         (template includesSubstring: '%1') not or: [ (template includesSubstring: '%2') not ] ])
         ifTrue: [ ^ self defaultFimTemplate ].
     ^ template
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> fimTemplate: ignored [
 ]
 
 { #category : 'accessing' }
@@ -294,10 +290,7 @@ CopilotSettings class >> installModelNamed: modelName [
 	| client |
 	[
 		client := self newOllamaClient.
-		        self
-            notifyUser:
-                ('Downloading the Copilot model "{1}" via Ollama. This may take a few minutes.'
-                    format: { modelName }).
+		self notifyUser: ('Downloading... This may take a few minutes.' format: { modelName }).
 		CoCopilotLogger logBackEndEvent: 'Invoking Ollama model install script' details: (Dictionary new
 				 at: #model put: modelName;
 				 yourself).
@@ -320,14 +313,14 @@ CopilotSettings class >> installModelNamed: modelName [
 
 { #category : 'accessing' }
 CopilotSettings class >> isCopilotEngineSelected [
-    "Check if the current completion engine is the copilot engine"
-    ^ [ 
-        | currentEngine |
-        currentEngine := RubSmalltalkEditor completionEngineClass.
-        currentEngine notNil and: [ 
-            currentEngine name = 'CoCompletionEnginePharoCopilot' or: [
-                currentEngine name includesSubstring: 'Copilot' ] ]
-    ] on: Error do: [ false ]
+
+	^ [
+		  | currentEngine |
+		  currentEngine := RubSmalltalkEditor completionEngineClass.
+		  currentEngine notNil and: [
+			  currentEngine name = 'CoCompletionEnginePharoCopilot' or: [ currentEngine name includesSubstring: 'Copilot' ] ] ]
+		  on: Error
+		  do: [ false ]
 ]
 
 { #category : 'accessing' }
@@ -577,36 +570,30 @@ CopilotSettings class >> port: aNumber [
 { #category : 'settings' }
 CopilotSettings class >> promptToInstallMissingModelNamed: modelName availableModels: availableModels [
 
-    | uiClass uiManager confirmation message transcript |
-    message :=
-            ('The model "{1}" is not available in your Ollama installation. Do you want to download it now?'
-                    format: { modelName }).
-    CoCopilotLogger
-        logBackEndEvent: 'Prompting user to install missing Ollama model'
-        details: (Dictionary new
-            at: #model put: modelName;
-            at: #availableModels put: availableModels;
-            yourself).
-    uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
-    uiClass ifNotNil: [
-        (uiClass respondsTo: #default)
-            ifTrue: [
-                uiManager := uiClass default.
-                (uiManager respondsTo: #confirm:)
-                    ifTrue: [ confirmation := uiManager confirm: message ] ] ].
-    confirmation ifNil: [
-        transcript := Smalltalk globals at: #Transcript ifAbsent: [ nil ].
-        transcript ifNotNil: [
-            (transcript respondsTo: #show:)
-                ifTrue: [ transcript show: message; cr ] ].
-        ^ false ].
-    CoCopilotLogger
-        logBackEndEvent: 'User responded to Ollama model install prompt'
-        details: (Dictionary new
-            at: #model put: modelName;
-            at: #userAccepted put: confirmation;
-            yourself).
-    ^ confirmation
+	| uiClass uiManager confirmation message transcript |
+	message := 'The model is not available' format: { modelName }.
+	CoCopilotLogger logBackEndEvent: 'Prompting user to install missing Ollama model' details: (Dictionary new
+			 at: #model put: modelName;
+			 at: #availableModels put: availableModels;
+			 yourself).
+	uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
+	uiClass ifNotNil: [
+			(uiClass respondsTo: #default) ifTrue: [
+					uiManager := uiClass default.
+					(uiManager respondsTo: #confirm:) ifTrue: [ confirmation := uiManager confirm: message ] ] ].
+	confirmation ifNil: [
+			transcript := Smalltalk globals at: #Transcript ifAbsent: [ nil ].
+			transcript ifNotNil: [
+					(transcript respondsTo: #show:) ifTrue: [
+							transcript
+								show: message;
+								cr ] ].
+			^ false ].
+	CoCopilotLogger logBackEndEvent: 'User responded to Ollama model install prompt' details: (Dictionary new
+			 at: #model put: modelName;
+			 at: #userAccepted put: confirmation;
+			 yourself).
+	^ confirmation
 ]
 
 { #category : 'settings' }
