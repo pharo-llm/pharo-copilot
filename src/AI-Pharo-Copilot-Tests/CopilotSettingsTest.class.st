@@ -10,7 +10,7 @@ Class {
 CopilotSettingsTest >> testAutoInstallRunsWhenPharoCoderMissing [
 
     | stub modelName missingResponse availableResponse |
-    modelName := 'pharo-coder-1.5b-fim-f16.gguf:latest'.
+    modelName := 'missing-test-model:latest'.
     missingResponse := Dictionary new at: #models put: #(); yourself.
     availableResponse := Dictionary new
         at: #models put: { Dictionary new
@@ -33,7 +33,7 @@ CopilotSettingsTest >> testAutoInstallRunsWhenPharoCoderMissing [
 CopilotSettingsTest >> testAutoInstallToggleDisablesScript [
 
     | stub modelName missingResponse |
-    modelName := 'pharo-coder-1.5b-fim-f16.gguf:latest'.
+    modelName := 'missing-test-model:latest'.
     missingResponse := Dictionary new at: #models put: #(); yourself.
     CopilotSettings withDefaultSettingsDo: [
         stub := OllamaClientStub new.

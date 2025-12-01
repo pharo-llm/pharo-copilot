@@ -826,7 +826,9 @@ CopilotSettings class >> shouldAutoInstallModelNamed: modelName [
 
     (self autoInstallModelScriptEnabled) ifFalse: [ ^ false ].
     modelName ifNil: [ ^ false ].
-    ^ modelName = 'pharo-coder-1.5b-fim-f16.gguf:latest'
+    (modelName respondsTo: #isEmpty) ifTrue: [ modelName isEmpty ifTrue: [ ^ false ] ].
+    (self isNullModelName: modelName) ifTrue: [ ^ false ].
+    ^ true
 ]
 
 { #category : 'accessing' }
