@@ -814,11 +814,12 @@ CopilotSettings class >> shouldShowDetailedSettings [
 { #category : 'accessing' }
 CopilotSettings class >> showInstallCompletionDialog [
 
-	| message uiClass uiManager transcript |
-	message := 'Pharo Copilot installed ' , String cr , 'Welcome to Pharo-Copilot' , String cr
-	           , 'Ollama runs your models locally, so none of your data is sent anywhere.' , String cr
-	           , 'Everything is already configured—just open your Browser and start typing.' , String cr
-	           , 'For more details, visit our documentation' , String cr.
+| message uiClass uiManager transcript |
+(SmalltalkImage current isHeadless or: [ OSEnvironment current includesKey: 'CI' ]) ifTrue: [ ^ self ].
+message := 'Pharo Copilot installed ' , String cr , 'Welcome to Pharo-Copilot' , String cr
+           , 'Ollama runs your models locally, so none of your data is sent anywhere.' , String cr
+           , 'Everything is already configured—just open your Browser and start typing.' , String cr
+           , 'For more details, visit our documentation' , String cr.
 	uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
 	uiClass ifNotNil: [
 			(uiClass respondsTo: #default) ifTrue: [
