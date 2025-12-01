@@ -1,8 +1,9 @@
 Class {
 	#name : 'UsabilityTest',
 	#superclass : 'CopilotMockModelTestCase',
-	#category : 'AI-Pharo-Copilot-Tests',
-	#package : 'AI-Pharo-Copilot-Tests'
+	#category : 'AI-Pharo-Copilot-Tests-Tests',
+	#package : 'AI-Pharo-Copilot-Tests',
+	#tag : 'Tests'
 }
 
 { #category : 'tests' }

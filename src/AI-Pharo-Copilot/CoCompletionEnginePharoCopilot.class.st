@@ -9,6 +9,12 @@ Class {
 	#package : 'AI-Pharo-Copilot'
 }
 
+{ #category : 'replacement' }
+CoCompletionEnginePharoCopilot >> basicReplaceTokenInEditorWith: newString [
+
+    super replaceTokenInEditorWith: newString.
+]
+
 { #category : 'accessing' }
 CoCompletionEnginePharoCopilot >> completionBuilder [
             | builderClass |
@@ -28,8 +34,10 @@ CoCompletionEnginePharoCopilot >> completionBuilder [
 { #category : 'replacement' }
 CoCompletionEnginePharoCopilot >> replaceTokenInEditorWith: newString [
 
-    | originalCaretPosition |
-    originalCaretPosition := self editor caret.
-    super replaceTokenInEditorWith: newString.
-    self editor selectAt: originalCaretPosition.
+	| originalCaretPosition |
+	    newString ifNil: [ ^ self ].
+    newString isEmpty ifTrue: [ ^ self ].
+	originalCaretPosition := self editor caret.
+	self basicReplaceTokenInEditorWith: newString.
+	self editor selectAt: originalCaretPosition
 ]

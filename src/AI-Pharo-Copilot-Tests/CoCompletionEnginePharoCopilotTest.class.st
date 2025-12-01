@@ -1,8 +1,9 @@
 Class {
 	#name : 'CoCompletionEnginePharoCopilotTest',
 	#superclass : 'TestCase',
-	#category : 'AI-Pharo-Copilot-Tests',
-	#package : 'AI-Pharo-Copilot-Tests'
+	#category : 'AI-Pharo-Copilot-Tests-Tests',
+	#package : 'AI-Pharo-Copilot-Tests',
+	#tag : 'Tests'
 }
 
 { #category : 'tests' }
