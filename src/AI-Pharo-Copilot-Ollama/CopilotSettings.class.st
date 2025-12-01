@@ -23,7 +23,8 @@ Class {
 { #category : 'accessing' }
 CopilotSettings class >> attemptAutoInstallForModelNamed: modelName usingInitialResponse: response [
 
-   ^ self performInstallOfModelNamed: modelName usingInitialResponse: response
+	(self shouldAutoInstallModelNamed: modelName) ifFalse: [ ^ false ].
+    ^ self performInstallOfModelNamed: modelName usingInitialResponse: response
 ]
 
 { #category : 'accessing' }
@@ -298,31 +299,31 @@ self clearCachedModelMetadata.
 { #category : 'accessing' }
 CopilotSettings class >> installModelNamed: modelName [
 
-    | client |
-    [
-        client := self newOllamaClient.
-        CoCopilotLogger
-            logBackEndEvent: 'Invoking Ollama model install script'
-            details: (Dictionary new
-                at: #model put: modelName;
-                yourself).
-        client pullModelNamed: modelName.
-        CoCopilotLogger
-            logBackEndEvent: 'Ollama model install script completed'
-            details: (Dictionary new
-                at: #model put: modelName;
-                yourself).
-        ^ true
-    ] on: Error do: [ :ex |
-        CoCopilotLogger
-            logError: 'Failed to invoke Ollama model install script'
-            origin: #CopilotSettings
-            exception: ex
-            payload: (Dictionary new
-                at: #model put: modelName;
-                yourself).
-        ^ false
-    ]
+	| client |
+	[
+		client := self newOllamaClient.
+		        self
+            notifyUser:
+                ('Downloading the Copilot model "{1}" via Ollama. This may take a few minutes.'
+                    format: { modelName }).
+		CoCopilotLogger logBackEndEvent: 'Invoking Ollama model install script' details: (Dictionary new
+				 at: #model put: modelName;
+				 yourself).
+		client pullModelNamed: modelName.
+		CoCopilotLogger logBackEndEvent: 'Ollama model install script completed' details: (Dictionary new
+				 at: #model put: modelName;
+				 yourself).
+		^ true ]
+		on: Error
+		do: [ :ex |
+				CoCopilotLogger
+					logError: 'Failed to invoke Ollama model install script'
+					origin: #CopilotSettings
+					exception: ex
+					payload: (Dictionary new
+							 at: #model put: modelName;
+							 yourself).
+				^ false ]
 ]
 
 { #category : 'accessing' }
