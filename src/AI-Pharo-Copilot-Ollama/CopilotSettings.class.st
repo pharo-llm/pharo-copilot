@@ -266,12 +266,6 @@ CopilotSettings class >> fimTemplateFromFile: aFileReference [
 ]
 
 { #category : 'accessing' }
-CopilotSettings class >> fimTemplateOption: aString [
-
-	"The inline FIM template is sourced from the templates repository."
-]
-
-{ #category : 'accessing' }
 CopilotSettings class >> host [
 
     ^ Host ifNil: [ Host := '127.0.0.1' ].
