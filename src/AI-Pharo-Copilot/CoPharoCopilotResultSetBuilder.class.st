@@ -16,6 +16,46 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
         yourself
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> applyContent: content toContext: aContext expectedPrefix: prefixString suffix: suffixString contextInfo: contextInfo [ 
+
+        | snapshot |
+        content isEmpty
+                ifTrue: [
+                        ^ CoCopilotLogger logFrontEndEvent: 'No suggestion content to apply' details: (Dictionary new
+                                                        at: #reason put: 'Generated content was empty';
+                                                        at: #rawResponse put: (contextInfo at: #rawResponse ifAbsent: [ '' ]);
+                                                        yourself) ].
+
+        aContext ifNil: [
+                        ^ CoCopilotLogger logFrontEndEvent: 'Skipped applying suggestion - missing context' details: (Dictionary new
+                                                        at: #appliedContent put: content;
+                                                        at: #appliedLength put: content size;
+                                                        at: #reason put: 'Completion context was nil';
+                                                        yourself) ].
+
+
+        snapshot := self contextSnapshotFor: aContext.
+        ((snapshot at: #prefix) = prefixString and: [ (snapshot at: #suffix) = suffixString ])
+                ifFalse: [
+                        ^ CoCopilotLogger logFrontEndEvent: 'Skipped applying suggestion - context changed' details: (Dictionary new
+                                                        at: #appliedContent put: content;
+                                                        at: #appliedLength put: content size;
+                                                        at: #expectedPrefixLength put: prefixString size;
+                                                        at: #expectedSuffixLength put: suffixString size;
+                                                        at: #currentPrefixLength put: (snapshot at: #prefix) size;
+                                                        at: #currentSuffixLength put: (snapshot at: #suffix) size;
+                                                        at: #requestedPosition put: (contextInfo at: #cursorPosition ifAbsent: [ nil ]);
+                                                        at: #currentPosition put: (snapshot at: #position);
+                                                        yourself) ].
+
+        aContext replaceTokenInEditorWith: content.
+        CoCopilotLogger logFrontEndEvent: 'Applied suggestion to editor' details: (Dictionary new
+                                                 at: #appliedContent put: content;
+                                                 at: #appliedLength put: content size;
+                                                 yourself)
+]
+
 { #category : 'API - building' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
 
@@ -139,6 +179,23 @@ CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
         ^ body trimBoth
 ]
 
+{ #category : 'validation' }
+CoPharoCopilotResultSetBuilder >> contextSnapshotFor: aContext [
+
+        | safeSource safePosition |
+        safeSource := [ aContext source ifNil: [ '' ] ] on: Error do: [ '' ].
+        safePosition := [ aContext position ifNil: [ 0 ] ] on: Error do: [ 0 ].
+        safePosition := (safePosition max: 0) min: safeSource size.
+        ^ Dictionary new
+                        at: #prefix put: (safePosition > 0 ifTrue: [ safeSource copyFrom: 1 to: safePosition ] ifFalse: [ '' ]);
+                        at: #suffix put: (safePosition < safeSource size
+                                ifTrue: [ safeSource copyFrom: safePosition + 1 to: safeSource size ]
+                                ifFalse: [ '' ]);
+                        at: #position put: safePosition;
+                        at: #sourceLength put: safeSource size;
+                        yourself
+]
+
 { #category : 'API - building' }
 CoPharoCopilotResultSetBuilder >> indexOfClosingFenceIn: text startingAt: startIndex [ 
 
@@ -215,14 +272,11 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 		CoCopilotLogger logFrontEndEvent: 'Preparing completion request' details: contextInfo.
 
 		client := OllamaClient new.
-		                classContext := self classContextFor: aContext.
-                contextInfo
-                        at: #classContextLength put: classContext size;
-                        at: #classContextPresent put: classContext isEmpty not.
-                rawResponse := client
-                        generateForPrefix: prefixString
-                        suffix: suffixString
-                        context: classContext.
+		classContext := self classContextFor: aContext.
+		contextInfo
+			at: #classContextLength put: classContext size;
+			at: #classContextPresent put: classContext isEmpty not.
+		rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
 		rawResponseString := [ rawResponse asString ]
 			                     on: Error
 			                     do: [ rawResponse printString ].
@@ -230,6 +284,9 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 				 at: #rawResponseClass put: rawResponse class name;
 				 at: #rawResponse put: rawResponseString;
 				 yourself).
+		contextInfo at: #rawResponse put: rawResponseString.
+		
+		
 		content := rawResponseString.
 		[
 			| parsed |
@@ -244,34 +301,19 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 							 yourself) ].
 
 		content := self cleanedContentFrom: content asString.
-		CoCopilotLogger logBackEndEvent: 'Normalized suggestion content' details: (Dictionary new
-				 at: #cleanedContent put: content;
-				 at: #cleanedLength put: content size;
-				 yourself).
-
-		content isEmpty
-			ifFalse: [
-					aContext
-						ifNil: [
-								CoCopilotLogger logFrontEndEvent: 'Skipped applying suggestion - missing context' details: (Dictionary new
-										 at: #appliedContent put: content;
-										 at: #appliedLength put: content size;
-										 at: #reason put: 'Completion context was nil';
-										 yourself) ]
-						ifNotNil: [
-								aContext replaceTokenInEditorWith: content.
-								CoCopilotLogger logFrontEndEvent: 'Applied suggestion to editor' details: (Dictionary new
-										 at: #appliedContent put: content;
-										 at: #appliedLength put: content size;
-										 yourself) ] ]
-			ifTrue: [
-					CoCopilotLogger logFrontEndEvent: 'No suggestion content to apply' details: (Dictionary new
-							 at: #reason put: 'Generated content was empty';
-							 at: #rawResponse put: rawResponseString;
-							 yourself) ] ]
-		on: Error
-		do: [ :ex |
-				CoCopilotLogger
+		                CoCopilotLogger logBackEndEvent: 'Normalized suggestion content' details: (Dictionary new
+                                 at: #cleanedContent put: content;
+                                 at: #cleanedLength put: content size;
+                                 yourself).
+                self
+                        applyContent: content
+                        toContext: aContext
+                        expectedPrefix: prefixString
+                        suffix: suffixString
+                        contextInfo: contextInfo ]
+                on: Error
+                do: [ :ex |
+                                CoCopilotLogger
 					logError: 'Asynchronous completion failed'
 					origin: #CoPharoCopilotResultSetBuilder
 					exception: ex
