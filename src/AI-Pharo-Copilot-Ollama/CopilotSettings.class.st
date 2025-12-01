@@ -23,44 +23,7 @@ Class {
 { #category : 'accessing' }
 CopilotSettings class >> attemptAutoInstallForModelNamed: modelName usingInitialResponse: response [
 
-    (self shouldAutoInstallModelNamed: modelName) ifFalse: [ ^ false ].
-    CoCopilotLogger
-        logBackEndEvent: 'Attempting auto-install for missing Ollama model'
-        details: (Dictionary new
-            at: #model put: modelName;
-            at: #availableModelsBefore put: (self modelNamesFromResponse: response);
-            yourself).
-    (self installModelNamed: modelName) ifFalse: [ ^ false ].
-    [
-        | refreshedResponse refreshedModels |
-        refreshedResponse := self newOllamaClient listModels.
-        refreshedModels := self modelNamesFromResponse: refreshedResponse.
-        (refreshedModels includes: modelName) ifTrue: [
-            CoCopilotLogger
-                logBackEndEvent: 'Auto-install detected newly available Ollama model'
-                details: (Dictionary new
-                    at: #model put: modelName;
-                    at: #availableModelsAfter put: refreshedModels;
-                    yourself).
-            [ OModelRegistry refresh ] on: Error do: [ :ignored | ].
-            ^ true
-        ].
-        CoCopilotLogger
-            logBackEndEvent: 'Auto-install did not expose expected Ollama model'
-            details: (Dictionary new
-                at: #model put: modelName;
-                at: #availableModelsAfter put: refreshedModels;
-                yourself).
-    ] on: Error do: [ :ex |
-        CoCopilotLogger
-            logError: 'Failed to refresh Ollama models after auto-install'
-            origin: #CopilotSettings
-            exception: ex
-            payload: (Dictionary new
-                at: #model put: modelName;
-                yourself).
-    ].
-    ^ false
+   ^ self performInstallOfModelNamed: modelName usingInitialResponse: response
 ]
 
 { #category : 'accessing' }
@@ -187,6 +150,10 @@ CopilotSettings class >> ensureSelectedModelAvailable [
     (availableModels includes: modelName) ifTrue: [ ^ true ].
     (self attemptAutoInstallForModelNamed: modelName usingInitialResponse: response)
         ifTrue: [ ^ true ].
+    (self promptToInstallMissingModelNamed: modelName availableModels: availableModels)
+        ifTrue: [
+            (self performInstallOfModelNamed: modelName usingInitialResponse: response)
+                ifTrue: [ ^ true ] ].
     CoCopilotLogger
         logBackEndEvent: 'Missing Ollama model'
         details: (Dictionary new
@@ -564,6 +531,13 @@ CopilotSettings class >> ollamaClientFactory: aBlockClosure [
     self clearCachedModelMetadata.
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> performInstallOfModelNamed: modelName usingInitialResponse: response [
+
+    ^ (self installModelNamed: modelName)
+        and: [ self refreshModelsAfterInstallOf: modelName usingInitialResponse: response ]
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> populateMetadata: metadata fromResponse: response [
 
@@ -605,6 +579,78 @@ CopilotSettings class >> port: aNumber [
 					        do: [ self port ] ]
 		        ifFalse: [ aNumber ].
 		self clearCachedModelMetadata.
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> promptToInstallMissingModelNamed: modelName availableModels: availableModels [
+
+    | uiClass uiManager confirmation message transcript |
+    message :=
+            ('The model "{1}" is not available in your Ollama installation. Do you want to download it now?'
+                    format: { modelName }).
+    CoCopilotLogger
+        logBackEndEvent: 'Prompting user to install missing Ollama model'
+        details: (Dictionary new
+            at: #model put: modelName;
+            at: #availableModels put: availableModels;
+            yourself).
+    uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
+    uiClass ifNotNil: [
+        (uiClass respondsTo: #default)
+            ifTrue: [
+                uiManager := uiClass default.
+                (uiManager respondsTo: #confirm:)
+                    ifTrue: [ confirmation := uiManager confirm: message ] ] ].
+    confirmation ifNil: [
+        transcript := Smalltalk globals at: #Transcript ifAbsent: [ nil ].
+        transcript ifNotNil: [
+            (transcript respondsTo: #show:)
+                ifTrue: [ transcript show: message; cr ] ].
+        ^ false ].
+    CoCopilotLogger
+        logBackEndEvent: 'User responded to Ollama model install prompt'
+        details: (Dictionary new
+            at: #model put: modelName;
+            at: #userAccepted put: confirmation;
+            yourself).
+    ^ confirmation
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> refreshModelsAfterInstallOf: modelName usingInitialResponse: initialResponse [
+
+    [
+        | refreshedResponse refreshedModels |
+        refreshedResponse := self newOllamaClient listModels.
+        refreshedModels := self modelNamesFromResponse: refreshedResponse.
+        (refreshedModels includes: modelName) ifTrue: [
+            CoCopilotLogger
+                logBackEndEvent: 'Detected newly available Ollama model after install'
+                details: (Dictionary new
+                    at: #model put: modelName;
+                    at: #availableModelsBefore put: (self modelNamesFromResponse: initialResponse);
+                    at: #availableModelsAfter put: refreshedModels;
+                    yourself).
+            [ OModelRegistry refresh ] on: Error do: [ :ignored | ].
+            ^ true
+        ].
+        CoCopilotLogger
+            logBackEndEvent: 'Model install did not expose expected Ollama model'
+            details: (Dictionary new
+                at: #model put: modelName;
+                at: #availableModelsBefore put: (self modelNamesFromResponse: initialResponse);
+                at: #availableModelsAfter put: refreshedModels;
+                yourself).
+    ] on: Error do: [ :ex |
+        CoCopilotLogger
+            logError: 'Failed to refresh Ollama models after install'
+            origin: #CopilotSettings
+            exception: ex
+            payload: (Dictionary new
+                at: #model put: modelName;
+                yourself).
+    ].
+    ^ false
 ]
 
 { #category : 'accessing' }
