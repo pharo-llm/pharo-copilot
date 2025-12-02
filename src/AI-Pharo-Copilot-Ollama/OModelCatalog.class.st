@@ -16,6 +16,11 @@ OModelCatalog class >> pharoCopilotNull [
 ]
 
 { #category : 'private - definitions' }
-OModelCatalog class >> qwen25Coder1p5BLatest [
-        <ollamaModel: 'qwen2.5-coder' tag: '0.5b' label: 'Qwen2.5 Coder 0.5B'>
+OModelCatalog class >> pharoqwencoder154003b [
+        <ollamaModel: 'omarabedelkader/pharo-qwen-coder-15400' tag: '3b' label: 'Base Model (solid performance)'>
+]
+
+{ #category : 'private - definitions' }
+OModelCatalog class >> pharoqwencoder154007b [
+        <ollamaModel: 'omarabedelkader/pharo-qwen-coder-15400' tag: '7b' label: 'Large Model (high-quality outputs)'>
 ]
