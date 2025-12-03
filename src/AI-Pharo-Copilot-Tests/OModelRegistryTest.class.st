@@ -109,18 +109,20 @@ OModelRegistryTest >> testRebuildHandlesEmptyPragmas [
 { #category : 'tests' }
 OModelRegistryTest >> testRebuildWithoutRemoteModelsDoesNotIncludeCatalogEntries [
 
-	| registry |
-	OModelRegistry modelsFetcher: [
-			Dictionary new
-				at: #models put: #(  );
-				yourself ].
-	OModelRegistry refresh.
-	registry := OModelRegistry current.
-    self assert: registry byFullName size equals: 1.
-    self assert: registry byLabel size equals: 1.
-    self assert: (registry specByFullName: CopilotSettings nullModelFullName) notNil.
-	OModelRegistry modelsFetcher: [ self defaultModelsResponse ].
-	OModelRegistry refresh
+        | registry |
+        OModelRegistry modelsFetcher: [
+                        Dictionary new
+                                at: #models put: #(  );
+                                yourself ].
+        OModelRegistry refresh.
+        registry := OModelRegistry current.
+        self assert: (registry specByFullName: CopilotSettings nullModelFullName) notNil.
+        self assert: (registry specByLabel: 'Base Model (solid performance)') notNil.
+        self assert: (registry specByLabel: 'Large Model (high-quality outputs)') notNil.
+        self assert: registry byFullName size >= 3.
+        self assert: registry byLabel size >= 3.
+        OModelRegistry modelsFetcher: [ self defaultModelsResponse ].
+        OModelRegistry refresh
 ]
 
 { #category : 'tests' }
