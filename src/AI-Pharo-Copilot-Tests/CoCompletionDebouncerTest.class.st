@@ -9,18 +9,22 @@ Class {
 { #category : 'tests' }
 CoCompletionDebouncerTest >> testCancelsPendingRequestWhenRescheduled [
 
-        | debouncer semaphore counter |
-        debouncer := CoCompletionDebouncer new.
-        debouncer delayMilliseconds: 30.
-        semaphore := Semaphore new.
-        counter := 0.
+	| debouncer semaphore counter |
+	debouncer := CoCompletionDebouncer new.
+	debouncer delayMilliseconds: 30.
+	semaphore := Semaphore new.
+	counter := 0.
 
-        debouncer schedule: [ counter := counter + 1. semaphore signal ].
-        debouncer schedule: [ counter := counter + 10. semaphore signal ].
+	debouncer schedule: [
+			counter := counter + 1.
+			semaphore signal ].
+	debouncer schedule: [
+			counter := counter + 10.
+			semaphore signal ].
 
-        semaphore waitTimeoutMSecs: 300.
+	semaphore waitTimeoutMilliseconds: 300.
 
-        self assert: counter equals: 10
+	self assert: counter equals: 10
 ]
 
 { #category : 'tests' }

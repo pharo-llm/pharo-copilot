@@ -81,12 +81,15 @@ CoCompletionDebouncer >> schedule: aBlock bypass: bypassDebounce [
     bypassDebounce ifTrue: [ ^ self performImmediately: aBlock ].
     self cancelPending.
     pendingProcess := [
-        (Delay forMilliseconds: self delayMilliseconds) wait.
-        aBlock value
-    ] ensure: [ pendingProcess := nil ].
+        [
+            (Delay forMilliseconds: self delayMilliseconds) wait.
+            aBlock value
+        ] ensure: [ pendingProcess := nil ]
+    ].
 
     pendingProcess := (pendingProcess respondsTo: #forkAt:)
             ifTrue: [ pendingProcess forkAt: Processor userBackgroundPriority ]
             ifFalse: [ pendingProcess fork ].
     ^ pendingProcess
+
 ]
