@@ -64,7 +64,7 @@ CoPharoCopilotResultSetBuilder >> applyContent: content toContext: aContext expe
 { #category : 'API - building' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
 
-	| context prefix suffix contextInfo process fetcher bypassDebounce |
+	| context prefix suffix contextInfo process fetcher bypassDebounce request worker |
 	context := completionContext.
 	prefix := context source copyFrom: 1 to: context position.
 	suffix := context position < context source size
@@ -79,26 +79,39 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		               at: #sourceSize put: context source size;
 		               at: #fullSource put: context source;
 		               at: #prefix put: prefix;
-		               at: #suffix put: suffix;
-		               yourself.
-	bypassDebounce := self shouldBypassDebounceIn: context.
-	process := self debouncer
-		           schedule: [
-				           self
-					           processCompletionFor: context
-					           prefix: prefix
-					           suffix: suffix
-					           contextInfo: contextInfo ]
-		           bypass: bypassDebounce.
+		              at: #suffix put: suffix;
+                               yourself.
+        bypassDebounce := self shouldBypassDebounceIn: context.
+
+        CoCancellableRequestRegistry cancelAllActiveRequests.
+        request := CoCancellableRequest withContext: contextInfo copy.
+        CoCancellableRequestRegistry register: request.
+
+        worker := [
+                request process: Processor activeProcess.
+                [
+                        self
+                                processCompletionFor: context
+                                prefix: prefix
+                                suffix: suffix
+                                contextInfo: contextInfo
+                                request: request ]
+                        ensure: [ request registerCompletion ] ].
+
+        process := self debouncer
+                           schedule: worker
+                           bypass: bypassDebounce.
+        request process ifNil: [ request process: process ].
 
 	CoCopilotLogger
 		logBackEndEvent: 'Dispatched asynchronous completion fetch'
 		details: (Dictionary new
 				 at: #processPriority put: Processor userBackgroundPriority;
-                        at: #processId put: (process ifNotNil: [ process identityHash ]);
-                        at: #debounceBypassed put: bypassDebounce;
-                        at: #debounceDelayMilliseconds put: self debouncer delayMilliseconds;
-                         yourself).
+				 at: #processId put: (process ifNotNil: [ process identityHash ]);
+				 at: #debounceBypassed put: bypassDebounce;
+				 at: #debounceDelayMilliseconds
+				 put: self debouncer delayMilliseconds;
+				 yourself).
 
 	fetcher := CoCollectionFetcher onCollection: #(  ).
 	^ CoResultSet fetcher: fetcher
@@ -363,12 +376,104 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 ]
 
 { #category : 'API - building' }
+CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo request: aRequest [
+
+        | classContext |
+        [
+                | client rawResponse rawResponseString content |
+                CoCopilotLogger logFrontEndEvent: 'Preparing completion request' details: contextInfo.
+
+                (self requestCancelled: aRequest reason: 'Request cancelled before preparing client')
+                        ifTrue: [ ^ self ].
+                client := OllamaClient new.
+                classContext := self classContextFor: aContext.
+                contextInfo
+                        at: #classContextLength put: classContext size;
+                        at: #classContextPresent put: classContext isEmpty not.
+
+                (self requestCancelled: aRequest reason: 'Request cancelled before dispatching to Ollama')
+                        ifTrue: [ ^ self ].
+                rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
+                rawResponseString := [ rawResponse asString ]
+                                             on: Error
+                                             do: [ rawResponse printString ].
+                CoCopilotLogger logBackEndEvent: 'Received raw suggestion payload' details: (Dictionary new
+					 at: #rawResponseClass put: rawResponse class name;
+					 at: #rawResponse put: rawResponseString;
+					 yourself).
+		contextInfo at: #rawResponse put: rawResponseString.
+
+
+		content := rawResponseString.
+		[
+			| parsed |
+			parsed := STONJSON fromString: rawResponseString.
+			(parsed isKindOf: Dictionary) ifTrue: [
+					content := parsed
+						           at: #response
+						           ifAbsent: [
+						           parsed at: 'response' ifAbsent: [ rawResponseString ] ] ] ]
+			on: Error
+			do: [ :ex |
+					CoCopilotLogger
+						logBackEndEvent: 'Failed to parse suggestion payload as JSON'
+						details: (Dictionary new
+								 at: #error put: ex messageText;
+								 at: #rawResponse put: rawResponseString;
+								 yourself) ].
+
+		content := self cleanedContentFrom: content asString.
+		CoCopilotLogger
+			logBackEndEvent: 'Normalized suggestion content'
+			details: (Dictionary new
+at: #cleanedContent put: content;
+                                at: #cleanedLength put: content size;
+                                yourself).
+
+                (self requestCancelled: aRequest reason: 'Request cancelled before applying content')
+                        ifTrue: [ ^ self ].
+		self
+			applyContent: content
+			toContext: aContext
+			expectedPrefix: prefixString
+			suffix: suffixString
+			contextInfo: contextInfo ]
+		on: Error
+		do: [ :ex |
+				CoCopilotLogger
+					logError: 'Asynchronous completion failed'
+					origin: #CoPharoCopilotResultSetBuilder
+					exception: ex
+					payload: (Dictionary new
+							 at: #requestDetails put: contextInfo copy;
+							 at: #prefixLength put: prefixString size;
+							 at: #suffixLength put: suffixString size;
+							 yourself) ]
+]
+
+{ #category : 'API - building' }
 CoPharoCopilotResultSetBuilder >> renderGhostText: content inContext: aContext [
 
         aContext ifNil: [ ^ self ].
         (aContext respondsTo: #renderGhostText:)
                 ifTrue: [ aContext renderGhostText: content ]
                 ifFalse: [ aContext replaceTokenInEditorWith: content ]
+]
+
+{ #category : 'API - building' }
+CoPharoCopilotResultSetBuilder >> requestCancelled: aRequest reason: reasonString [
+
+        aRequest ifNil: [ ^ false ].
+        aRequest cancelled ifFalse: [ ^ false ].
+
+        CoCopilotLogger
+                logBackEndEvent: 'Skipped completion work for cancelled request'
+                details: (Dictionary new
+                                         at: #requestId put: aRequest id;
+                                         at: #reason put: (reasonString ifNil: [ 'unspecified' ]);
+                                         at: #requestContext put: aRequest contextInfo;
+                                         yourself).
+        ^ true
 ]
 
 { #category : 'API - building' }
