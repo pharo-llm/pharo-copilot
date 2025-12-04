@@ -1,160 +1,99 @@
-"
-Represents an asynchronous request that can be cancelled.
-Tracks all active requests globally and logs lifecycle events for debugging.
-"
 Class {
 	#name : 'CoCancellableRequest',
 	#superclass : 'Object',
 	#instVars : [
-		'identifier',
+		'id',
 		'process',
 		'cancelled',
-		'label'
+		'contextInfo'
 	],
 	#classInstVars : [
-		'activeRequests'
+		'NextId'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
 }
 
 { #category : 'accessing' }
-CoCancellableRequest class >> activeRequests [
+CoCancellableRequest class >> nextId [
 
-        ^ activeRequests ifNil: [ activeRequests := IdentitySet new ]
+        NextId ifNil: [ NextId := 0 ].
+        NextId := NextId + 1.
+        ^ NextId
 ]
 
 { #category : 'accessing' }
-CoCancellableRequest class >> activeRequestsSnapshot [
+CoCancellableRequest class >> withContext: aDictionary [
 
-        ^ self activeRequests copy
+        ^ self new
+                contextInfo: aDictionary;
+                yourself
 ]
 
-{ #category : 'accessing' }
-CoCancellableRequest class >> cancelAll [
-		<script>
-
-        self cancelAllLabeled: nil
-
-]
-
-{ #category : 'accessing' }
-CoCancellableRequest class >> cancelAllLabeled: aLabelString [
-
-        "Cancel every tracked request matching the given label. If the label is nil,
-        cancel everything."
-
-        (self activeRequests copy) do: [ :request |
-                (aLabelString isNil or: [ request label = aLabelString ])
-                        ifTrue: [ request cancel ] ]
-]
-
-{ #category : 'accessing' }
-CoCancellableRequest class >> register: aRequest [
-
-        self activeRequests add: aRequest
-]
-
-{ #category : 'accessing' }
-CoCancellableRequest class >> startNamed: aLabelString priority: aPriority running: aBlockClosure [
-
-        | request |
-        request := self new.
-        ^ request
-                startNamed: aLabelString
-                priority: aPriority
-                running: aBlockClosure
-]
-
-{ #category : 'accessing' }
-CoCancellableRequest class >> startNamed: aLabelString running: aBlockClosure [
-
-        ^ self
-                startNamed: aLabelString
-                priority: Processor userBackgroundPriority
-                running: aBlockClosure
-]
-
-{ #category : 'accessing' }
-CoCancellableRequest class >> unregister: aRequest [ 
-        self activeRequests remove: aRequest ifAbsent: [ ]
-]
-
-{ #category : 'accessing' }
-CoCancellableRequest class >> unregisterAll [
-
-        self activeRequests copy do: [ :request | self unregister: request ]
-]
-
-{ #category : 'actions' }
-CoCancellableRequest >> cancel [
+{ #category : 'evaluating' }
+CoCancellableRequest >> cancelWithReason: aString [
 
         cancelled ifTrue: [ ^ self ].
         cancelled := true.
-        process ifNotNil: [ process isTerminated ifFalse: [ process terminate ] ].
-        self class unregister: self.
-        CoCopilotLogger logFrontEndEvent: 'Cancelled request' details: (Dictionary new
-                                 at: #requestId put: self identifier;
-                                 at: #label put: label;
-                                 yourself)
+        process ifNotNil: [ process terminate ].
+        CoCopilotLogger
+                logBackEndEvent: 'Cancelled completion request'
+                details: (Dictionary new
+                                         at: #requestId put: self id;
+                                         at: #reason put: (aString ifNil: [ 'unspecified' ]);
+                                         at: #requestContext put: (self contextInfo ifNil: [ Dictionary new ]);
+                                         yourself).
+        CoCancellableRequestRegistry remove: self
 ]
 
-{ #category : 'actions' }
-CoCancellableRequest >> identifier [
-
-        ^ identifier
-]
-
-{ #category : 'initialization' }
-CoCancellableRequest >> ifCancelled: aBlock [
-
-        self isCancelled ifTrue: [ aBlock value. ^ true ].
-        ^ false
-]
-
-{ #category : 'initialization' }
-CoCancellableRequest >> initialize [
-
-        super initialize.
-        identifier := UUID new asString.
-        cancelled := false
-]
-
-{ #category : 'initialization' }
-CoCancellableRequest >> isCancelled [
+{ #category : 'evaluating' }
+CoCancellableRequest >> cancelled [
 
         ^ cancelled = true
 ]
 
-{ #category : 'initialization' }
-CoCancellableRequest >> label [
+{ #category : 'evaluating' }
+CoCancellableRequest >> contextInfo [
 
-        ^ label ifNil: [ 'request' ]
+        ^ contextInfo ifNil: [ Dictionary new ]
 ]
 
-{ #category : 'initialization' }
-CoCancellableRequest >> markFinished [ 
+{ #category : 'evaluating' }
+CoCancellableRequest >> contextInfo: aDictionary [
 
-        self class unregister: self.
-        self isCancelled
-                ifFalse: [
-                        CoCopilotLogger logFrontEndEvent: 'Completed request' details: (Dictionary new
-                                                 at: #requestId put: self identifier;
-                                                 at: #label put: self label;
-                                                 yourself) ]
+        contextInfo := aDictionary ifNil: [ Dictionary new ] ifNotNil: [ aDictionary ]
 ]
 
-{ #category : 'initialization' }
-CoCancellableRequest >> startNamed: aLabelString priority: aPriority running: aBlockClosure [
+{ #category : 'evaluating' }
+CoCancellableRequest >> id [
 
-        label := aLabelString.
-        self class register: self.
-        CoCopilotLogger logFrontEndEvent: 'Started cancellable request' details: (Dictionary new
-                                 at: #requestId put: self identifier;
-                                 at: #label put: self label;
-                                 at: #priority put: aPriority;
-                                 yourself).
-        process := [ [ aBlockClosure value: self ] ensure: [ self markFinished ] ]
-                           forkAt: aPriority.
-        ^ self
+        ^ id
+]
+
+{ #category : 'evaluating' }
+CoCancellableRequest >> initialize [
+
+        super initialize.
+        id := self class nextId.
+        cancelled := false.
+        contextInfo := Dictionary new.
+        process := nil
+]
+
+{ #category : 'evaluating' }
+CoCancellableRequest >> process [
+
+        ^ process
+]
+
+{ #category : 'evaluating' }
+CoCancellableRequest >> process: aProcess [
+
+        process := aProcess
+]
+
+{ #category : 'evaluating' }
+CoCancellableRequest >> registerCompletion [
+
+        CoCancellableRequestRegistry remove: self
 ]
