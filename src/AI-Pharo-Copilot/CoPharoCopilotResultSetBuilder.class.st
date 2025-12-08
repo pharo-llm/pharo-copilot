@@ -22,14 +22,12 @@ CoPharoCopilotResultSetBuilder >> applyContent: content toContext: aContext expe
         | snapshot |
         content isEmpty
                 ifTrue: [
-	self clearGhostTextInContext: aContext.
                         ^ CoCopilotLogger logFrontEndEvent: 'No suggestion content to apply' details: (Dictionary new
                                                         at: #reason put: 'Generated content was empty';
                                                         at: #rawResponse put: (contextInfo at: #rawResponse ifAbsent: [ '' ]);
                                                         yourself) ].
 
         aContext ifNil: [
-	self clearGhostTextInContext: aContext.
                         ^ CoCopilotLogger logFrontEndEvent: 'Skipped applying suggestion - missing context' details: (Dictionary new
                                                         at: #appliedContent put: content;
                                                         at: #appliedLength put: content size;
@@ -40,21 +38,21 @@ CoPharoCopilotResultSetBuilder >> applyContent: content toContext: aContext expe
         snapshot := self contextSnapshotFor: aContext.
         ((snapshot at: #prefix) = prefixString and: [ (snapshot at: #suffix) = suffixString ])
                 ifFalse: [
-	self clearGhostTextInContext: aContext.
                         ^ CoCopilotLogger logFrontEndEvent: 'Skipped applying suggestion - context changed' details: (Dictionary new
                                                         at: #appliedContent put: content;
                                                         at: #appliedLength put: content size;
                                                         at: #expectedPrefixLength put: prefixString size;
                                                         at: #expectedSuffixLength put: suffixString size;
                                                         at: #currentPrefixLength put: (snapshot at: #prefix) size;
-                                                         at: #currentSuffixLength put: (snapshot at: #suffix) size;
-                                                         at: #requestedPosition put: (contextInfo at: #cursorPosition ifAbsent: [ nil ]);
-                                                         at: #currentPosition put: (snapshot at: #position);
-                                                         yourself) ].
+                                                        at: #currentSuffixLength put: (snapshot at: #suffix) size;
+                                                        at: #requestedPosition put: (contextInfo at: #cursorPosition ifAbsent: [ nil ]);
+                                                        at: #currentPosition put: (snapshot at: #position);
+                                                        yourself) ].
 
-        self renderGhostText: content inContext: aContext.
-        CoCopilotLogger logFrontEndEvent: 'Rendered ghost text suggestion' details: (Dictionary new
-                                                 at: #ghostLength put: content size;
+        aContext replaceTokenInEditorWith: content.
+        CoCopilotLogger logFrontEndEvent: 'Applied suggestion to editor' details: (Dictionary new
+                                                 at: #appliedContent put: content;
+                                                 at: #appliedLength put: content size;
                                                  yourself)
 ]
 
@@ -179,12 +177,6 @@ CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
                         ifTrue: [ text ]
                         ifFalse: [ text copyFrom: 1 to: idx - 1 ].
         ^ body trimBoth
-]
-
-{ #category : 'API - building' }
-CoPharoCopilotResultSetBuilder >> clearGhostTextInContext: aContext [
-
-        (aContext respondsTo: #clearGhostText) ifTrue: [ aContext clearGhostText ]
 ]
 
 { #category : 'validation' }
@@ -330,15 +322,6 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 							 at: #prefixLength put: prefixString size;
 							 at: #suffixLength put: suffixString size;
 							 yourself) ]
-]
-
-{ #category : 'API - building' }
-CoPharoCopilotResultSetBuilder >> renderGhostText: content inContext: aContext [
-
-        aContext ifNil: [ ^ self ].
-        (aContext respondsTo: #renderGhostText:)
-                ifTrue: [ aContext renderGhostText: content ]
-                ifFalse: [ aContext replaceTokenInEditorWith: content ]
 ]
 
 { #category : 'API - building' }
