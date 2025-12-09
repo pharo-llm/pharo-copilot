@@ -77,23 +77,6 @@ CoCopilotLogger class >> ensureLogFileInitialized [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> ensureLogsDirectory [
-
-	| directory |
-	self loggingEnabled ifFalse: [ ^ self logsDirectoryReference ].
-	directory := self logsDirectoryReference.
-	[
-		directory directory parent ensureCreateDirectory.
-		directory ensureCreateDirectory ]
-		on: Error
-		do: [ :ex |
-				Transcript
-					show: 'Copilot log directory could not be created: ' , ex messageText;
-					cr ].
-	^ directory
-]
-
-{ #category : 'class initialization' }
 CoCopilotLogger class >> evaluationLogFileName [
         ^ 'copilot-evaluation-log.jsonl'
 ]
