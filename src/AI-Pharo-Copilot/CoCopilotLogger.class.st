@@ -245,15 +245,14 @@ CoCopilotLogger class >> loggingEnabled [
 
 { #category : 'class initialization' }
 CoCopilotLogger class >> logsDirectoryName [
-        ^ 'copilot-logs'
+        ^ self pharoCopilotDirectoryName
 ]
 
 { #category : 'class initialization' }
 CoCopilotLogger class >> logsDirectoryReference [
         ^ logsDirectoryReference ifNil: [
                 logsDirectoryReference := FileLocator imageDirectory
-                        / self pharoCopilotDirectoryName
-                        / self logsDirectoryName ]
+                        / self pharoCopilotDirectoryName ]
 ]
 
 { #category : 'class initialization' }

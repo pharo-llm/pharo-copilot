@@ -173,8 +173,7 @@ CoSuggestionEvaluatorTest >> testSavePersistentStatsProducesJson [
     | tempFs tempDir tempFile originalReference originalLoggingEnabled jsonLine parsed |
     tempFs := FileSystem memory.
             tempDir := tempFs
-            / CoCopilotLogger pharoCopilotDirectoryName
-            / CoCopilotLogger logsDirectoryName.
+            / CoCopilotLogger pharoCopilotDirectoryName.
     tempDir parent ensureCreateDirectory.
     tempDir ensureCreateDirectory.
     tempFile := tempDir / 'copilot-evaluation-log.jsonl'.
