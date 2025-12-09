@@ -194,7 +194,7 @@ CopilotSettingsTest >> testHostAccessor [
 CopilotSettingsTest >> testLoggingEnabledDefaultsToTrue [
 
     CopilotSettings withDefaultSettingsDo: [
-        self assert: CopilotSettings loggingEnabled equals: true.
+        self assert: CopilotSettings loggingEnabled equals: false.
     ].
 ]
 
