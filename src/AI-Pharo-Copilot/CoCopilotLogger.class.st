@@ -129,9 +129,12 @@ CoCopilotLogger class >> formatValue: anObject [
 
 { #category : 'class initialization' }
 CoCopilotLogger class >> initialize [
-
-	self ensureLogFileInitialized.
-	self ensureEvaluationLogFileInitialized
+	logFileReference := nil.
+	        logsDirectoryReference := nil.
+        evaluationLogFileReference := nil.
+        self ensureLogsDirectory.
+        self ensureLogFileInitialized.
+        self ensureEvaluationLogFileInitialized
 ]
 
 { #category : 'introspection' }
