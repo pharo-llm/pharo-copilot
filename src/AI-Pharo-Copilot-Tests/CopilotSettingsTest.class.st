@@ -441,7 +441,9 @@ CopilotSettingsTest >> testNullModelGeneratesMetadataFiles [
             modelDir notNil ifTrue: [
                 [ modelDir children do: [ :child | child ensureDelete ] ] on: Error do: [ :ignored | ].
                 modelDir exists ifTrue: [ modelDir ensureDelete ] ].
-            tempDir exists ifTrue: [ tempDir ensureDelete ].
+            tempDir exists ifTrue: [
+                [ tempDir children do: [ :child | child ensureDelete ] ] on: Error do: [ :ignored | ].
+                tempDir ensureDelete ].
         ]
     ].
 ]
