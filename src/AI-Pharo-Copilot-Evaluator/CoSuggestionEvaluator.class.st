@@ -26,8 +26,7 @@ Class {
 	#instVars : [
 		'acceptedEntries',
 		'rejectedEntries',
-		'sessionStats',
-		'persistentStats'
+		'sessionStats'
 	],
 	#classInstVars : [
 		'default'
@@ -183,7 +182,6 @@ CoSuggestionEvaluator >> initialize [
 	rejectedEntries := OrderedCollection new.
 	sessionStats := Dictionary new.
 	self initializeStats.
-	self loadPersistentStats.
 ]
 
 { #category : 'initialization' }
@@ -221,57 +219,6 @@ CoSuggestionEvaluator >> iterationSelectors [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> jsonSafeObject: anObject [
-        anObject isNil ifTrue: [ ^ nil ].
-
-        (anObject isString or: [ anObject isKindOf: Text ]) ifTrue: [ ^ anObject asString ].
-        (anObject isKindOf: DateAndTime) ifTrue: [ ^ anObject asString ].
-        (anObject isKindOf: Number) ifTrue: [ ^ anObject ].
-        (anObject isKindOf: Boolean) ifTrue: [ ^ anObject ].
-
-        (anObject isKindOf: Dictionary) ifTrue: [
-                | jsonDict |
-                jsonDict := Dictionary new.
-                anObject keysAndValuesDo: [ :key :value |
-                        | jsonKey |
-                        jsonKey := key ifNil: [ 'nil' ] ifNotNil: [ key asString ].
-                        jsonDict at: jsonKey put: (self jsonSafeObject: value) ].
-                ^ jsonDict ].
-
-        (anObject isKindOf: SequenceableCollection) ifTrue: [
-                ^ anObject collect: [ :each | self jsonSafeObject: each ] ].
-
-        (anObject isKindOf: Set) ifTrue: [
-                ^ anObject asArray collect: [ :each | self jsonSafeObject: each ] ].
-
-        (anObject respondsTo: #asString) ifTrue: [ ^ anObject asString ].
-
-        ^ anObject printString
-]
-
-{ #category : 'initialization' }
-CoSuggestionEvaluator >> loadPersistentStats [
-	"Load previous evaluation data if available"
-CoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
-	[
-		| evaluationFile |
-		evaluationFile := CoCopilotLogger evaluationLogFileReference.
-
-		(evaluationFile exists and: [ evaluationFile isFile ]) ifTrue: [
-				persistentStats := OrderedCollection new.
-				evaluationFile readStreamDo: [ :stream |
-						[ stream atEnd ] whileFalse: [
-								| line |
-								line := stream nextLine.
-								(line isNil or: [ line isEmpty ]) ifFalse: [
-										[ persistentStats add: (STONJSON fromString: line) ]
-											on: Error
-											do: [ "Ignore invalid entries" ] ] ] ] ] ]
-		on: Error
-		do: [ "Ignore if can't access files" ]
-]
-
-{ #category : 'initialization' }
 CoSuggestionEvaluator >> recordSuggestionAccepted: aCopilotEntry context: aCompletionContext [
 	| evaluationEntry |
 	
@@ -284,7 +231,6 @@ CoSuggestionEvaluator >> recordSuggestionAccepted: aCopilotEntry context: aCompl
 	
 	acceptedEntries add: evaluationEntry.
 	self updateStats: evaluationEntry.
-	self savePersistentStats.
 	
 	"Notify for potential model improvement"
 	self announceEvaluation: evaluationEntry.
@@ -318,36 +264,6 @@ CoSuggestionEvaluator >> rejectionRate [
 	total = 0 ifTrue: [ ^ 0 ].
 	rejected := sessionStats at: #totalRejected ifAbsent: [ 0 ].
 	^ (rejected / total * 100) rounded
-]
-
-{ #category : 'initialization' }
-CoSuggestionEvaluator >> savePersistentStats [
-	"Save evaluation data to file for long-term analysis"
-        | evaluationFile data |
-        CoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
-
-        evaluationFile := CoCopilotLogger evaluationLogFileReference.
-        data := Dictionary new
-                        at: #acceptedCount put: acceptedEntries size;
-		        at: #rejectedCount put: rejectedEntries size;
-		        at: #sessionStats put: sessionStats;
-		        at: #timestamp put: DateAndTime now;
-		        at: #modelName put: CopilotSettings modelName;
-		        yourself.
-
-	[
-		CoCopilotLogger ensureEvaluationLogFileInitialized.
-		evaluationFile writeStreamDo: [ :stream |
-				| safeData |
-				safeData := self jsonSafeObject: data.
-				stream setToEnd.
-				stream nextPutAll: (STONJSON toString: safeData).
-				stream nextPut: Character lf ] ]
-		on: Error
-		do: [ :ex | "Silently ignore file write errors"
-				Transcript
-					show: 'Could not save evaluation stats: ' , ex messageText;
-					cr ]
 ]
 
 { #category : 'initialization' }

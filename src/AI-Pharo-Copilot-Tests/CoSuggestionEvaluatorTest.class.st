@@ -168,35 +168,6 @@ CoSuggestionEvaluatorTest >> testRejectionRateCalculation [
 ]
 
 { #category : 'running' }
-CoSuggestionEvaluatorTest >> testSavePersistentStatsProducesJson [
-
-    | tempFs tempDir tempFile originalReference originalLoggingEnabled jsonLine parsed |
-    tempFs := FileSystem memory.
-            tempDir := tempFs
-            / CoCopilotLogger pharoCopilotDirectoryName.
-    tempDir parent ensureCreateDirectory.
-    tempDir ensureCreateDirectory.
-    tempFile := tempDir / 'copilot-evaluation-log.jsonl'.
-
-    originalReference := CoCopilotLogger evaluationLogFileReference.
-    originalLoggingEnabled := CopilotSettings loggingEnabled.
-
-    [
-            CopilotSettings loggingEnabled: true.
-            CoCopilotLogger evaluationLogFileReference: tempFile.
-            evaluator savePersistentStats.
-            jsonLine := tempFile readStreamDo: [ :stream | stream nextLine ].
-            parsed := STONJSON fromString: jsonLine.
-		self assert: (parsed at: 'rejectedCount') equals: 0.
-		self assert: ((parsed at: 'sessionStats') isKindOf: Dictionary).
-		self assert: ((parsed at: 'sessionStats') includesKey: 'totalSuggestions').
-		self assert: ((parsed at: 'timestamp') isKindOf: String).
-		self assert: ((parsed at: 'modelName') isKindOf: String) ] ensure: [
-			tempFile ensureDelete.
-			CoCopilotLogger evaluationLogFileReference: originalReference ]
-]
-
-{ #category : 'running' }
 CoSuggestionEvaluatorTest >> testUpdateLengthStatsLongSuggestion [
 	| entry |
 	entry := CoEvaluationEntry new.

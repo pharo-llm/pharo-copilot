@@ -13,7 +13,6 @@ Class {
 		'ModelMetadata',
 		'OllamaClientFactory',
 		'AutoInstallModelScriptEnabled',
-		'LoggingEnabled',
 		'TemplatesDirectory'
 	],
 	#category : 'AI-Pharo-Copilot-Ollama',
@@ -83,54 +82,27 @@ CopilotSettings class >> copilotProvider: aSymbol [
 { #category : 'accessing' }
 CopilotSettings class >> defaultFimTemplate [
 
-    | template cacheFile |
-    cacheFile := self templateFileForModelNamed: self modelName.
-    template := self fimTemplateFromFile: cacheFile.
-    template ifNotNil: [
-        CoCopilotLogger
-            logBackEndEvent: 'Using cached FIM template from logs'
-            details: (Dictionary new
-                at: #model put: (self modelName ifNil: [ 'unknown-model' ]);
-                at: #source put: cacheFile pathString;
-                yourself).
-        ^ template ].
-    template := self fimTemplateFromBundledTemplates.
+
+    | template |
+template := self fimTemplateFromBundledTemplates.
     template ifNotNil: [ ^ template ].
-    self logMissingFimTemplate.
     ^ self error: 'No fill-in-the-middle template is available for the current Copilot model.'
 ]
 
 { #category : 'settings' }
 CopilotSettings class >> ensureOllamaServiceAvailable [
 
-    | response |
-    [
-        response := self newOllamaClient listModels.
-    ]
-        on: Error
-        do: [ :ex |
-            CoCopilotLogger
-                logError: 'Ollama service unavailable'
-                origin: #CopilotSettings
-                exception: ex
-                payload: (Dictionary new
-                    at: #host put: self host;
-                    at: #port put: self port;
-                    yourself).
-            self notifyUser: 'Ollama is not configured. Please configure it.'.
-            ^ nil
-        ].
-    response ifNil: [
-        CoCopilotLogger
-            logBackEndEvent: 'Missing response from Ollama service'
-            details: (Dictionary new
-                at: #host put: self host;
-                at: #port put: self port;
-                yourself).
-        self notifyUser: 'Ollama is not configured. Please configure it.'.
-        ^ nil
-    ].
-    ^ response
+	| response |
+	<TODO: 'make it better'>
+	[ response := self newOllamaClient listModels ]
+		on: Error
+		do: [ :ex |
+				self notifyUser: 'Ollama is not configured. Please configure it.'.
+				^ nil ].
+	response ifNil: [
+			self notifyUser: 'Ollama is not configured. Please configure it.'.
+			^ nil ].
+	^ response
 ]
 
 { #category : 'settings' }
@@ -142,61 +114,38 @@ CopilotSettings class >> ensureSelectedModelAvailable [
 	response := self ensureOllamaServiceAvailable.
 	response ifNil: [ ^ false ].
 	availableModels := self modelNamesFromResponse: response.
-	CoCopilotLogger logBackEndEvent: 'Validated Ollama model availability' details: (Dictionary new
-			 at: #model put: modelName;
-			 at: #availableModelCount put: availableModels size;
-			 yourself).
 	(availableModels includes: modelName) ifTrue: [ ^ true ].
 	self autoInstallModelScriptEnabled ifFalse: [ ^ false ].
 	(self attemptAutoInstallForModelNamed: modelName usingInitialResponse: response) ifTrue: [ ^ true ].
 	(self promptToInstallMissingModelNamed: modelName availableModels: availableModels) ifTrue: [
 		(self performInstallOfModelNamed: modelName usingInitialResponse: response) ifTrue: [ ^ true ] ].
-	CoCopilotLogger logBackEndEvent: 'Missing Ollama model' details: (Dictionary new
-			 at: #model put: modelName;
-			 at: #availableModels put: availableModels;
-			 yourself).
 	self notifyUser:
-		('We could not find this model in your Ollama installation. If you recently requested its installation, please wait while it completes.' format: { modelName }).
+		('We could not find this model in your Ollama installation. If you recently requested its installation, please wait while it completes.'
+			 format: { modelName }).
 	^ false
 ]
 
 { #category : 'accessing' }
 CopilotSettings class >> fetchModelMetadata [
 
-| client response metadata modelName |
-metadata := Dictionary new.
-(self ensureSelectedModelAvailable) ifFalse: [ ^ metadata ].
-modelName := self modelName.
-(self isNullModelName: modelName) ifTrue: [
-metadata := self nullModelMetadata.
-self saveModelMetadataFilesFor: metadata.
-CoCopilotLogger
-logBackEndEvent: 'Generated null model metadata'
-details: (Dictionary new
-at: #model put: modelName;
-at: #keys put: metadata keys asArray;
-yourself).
-^ metadata ].
-[
-client := self newOllamaClient.
-response := client showModelNamed: modelName.
-response ifNil: [ ^ metadata ].
-self populateMetadata: metadata fromResponse: response.
-self saveModelMetadataFilesFor: metadata.
-CoCopilotLogger
-logBackEndEvent: 'Fetched Ollama model metadata'
-details: (Dictionary new
-at: #model put: (metadata at: #model ifAbsent: [ modelName ]);
-at: #keys put: metadata keys asArray;
-yourself) ]
-on: Error
-do: [ :ex |
-CoCopilotLogger logBackEndEvent: 'Failed to fetch Ollama model metadata' details: (Dictionary new
-at: #model put: modelName;
-at: #errorClass put: ex class name;
-at: #error put: ex description;
-yourself) ].
-^ metadata
+	| client response metadata modelName |
+	metadata := Dictionary new.
+	self ensureSelectedModelAvailable ifFalse: [ ^ metadata ].
+	modelName := self modelName.
+	(self isNullModelName: modelName) ifTrue: [
+			metadata := self nullModelMetadata.
+			^ metadata ].
+	[
+		client := self newOllamaClient.
+		response := client showModelNamed: modelName.
+		response ifNil: [ ^ metadata ].
+		self populateMetadata: metadata fromResponse: response.
+		self saveModelMetadataFilesFor: metadata.
+		 ]
+		on: Error
+		do: [ :ex |
+				 ].
+	^ metadata
 ]
 
 { #category : 'accessing' }
@@ -218,51 +167,35 @@ CopilotSettings class >> fimTemplate [
 { #category : 'accessing' }
 CopilotSettings class >> fimTemplateFromBundledTemplates [
 
-    | directory sanitizedName candidates |
-    directory := self templatesDirectory.
-    (directory exists) ifFalse: [ ^ nil ].
-    sanitizedName := self
-        sanitizedFileComponentFor: self modelName
-        default: 'unknown-model'.
-    candidates := OrderedCollection new.
-    candidates add: directory / sanitizedName / 'template.txt'.
-    candidates add: directory / 'template.txt'.
-    candidates do: [ :each |
-        | value |
-        value := self fimTemplateFromFile: each.
-        value ifNotNil: [
-            CoCopilotLogger
-                logBackEndEvent: 'Using bundled FIM template'
-                details: (Dictionary new
-                    at: #model put: (self modelName ifNil: [ 'unknown-model' ]);
-                    at: #source put: each pathString;
-                    yourself).
-            ^ value ] ].
-    ^ nil
+	| directory sanitizedName candidates |
+	directory := self templatesDirectory.
+	directory exists ifFalse: [ ^ nil ].
+	sanitizedName := self sanitizedFileComponentFor: self modelName default: 'unknown-model'.
+	candidates := OrderedCollection new.
+	candidates add: directory / sanitizedName / 'template.txt'.
+	candidates add: directory / 'template.txt'.
+	candidates do: [ :each |
+			| value |
+			value := self fimTemplateFromFile: each.
+			 value ifNotNil: [ ^ value ] ].
+	
 ]
 
 { #category : 'accessing' }
 CopilotSettings class >> fimTemplateFromFile: aFileReference [
 
-    | file contents |
-    aFileReference ifNil: [ ^ nil ].
-    file := aFileReference asFileReference.
-    (file exists and: [ file isFile ]) ifFalse: [ ^ nil ].
-    contents := [ file readStreamDo: [ :stream | stream contents ] ]
-        on: Error
-        do: [ :ex |
-            CoCopilotLogger
-                logError: 'Failed to read FIM template file'
-                origin: #CopilotSettings
-                exception: ex
-                payload: (Dictionary new
-                    at: #file put: file pathString;
-                    yourself).
-            ^ nil ].
-    (contents respondsTo: #asString) ifFalse: [ ^ nil ].
-    contents := contents asString.
-    contents isEmpty ifTrue: [ ^ nil ].
-    ^ contents
+	| file contents |
+	aFileReference ifNil: [ ^ nil ].
+	file := aFileReference asFileReference.
+	(file exists and: [ file isFile ]) ifFalse: [ ^ nil ].
+	contents := [ file readStreamDo: [ :stream | stream contents ] ]
+		            on: Error
+		            do: [ :ex |
+				            ^ nil ].
+	(contents respondsTo: #asString) ifFalse: [ ^ nil ].
+	contents := contents asString.
+	contents isEmpty ifTrue: [ ^ nil ].
+	^ contents
 ]
 
 { #category : 'accessing' }
@@ -285,23 +218,10 @@ CopilotSettings class >> installModelNamed: modelName [
 	[
 		client := self newOllamaClient.
 		self notifyUser: ('Downloading... This may take a few minutes.' format: { modelName }).
-		CoCopilotLogger logBackEndEvent: 'Invoking Ollama model install script' details: (Dictionary new
-				 at: #model put: modelName;
-				 yourself).
 		client pullModelNamed: modelName.
-		CoCopilotLogger logBackEndEvent: 'Ollama model install script completed' details: (Dictionary new
-				 at: #model put: modelName;
-				 yourself).
 		^ true ]
 		on: Error
 		do: [ :ex |
-				CoCopilotLogger
-					logError: 'Failed to invoke Ollama model install script'
-					origin: #CopilotSettings
-					exception: ex
-					payload: (Dictionary new
-							 at: #model put: modelName;
-							 yourself).
 				^ false ]
 ]
 
@@ -321,38 +241,6 @@ CopilotSettings class >> isCopilotEngineSelected [
 CopilotSettings class >> isNullModelName: aString [
 
         ^ aString = self nullModelFullName
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> logMissingFimTemplate [
-
-    CoCopilotLogger
-        logBackEndEvent: 'Missing FIM template for model'
-        details: (Dictionary new
-            at: #model put: (self modelName ifNil: [ 'unknown-model' ]);
-            at: #templatesDirectory put: self templatesDirectory pathString;
-            yourself)
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> loggingEnabled [
-
-    ^ LoggingEnabled ifNil: [ LoggingEnabled := true ]
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> loggingEnabled: aBoolean [
-
-    LoggingEnabled := aBoolean.
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> metadataFileContentsFor: value [
-
-    | formatted |
-    formatted := CoCopilotLogger formatValue: value.
-    formatted ifNil: [ ^ '' ].
-    ^ formatted asString
 ]
 
 { #category : 'accessing' }
@@ -566,10 +454,6 @@ CopilotSettings class >> promptToInstallMissingModelNamed: modelName availableMo
 
 	| uiClass uiManager confirmation message transcript |
 	message := 'This model is not available, Do you want to install it ? ' format: { modelName }.
-	CoCopilotLogger logBackEndEvent: 'Prompting user to install missing Ollama model' details: (Dictionary new
-			 at: #model put: modelName;
-			 at: #availableModels put: availableModels;
-			 yourself).
 	uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
 	uiClass ifNotNil: [
 			(uiClass respondsTo: #default) ifTrue: [
@@ -583,10 +467,6 @@ CopilotSettings class >> promptToInstallMissingModelNamed: modelName availableMo
 								show: message;
 								cr ] ].
 			^ false ].
-	CoCopilotLogger logBackEndEvent: 'User responded to Ollama model install prompt' details: (Dictionary new
-			 at: #model put: modelName;
-			 at: #userAccepted put: confirmation;
-			 yourself).
 	^ confirmation
 ]
 
@@ -598,44 +478,13 @@ CopilotSettings class >> refreshModelsAfterInstallOf: modelName usingInitialResp
         refreshedResponse := self newOllamaClient listModels.
         refreshedModels := self modelNamesFromResponse: refreshedResponse.
         (refreshedModels includes: modelName) ifTrue: [
-            CoCopilotLogger
-                logBackEndEvent: 'Detected newly available Ollama model after install'
-                details: (Dictionary new
-                    at: #model put: modelName;
-                    at: #availableModelsBefore put: (self modelNamesFromResponse: initialResponse);
-                    at: #availableModelsAfter put: refreshedModels;
-                    yourself).
             [ OModelRegistry refresh ] on: Error do: [ :ignored | ].
             ^ true
         ].
-        CoCopilotLogger
-            logBackEndEvent: 'Model install did not expose expected Ollama model'
-            details: (Dictionary new
-                at: #model put: modelName;
-                at: #availableModelsBefore put: (self modelNamesFromResponse: initialResponse);
-                at: #availableModelsAfter put: refreshedModels;
-                yourself).
+     
     ] on: Error do: [ :ex |
-        CoCopilotLogger
-            logError: 'Failed to refresh Ollama models after install'
-            origin: #CopilotSettings
-            exception: ex
-            payload: (Dictionary new
-                at: #model put: modelName;
-                yourself).
     ].
     ^ false
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> removeMetadataTextFilesFrom: aDirectory [
-
-    (aDirectory exists) ifFalse: [ ^ self ].
-    [
-        aDirectory children do: [ :child |
-            (child isFile and: [ ((child extension ifNil: [ '' ]) asLowercase) = 'txt' ]) ifTrue: [
-                [ child ensureDelete ] on: Error do: [ :ignored | ] ] ]
-        ] on: Error do: [ :ignored | ]
 ]
 
 { #category : 'accessing' }
@@ -649,7 +498,6 @@ CopilotSettings class >> resetToDefaultSettings [
 	ModelMetadata := nil.
 	OllamaClientFactory := nil.
 	AutoInstallModelScriptEnabled := nil.
-	LoggingEnabled := nil.
 	TemplatesDirectory := nil
 ]
 
@@ -664,7 +512,6 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	ModelMetadata := aDictionary at: #ModelMetadata ifAbsent: [ nil ].
 	OllamaClientFactory := aDictionary at: #OllamaClientFactory ifAbsent: [ nil ].
 	AutoInstallModelScriptEnabled := aDictionary at: #AutoInstallModelScriptEnabled ifAbsent: [ nil ].
-	LoggingEnabled := aDictionary at: #LoggingEnabled ifAbsent: [ nil ].
 	TemplatesDirectory := aDictionary at: #TemplatesDirectory ifAbsent: [ nil ]
 ]
 
@@ -676,55 +523,6 @@ CopilotSettings class >> sanitizedFileComponentFor: anObject default: defaultStr
     candidate := [ anObject asString ] on: Error do: [ anObject printString ].
     (candidate isNil or: [ candidate isEmpty ]) ifTrue: [ ^ defaultString asFileName ].
     ^ candidate asFileName
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> saveModelMetadataFilesFor: metadata [
-
-    | modelNameValue modelNameString logsDirectory modelDirectory |
-    (self loggingEnabled and: [ metadata notNil ]) ifFalse: [ ^ self ].
-    metadata isEmpty ifTrue: [ ^ self ].
-    modelNameValue := metadata at: #model ifAbsent: [ self modelName ].
-    modelNameString := modelNameValue ifNil: [ self modelName ].
-    modelNameString isNil ifTrue: [ modelNameString := 'unknown-model' ].
-    modelNameString := modelNameString asString.
-    logsDirectory := CoCopilotLogger ensureLogsDirectory.
-    modelDirectory := logsDirectory / (self sanitizedFileComponentFor: modelNameString default: 'unknown-model').
-    [
-        modelDirectory ensureCreateDirectory
-    ] on: Error do: [ :ex |
-        CoCopilotLogger
-            logBackEndEvent: 'Failed to prepare metadata directory'
-            details: (Dictionary new
-                at: #model put: modelNameString;
-                at: #errorClass put: ex class name;
-                at: #error put: ex description;
-                yourself).
-        ^ self
-    ].
-    self removeMetadataTextFilesFrom: modelDirectory.
-    metadata associationsDo: [ :assoc |
-        | fileName fileRef contents keyLabel |
-        fileName := (self sanitizedFileComponentFor: assoc key default: 'metadata') , '.txt'.
-        fileRef := modelDirectory / fileName.
-        contents := self metadataFileContentsFor: assoc value.
-        keyLabel := (assoc key ifNil: [ 'metadata' ]) asString.
-        [
-            fileRef ensureCreateFile.
-            fileRef writeStreamDo: [ :stream |
-                stream truncate.
-                stream nextPutAll: contents ]
-        ] on: Error do: [ :ex |
-            CoCopilotLogger
-                logBackEndEvent: 'Failed to write Ollama metadata file'
-                details: (Dictionary new
-                    at: #model put: modelNameString;
-                    at: #key put: keyLabel;
-                    at: #file put: fileRef basename;
-                    at: #errorClass put: ex class name;
-                    at: #error put: ex description;
-                    yourself) ]
-    ]
 ]
 
 { #category : 'settings' }
@@ -757,16 +555,6 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #modelName:;
 					default: self modelName;
 					domainValues: self availableModelNames.
-
-				(aBuilder setting: #loggingEnabled)
-					order: 0.3;
-					label: 'Enable logging';
-					target: self;
-					getSelector: #loggingEnabled;
-					setSelector: #loggingEnabled:;
-					default: self loggingEnabled;
-					description: 'When disabled, Copilot will not record activity or evaluation logs.'.
-
 
 				(aBuilder setting: #autoInstallModelScriptEnabled)
 					order: 0.4;
@@ -809,7 +597,6 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #ModelMetadata put: ModelMetadata;
 		  at: #OllamaClientFactory put: OllamaClientFactory;
 		  at: #AutoInstallModelScriptEnabled put: AutoInstallModelScriptEnabled;
-		  at: #LoggingEnabled put: LoggingEnabled;
 		at: #TemplatesDirectory put: TemplatesDirectory;
 		  yourself
 ]

@@ -116,39 +116,6 @@ CopilotSettingsTest >> testCopilotProviderAccessor [
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
-
-	CopilotSettings withDefaultSettingsDo: [
-			| tempDir tempLogFile tempEvalFile originalLogRef originalDirRef originalEvalRef evaluator |
-			tempDir := FileLocator temp / ('copilot-logger-test-' , UUID new asString).
-			tempLogFile := tempDir / CoCopilotLogger logFileName.
-			tempEvalFile := tempDir / CoCopilotLogger evaluationLogFileName.
-			originalLogRef := CoCopilotLogger rawLogFileReference.
-			originalDirRef := CoCopilotLogger rawLogsDirectoryReference.
-			originalEvalRef := CoCopilotLogger rawEvaluationLogFileReference.
-			[
-				CopilotSettings loggingEnabled: false.
-				CoCopilotLogger rawLogsDirectoryReference: tempDir.
-				CoCopilotLogger rawLogFileReference: tempLogFile.
-				CoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
-				tempLogFile exists ifTrue: [ tempLogFile ensureDelete ].
-				tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-				CoCopilotLogger ensureLogFileInitialized.
-				CoCopilotLogger ensureEvaluationLogFileInitialized.
-				CoCopilotLogger logFrontEndEvent: 'Logging disabled test' details: Dictionary new.
-				evaluator := CoSuggestionEvaluator new.
-				evaluator savePersistentStats.
-				self deny: tempLogFile exists.
-				self deny: tempEvalFile exists ] ensure: [
-					tempLogFile exists ifTrue: [ tempLogFile ensureDelete ].
-					tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-					tempDir exists ifTrue: [ tempDir ensureDelete ].
-					CoCopilotLogger rawLogFileReference: originalLogRef.
-					CoCopilotLogger rawLogsDirectoryReference: originalDirRef.
-					CoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
-]
-
-{ #category : 'tests' }
 CopilotSettingsTest >> testEnsureSelectedModelAvailableShortCircuitsForNullModel [
 
     CopilotSettings withDefaultSettingsDo: [
@@ -191,35 +158,11 @@ CopilotSettingsTest >> testHostAccessor [
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testLoggingEnabledDefaultsToTrue [
-
-    CopilotSettings withDefaultSettingsDo: [
-        self assert: CopilotSettings loggingEnabled equals: false.
-    ].
-]
-
-{ #category : 'tests' }
 CopilotSettingsTest >> testMetadataStringForKeyDefaultWhenMissing [
     | value |
     CopilotSettings clearCachedModelMetadata.
     value := CopilotSettings metadataStringForKey: #unknown default: 'Missing'.
     self assert: value equals: 'Missing'.
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testMissingDefaultFimTemplateSignalsError [
-
-    | originalLogsDir tempFs logsDir |
-    originalLogsDir := CoCopilotLogger rawLogsDirectoryReference.
-    self withTemporaryTemplatesDirectoryDo: [ :ignoredDirectory |
-        tempFs := FileSystem memory.
-        logsDir := tempFs / 'pharo-copilot' / 'logs'.
-        logsDir ensureCreateDirectory.
-        [
-            CoCopilotLogger rawLogsDirectoryReference: logsDir.
-            self should: [ CopilotSettings defaultFimTemplate ] raise: Error
-        ] ensure: [ CoCopilotLogger rawLogsDirectoryReference: originalLogsDir ]
-    ]
 ]
 
 { #category : 'tests' }
@@ -400,51 +343,6 @@ CopilotSettingsTest >> testNewOllamaClientUsesConfiguredFactory [
     ] ensure: [
         CopilotSettings ollamaClientFactory: oldFactory.
         CopilotSettings clearCachedModelMetadata.
-    ].
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testNullModelGeneratesMetadataFiles [
-
-    CopilotSettings withDefaultSettingsDo: [
-        | tempDir originalDirRef originalFactory metadata modelDir detailsFile systemFile templateFile modelfileFile modelFile parsedDetails |
-        tempDir := FileLocator temp / ('copilot-null-metadata-' , UUID new asString).
-        originalDirRef := CoCopilotLogger rawLogsDirectoryReference.
-        originalFactory := CopilotSettings ollamaClientFactory.
-        [
-            tempDir exists ifTrue: [ tempDir ensureDelete ].
-            CoCopilotLogger rawLogsDirectoryReference: tempDir.
-            CopilotSettings loggingEnabled: true.
-            CopilotSettings clearCachedModelMetadata.
-            CopilotSettings modelName: CopilotSettings nullModelFullName.
-            CopilotSettings ollamaClientFactory: [ self fail: 'Null model should not request Ollama metadata.' ].
-            metadata := CopilotSettings modelMetadata.
-            self assert: metadata equals: CopilotSettings nullModelMetadata.
-            modelDir := tempDir / (CopilotSettings sanitizedFileComponentFor: CopilotSettings nullModelFullName default: 'unknown-model').
-            self assert: modelDir exists.
-            detailsFile := modelDir / 'details.txt'.
-            systemFile := modelDir / 'system.txt'.
-            templateFile := modelDir / 'template.txt'.
-            modelfileFile := modelDir / 'modelfile.txt'.
-            modelFile := modelDir / 'model.txt'.
-            { detailsFile. systemFile. templateFile. modelfileFile. modelFile } do: [ :each | self assert: each exists ].
-            parsedDetails := STONJSON fromString: detailsFile contents.
-            self assert: parsedDetails equals: (metadata at: #details).
-            self assert: systemFile contents equals: (metadata at: #system).
-            self assert: templateFile contents equals: (metadata at: #template).
-            self assert: modelfileFile contents equals: (metadata at: #modelfile).
-            self assert: modelFile contents equals: (metadata at: #model).
-        ] ensure: [
-            CopilotSettings ollamaClientFactory: originalFactory.
-            CoCopilotLogger rawLogsDirectoryReference: originalDirRef.
-            CopilotSettings clearCachedModelMetadata.
-            modelDir notNil ifTrue: [
-                [ modelDir children do: [ :child | child ensureDelete ] ] on: Error do: [ :ignored | ].
-                modelDir exists ifTrue: [ modelDir ensureDelete ] ].
-            tempDir exists ifTrue: [
-                [ tempDir children do: [ :child | child ensureDelete ] ] on: Error do: [ :ignored | ].
-                tempDir ensureDelete ].
-        ]
     ].
 ]
 

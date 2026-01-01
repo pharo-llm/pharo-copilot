@@ -22,43 +22,15 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> applyContent: content toContext: aContext expectedPrefix: prefixString suffix: suffixString contextInfo: contextInfo [ 
+CoPharoCopilotResultSetBuilder >> applyContent: content toContext: aContext expectedPrefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
-        | snapshot |
-        content isEmpty
-                ifTrue: [
-                        ^ CoCopilotLogger logFrontEndEvent: 'No suggestion content to apply' details: (Dictionary new
-                                                        at: #reason put: 'Generated content was empty';
-                                                        at: #rawResponse put: (contextInfo at: #rawResponse ifAbsent: [ '' ]);
-                                                        yourself) ].
-
-        aContext ifNil: [
-                        ^ CoCopilotLogger logFrontEndEvent: 'Skipped applying suggestion - missing context' details: (Dictionary new
-                                                        at: #appliedContent put: content;
-                                                        at: #appliedLength put: content size;
-                                                        at: #reason put: 'Completion context was nil';
-                                                        yourself) ].
-
-
-        snapshot := self contextSnapshotFor: aContext.
-        ((snapshot at: #prefix) = prefixString and: [ (snapshot at: #suffix) = suffixString ])
-                ifFalse: [
-                        ^ CoCopilotLogger logFrontEndEvent: 'Skipped applying suggestion - context changed' details: (Dictionary new
-                                                        at: #appliedContent put: content;
-                                                        at: #appliedLength put: content size;
-                                                        at: #expectedPrefixLength put: prefixString size;
-                                                        at: #expectedSuffixLength put: suffixString size;
-                                                        at: #currentPrefixLength put: (snapshot at: #prefix) size;
-                                                        at: #currentSuffixLength put: (snapshot at: #suffix) size;
-                                                        at: #requestedPosition put: (contextInfo at: #cursorPosition ifAbsent: [ nil ]);
-                                                        at: #currentPosition put: (snapshot at: #position);
-                                                        yourself) ].
-
-        aContext replaceTokenInEditorWith: content.
-        CoCopilotLogger logFrontEndEvent: 'Applied suggestion to editor' details: (Dictionary new
-                                                 at: #appliedContent put: content;
-                                                 at: #appliedLength put: content size;
-                                                 yourself)
+	| snapshot |
+	content isEmpty ifTrue: [ ^ self ].
+	aContext ifNil: [ ^ self ].
+	snapshot := self contextSnapshotFor: aContext.
+	((snapshot at: #prefix) = prefixString and: [ (snapshot at: #suffix) = suffixString ]) ifFalse: [ ^ self ].
+	aContext replaceTokenInEditorWith: content.
+	^ self.
 ]
 
 { #category : 'API - building' }
@@ -290,7 +262,6 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 	| classContext |
 	[
 		| client rawResponse rawResponseString content |
-		CoCopilotLogger logFrontEndEvent: 'Preparing completion request' details: contextInfo.
 
 		client := OllamaClient new.
 		classContext := self classContextFor: aContext.
@@ -301,13 +272,9 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 		rawResponseString := [ rawResponse asString ]
 			                     on: Error
 			                     do: [ rawResponse printString ].
-		CoCopilotLogger logBackEndEvent: 'Received raw suggestion payload' details: (Dictionary new
-				 at: #rawResponseClass put: rawResponse class name;
-				 at: #rawResponse put: rawResponseString;
-				 yourself).
 		contextInfo at: #rawResponse put: rawResponseString.
-		
-		
+
+
 		content := rawResponseString.
 		[
 			| parsed |
@@ -316,33 +283,18 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 				content := parsed at: #response ifAbsent: [ parsed at: 'response' ifAbsent: [ rawResponseString ] ] ] ]
 			on: Error
 			do: [ :ex |
-					CoCopilotLogger logBackEndEvent: 'Failed to parse suggestion payload as JSON' details: (Dictionary new
-							 at: #error put: ex messageText;
-							 at: #rawResponse put: rawResponseString;
-							 yourself) ].
+				].
 
 		content := self cleanedContentFrom: content asString.
-		                CoCopilotLogger logBackEndEvent: 'Normalized suggestion content' details: (Dictionary new
-                                 at: #cleanedContent put: content;
-                                 at: #cleanedLength put: content size;
-                                 yourself).
-                self
-                        applyContent: content
-                        toContext: aContext
-                        expectedPrefix: prefixString
-                        suffix: suffixString
-                        contextInfo: contextInfo ]
-                on: Error
-                do: [ :ex |
-                                CoCopilotLogger
-					logError: 'Asynchronous completion failed'
-					origin: #CoPharoCopilotResultSetBuilder
-					exception: ex
-					payload: (Dictionary new
-							 at: #requestDetails put: contextInfo copy;
-							 at: #prefixLength put: prefixString size;
-							 at: #suffixLength put: suffixString size;
-							 yourself) ]
+		self
+			applyContent: content
+			toContext: aContext
+			expectedPrefix: prefixString
+			suffix: suffixString
+			contextInfo: contextInfo ]
+		on: Error
+		do: [ :ex |
+				 ]
 ]
 
 { #category : 'API - building' }
@@ -355,24 +307,20 @@ CoPharoCopilotResultSetBuilder >> safeDefinitionStringFor: aBehavior [
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
-        | token |
-        debounceToken ifNil: [ debounceToken := 0 ].
-        debounceToken := debounceToken + 1.
-        token := debounceToken.
-        debounceProcess ifNotNil: [ debounceProcess terminate ].
-        debounceProcess := [
-                (Delay forMilliseconds: self debounceMilliseconds) wait.
-                token = debounceToken ifTrue: [
-                        self
-                                processCompletionFor: aContext
-                                prefix: prefixString
-                                suffix: suffixString
-                                contextInfo: contextInfo ] ] forkAt: Processor userBackgroundPriority.
-        CoCopilotLogger logBackEndEvent: 'Dispatched debounced completion fetch' details: (Dictionary new
-                        at: #processPriority put: Processor userBackgroundPriority;
-                        at: #processId put: debounceProcess identityHash;
-                        at: #debounceMilliseconds put: self debounceMilliseconds;
-                        yourself)
+	| token |
+	debounceToken ifNil: [ debounceToken := 0 ].
+	debounceToken := debounceToken + 1.
+	token := debounceToken.
+	debounceProcess ifNotNil: [ debounceProcess terminate ].
+	debounceProcess := [
+		                   (Delay forMilliseconds: self debounceMilliseconds) wait.
+		                   token = debounceToken ifTrue: [
+				                   self
+					                   processCompletionFor: aContext
+					                   prefix: prefixString
+					                   suffix: suffixString
+					                   contextInfo: contextInfo ] ] forkAt: Processor userBackgroundPriority.
+	^ self
 ]
 
 { #category : 'initialization' }
