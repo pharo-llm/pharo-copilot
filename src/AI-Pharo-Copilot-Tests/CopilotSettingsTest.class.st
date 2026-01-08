@@ -158,6 +158,14 @@ CopilotSettingsTest >> testHostAccessor [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testLoggingEnabledDefaultsToTrue [
+
+    CopilotSettings withDefaultSettingsDo: [
+        self assert: CopilotSettings loggingEnabled equals: true.
+    ].
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testMetadataStringForKeyDefaultWhenMissing [
     | value |
     CopilotSettings clearCachedModelMetadata.
