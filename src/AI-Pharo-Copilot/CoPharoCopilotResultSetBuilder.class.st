@@ -15,180 +15,223 @@ Class {
 }
 
 { #category : 'instance creation' }
-CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionContext [ 
-    ^ self new
-        initializeOnContext: aSystemCompletionContext;
-        yourself
+CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionContext [
+
+	"Create and initialize a builder bound to the given completion context."
+	^ self new
+		initializeOnContext: aSystemCompletionContext;
+		yourself
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> applyContent: content toContext: aContext expectedPrefix: prefixString suffix: suffixString contextInfo: contextInfo [ 
+CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
+	"Apply a suggestion into the editor only if the context still matches the prefix/suffix we requested for."
 
-        | snapshot |
-        content isEmpty
-                ifTrue: [
-                        ^ CoCopilotLogger logFrontEndEvent: 'No suggestion content to apply' details: (Dictionary new
-                                                        at: #reason put: 'Generated content was empty';
-                                                        at: #rawResponse put: (contextInfo at: #rawResponse ifAbsent: [ '' ]);
-                                                        yourself) ].
+	| snapshot |
+	contentString isEmpty ifTrue: [
+		^ CoCopilotLogger
+			logFrontEndEvent: 'No suggestion content to apply'
+			details: (Dictionary new
+				at: #reason put: 'Generated content was empty';
+				at: #rawResponse put: (contextInfo at: #rawResponse ifAbsent: [ '' ]);
+				yourself) ].
 
-        aContext ifNil: [
-                        ^ CoCopilotLogger logFrontEndEvent: 'Skipped applying suggestion - missing context' details: (Dictionary new
-                                                        at: #appliedContent put: content;
-                                                        at: #appliedLength put: content size;
-                                                        at: #reason put: 'Completion context was nil';
-                                                        yourself) ].
+	aContext ifNil: [
+		^ CoCopilotLogger
+			logFrontEndEvent: 'Skipped applying suggestion - missing context'
+			details: (Dictionary new
+				at: #appliedContent put: contentString;
+				at: #appliedLength put: contentString size;
+				at: #reason put: 'Completion context was nil';
+				yourself) ].
 
+	snapshot := self contextSnapshotFor: aContext.
+	(((snapshot at: #prefix) = expectedPrefix) and: [ (snapshot at: #suffix) = expectedSuffix ])
+		ifFalse: [
+			^ CoCopilotLogger
+				logFrontEndEvent: 'Skipped applying suggestion - context changed'
+				details: (Dictionary new
+					at: #appliedContent put: contentString;
+					at: #appliedLength put: contentString size;
+					at: #expectedPrefixLength put: expectedPrefix size;
+					at: #expectedSuffixLength put: expectedSuffix size;
+					at: #currentPrefixLength put: (snapshot at: #prefix) size;
+					at: #currentSuffixLength put: (snapshot at: #suffix) size;
+					at: #requestedPosition put: (contextInfo at: #cursorPosition ifAbsent: [ nil ]);
+					at: #currentPosition put: (snapshot at: #position);
+					yourself) ].
 
-        snapshot := self contextSnapshotFor: aContext.
-        ((snapshot at: #prefix) = prefixString and: [ (snapshot at: #suffix) = suffixString ])
-                ifFalse: [
-                        ^ CoCopilotLogger logFrontEndEvent: 'Skipped applying suggestion - context changed' details: (Dictionary new
-                                                        at: #appliedContent put: content;
-                                                        at: #appliedLength put: content size;
-                                                        at: #expectedPrefixLength put: prefixString size;
-                                                        at: #expectedSuffixLength put: suffixString size;
-                                                        at: #currentPrefixLength put: (snapshot at: #prefix) size;
-                                                        at: #currentSuffixLength put: (snapshot at: #suffix) size;
-                                                        at: #requestedPosition put: (contextInfo at: #cursorPosition ifAbsent: [ nil ]);
-                                                        at: #currentPosition put: (snapshot at: #position);
-                                                        yourself) ].
-
-        aContext replaceTokenInEditorWith: content.
-        CoCopilotLogger logFrontEndEvent: 'Applied suggestion to editor' details: (Dictionary new
-                                                 at: #appliedContent put: content;
-                                                 at: #appliedLength put: content size;
-                                                 yourself)
+	aContext replaceTokenInEditorWith: contentString.
+	CoCopilotLogger
+		logFrontEndEvent: 'Applied suggestion to editor'
+		details: (Dictionary new
+			at: #appliedContent put: contentString;
+			at: #appliedLength put: contentString size;
+			yourself)
 ]
 
-{ #category : 'API - building' }
+{ #category : 'private' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
+	"Prepare a result set and (if appropriate) schedule an async completion request for the current editor state."
 
-        | context prefix suffix contextInfo fetcher |
-        context := completionContext.
-        prefix := context source copyFrom: 1 to: context position.
-        suffix := context position < context source size
-                          ifTrue: [ context source copyFrom: context position + 1 to: context source size ]
-		          ifFalse: [ '' ].
-	contextInfo := Dictionary new
-		               at: #contextClass put: context class name;
-		               at: #cursorPosition put: context position;
-		               at: #sourceSize put: context source size;
-		               at: #fullSource put: context source;
-		               at: #prefix put: prefix;
-		               at: #suffix put: suffix;
-		               yourself.
-		        (self shouldRequestCompletionForPrefix: prefix suffix: suffix)
-                ifTrue: [ self scheduleCompletionFor: context prefix: prefix suffix: suffix contextInfo: contextInfo ].
+	| context prefix suffix contextInfo fetcher |
+	context := completionContext.
 
+	prefix := context source copyFrom: 1 to: context position.
+	suffix := context position < context source size
+		ifTrue: [ context source copyFrom: context position + 1 to: context source size ]
+		ifFalse: [ '' ].
 
-	fetcher := CoCollectionFetcher onCollection: #(  ).
+	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
+
+	(self shouldRequestCompletionForPrefix: prefix suffix: suffix)
+		ifTrue: [ self scheduleCompletionFor: context prefix: prefix suffix: suffix contextInfo: contextInfo ].
+
+	"Result sets are handled by applying directly into the editor once the async request returns."
+	fetcher := CoCollectionFetcher onCollection: #().
 	^ CoResultSet fetcher: fetcher
 ]
 
-{ #category : 'API - building' }
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> classContextFor: aContext [
+	"Build a textual snapshot of the class around the completion context (definition + methods) for better suggestions."
 
-        | behavior compiledMethod methodClass classDefinition instanceSide classSide |
-        behavior := (aContext respondsTo: #behavior)
-                ifTrue: [ [ aContext behavior ] on: Error do: [ nil ] ]
-                ifFalse: [ nil ].
-        compiledMethod := (aContext respondsTo: #method)
-                ifTrue: [ [ aContext method ] on: Error do: [ nil ] ]
-                ifFalse: [ nil ].
-        methodClass := behavior ifNil: [ compiledMethod ifNotNil: [ compiledMethod methodClass ] ] ifNotNil: [ behavior ].
-        classDefinition := self safeDefinitionStringFor: methodClass.
-        instanceSide := self methodSourcesFor: methodClass.
-        classSide := self methodSourcesFor: (methodClass ifNotNil: [ methodClass class ]).
-        ^ self
-                classDefinition: classDefinition
-                instanceMethods: instanceSide
-                classMethods: classSide
+	| behavior compiledMethod methodClass classDefinition instanceSide classSide |
+	behavior := (aContext respondsTo: #behavior)
+		ifTrue: [ [ aContext behavior ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+
+	compiledMethod := (aContext respondsTo: #method)
+		ifTrue: [ [ aContext method ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+
+	methodClass := behavior
+		ifNil: [ compiledMethod ifNotNil: [ compiledMethod methodClass ] ]
+		ifNotNil: [ behavior ].
+
+	classDefinition := self safeDefinitionStringFor: methodClass.
+	instanceSide := self methodSourcesFor: methodClass.
+	classSide := self methodSourcesFor: (methodClass ifNotNil: [ methodClass class ]).
+
+	^ self
+		classDefinition: classDefinition
+		instanceMethods: instanceSide
+		classMethods: classSide
 ]
 
-{ #category : 'API - building' }
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> classDefinition: classDefinitionString instanceMethods: instanceMethodsString classMethods: classMethodsString [
+	"Format the class context (definition and methods) into a single string suitable for passing to the model."
 
-        | hasDefinition hasInstance hasClass |
-        hasDefinition := classDefinitionString isEmpty not.
-        hasInstance := instanceMethodsString isEmpty not.
-        hasClass := classMethodsString isEmpty not.
-        (hasDefinition or: [ hasInstance or: hasClass ]) ifFalse: [ ^ '' ].
-        ^ String streamContents: [ :stream |
-                hasDefinition ifTrue: [
-                        stream
-                                nextPutAll: 'Class Definition:';
-                                cr;
-                                nextPutAll: classDefinitionString;
-                                cr;
-                                cr ].
-                hasInstance ifTrue: [
-                        stream
-                                nextPutAll: 'Instance Side Methods:';
-                                cr;
-                                nextPutAll: instanceMethodsString;
-                                cr ].
-                hasClass ifTrue: [
-                        stream
-                                nextPutAll: 'Class Side Methods:';
-                                cr;
-                                nextPutAll: classMethodsString ] ]
+	| hasDefinition hasInstance hasClass |
+	hasDefinition := classDefinitionString isEmpty not.
+	hasInstance := instanceMethodsString isEmpty not.
+	hasClass := classMethodsString isEmpty not.
+
+	(hasDefinition or: [ hasInstance or: hasClass ]) ifFalse: [ ^ '' ].
+
+	^ String streamContents: [ :stream |
+		hasDefinition ifTrue: [
+			stream
+				nextPutAll: 'Class Definition:';
+				cr;
+				nextPutAll: classDefinitionString;
+				cr;
+				cr ].
+
+		hasInstance ifTrue: [
+			stream
+				nextPutAll: 'Instance Side Methods:';
+				cr;
+				nextPutAll: instanceMethodsString;
+				cr ].
+
+		hasClass ifTrue: [
+			stream
+				nextPutAll: 'Class Side Methods:';
+				cr;
+				nextPutAll: classMethodsString ] ]
 ]
 
-{ #category : 'API - building' }
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
+	"Normalize suggestion text: prefer code-fence body if present, drop language markers, trim surrounding whitespace."
 
-	| text start rest closingIndex body newlineIndex firstLine delimiter idx |
-        text := (aString ifNil: [ '' ]) asString.
-        text isEmpty ifTrue: [ ^ '' ].
+	| text fenceStart rest fenceEnd body newlineIndex firstLine delimiterIndex |
+	text := (aString ifNil: [ '' ]) asString.
+	text isEmpty ifTrue: [ ^ '' ].
 
-        start := text indexOfSubCollection: '```' startingAt: 1 ifAbsent: [ 0 ].
-        start > 0 ifTrue: [
-                rest := start + 3 <= text size
-                        ifTrue: [ text copyFrom: start + 3 to: text size ]
-                        ifFalse: [ '' ].
-                closingIndex := self indexOfClosingFenceIn: rest startingAt: 1.
-                closingIndex := closingIndex = 0
-                        ifTrue: [ rest size + 1 ]
-                        ifFalse: [ closingIndex ].
-                body := closingIndex <= 1
-                        ifTrue: [ '' ]
-                        ifFalse: [ rest copyFrom: 1 to: closingIndex - 1 ].
-                newlineIndex := body indexOf: Character lf ifAbsent: [ 0 ].
-                newlineIndex > 0
-                        ifTrue: [
-                                firstLine := body copyFrom: 1 to: newlineIndex - 1.
-                                (firstLine isEmpty or: [ self isLanguageSpec: firstLine ]) ifTrue: [
-                                        body := newlineIndex < body size
-                                                ifTrue: [ body copyFrom: newlineIndex + 1 to: body size ]
-                                                ifFalse: [ '' ] ] ]
-                        ifFalse: [
-                                (self isLanguageSpec: body) ifTrue: [ body := '' ] ].
-                ^ body trimBoth ].
+	fenceStart := text indexOfSubCollection: '```' startingAt: 1 ifAbsent: [ 0 ].
+	fenceStart > 0 ifTrue: [
+		rest := (fenceStart + 3 <= text size)
+			ifTrue: [ text copyFrom: fenceStart + 3 to: text size ]
+			ifFalse: [ '' ].
 
-        delimiter := String lf , String lf.
-        idx := text indexOfSubCollection: delimiter startingAt: 1 ifAbsent: [ 0 ].
-        body := idx = 0
-                        ifTrue: [ text ]
-                        ifFalse: [ text copyFrom: 1 to: idx - 1 ].
-        ^ body trimBoth
+		fenceEnd := self indexOfClosingFenceIn: rest startingAt: 1.
+		fenceEnd := fenceEnd = 0
+			ifTrue: [ rest size + 1 ]
+			ifFalse: [ fenceEnd ].
+
+		body := fenceEnd <= 1
+			ifTrue: [ '' ]
+			ifFalse: [ rest copyFrom: 1 to: fenceEnd - 1 ].
+
+		"Drop a first-line language spec like ```smalltalk"
+		newlineIndex := body indexOf: Character lf ifAbsent: [ 0 ].
+		newlineIndex > 0 ifTrue: [
+			firstLine := body copyFrom: 1 to: newlineIndex - 1.
+			((firstLine isEmpty) or: [ self isLanguageSpec: firstLine ]) ifTrue: [
+				body := newlineIndex < body size
+					ifTrue: [ body copyFrom: newlineIndex + 1 to: body size ]
+					ifFalse: [ '' ] ] ]
+		ifFalse: [
+			(self isLanguageSpec: body) ifTrue: [ body := '' ] ].
+
+		^ body trimBoth
+	].
+
+	"Fallback: keep only the first paragraph if multiple paragraphs exist."
+	delimiterIndex := text indexOfSubCollection: (String lf , String lf) startingAt: 1 ifAbsent: [ 0 ].
+	body := delimiterIndex = 0
+		ifTrue: [ text ]
+		ifFalse: [ text copyFrom: 1 to: delimiterIndex - 1 ].
+
+	^ body trimBoth
 ]
 
-{ #category : 'validation' }
-CoPharoCopilotResultSetBuilder >> contextSnapshotFor: aContext [
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> contextInfoFor: aContext prefix: prefixString suffix: suffixString [
+	"Build a diagnostic payload used for logging and debugging completion requests."
 
-        | safeSource safePosition |
-        safeSource := [ aContext source ifNil: [ '' ] ] on: Error do: [ '' ].
-        safePosition := [ aContext position ifNil: [ 0 ] ] on: Error do: [ 0 ].
-        safePosition := (safePosition max: 0) min: safeSource size.
-        ^ Dictionary new
-                        at: #prefix put: (safePosition > 0 ifTrue: [ safeSource copyFrom: 1 to: safePosition ] ifFalse: [ '' ]);
-                        at: #suffix put: (safePosition < safeSource size
-                                ifTrue: [ safeSource copyFrom: safePosition + 1 to: safeSource size ]
-                                ifFalse: [ '' ]);
-                        at: #position put: safePosition;
-                        at: #sourceLength put: safeSource size;
-                        yourself
+	^ Dictionary new
+		at: #contextClass put: aContext class name;
+		at: #cursorPosition put: aContext position;
+		at: #sourceSize put: aContext source size;
+		at: #fullSource put: aContext source;
+		at: #prefix put: prefixString;
+		at: #suffix put: suffixString;
+		yourself
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> contextSnapshotFor: aContext [
+	"Take a safe snapshot (prefix/suffix/position) of the completion context so we can detect changes."
+
+	| source position |
+	source := [ aContext source ifNil: [ '' ] ] on: Error do: [ '' ].
+	position := [ aContext position ifNil: [ 0 ] ] on: Error do: [ 0 ].
+	position := (position max: 0) min: source size.
+
+	^ Dictionary new
+		at: #prefix put: (position > 0
+			ifTrue: [ source copyFrom: 1 to: position ]
+			ifFalse: [ '' ]);
+		at: #suffix put: (position < source size
+			ifTrue: [ source copyFrom: position + 1 to: source size ]
+			ifFalse: [ '' ]);
+		at: #position put: position;
+		at: #sourceLength put: source size;
+		yourself
 ]
 
 { #category : 'initialization' }
@@ -199,93 +242,145 @@ CoPharoCopilotResultSetBuilder >> debounceMilliseconds [
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> debounceMilliseconds: anInteger [
+	"Set the debounce delay (milliseconds) used before firing a completion request."
 
-        debounceMilliseconds := anInteger
+	debounceMilliseconds := anInteger
 ]
 
-{ #category : 'API - building' }
-CoPharoCopilotResultSetBuilder >> indexOfClosingFenceIn: text startingAt: startIndex [ 
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> ebounceMilliseconds [
+	"Return the current debounce delay used before firing a completion request."
 
-        | idx lastValid size |
-        text isEmpty ifTrue: [ ^ 0 ].
-        size := text size.
-        lastValid := 0.
-        idx := text indexOfSubCollection: '```' startingAt: startIndex ifAbsent: [ 0 ].
-        [ idx > 0 ] whileTrue: [
-                | before after |
-                before := idx = 1 or: [
-                        | prev |
-                        prev := text at: idx - 1.
-                        prev = Character lf or: [ prev = Character cr ] ].
-                after := (idx + 3 > size)
-                        or: [ | next |
-                                next := text at: idx + 3.
-                                next = Character lf or: [ next = Character cr ] ].
-                (before and: after) ifTrue: [ lastValid := idx ].
-                idx := text indexOfSubCollection: '```' startingAt: idx + 1 ifAbsent: [ 0 ].
-        ].
-        ^ lastValid
+	^ debounceMilliseconds ifNil: [ 250 ]
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> extractResponseContentFromRaw: rawResponseString [
+	"Extract the suggestion text from the raw Ollama payload (JSON or plain text)."
+
+	| content |
+	content := rawResponseString.
+
+	[
+		| parsed |
+		parsed := STONJSON fromString: rawResponseString.
+		(parsed isKindOf: Dictionary) ifTrue: [
+			content := parsed
+				at: #response
+				ifAbsent: [ parsed at: 'response' ifAbsent: [ rawResponseString ] ] ]
+	]
+		on: Error
+		do: [ :ex |
+			CoCopilotLogger
+				logBackEndEvent: 'Failed to parse suggestion payload as JSON'
+				details: (Dictionary new
+					at: #error put: ex messageText;
+					at: #rawResponse put: rawResponseString;
+					yourself) ].
+
+	^ content asString
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> indexOfClosingFenceIn: text startingAt: startIndex [
+	"Return the index of the last valid closing ``` fence in text (must be on its own line-ish); 0 if none."
+
+	| idx lastValid size |
+	text isEmpty ifTrue: [ ^ 0 ].
+
+	size := text size.
+	lastValid := 0.
+	idx := text indexOfSubCollection: '```' startingAt: startIndex ifAbsent: [ 0 ].
+
+	[ idx > 0 ] whileTrue: [
+		| before after |
+		before := (idx = 1)
+			or: [ | prev |
+				prev := text at: idx - 1.
+				(prev = Character lf) or: [ prev = Character cr ] ].
+
+		after := (idx + 3 > size)
+			or: [ | next |
+				next := text at: idx + 3.
+				(next = Character lf) or: [ next = Character cr ] ].
+
+		(before and: after) ifTrue: [ lastValid := idx ].
+		idx := text indexOfSubCollection: '```' startingAt: idx + 1 ifAbsent: [ 0 ].
+	].
+
+	^ lastValid
 ]
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> initialize [
+	"Initialize default debounce settings."
 
 	super initialize.
 	debounceMilliseconds := 250.
-	debounceToken := 0.
+	debounceToken := 0
 ]
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> initializeOnContext: aSystemCompletionContext [
+	"Bind this builder to a completion context provided by the completion system."
 
-	completionContext := aSystemCompletionContext.
+	completionContext := aSystemCompletionContext
 ]
 
-{ #category : 'API - building' }
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> isLanguageSpec: aString [
+	"Answer true if the string looks like a code-fence language marker (e.g., 'smalltalk', 'pharo', 'json')."
 
-	        | candidate trimmed |
-        aString ifNil: [ ^ false ].
-        candidate := aString asString.
-        candidate isEmpty ifTrue: [ ^ false ].
-        trimmed := candidate trimBoth.
-        (trimmed size = candidate size) ifFalse: [ ^ false ].
-        candidate := trimmed.
-        ^ (#('smalltalk' 'pharo' 'bash' 'sh' 'shell' 'python'
-                'javascript' 'json' 'java' 'c' 'cpp' 'xml' 'html'
-                'ruby' 'php' 'sql' 'yaml' 'yml' 'go' 'rust' 'typescript')
-                includes: candidate asLowercase)
-                or: [ candidate allSatisfy: [ :ch |
-                                ch isLetter
-                                        or: [ ch isDigit
-                                        or: [ '#+-_' includes: ch ] ] ] ]
+	| candidate trimmed |
+	aString ifNil: [ ^ false ].
+
+	candidate := aString asString.
+	candidate isEmpty ifTrue: [ ^ false ].
+
+	trimmed := candidate trimBoth.
+	(trimmed size = candidate size) ifFalse: [ ^ false ].
+	candidate := trimmed.
+
+	^ (#('smalltalk' 'pharo' 'bash' 'sh' 'shell' 'python'
+		'javascript' 'json' 'java' 'c' 'cpp' 'xml' 'html'
+		'ruby' 'php' 'sql' 'yaml' 'yml' 'go' 'rust' 'typescript')
+		includes: candidate asLowercase)
+		or: [ candidate allSatisfy: [ :ch |
+			ch isLetter
+				or: [ ch isDigit
+				or: [ '#+-_' includes: ch ] ] ] ]
 ]
 
-{ #category : 'API - building' }
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> methodSourcesFor: aBehavior [
+	"Collect and concatenate the source of all methods of the given behavior (sorted), ignoring failures."
 
-        aBehavior ifNil: [ ^ '' ].
-        ^ String streamContents: [ :stream |
-                [ (aBehavior selectors asSortedCollection) do: [ :selector |
-                        | source |
-                        source := [ aBehavior sourceCodeAt: selector ] on: Error do: [ nil ].
-                        source ifNotNil: [
-                                stream
-                                        nextPutAll: source;
-                                        cr;
-                                        cr ] ] ]
-                        on: Error
-                        do: [ ] ]
+	aBehavior ifNil: [ ^ '' ].
+
+	^ String streamContents: [ :stream |
+		[
+			(aBehavior selectors asSortedCollection) do: [ :selector |
+				| source |
+				source := [ aBehavior sourceCodeAt: selector ] on: Error do: [ nil ].
+				source ifNotNil: [
+					stream
+						nextPutAll: source;
+						cr;
+						cr ] ] ]
+			on: Error
+			do: [ ] ]
 ]
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> minimumPrefixLength [
+	"Minimum prefix length required before we request a completion."
 
-        ^ 2
+	^ 2
 ]
 
-{ #category : 'API - building' }
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+	"Call Ollama, normalize the response into plain text, then apply it if the editor context is unchanged."
 
 	| classContext |
 	[
@@ -294,91 +389,98 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 
 		client := OllamaClient new.
 		classContext := self classContextFor: aContext.
+
 		contextInfo
 			at: #classContextLength put: classContext size;
 			at: #classContextPresent put: classContext isEmpty not.
-		rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
-		rawResponseString := [ rawResponse asString ]
-			                     on: Error
-			                     do: [ rawResponse printString ].
-		CoCopilotLogger logBackEndEvent: 'Received raw suggestion payload' details: (Dictionary new
-				 at: #rawResponseClass put: rawResponse class name;
-				 at: #rawResponse put: rawResponseString;
-				 yourself).
-		contextInfo at: #rawResponse put: rawResponseString.
-		
-		
-		content := rawResponseString.
-		[
-			| parsed |
-			parsed := STONJSON fromString: rawResponseString.
-			(parsed isKindOf: Dictionary) ifTrue: [
-				content := parsed at: #response ifAbsent: [ parsed at: 'response' ifAbsent: [ rawResponseString ] ] ] ]
-			on: Error
-			do: [ :ex |
-					CoCopilotLogger logBackEndEvent: 'Failed to parse suggestion payload as JSON' details: (Dictionary new
-							 at: #error put: ex messageText;
-							 at: #rawResponse put: rawResponseString;
-							 yourself) ].
 
-		content := self cleanedContentFrom: content asString.
-		                CoCopilotLogger logBackEndEvent: 'Normalized suggestion content' details: (Dictionary new
-                                 at: #cleanedContent put: content;
-                                 at: #cleanedLength put: content size;
-                                 yourself).
-                self
-                        applyContent: content
-                        toContext: aContext
-                        expectedPrefix: prefixString
-                        suffix: suffixString
-                        contextInfo: contextInfo ]
-                on: Error
-                do: [ :ex |
-                                CoCopilotLogger
-					logError: 'Asynchronous completion failed'
-					origin: #CoPharoCopilotResultSetBuilder
-					exception: ex
-					payload: (Dictionary new
-							 at: #requestDetails put: contextInfo copy;
-							 at: #prefixLength put: prefixString size;
-							 at: #suffixLength put: suffixString size;
-							 yourself) ]
+		rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
+
+		rawResponseString := [ rawResponse asString ]
+			on: Error
+			do: [ rawResponse printString ].
+
+		CoCopilotLogger
+			logBackEndEvent: 'Received raw suggestion payload'
+			details: (Dictionary new
+				at: #rawResponseClass put: rawResponse class name;
+				at: #rawResponse put: rawResponseString;
+				yourself).
+
+		contextInfo at: #rawResponse put: rawResponseString.
+
+		content := self extractResponseContentFromRaw: rawResponseString.
+		content := self cleanedContentFrom: content.
+
+		CoCopilotLogger
+			logBackEndEvent: 'Normalized suggestion content'
+			details: (Dictionary new
+				at: #cleanedContent put: content;
+				at: #cleanedLength put: content size;
+				yourself).
+
+		self
+			applyContent: content
+			toContext: aContext
+			expectedPrefix: prefixString
+			suffix: suffixString
+			contextInfo: contextInfo
+	]
+		on: Error
+		do: [ :ex |
+			CoCopilotLogger
+				logError: 'Asynchronous completion failed'
+				origin: #CoPharoCopilotResultSetBuilder
+				exception: ex
+				payload: (Dictionary new
+					at: #requestDetails put: contextInfo copy;
+					at: #prefixLength put: prefixString size;
+					at: #suffixLength put: suffixString size;
+					yourself) ]
 ]
 
-{ #category : 'API - building' }
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> safeDefinitionStringFor: aBehavior [
+	"Return the class definition string for a behavior, or empty string if unavailable."
 
-        aBehavior ifNil: [ ^ '' ].
-        ^ [ aBehavior definition asString ] on: Error do: [ '' ]
+	aBehavior ifNil: [ ^ '' ].
+	^ [ aBehavior definition asString ] on: Error do: [ '' ]
 ]
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+	"Debounce completion requests: cancel any pending request and schedule a new one for the latest editor state."
 
-        | token |
-        debounceToken ifNil: [ debounceToken := 0 ].
-        debounceToken := debounceToken + 1.
-        token := debounceToken.
-        debounceProcess ifNotNil: [ debounceProcess terminate ].
-        debounceProcess := [
-                (Delay forMilliseconds: self debounceMilliseconds) wait.
-                token = debounceToken ifTrue: [
-                        self
-                                processCompletionFor: aContext
-                                prefix: prefixString
-                                suffix: suffixString
-                                contextInfo: contextInfo ] ] forkAt: Processor userBackgroundPriority.
-        CoCopilotLogger logBackEndEvent: 'Dispatched debounced completion fetch' details: (Dictionary new
-                        at: #processPriority put: Processor userBackgroundPriority;
-                        at: #processId put: debounceProcess identityHash;
-                        at: #debounceMilliseconds put: self debounceMilliseconds;
-                        yourself)
+	| token |
+	debounceToken ifNil: [ debounceToken := 0 ].
+	debounceToken := debounceToken + 1.
+	token := debounceToken.
+
+	debounceProcess ifNotNil: [ debounceProcess terminate ].
+
+	debounceProcess := [
+		(Delay forMilliseconds: self debounceMilliseconds) wait.
+		token = debounceToken ifTrue: [
+			self
+				processCompletionFor: aContext
+				prefix: prefixString
+				suffix: suffixString
+				contextInfo: contextInfo ] ] forkAt: Processor userBackgroundPriority.
+
+	CoCopilotLogger
+		logBackEndEvent: 'Dispatched debounced completion fetch'
+		details: (Dictionary new
+			at: #processPriority put: Processor userBackgroundPriority;
+			at: #processId put: debounceProcess identityHash;
+			at: #debounceMilliseconds put: self debounceMilliseconds;
+			yourself)
 ]
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForPrefix: prefixString suffix: suffixString [
+	"Decide whether it's worth requesting a completion for the current prefix/suffix."
 
-        prefixString ifNil: [ ^ false ].
-        (prefixString size < self minimumPrefixLength) ifTrue: [ ^ false ].
-        ^ true
+	prefixString ifNil: [ ^ false ].
+	(prefixString size < self minimumPrefixLength) ifTrue: [ ^ false ].
+	^ true
 ]
