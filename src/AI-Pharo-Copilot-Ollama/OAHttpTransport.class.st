@@ -124,6 +124,9 @@ OAHttpTransport >> newJsonClientForPath: aPath [
 	client forJsonREST.
 	client host: host; port: port; path: aPath.
 
+	"Hard stop so UI never waits forever if Ollama is slow/down."
+	(client respondsTo: #timeout:) ifTrue: [ client timeout: 5 ].
+
 	self applyDefaultHeadersTo: client.
 	self configureJsonOn: client.
 

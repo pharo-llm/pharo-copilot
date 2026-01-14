@@ -337,7 +337,7 @@ CopilotSettings class >> logMissingFimTemplate [
 { #category : 'accessing' }
 CopilotSettings class >> loggingEnabled [
 
-    ^ LoggingEnabled ifNil: [ LoggingEnabled := true ]
+	^ LoggingEnabled ifNil: [ LoggingEnabled := true ]
 ]
 
 { #category : 'accessing' }
