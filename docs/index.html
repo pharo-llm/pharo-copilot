@@ -1,51 +1,2015 @@
-<!DOCTYPE HTML>
-<html>
-		<head>
-	    <meta charset="UTF-8" />
-	    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-	    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<link rel="icon" type="image/png" href="/Pharo-Copilot/files/favicon.ico">
-	    <link rel="stylesheet" type="text/css" href="/Pharo-Copilot/files/simple.css" /> 
-	    <title>Pharo-Copilot</title>
-	</head>
-	<body>
-	
-	<div id="header">
-	<div id="headerSiteTitle">
-	Pharo-Copilot Documentation
-	</div>
-	<div id="headerPageTitle"> 
-	</div>
-</div>
-	<div id="menu">
-	<div id="toc">
-		<div id="tocItem"><a href="/Pharo-Copilot/index.html">Home</a>
-		</div>
-		<div id="tocItem"><a href="/Pharo-Copilot/publications.html">Publications</a>
-		</div>	
-		<div id="tocItem"><a href="/Pharo-Copilot/news/index.html">News</a>
-		</div>
-	</div>
-</div>    <!--Closing menu -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Pharo Copilot – System Documentation</title>
 
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="assets/css.css" rel="stylesheet">
+</head>
+<body>
 
-	<div id="mainContent">
-		
-		<div id="personalDetails">
-		<div><img src="/Pharo-Copilot/files/logo.png" width="128px"></div>
-	</div>
+<header class="border-bottom">
+  <div class="container-xxl py-3 d-flex justify-content-between">
+    <div class="fw-semibold">Pharo-Copilot Documentation</div>
+    <a href="index.html">Home</a>
+  </div>
+</header>
 
-	<h1>Pharo Copilot – System Documentation</h1><p>Table of Contents</p><ol><li>Executive Summary</li><li>Architecture Overview</li><li>Core Components</li><li>Ollama Integration</li><li>Completion Engine</li><li>Evaluation System</li><li>Fill-in-the-Middle (FIM) Templates</li><li>Installation & Setup</li><li>Usage Guide</li><li>. Configuration & Settings</li><li>. Extension Points</li><li>. Troubleshooting</li><li>. Testing Suite</li></ol><p>---</p><h2>1. Executive Summary</h2><p>AI-Pharo-Copilot is an AI-powered code completion assistant integrated directly into the Pharo Smalltalk development environment. It provides intelligent, context-aware code suggestions using Large Language Models (LLMs) running locally via Ollama, eliminating the need to send code to external servers.</p><h3>Key Features</h3><ul><li><strong>Local LLM Integration</strong>: Runs models locally via Ollama for complete privacy</li><li><strong>Context-Aware Completions</strong>: Analyzes class structure, methods, and surrounding code</li><li><strong>Fill-in-the-Middle (FIM) Support</strong>: Completes code based on prefix and suffix context</li><li><strong>Real-time Evaluation</strong>: Tracks suggestion acceptance rates and quality metrics</li><li><strong>Asynchronous Processing</strong>: Non-blocking completion fetching for smooth editing</li><li><strong>Comprehensive Logging</strong>: Detailed activity tracking for debugging and analysis</li><li><strong>Auto-Installation</strong>: Automatically pulls recommended models when missing</li><li><strong>Extensive Testing</strong>: Full test suite with mock support for reliable development</li></ul><h3>Technology Stack</h3><ul><li><strong>Language</strong>: Pharo Smalltalk (13 & 14 compatible)</li><li><strong>LLM Backend</strong>: Ollama (local inference server)</li><li><strong>Completion Framework</strong>: Pharo's native Completion Engine</li><li><strong>HTTP Client</strong>: ZnClient (Zinc HTTP Components)</li><li><strong>Persistence</strong>: STON (Smalltalk Object Notation) and JSONL</li><li><strong>Logging</strong>: File-based logging with structured events</li></ul><p>---</p><h2>2. Architecture Overview</h2><p>AI-Pharo-Copilot follows a layered architecture with clear separation of concerns:</p><pre><code>┌─────────────────────────────────────────────────────────┐│                   Editor Integration                    ││        (RubSmalltalkEditor, Completion Engine)          │└────────────────────┬────────────────────────────────────┘                     │┌────────────────────▼────────────────────────────────────┐│                 Completion Layer                        ││  (CoCompletionEnginePharoCopilot, ResultSetBuilder)    │└────────────────────┬────────────────────────────────────┘                     │┌────────────────────▼────────────────────────────────────┐│                   Client Layer                          ││    (OllamaClient, HTTP Transport, FIM Template)         │└────────────────────┬────────────────────────────────────┘                     │┌────────────────────▼────────────────────────────────────┐│                Evaluation & Logging                     ││  (CoSuggestionEvaluator, CoCopilotLogger, Reports)      │└────────────────────┬────────────────────────────────────┘                     │┌────────────────────▼────────────────────────────────────┐│              Settings & Configuration                   ││  (CopilotSettings, OModelRegistry, Model Catalog)       │└─────────────────────────────────────────────────────────┘</code></pre><h3>Package Structure</h3><table><tr><th>Package</th><th>Purpose</th></tr><tr><td><strong>AI-Pharo-Copilot</strong></td><td>Core completion engine, result builder, context, and logging</td></tr><tr><td><strong>AI-Pharo-Copilot-Ollama</strong></td><td>Ollama client, HTTP transport, model registry, and settings</td></tr><tr><td><strong>AI-Pharo-Copilot-Evaluator</strong></td><td>Suggestion evaluation, metrics tracking, and reporting</td></tr><tr><td><strong>AI-Pharo-Copilot-Tests</strong></td><td>Comprehensive test suite with mock infrastructure</td></tr></table><p>---</p><h2>3. Core Components</h2><h3>3.1 CoCompletionEnginePharoCopilot (Completion Engine)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot/CoCompletionEnginePharoCopilot.class.st</code></p><p><strong>Purpose</strong>: The main completion engine that integrates with Pharo's editor.</p><p><strong>Responsibilities</strong>:</p><ul><li>Provides completion builder instance</li><li>Handles token replacement in editor</li><li>Maintains cursor position after insertion</li><li>Logs completion requests</li></ul><p><strong>Key Methods</strong>:</p><pre><code>CoCompletionEnginePharoCopilot >> completionBuilder    "Returns memoized CoPharoCopilotResultSetBuilder instance"    ^ completionBuilder ifNil: [         completionBuilder := CoPharoCopilotResultSetBuilder new ]CoCompletionEnginePharoCopilot >> replaceTokenInEditorWith: newString    "Replaces text and maintains original cursor position"    | originalCaretPosition |    originalCaretPosition := self editor caret.    super replaceTokenInEditorWith: newString.    self editor selectAt: originalCaretPosition.</code></pre><p><strong>Integration</strong>:</p><pre><code>"Set as active completion engine"RubSmalltalkEditor completionEngineClass: CoCompletionEnginePharoCopilot</code></pre><p>---</p><h3>3.2 CoPharoCopilotResultSetBuilder (Result Builder)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot/CoPharoCopilotResultSetBuilder.class.st</code></p><p><strong>Purpose</strong>: Builds completion result sets by coordinating with Ollama and processing responses.</p><p><strong>Responsibilities</strong>:</p><ul><li>Extracts code context (class definition, methods, prefix/suffix)</li><li>Dispatches asynchronous completion requests</li><li>Cleans and normalizes LLM responses</li><li>Applies suggestions to editor</li></ul><p><strong>Key Attributes</strong>:</p><pre><code>completionContext    "The completion context from editor"</code></pre><p><strong>Key Methods</strong>:</p><pre><code>buildCompletion    "Main entry point - dispatches async fetch and returns empty result set"    classContextFor: aContext    "Extracts class definition and all methods for context"    processCompletionFor: aContext prefix: prefix suffix: suffix contextInfo: dict    "Background worker that queries Ollama and applies result"    cleanedContentFrom: aString    "Removes markdown fences and language specifiers"</code></pre><p><strong>Process Flow</strong>:</p><ol><li><strong>Context Extraction</strong>: Gathers class definition, instance methods, class methods</li><li><strong>Async Dispatch</strong>: Forks background process at <code>userBackgroundPriority</code></li><li><strong>API Call</strong>: Sends request to OllamaClient with FIM template</li><li><strong>Response Cleaning</strong>: Removes <code></code>`smalltalk fences and metadata</li><li><strong>Editor Update</strong>: Applies cleaned suggestion to editor</li><li><strong>Logging</strong>: Records all stages with detailed context</li></ol><p><strong>Context Structure</strong>:</p><pre><code>contextInfo := Dictionary new    at: #contextClass put: context class name;    at: #cursorPosition put: context position;    at: #sourceSize put: context source size;    at: #fullSource put: context source;    at: #prefix put: prefix;    at: #suffix put: suffix;    at: #classContextLength put: classContext size;    yourself.</code></pre><p>---</p><h3>3.3 CoPharoCopilotContext (Completion Context)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot/CoPharoCopilotContext.class.st</code></p><p><strong>Purpose</strong>: Specialized completion context for Pharo Copilot.</p><p><strong>Initialization</strong>:</p><pre><code>CoPharoCopilotContext >> initialize    super initialize.    completionBuilder := CoPharoCopilotResultSetBuilder         initializeOnContext: self</code></pre><p>---</p><h3>3.4 CoCopilotEntry (Suggestion Entry)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot/CoCopilotEntry.class.st</code></p><p><strong>Purpose</strong>: Represents a single completion suggestion.</p><p><strong>Attributes</strong>:</p><pre><code>text    "The completion text"</code></pre><p><strong>Key Methods</strong>:</p><pre><code>CoCopilotEntry class >> contents: aString    "Factory method"    ^ self new text: aString; yourself.activateOn: aCoCompletionContext    "Apply suggestion to editor"    aCoCompletionContext replaceTokenInEditorWith: textdisplayString    "Truncate long suggestions for display"    ^ text size > 120        ifTrue: [ (text copyFrom: 1 to: 117), '…' ]        ifFalse: [ text ]</code></pre><p>---</p><h3>3.5 CoCopilotLogger (Activity Logger)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot/CoCopilotLogger.class.st</code></p><p><strong>Purpose</strong>: Centralized logging system for all copilot activities.</p><p><strong>Log Files</strong>:</p><ul><li><strong>Activity Log</strong>: <code>pharo-copilot/copilot-logs/copilot.log</code></li><li><strong>Evaluation Log</strong>: <code>pharo-copilot/copilot-logs/copilot-evaluation-log.jsonl</code></li></ul><p><strong>Class Variables</strong>:</p><pre><code>logFileReferencelogsDirectoryReferenceevaluationLogFileReference</code></pre><p><strong>Key Methods</strong>:</p><pre><code>CoCopilotLogger class >> logFrontEndEvent: eventName details: aDictionary    "Log user-facing events"    CoCopilotLogger class >> logBackEndEvent: eventName details: aDictionary    "Log backend/API events"    CoCopilotLogger class >> logError: eventName origin: originSymbol     exception: anException payload: aDictionary    "Log errors with stack traces"</code></pre><p><strong>Log Format</strong>:</p><pre><code>===== [FRONTEND] Preparing completion request @ 2025-01-15 14:23:45 =====  - contextClass: CoPharoCopilotContext  - cursorPosition: 45  - sourceSize: 120  - fullSource: Object subclass: #MyClass...===== [BACKEND] Dispatching generate request @ 2025-01-15 14:23:46 =====  - endpoint: api/generate  - modelFullName: pharo-coder-1.5b-fim-f16.gguf:latest  - optionsSnapshot: {"task": "fill-in-the-middle"}===== [ERROR] Asynchronous completion failed @ 2025-01-15 14:23:50 =====  - origin: CoPharoCopilotResultSetBuilder  - error: Connection timeout  - stackTrace: ...</code></pre><p><strong>Enabling/Disabling</strong>:</p><pre><code>CopilotSettings loggingEnabled: true.   "Enable"CopilotSettings loggingEnabled: false.  "Disable"</code></pre><p>---</p><h2>4. Ollama Integration</h2><h3>4.1 OllamaClient (REST API Client)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot-Ollama/OllamaClient.class.st</code></p><p><strong>Purpose</strong>: Simple client for invoking the Ollama REST API.</p><p><strong>Attributes</strong>:</p><pre><code>transport    "OAHttpTransport instance"modelSpec    "OModelSpec - current model"stream       "Boolean - streaming mode (currently false)"format       "Output format (optional)"options      "Dictionary of Ollama options"</code></pre><p><strong>Key Methods</strong>:</p><pre><code>generate: aPromptString    "Main API call to /api/generate endpoint"    | payload resp normalized |    self isNullModel ifTrue: [ ^ self class nullModelResponseString ].    payload := Dictionary new        at: #model put: modelSpec fullName;        at: #prompt put: aPromptString;        at: #stream put: stream;        yourself.    resp := transport postJsonAt: 'api/generate' body: payload.    ^ self normalizeResponse: respgenerateForPrefix: prefixString suffix: suffixString context: contextString    "Fill-in-the-middle completion"    | prompt originalOptions response |    prompt := self        expandFimTemplate: CopilotSettings fimTemplate        prefix: prefixString        suffix: suffixString        context: contextString.    originalOptions := options copy.    options at: #task put: 'fill-in-the-middle'.    response := self generate: prompt.    options := originalOptions.    ^ responselistModels    "Query available models from Ollama"    ^ transport getJsonAt: 'api/tags'</code></pre><p><strong>Null Model</strong>:</p><p>When no model is configured, Copilot uses a special "null model":</p><pre><code>OllamaClient class >> nullModelFullName    ^ 'pharo-copilot-null'OllamaClient class >> nullModelResponseString    ^ 'no output, please configure.'</code></pre><p>---</p><h3>4.2 OAHttpTransport (HTTP Client)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot-Ollama/OAHttpTransport.class.st</code></p><p><strong>Purpose</strong>: Performs HTTP JSON requests against the local Ollama server.</p><p><strong>Attributes</strong>:</p><pre><code>host             "Server host (default: 127.0.0.1)"port             "Server port (default: 11434)"defaultHeaders   "HTTP headers dictionary"jsonReader       "STON JSON reader"jsonWriter       "STON JSON writer"</code></pre><p><strong>Key Methods</strong>:</p><pre><code>postJsonAt: aPath body: aDictionary    "POST request with JSON payload"    | cl |    cl := ZnClient new.    cl accept: ZnMimeType applicationJson.    cl contentWriter: [:data | ZnEntity json: (jsonWriter toString: data) ].    cl host: host; port: port; path: aPath.    cl forJsonREST.    cl contentReader: [:entity | jsonReader fromString: entity contents ].    cl contents: aDictionary.    ^ cl post.getJsonAt: aPath    "GET request returning JSON"    | cl |    cl := ZnEasy client.    cl forJsonREST; host: host; port: port; path: aPath.    ^ cl get</code></pre><p>---</p><h3>4.3 OModelRegistry (Model Discovery)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot-Ollama/OModelRegistry.class.st</code></p><p><strong>Purpose</strong>: Registry that builds and looks up available model specs.</p><p><strong>Class Variables</strong>:</p><pre><code>current         "Singleton instance"modelsFetcher   "Optional block to override model fetching"</code></pre><p><strong>Attributes</strong>:</p><pre><code>byFullName    "Dictionary of specs by full name (e.g., 'codellama:7b')"byLabel       "Dictionary of specs by friendly label"</code></pre><p><strong>Key Methods</strong>:</p><pre><code>OModelRegistry class >> refresh    "Rebuild registry from Ollama API"    current := self new.    current rebuild.    ^ currentrebuild    "Fetch models from Ollama and create specs"    | knownSpecs nullSpec |    byFullName := Dictionary new.    byLabel := Dictionary new.    knownSpecs := Dictionary new.        "Collect pragmas"    (Pragma allNamed: #ollamaModel:tag:label:) do: [ :p |        | fam tag label spec full |        fam := p arguments first.        tag := p arguments second.        label := p arguments third.        spec := OModelSpec family: fam tag: tag label: label.        full := spec fullName.        knownSpecs at: full put: spec ].        "Fetch from Ollama"    [ | resp models |        resp := self class fetchModelsResponse.        models := resp at: #models ifAbsent: [ #() ].        models do: [ :m |            | name spec |            name := m at: #name.            spec := knownSpecs at: name ifAbsent: [                self specFromModelName: name ].            self addSpec: spec ]    ] on: Error do: [ :ex | "ignore if server unreachable" ]domainValuesForSettings    "Returns array of label -> fullName associations for UI"    ^ (self allSpecs collect: [ :spec |         spec label -> spec fullName ]) asArray</code></pre><p><strong>Model Spec Format</strong>:</p><pre><code>OModelSpec    family: 'codellama'    "Base model name"    tag: '7b'              "Size/variant tag"    label: 'Code Llama 7B' "Human-readable label"</code></pre><p>---</p><h3>4.4 OModelSpec (Model Specification)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot-Ollama/OModelSpec.class.st</code></p><p><strong>Purpose</strong>: Represents an Ollama model identified by family, tag, and label.</p><p><strong>Attributes</strong>:</p><pre><code>family    "Base model name (e.g., 'codellama')"tag       "Version/size tag (e.g., '7b')"label     "Human-readable display name"</code></pre><p><strong>Key Methods</strong>:</p><pre><code>fullName    "Returns family:tag format"    ^ tag        ifNil:  [ family ]        ifNotNil: [ family , ':' , tag ]</code></pre><p><strong>Example</strong>:</p><pre><code>spec := OModelSpec     family: 'pharo-coder-1.5b-fim-f16.gguf'     tag: 'latest'     label: 'Pharo Coder 1.5B'.spec fullName.  "=> 'pharo-coder-1.5b-fim-f16.gguf:latest'"spec label.     "=> 'Pharo Coder 1.5B'"</code></pre><p>---</p><h3>4.5 OModelCatalog (Built-in Models)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot-Ollama/OModelCatalog.class.st</code></p><p><strong>Purpose</strong>: Catalog of built-in Ollama model definitions using pragmas.</p><p><strong>Example Pragma</strong>:</p><pre><code>OModelCatalog class >> pharoCopilotNull    <ollamaModel: 'pharo-copilot-null' tag: nil label: 'Pharo Null Copilot'></code></pre><p>Custom models can be registered by adding methods with the <code><ollamaModel:tag:label:></code> pragma.</p><p>---</p><h2>5. Completion Engine</h2><h3>5.1 Response Cleaning</h3><p>The result builder includes sophisticated response cleaning to handle various LLM output formats:</p><p><strong>Markdown Fence Removal</strong>:</p><pre><code>cleanedContentFrom: aString    "Removes ```language fences and extracts code"    | text start rest closingIndex body |    text := (aString ifNil: [ '' ]) asString.        "Find opening fence"    start := text indexOfSubCollection: '```' startingAt: 1.    start > 0 ifTrue: [        rest := text copyFrom: start + 3 to: text size.        closingIndex := self indexOfClosingFenceIn: rest.        body := rest copyFrom: 1 to: closingIndex - 1.                "Remove language specifier line"        newlineIndex := body indexOf: Character lf.        newlineIndex > 0 ifTrue: [            firstLine := body copyFrom: 1 to: newlineIndex - 1.            (self isLanguageSpec: firstLine) ifTrue: [                body := body copyFrom: newlineIndex + 1 to: body size ] ].        ^ body trimBoth ].        "No fence - return up to double newline"    idx := text indexOfSubCollection: String lf , String lf.    body := idx = 0        ifTrue: [ text ]        ifFalse: [ text copyFrom: 1 to: idx - 1 ].    ^ body trimBoth</code></pre><p><strong>Language Specifier Detection</strong>:</p><pre><code>isLanguageSpec: aString    "Check if line is a language identifier"    | trimmed |    trimmed := aString trimBoth.    ^ (#('smalltalk' 'pharo' 'bash' 'python' 'javascript' 'json' ...)        includes: trimmed asLowercase)        or: [ trimmed allSatisfy: [ :ch |            ch isLetter or: [ ch isDigit or: [ '#+-_' includes: ch ] ] ] ]</code></pre><p>---</p><h3>5.2 Context Extraction</h3><p><strong>Class Context Building</strong>:</p><pre><code>classContextFor: aContext    "Extract comprehensive class information"    | behavior compiledMethod methodClass classDefinition instanceSide classSide |        "Get behavior from context"    behavior := (aContext respondsTo: #behavior)        ifTrue: [ [ aContext behavior ] on: Error do: [ nil ] ]        ifFalse: [ nil ].        "Get method if available"    compiledMethod := (aContext respondsTo: #method)        ifTrue: [ [ aContext method ] on: Error do: [ nil ] ]        ifFalse: [ nil ].        "Determine method class"    methodClass := behavior         ifNil: [ compiledMethod ifNotNil: [ compiledMethod methodClass ] ]         ifNotNil: [ behavior ].        "Build context string"    classDefinition := self safeDefinitionStringFor: methodClass.    instanceSide := self methodSourcesFor: methodClass.    classSide := self methodSourcesFor: (methodClass ifNotNil: [ methodClass class ]).        ^ self        classDefinition: classDefinition        instanceMethods: instanceSide        classMethods: classSide</code></pre><p><strong>Method Sources Extraction</strong>:</p><pre><code>methodSourcesFor: aBehavior    "Collect all method sources from a behavior"    aBehavior ifNil: [ ^ '' ].    ^ String streamContents: [ :stream |        [ (aBehavior selectors asSortedCollection) do: [ :selector |            | source |            source := [ aBehavior sourceCodeAt: selector ]                 on: Error do: [ nil ].            source ifNotNil: [                stream                    nextPutAll: source;                    cr; cr ] ] ]            on: Error do: [ ] ]</code></pre><p>---</p><h2>6. Evaluation System</h2><h3>6.1 CoSuggestionEvaluator (Metrics Tracker)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot-Evaluator/CoSuggestionEvaluator.class.st</code></p><p><strong>Purpose</strong>: Tracks suggestion acceptance rates and generates comprehensive reports.</p><p><strong>Attributes</strong>:</p><pre><code>acceptedEntries     "OrderedCollection of CoEvaluationEntry"rejectedEntries     "OrderedCollection of CoEvaluationEntry"sessionStats        "Dictionary of current session statistics"persistentStats     "Dictionary of lifetime statistics"</code></pre><p><strong>Class Methods</strong>:</p><pre><code>CoSuggestionEvaluator class >> default    "Singleton instance"    ^ default ifNil: [ default := self new ]</code></pre><p><strong>Key Methods</strong>:</p><pre><code>recordSuggestionAccepted: aCopilotEntry context: aContext    "Record accepted suggestion"    | entry contextType |    entry := CoEvaluationEntry new        suggestion: aCopilotEntry;        context: aContext;        timestamp: DateAndTime now;        action: #accepted;        yourself.    acceptedEntries add: entry.    self updateSessionStats: entry.    self announceEvaluation: entry.recordSuggestionRejected: aCopilotEntry context: aContext reason: reasonString    "Record rejected suggestion with reason"    | entry |    entry := CoEvaluationEntry new        suggestion: aCopilotEntry;        context: aContext;        timestamp: DateAndTime now;        action: #rejected;        rejectionReason: reasonString;        yourself.    rejectedEntries add: entry.    self updateSessionStats: entry.    self announceEvaluation: entry.acceptanceRate    "Calculate percentage of accepted suggestions"    | total accepted |    total := sessionStats at: #totalSuggestions ifAbsent: [ 0 ].    total = 0 ifTrue: [ ^ 0 ].    accepted := sessionStats at: #totalAccepted ifAbsent: [ 0 ].    ^ (accepted / total * 100) rounded</code></pre><p><strong>Session Statistics Structure</strong>:</p><pre><code>sessionStats := Dictionary new    at: #sessionStartTime put: DateAndTime now;    at: #totalSuggestions put: 0;    at: #totalAccepted put: 0;    at: #totalRejected put: 0;    at: #modelStats put: Dictionary new;    at: #contextStats put: Dictionary new;    at: #lengthStats put: Dictionary new;    yourself.</code></pre><p><strong>Context Type Classification</strong>:</p><pre><code>determineContextType: aContext    "Classify the code context"    | src |    src := aContext source.    (self isClassDef: src)         ifTrue: [ ^ #classDef ].    (self isMethodDef: src)        ifTrue: [ ^ #method ].    (self hasTopLevel: '^' in: src)    ifTrue: [ ^ #return ].    (self hasTopLevel: ':=' in: src)   ifTrue: [ ^ #assignment ].    (self hasAnyTopLevel: self iterationSelectors in: src)        ifTrue: [ ^ #iteration ].    (self hasAnyTopLevel: self conditionSelectors in: src)        ifTrue: [ ^ #condition ].    ^ #other</code></pre><p><strong>Export to CSV</strong>:</p><pre><code>exportToCSV: filename    "Export evaluation data for external analysis"    filename asFileReference writeStreamDo: [ :stream |        "Header"        stream nextPutAll: 'Timestamp,Action,Suggestion,Context,Model,Length,Reason'; lf.                "Data rows"        (acceptedEntries , rejectedEntries) do: [ :entry |            stream                 nextPutAll: entry timestamp asString; nextPut: $,;                nextPutAll: entry action asString; nextPut: $,;                nextPutAll: '"', (entry suggestion contents                     copyReplaceAll: '"' with: '""'), '"'; nextPut: $,;                nextPutAll: '"', (entry context source copyFrom: 1                     to: (50 min: entry context source size)), '"'; nextPut: $,;                nextPutAll: CopilotSettings modelName; nextPut: $,;                nextPutAll: entry suggestion contents size asString; nextPut: $,;                nextPutAll: (entry rejectionReason ifNil: [ '' ]); lf ] ]</code></pre><p>---</p><h3>6.2 CoEvaluationReport (Report Generator)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot-Evaluator/CoEvaluationReport.class.st</code></p><p><strong>Purpose</strong>: Generates comprehensive evaluation reports.</p><p><strong>Report Sections</strong>:</p><ol><li><strong>Overview</strong>: Total suggestions, acceptance rate, rejection rate</li><li><strong>Model Performance</strong>: Statistics per model</li><li><strong>Context Analysis</strong>: Acceptance rates by code context type</li><li><strong>Length Analysis</strong>: Success rates by suggestion length</li><li><strong>Top Rejection Reasons</strong>: Most common rejection causes</li><li><strong>Recommendations</strong>: Actionable insights</li></ol><p><strong>Example Report</strong>:</p><pre><code>=== Copilot Evaluation Report ===OVERVIEW--------Session started: 2025-01-15 14:23:45Total suggestions: 150Accepted: 105 (70%)Rejected: 30 (20%)Ignored: 15MODEL PERFORMANCE----------------pharo-coder-1.5b-fim-f16.gguf:latest: 105/150 accepted (70%)CONTEXT ANALYSIS----------------method: 80/100 accepted (80%)assignment: 15/25 accepted (60%)return: 10/25 accepted (40%)SUGGESTION LENGTH ANALYSIS--------------------------short suggestions: 60/75 accepted (80%)medium suggestions: 35/50 accepted (70%)long suggestions: 10/25 accepted (40%)TOP REJECTION REASONS--------------------Incorrect syntax: 12 timesIncomplete suggestion: 8 timesWrong method name: 5 timesIrrelevant context: 5 timesRECOMMENDATIONS---------------• High acceptance rate - model is performing well• Export data to CSV for detailed analysis: CoSuggestionEvaluator default exportToCSV: 'evaluation.csv'</code></pre><p>---</p><h3>6.3 CoEvaluationEntry (Evaluation Record)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot-Evaluator/CoEvaluationEntry.class.st</code></p><p><strong>Purpose</strong>: Represents a single evaluation record.</p><p><strong>Attributes</strong>:</p><pre><code>suggestion         "CoCopilotEntry - the suggestion"context            "CoPharoCopilotContext - code context"timestamp          "DateAndTime - when recorded"action             "Symbol - #accepted, #rejected, or #ignored"rejectionReason    "String - why rejected (optional)"metadata           "Dictionary - additional data"</code></pre><p>---</p><h3>6.4 CoEvaluationAnnouncement (Event Notification)</h3><p><strong>Location</strong>: <code>src/AI-Pharo-Copilot-Evaluator/CoEvaluationAnnouncement.class.st</code></p><p><strong>Purpose</strong>: Announcement broadcast when evaluations are recorded.</p><p><strong>Usage</strong>:</p><pre><code>"Listen for evaluation events"SystemAnnouncer uniqueInstance weak    when: CoEvaluationAnnouncement    send: #handleEvaluation:    to: self.handleEvaluation: anAnnouncement    | entry |    entry := anAnnouncement entry.    "Process evaluation..."</code></pre><p>---</p><h2>7. Fill-in-the-Middle (FIM) Templates</h2><h3>7.1 Template System</h3><p>FIM templates define how to format the prompt for models that support fill-in-the-middle completion.</p><p><strong>Template Placeholders</strong>:</p><ul><li><code>{{ .Prompt }}</code> or <code>{{.Prompt}}</code> - Code before cursor (prefix)</li><li><code>{{ .Suffix }}</code> or <code>{{.Suffix}}</code> - Code after cursor (suffix)</li><li><code>{{ .Context }}</code> or <code>{{.Context}}</code> - Class/method context</li><li><code>{1}</code>, <code>{2}</code>, <code>{3}</code> - Positional format strings (prefix, suffix, context)</li></ul><p><strong>Template Expansion</strong>:</p><pre><code>expandFimTemplate: templateString prefix: prefixString     suffix: suffixString context: contextString        | prompt safePrefix safeSuffix safeContext includesContextPlaceholder |    safePrefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].    safeSuffix := suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ].    safeContext := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].        prompt := templateString ifNil: [ '' ].        "Check if context placeholder exists"    includesContextPlaceholder := (prompt includesSubstring: '{{ .Context }}')        or: [ (prompt includesSubstring: '{{.Context}}')         or: [ prompt includesSubstring: '{3}' ] ].        "Replace placeholders"    prompt := prompt copyReplaceAll: '{{ .Prompt }}' with: safePrefix.    prompt := prompt copyReplaceAll: '{{.Prompt}}' with: safePrefix.    prompt := prompt copyReplaceAll: '{{ .Suffix }}' with: safeSuffix.    prompt := prompt copyReplaceAll: '{{.Suffix}}' with: safeSuffix.    prompt := prompt copyReplaceAll: '{{ .Context }}' with: safeContext.    prompt := prompt copyReplaceAll: '{{.Context}}' with: safeContext.        "Positional format"    prompt := prompt format: { safePrefix. safeSuffix. safeContext }.        "Prepend context if not in template"    (includesContextPlaceholder not and: [ safeContext isEmpty not ])         ifTrue: [ prompt := self prependContext: safeContext toPrompt: prompt ].        ^ prompt</code></pre><p>---</p><h3>7.2 Template Storage</h3><p><strong>Locations</strong>:</p><ol><li><strong>Bundled Templates</strong>: <code>pharo-copilot/templates/</code> directory</li><li><strong>Cached Templates</strong>: <code>pharo-copilot/copilot-logs/{model-name}/template.txt</code></li></ol><p><strong>Template Discovery</strong>:</p><pre><code>CopilotSettings class >> defaultFimTemplate    "Returns FIM template for current model"    | template cacheFile |        "Try cached template first"    cacheFile := self templateFileForModelNamed: self modelName.    template := self fimTemplateFromFile: cacheFile.    template ifNotNil: [ ^ template ].        "Fall back to bundled templates"    template := self fimTemplateFromBundledTemplates.    template ifNotNil: [ ^ template ].        "Error if no template found"    self logMissingFimTemplate.    ^ self error: 'No fill-in-the-middle template is available         for the current Copilot model.'</code></pre><p><strong>Example Template</strong> (CodeLlama format):</p><pre><code><PRE> {{ .Prompt }} <SUF> {{ .Suffix }} <MID></code></pre><p><strong>Example Template</strong> (Pharo Coder format):</p><pre><code>Complete the following Smalltalk code:Class Context:{{ .Context }}Code to complete:{{ .Prompt }}<FILL>{{ .Suffix }}Completion:</code></pre><p>---</p><h3>7.3 Model Metadata</h3><p>Model metadata is fetched from Ollama and cached locally:</p><p><strong>Fetch Metadata</strong>:</p><pre><code>CopilotSettings class >> fetchModelMetadata    "Query model details from Ollama"    | client response metadata |    client := self newOllamaClient.        [ response := client showModelNamed: self modelName.      metadata := self populateMetadata: Dictionary new fromResponse: response.      self saveModelMetadataToDisk: metadata forModel: self modelName.    ] on: Error do: [ :ex |        metadata := self nullModelMetadata ].        ^ metadata</code></pre><p><strong>Metadata Structure</strong>:</p><pre><code>metadata := Dictionary new    at: #model put: 'pharo-coder-1.5b-fim-f16.gguf:latest';    at: #template put: '<PRE> {1} <SUF> {2} <MID>';    at: #system put: 'You are a Smalltalk code completion assistant...';    at: #parameters put: '{"temperature": 0.3, ...}';    at: #modelfile put: 'FROM pharo-coder-1.5b-fim-f16.gguf...';    yourself.</code></pre><p>---</p><h2>8. Installation & Setup</h2><h3>8.1 Prerequisites</h3><ol><li><strong>Pharo 13 or 14</strong>: Download from <a target="_blank" href="https://pharo.org/">pharo.org</a></li><li><strong>Ollama</strong>: Install from <a target="_blank" href="https://ollama.com/">ollama.com</a></li><li><strong>Git</strong> (optional): For cloning repository</li></ol><p>---</p><h3>8.2 Installation</h3><p><strong>Option 1: Metacello (Recommended)</strong></p><pre><code>"Latest stable release"Metacello new    repository: 'github://omarabedelkader/Pharo-Copilot:main/src';    baseline: 'PharoCopilot';    load.**Option 2: Manual Loading**</code></pre><p>"Clone repository and load packages"<br>repo := IceRepositoryCreator new<br>location: '/path/to/pharo-copilot';<br>createRepository.</p><p>"Load packages in order"</p><h1>(</h1><p>'AI-Pharo-Copilot'<br>'AI-Pharo-Copilot-Ollama'<br>'AI-Pharo-Copilot-Evaluator'<br>'AI-Pharo-Copilot-Tests'<br>) do: [ :pkgName |<br>Metacello new<br>baseline: pkgName;<br>repository: 'gitlocal:///path/to/pharo-copilot';<br>load ].</p><pre><code>---### 8.3 Ollama Setup**1. Install Ollama**</code></pre><h1>macOS/Linux</h1><p>curl <a target="_blank" href="https://ollama.ai/install.sh">https://ollama.ai/install.sh</a> | sh</p><h1>Windows</h1><h1>Download installer from ollama.com</h1><pre><code>**2. Start Ollama Service**</code></pre><p>ollama serve</p><pre><code>**3. Pull Recommended Model**</code></pre><h1>Recommended for Pharo</h1><p>ollama pull pharo-coder-1.5b-fim-f16.gguf:latest</p><h1>Alternative: CodeLlama</h1><p>ollama pull codellama:7b</p><pre><code>**4. Verify Installation**</code></pre><h1>List installed models</h1><p>ollama list</p><h1>Test model</h1><p>ollama run pharo-coder-1.5b-fim-f16.gguf:latest "Hello"</p><pre><code>---### 8.4 Initial Configuration**1. Enable Copilot Engine**</code></pre><p>"Set as active completion engine"<br>RubSmalltalkEditor completionEngineClass: CoCompletionEnginePharoCopilot.</p><p>"Verify"<br>RubSmalltalkEditor completionEngineClass.<br>"=> CoCompletionEnginePharoCopilot"</p><pre><code>**2. Configure Settings**</code></pre><p>"Enable copilot"<br>CopilotSettings copilotEnabled: true.</p><p>"Set provider"<br>CopilotSettings copilotProvider: #ollama.</p><p>"Select model"<br>CopilotSettings modelName: 'pharo-coder-1.5b-fim-f16.gguf:latest'.</p><p>"Configure host/port (defaults: 127.0.0.1:11434)"<br>CopilotSettings host: '127.0.0.1'.<br>CopilotSettings port: 11434.</p><p>"Enable logging"<br>CopilotSettings loggingEnabled: true.</p><p>"Enable auto-install"<br>CopilotSettings autoInstallModelScriptEnabled: true.</p><pre><code>**3. Test Connection**</code></pre><p>"Verify Ollama is reachable"<br>client := OllamaClient new.<br>models := client listModels.<br>models inspect.</p><p>"Test generation"<br>client generate: 'Hello, world!'.</p><pre><code>---### 8.5 System Settings UIAccess settings through Pharo's Settings Browser:1. Open **Settings Browser**: `Settings > System Settings`2. Navigate to **Code Browsing > Copilot**3. Configure:   - **Provider**: Select `ollama`   - **Model**: Choose from dropdown (auto-populated from Ollama)   - **Enable logging**: Check to enable activity logs   - **Auto-install model**: Check to auto-pull recommended model   - **Server host**: Default `127.0.0.1`   - **Server port**: Default `11434`---## 9. Usage Guide### 9.1 Basic Completion**1. Open a Browser/Playground**</code></pre><p>"Open System Browser"<br>Smalltalk tools browser open.</p><p>"Or Playground"<br>Smalltalk tools playground open.</p><pre><code>**2. Start Typing Code**</code></pre><p>Object subclass: #MyClass<br>instanceVariableNames: 'name age'<br>classVariableNames: ''<br>package: 'MyPackage'</p><p>MyClass >> initialize<br>super initialize.<br>"Place cursor here and wait for suggestions"</p><pre><code>**3. Accept Suggestion**- Suggestion appears automatically after brief pause- Press **Tab** to accept- Press **Esc** to reject- Continue typing to ignore---### 9.2 Context-Aware CompletionCopilot provides better suggestions with more context:**Example 1: Method Completion**</code></pre><p>"Given class:"<br>Person >> initialize<br>super initialize.<br>name := ''.<br>age := 0.</p><p>"Type this:"<br>Person >> description<br>"Copilot suggests:"<br>^ String streamContents: [ :s |<br>s nextPutAll: 'Person: '.<br>s nextPutAll: name.<br>s nextPutAll: ', Age: '.<br>s nextPutAll: age asString ]</p><pre><code>**Example 2: Iterating Collections**</code></pre><p>"Type this:"<br>collection := #(1 2 3 4 5).<br>collection collect: [ :each |<br>"Copilot suggests:"<br>each squared ]</p><pre><code>**Example 3: Conditional Logic**</code></pre><p>"Type this:"<br>value ifNil: [<br>"Copilot suggests:"<br>^ self defaultValue ]<br>ifNotNil: [ :v |<br>^ v + 1 ]</p><pre><code>---### 9.3 Fill-in-the-MiddleCopilot uses FIM to complete code in the middle of a method:</code></pre><p>"Before cursor:"<br>MyClass >> processData<br>| result |<br>result := data collect: [ :item | item * 2 ].<br>"Place cursor here"</p><p>"After cursor:"<br>^ result</p><p>"Copilot suggests between lines:"<br>result := result select: [ :each | each > 10 ].</p><pre><code>---### 9.4 Evaluation & Feedback**Track Your Usage**:</code></pre><p>"View session statistics"<br>CoSuggestionEvaluator default sessionStats inspect.</p><p>"Generate report"<br>report := CoSuggestionEvaluator default generateReport.<br>report inspect.</p><p>"Export to CSV"<br>CoSuggestionEvaluator default exportToCSV: 'copilot-evaluation.csv'.</p><p>"Check acceptance rate"<br>CoSuggestionEvaluator default acceptanceRate.<br>"=> 75"</p><pre><code>**Manual Rejection**:</code></pre><p>"If you want to explicitly mark a suggestion as rejected"<br>entry := CoCopilotEntry contents: 'bad suggestion'.<br>context := CoPharoCopilotContext new.<br>CoSuggestionEvaluator default<br>recordSuggestionRejected: entry<br>context: context<br>reason: 'Incorrect syntax'.</p><pre><code>---### 9.5 Viewing Logs**Activity Log**:</code></pre><p>"Open log file"<br>logFile := CoCopilotLogger logFileReference.<br>logFile exists ifTrue: [<br>logFile openWithShell ].</p><p>"Or inspect contents"<br>logFile contents inspect.</p><pre><code>**Evaluation Log (JSONL)**:</code></pre><p>"Open evaluation log"<br>evalLog := CoCopilotLogger evaluationLogFileReference.<br>evalLog exists ifTrue: [<br>evalLog openWithShell ].</p><p>"Parse JSON lines"<br>lines := evalLog contents lines.<br>entries := lines collect: [ :line |<br>STONJSON fromString: line ].<br>entries inspect.</p><pre><code>---## 10. Configuration & Settings### 10.1 CopilotSettings (Global Configuration)**Location**: `src/AI-Pharo-Copilot-Ollama/CopilotSettings.class.st`**Class Variables**:</code></pre><p>Enabled                        "Boolean - enable/disable copilot"<br>Provider                       "Symbol - backend provider (#ollama)"<br>ModelName                      "String - selected model full name"<br>Host                           "String - Ollama server host"<br>Port                           "Integer - Ollama server port"<br>ModelMetadata                  "Dictionary - cached model info"<br>OllamaClientFactory            "Block - factory for creating clients"<br>AutoInstallModelScriptEnabled  "Boolean - auto-pull missing models"<br>LoggingEnabled                 "Boolean - enable activity logging"<br>TemplatesDirectory             "FileReference - FIM templates location"</p><pre><code>**Key Methods**:</code></pre><p>CopilotSettings class >> copilotEnabled<br>"Check if copilot is enabled"<br>^ Enabled ifNil: [ Enabled := true ].</p><p>CopilotSettings class >> copilotEnabled: aBool<br>"Enable/disable copilot"<br>Enabled := aBool.</p><p>CopilotSettings class >> modelName<br>"Get current model name"<br>^ ModelName ifNil: [ ModelName := OllamaClient defaultModelFullName ]</p><p>CopilotSettings class >> modelName: aString<br>"Set model and clear cached metadata"<br>ModelName := aString.<br>self clearCachedModelMetadata.</p><p>CopilotSettings class >> availableModelNames<br>"Returns array of label->fullName pairs for UI"<br>^ OModelRegistry refresh domainValuesForSettings</p><p>CopilotSettings class >> newOllamaClient<br>"Create new Ollama client instance"<br>^ self ollamaClientFactory value</p><pre><code>---### 10.2 Model Auto-InstallationWhen configured model is missing, Copilot can automatically pull it from Ollama:**Configuration**:</code></pre><p>"Enable auto-install for recommended model"<br>CopilotSettings autoInstallModelScriptEnabled: true.</p><pre><code>**Auto-Install Process**:</code></pre><p>CopilotSettings class >> attemptAutoInstallForModelNamed: modelName<br>usingInitialResponse: response<br><br>"Check if auto-install is enabled and model is recommended"<br>(self shouldAutoInstallModelNamed: modelName) ifFalse: [ ^ false ].<br><br>"Log attempt"<br>CoCopilotLogger<br>logBackEndEvent: 'Attempting auto-install for missing Ollama model'<br>details: (Dictionary new<br>at: #model put: modelName;<br>at: #availableModelsBefore put: (self modelNamesFromResponse: response);<br>yourself).<br><br>"Run install script"<br>(self installModelNamed: modelName) ifFalse: [ ^ false ].<br><br>"Verify model is now available"<br>[ | refreshedResponse refreshedModels |<br>refreshedResponse := self newOllamaClient listModels.<br>refreshedModels := self modelNamesFromResponse: refreshedResponse.<br>(refreshedModels includes: modelName) ifTrue: [<br>OModelRegistry refresh.<br>^ true ].<br>] on: Error do: [ :ex | self logError: ex ].<br><br>^ false</p><pre><code>**Recommended Model**:</code></pre><p>CopilotSettings class >> shouldAutoInstallModelNamed: modelName<br>(self autoInstallModelScriptEnabled) ifFalse: [ ^ false ].<br>modelName ifNil: [ ^ false ].<br>^ modelName = 'pharo-coder-1.5b-fim-f16.gguf:latest'</p><pre><code>---### 10.3 Custom Client FactoryFor testing or custom backends, override the client factory:</code></pre><p>"Use mock client for testing"<br>CopilotSettings ollamaClientFactory: [ MockOllamaClient new ].</p><p>"Restore default"<br>CopilotSettings ollamaClientFactory: [ OllamaClient new ].</p><pre><code>---### 10.4 Settings Snapshot & Restore**Snapshot Current Settings**:</code></pre><p>snapshot := CopilotSettings settingsSnapshot.<br>"=> Dictionary with all settings"</p><pre><code>**Restore Settings**:</code></pre><p>CopilotSettings restoreSettingsFromSnapshot: snapshot.</p><pre><code>**Temporary Settings**:</code></pre><p>"Execute block with default settings"<br>CopilotSettings withDefaultSettingsDo: [<br>"Your code here - settings are reset"<br>client := OllamaClient new.<br>client generate: 'test prompt' ].</p><p>"Settings restored automatically after block"</p><pre><code>---## 11. Extension Points### 11.1 Custom Models**Register Model via Pragma**:</code></pre><p>MyModelCatalog class >> myCustomModel<br><ollamaModel: 'mycustom' tag: 'v1' label: 'My Custom Model'></p><pre><code>**After registration**:</code></pre><p>"Refresh registry to pick up new pragmas"<br>OModelRegistry refresh.</p><p>"Model appears in settings dropdown"<br>CopilotSettings availableModelNames.<br>"=> includes: 'My Custom Model' -> 'mycustom:v1'"</p><pre><code>---### 11.2 Custom FIM Templates**Create Template File**:</code></pre><p>pharo-copilot/templates/mycustom-v1-template.txt</p><pre><code>**Template Content**:</code></pre><p><|fim<i>prefix|> .Prompt <|fim</i>suffix|> .Suffix <|fim_middle|></p><pre><code>**Or provide via code**:</code></pre><p>"Override template method"<br>CopilotSettings class >> fimTemplateForModel: modelName<br>modelName = 'mycustom:v1' ifTrue: [<br>^ '<|fim<i>prefix|>{1}<|fim</i>suffix|>{2}<|fim_middle|>' ].<br>^ super fimTemplateForModel: modelName</p><pre><code>---### 11.3 Custom Result Processing**Subclass Result Builder**:</code></pre><p>CoPharoCopilotResultSetBuilder subclass: #MyCustomResultSetBuilder<br>instanceVariableNames: ''<br>classVariableNames: ''<br>package: 'MyExtension'</p><p>MyCustomResultSetBuilder >> cleanedContentFrom: aString<br>"Custom cleaning logic"<br>| cleaned |<br>cleaned := super cleanedContentFrom: aString.<br><br>"Additional processing"<br>cleaned := self removeComments: cleaned.<br>cleaned := self formatCode: cleaned.<br><br>^ cleaned</p><pre><code>**Use Custom Builder**:</code></pre><p>CoPharoCopilotContext >> initialize<br>super initialize.<br>completionBuilder := MyCustomResultSetBuilder initializeOnContext: self</p><pre><code>---### 11.4 Evaluation Listeners**Subscribe to Evaluation Events**:</code></pre><p>Object subclass: #MyEvaluationListener<br>instanceVariableNames: ''<br>classVariableNames: ''<br>package: 'MyExtension'</p><p>MyEvaluationListener >> initialize<br>super initialize.<br>SystemAnnouncer uniqueInstance weak<br>when: CoEvaluationAnnouncement<br>send: #handleEvaluation:<br>to: self.</p><p>MyEvaluationListener >> handleEvaluation: anAnnouncement<br>| entry |<br>entry := anAnnouncement entry.<br><br>entry action = #accepted ifTrue: [<br>"Log accepted suggestion to external service"<br>self logToExternalService: entry ].<br><br>entry action = #rejected ifTrue: [<br>"Analyze rejection for improvement"<br>self analyzeRejection: entry ]</p><pre><code>---## 12. Troubleshooting### 12.1 Common Issues**Issue 1: "Ollama service unavailable"****Symptoms**: No completions, error in log**Checks**:</code></pre><h1>Verify Ollama is running</h1><p>ps aux | grep ollama</p><h1>Test API</h1><p>curl <a target="_blank" href="http://127.0.0.1:11434/api/tags">http://127.0.0.1:11434/api/tags</a></p><h1>Check port</h1><p>lsof -i :11434</p><pre><code>**Solutions**:</code></pre><h1>Start Ollama</h1><p>ollama serve</p><h1>Or restart service</h1><p>pkill ollama && ollama serve</p><pre><code>---**Issue 2: "Model not found"****Symptoms**: Error message, null model fallback**Checks**:</code></pre><h1>List installed models</h1><p>ollama list</p><h1>Check if model exists in Ollama</h1><p>ollama show pharo-coder-1.5b-fim-f16.gguf:latest</p><pre><code>**Solutions**:</code></pre><h1>Pull missing model</h1><p>ollama pull pharo-coder-1.5b-fim-f16.gguf:latest</p><h1>Or enable auto-install</h1><pre><code></code></pre><p>CopilotSettings autoInstallModelScriptEnabled: true.</p><pre><code>---**Issue 3: "No completions appearing"****Checks**:</code></pre><p>"Verify copilot is enabled"<br>CopilotSettings copilotEnabled.</p><p>"Check completion engine"<br>RubSmalltalkEditor completionEngineClass.<br>"Should be: CoCompletionEnginePharoCopilot"</p><p>"Test client manually"<br>client := OllamaClient new.<br>client generate: 'test'.</p><pre><code>**Solutions**:</code></pre><p>"Enable copilot"<br>CopilotSettings copilotEnabled: true.</p><p>"Set correct engine"<br>RubSmalltalkEditor completionEngineClass: CoCompletionEnginePharoCopilot.</p><p>"Refresh model registry"<br>OModelRegistry refresh.</p><pre><code>---**Issue 4: "Slow completions"****Checks**:</code></pre><p>"Check if large context is being sent"<br>CoCopilotLogger logFileReference contents inspect.<br>"Look for 'classContextLength' in logs"</p><pre><code>**Solutions**:</code></pre><h1>Use smaller, faster model</h1><p>ollama pull codellama:7b  # Instead of 34b</p><h1>Or use quantized model</h1><p>ollama pull pharo-coder-1.5b-fim-f16.gguf:latest  # Optimized</p><pre><code></code></pre><p>"Reduce context size (future enhancement)"<br>"Currently sends all methods - consider filtering"</p><pre><code>---**Issue 5: "Template not found"****Symptoms**: Error about missing FIM template**Checks**:</code></pre><p>"Check template file"<br>CopilotSettings templateFileForModelNamed: CopilotSettings modelName.<br>"Check if file exists"</p><p>"Check bundled templates"<br>CopilotSettings templatesDirectory entries inspect.</p><pre><code>**Solutions**:</code></pre><p>"Fetch metadata to create cached template"<br>CopilotSettings fetchModelMetadata.</p><p>"Or create template manually"<br>templateFile := CopilotSettings templateFileForModelNamed: CopilotSettings modelName.<br>templateFile parent ensureCreateDirectory.<br>templateFile writeStreamDo: [ :s |<br>s nextPutAll: '<PRE> {1} <SUF> {2} <MID>' ].</p><pre><code>---### 12.2 Debugging**Enable Verbose Logging**:</code></pre><p>"Ensure logging is enabled"<br>CopilotSettings loggingEnabled: true.</p><p>"Check log location"<br>CoCopilotLogger logFileReference fullName.<br>"=> '/path/to/pharo-copilot/copilot-logs/copilot.log'"</p><p>"Tail log file"<br>CoCopilotLogger logFileReference contents inspect.</p><pre><code>**Inspect Internal State**:</code></pre><p>"Check settings"<br>CopilotSettings settingsSnapshot inspect.</p><p>"Check current model"<br>client := OllamaClient new.<br>client instVarNamed: 'modelSpec'.</p><p>"Check evaluator stats"<br>CoSuggestionEvaluator default sessionStats inspect.</p><p>"Check registry"<br>OModelRegistry current allSpecs inspect.</p><pre><code>**Manual Completion Test**:</code></pre><p>"Create mock context"<br>context := CoPharoCopilotContext new.<br>context source: 'Object subclass: #Test'.</p><p>"Build completion manually"<br>builder := CoPharoCopilotResultSetBuilder new.<br>builder initializeOnContext: context.</p><p>"Extract context"<br>classContext := builder classContextFor: context.<br>classContext inspect.</p><p>"Test with client"<br>client := OllamaClient new.<br>response := client generateForPrefix: 'Object >> test' suffix: '' context: classContext.<br>response inspect.</p><pre><code>---### 12.3 Reset & Clean Start**Reset Settings to Default**:</code></pre><p>CopilotSettings resetToDefaultSettings.</p><pre><code>**Clear Caches**:</code></pre><p>"Clear model metadata cache"<br>CopilotSettings clearCachedModelMetadata.</p><p>"Reset model registry"<br>OModelRegistry reset.<br>OModelRegistry refresh.</p><p>"Reset evaluator"<br>CoSuggestionEvaluator reset.</p><pre><code>**Delete Logs**:</code></pre><p>"Delete activity log"<br>CoCopilotLogger logFileReference delete.</p><p>"Delete evaluation log"<br>CoCopilotLogger evaluationLogFileReference delete.</p><p>"Re-initialize logger"<br>CoCopilotLogger initialize.</p><pre><code>---## 13. Testing Suite### 13.1 Test Organization**Test Packages**:- **AI-Pharo-Copilot-Tests**: Main test suite- **AI-Pharo-Copilot-Tests-Mock**: Mock infrastructure**Test Categories**:1. **Unit Tests**: Component-level testing2. **Integration Tests**: Cross-component workflows3. **Regression Tests**: Prevent known issues4. **Usability Tests**: User experience validation5. **Stress Tests**: Performance and scalability6. **Advanced Tests**: Complex evaluation scenarios---### 13.2 Mock Infrastructure**CopilotMockModelTestCase**:Base test case that sets up mock models:</code></pre><p>CopilotMockModelTestCase >> setUp<br>super setUp.<br>mockContext := OTestModelSupport beginMockModels.</p><p>CopilotMockModelTestCase >> tearDown<br>[ super tearDown ] ensure: [<br>OTestModelSupport endMockModels: mockContext.<br>mockContext := nil ].</p><pre><code>**OTestModelSupport**:Utility class for mock model management:</code></pre><p>OTestModelSupport class >> beginMockModels<br>"Setup mock models for testing"<br>| context originalFetcher |<br>context := Dictionary new.<br><br>"Save original fetcher"<br>originalFetcher := OModelRegistry modelsFetcher.<br>context at: #originalFetcher put: originalFetcher.<br><br>"Install mock fetcher"<br>OModelRegistry modelsFetcher: [<br>self mockModelsResponse ].<br><br>"Refresh registry with mocks"<br>OModelRegistry refresh.<br><br>^ context</p><p>OTestModelSupport class >> endMockModels: context<br>"Restore original state"<br>| originalFetcher |<br>originalFetcher := context at: #originalFetcher ifAbsent: [ nil ].<br>OModelRegistry modelsFetcher: originalFetcher.<br>OModelRegistry refresh.</p><p>OTestModelSupport class >> mockModelsResponse<br>"Returns mock models list"<br>^ Dictionary new<br>at: #models put: #(<br>#{ #name -> 'mock:model' }<br>#{ #name -> 'test:7b' }<br>);<br>yourself</p><pre><code>---### 13.3 Key Test Classes**OAHttpTransportTest**:Tests HTTP transport layer:</code></pre><p>testDefaultHostAndPort<br>| transport |<br>transport := OAHttpTransport new.<br>self assert: transport host equals: '127.0.0.1'.<br>self assert: transport port equals: 11434.</p><p>testJsonReaderWriterInitialization<br>| transport |<br>transport := OAHttpTransport new.<br>self assert: transport jsonReader notNil.<br>self assert: transport jsonWriter notNil.</p><pre><code>**CopilotSettingsValidationTest**:Tests settings validation:</code></pre><p>testModelNameWithInvalidValues<br>| old longName |<br>old := CopilotSettings modelName.<br>[<br>"Empty string should not crash"<br>CopilotSettings modelName: ''.<br>self assert: CopilotSettings modelName equals: ''.<br><br>"Long name"<br>longName := String new: 1000 withAll: $m.<br>CopilotSettings modelName: longName.<br>self assert: CopilotSettings modelName equals: longName.<br>] ensure: [ CopilotSettings modelName: old ]</p><pre><code>**UsabilityTest**:Tests user experience:</code></pre><p>testEntryDisplayStringIsInformative<br>| shortEntry longEntry |<br>shortEntry := CoCopilotEntry contents: 'def method'.<br>longEntry := CoCopilotEntry contents: (String new: 200 withAll: $x).<br><br>"Short content shown completely"<br>self assert: shortEntry displayString equals: 'def method'.<br><br>"Long content truncated with indicator"<br>self assert: longEntry displayString size < 200.<br>self assert: (longEntry displayString endsWith: '…').</p><p>testAvailableModelNamesAreUserFriendly<br>| modelNames |<br>modelNames := CopilotSettings availableModelNames.<br>modelNames do: [ :assoc |<br>"Keys should be human-readable labels"<br>self assert: assoc key isString.<br>self deny: assoc key isEmpty.<br>"Labels should be more readable than identifiers"<br>self deny: assoc key equals: assoc value ]</p><pre><code>**RegressionTest**:Tests for known issues:</code></pre><p>testCleanedContentFromDoesNotAlterOriginalString<br>| builder original result |<br>builder := CoPharoCopilotResultSetBuilder new.<br>original := '<code></code><code>smalltalk', String lf, 'original code', String lf, '</code><code></code>'.<br>result := builder cleanedContentFrom: original.<br><br>"Original unchanged"<br>self assert: (original includesSubstring: '<code></code>`smalltalk').<br>self assert: result equals: 'original code'.</p><p>testDefaultModelConsistency<br>| defaultModel client1 client2 |<br>defaultModel := OllamaClient defaultModelFullName.<br>client1 := OllamaClient new.<br>client2 := OllamaClient new.<br><br>"Both clients use same model"<br>self assert: (client1 instVarNamed: 'modelSpec') fullName equals: defaultModel.<br>self assert: (client2 instVarNamed: 'modelSpec') fullName<br>equals: (client1 instVarNamed: 'modelSpec') fullName.</p><pre><code>**CoSuggestionEvaluatorAdvancedTest**:Tests evaluation system:</code></pre><p>testComplexEvaluationScenario<br>| evaluator context suggestions lengthStats |<br>evaluator := CoSuggestionEvaluator new.<br>context := CoPharoCopilotContext new.<br><br>"Create variety of suggestions"<br>suggestions := {<br>CoCopilotEntry contents: 'short'.<br>CoCopilotEntry contents: (String new: 30 withAll: l) }.<br><br>"Record actions"<br>evaluator recordSuggestionAccepted: suggestions first context: context.<br>evaluator recordSuggestionIgnored: suggestions second context: context.<br>evaluator recordSuggestionAccepted: suggestions third context: context.<br><br>"Verify statistics"<br>self assert: (evaluator sessionStats at: #totalSuggestions) equals: 3.<br>self assert: (evaluator sessionStats at: #totalAccepted) equals: 2.<br>self assert: evaluator acceptanceRate equals: 67.</p><pre><code>**OModelRegistryStressTest**:Tests scalability:</code></pre><p>testMassiveModelRegistry<br>| registry |<br>registry := OModelRegistry new.<br><br>1 to: 100 do: [:i |<br>| spec |<br>spec := OModelSpec<br>family: ('model', i asString)<br>tag:    ('v', i asString)<br>label:  ('Model ', i asString).<br>registry addSpec: spec ].<br><br>self assert: registry byFullName size equals: 100.<br>self assert: registry byLabel size equals: 100.<br>self assert: registry allSpecs size equals: 100.</p><pre><code>---### 13.4 Running Tests**Run All Tests**:</code></pre><p>"Run all copilot tests"<br>testRunner := TestRunner new.<br>testRunner selectPackage: 'AI-Pharo-Copilot-Tests'.<br>testRunner runAll.</p><p>"Or use SUnit"<br>(TestCase allSubclasses select: [ :tc |<br>tc category includesSubstring: 'Copilot' ]) do: [ :tc |<br>tc suite run ].</p><pre><code>**Run Specific Test Class**:</code></pre><p>"Run single test class"<br>UsabilityTest suite run.</p><p>"Run specific test"<br>UsabilityTest new testEntryDisplayStringIsInformative.</p><pre><code>**CI Integration**:</code></pre><h1>Run tests from command line</h1><p>pharo Pharo.image test --junit-xml-output 'AI-Pharo-Copilot-Tests'</p><pre><code>---## Appendix A: Class Reference### Core Package (AI-Pharo-Copilot)| Class | Purpose ||-------|---------|| **CoCompletionEnginePharoCopilot** | Main completion engine integration || **CoPharoCopilotResultSetBuilder** | Builds completion result sets || **CoPharoCopilotContext** | Specialized completion context || **CoCopilotEntry** | Single completion suggestion || **CoCopilotLogger** | Centralized activity logging |### Ollama Package (AI-Pharo-Copilot-Ollama)| Class | Purpose ||-------|---------|| **OllamaClient** | REST API client for Ollama || **OAHttpTransport** | HTTP transport layer || **CopilotSettings** | Global configuration || **OModelRegistry** | Model discovery and management || **OModelSpec** | Model specification || **OModelCatalog** | Built-in model definitions |### Evaluator Package (AI-Pharo-Copilot-Evaluator)| Class | Purpose ||-------|---------|| **CoSuggestionEvaluator** | Tracks suggestion metrics || **CoEvaluationReport** | Generates evaluation reports || **CoEvaluationEntry** | Single evaluation record || **CoEvaluationAnnouncement** | Evaluation event notification |### Test Package (AI-Pharo-Copilot-Tests)| Class | Purpose ||-------|---------|| **CopilotMockModelTestCase** | Base test with mock setup || **OTestModelSupport** | Mock infrastructure utilities || **OAHttpTransportTest** | Tests HTTP transport || **CopilotSettingsValidationTest** | Tests settings validation || **UsabilityTest** | Tests user experience || **RegressionTest** | Tests for known issues || **CoSuggestionEvaluatorAdvancedTest** | Tests evaluation system || **OModelRegistryStressTest** | Tests scalability |---## Appendix B: Configuration Files### Directory Structure</code></pre><p>pharo-image-directory/<br>├── pharo-copilot/<br>│   ├── templates/                    # FIM templates<br>│   │   ├── codellama-7b-template.txt<br>│   │   ├── pharo-coder-template.txt<br>│   │   └── ...<br>│   └── copilot-logs/                 # Activity logs<br>│       ├── copilot.log               # Main activity log<br>│       ├── copilot-evaluation-log.jsonl  # Evaluation data<br>│       └── {model-name}/             # Per-model metadata<br>│           ├── template.txt<br>│           ├── system.txt<br>│           ├── parameters.txt<br>│           └── modelfile.txt</p><pre><code>### Log File Formats**Activity Log** (`copilot.log`):</code></pre><p>===== [FRONTEND] Preparing completion request @ 2025-01-15 14:23:45 =====<br>- contextClass: CoPharoCopilotContext<br>- cursorPosition: 45<br>- sourceSize: 120</p><p>===== [BACKEND] Dispatching generate request @ 2025-01-15 14:23:46 =====<br>- endpoint: api/generate<br>- modelFullName: pharo-coder-1.5b-fim-f16.gguf:latest</p><pre><code>---## Appendix C: API Reference### Quick Reference**Enable Copilot**:</code></pre><p>RubSmalltalkEditor completionEngineClass: CoCompletionEnginePharoCopilot.<br>CopilotSettings copilotEnabled: true.</p><pre><code>**Configure Model**:</code></pre><p>CopilotSettings modelName: 'pharo-coder-1.5b-fim-f16.gguf:latest'.</p><pre><code>**Test Connection**:</code></pre><p>OllamaClient new listModels.</p><pre><code>**View Statistics**:</code></pre><p>CoSuggestionEvaluator default sessionStats inspect.<br>CoSuggestionEvaluator default generateReport inspect.</p><pre><code>**Export Data**:</code></pre><p>CoSuggestionEvaluator default exportToCSV: 'evaluation.csv'.</p><pre><code>**View Logs**:</code></pre><p>CoCopilotLogger logFileReference openWithShell.</p><pre><code>---## Contributors- Omar AbedelKader - Original author and maintainer## LicenseMIT License - See LICENSE file## Repositoryhttps://github.com/omarabedelkader/Pharo-Copilot---## Acknowledgments- **Pharo Community** - For the robust Smalltalk environment- **Ollama Team** - For making local LLMs accessible- **CodeLlama Team** - For FIM-capable models- **All Contributors** - For testing and feedback---**Document Version**: 1.0  **Last Updated**: January 2026  **Compatible with**: Pharo 13, Pharo 14, Ollama 0.1.0+---</code></pre>
-	
-	
-<br>
-<p>
-  © 2025 Omar AbedelKader
-</p>
-	
-	</div>
-	
-	</body>
-	
+<main class="container-xxl my-4">
+  <div class="row g-4">
 
+    
+    <aside class="col-12 col-lg-3">
+      <div id="sidebar" class="border rounded-3 p-3">
+        <div class="fw-semibold mb-2">On this page</div>
+        <nav class="toc" id="TOC" role="doc-toc">
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#pharo-copilot-system-documentation" id="toc-pharo-copilot-system-documentation">Pharo Copilot – System
+Documentation</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#executive-summary" id="toc-executive-summary">1. Executive
+Summary</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#key-features" id="toc-key-features">Key Features</a></li>
+<li><a class="toc-link" href="#technology-stack" id="toc-technology-stack">Technology
+Stack</a></li>
+</ul></li>
+<li><a class="toc-link" href="#architecture-overview" id="toc-architecture-overview">2.
+Architecture Overview</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#package-structure" id="toc-package-structure">Package
+Structure</a></li>
+</ul></li>
+<li><a class="toc-link" href="#core-components" id="toc-core-components">3. Core
+Components</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#cocompletionenginepharocopilot-completion-engine" id="toc-cocompletionenginepharocopilot-completion-engine">3.1
+CoCompletionEnginePharoCopilot (Completion Engine)</a></li>
+<li><a class="toc-link" href="#copharocopilotresultsetbuilder-result-builder" id="toc-copharocopilotresultsetbuilder-result-builder">3.2
+CoPharoCopilotResultSetBuilder (Result Builder)</a></li>
+<li><a class="toc-link" href="#copharocopilotcontext-completion-context" id="toc-copharocopilotcontext-completion-context">3.3
+CoPharoCopilotContext (Completion Context)</a></li>
+<li><a class="toc-link" href="#cocopilotentry-suggestion-entry" id="toc-cocopilotentry-suggestion-entry">3.4 CoCopilotEntry (Suggestion
+Entry)</a></li>
+<li><a class="toc-link" href="#cocopilotlogger-activity-logger" id="toc-cocopilotlogger-activity-logger">3.5 CoCopilotLogger (Activity
+Logger)</a></li>
+</ul></li>
+<li><a class="toc-link" href="#ollama-integration" id="toc-ollama-integration">4. Ollama
+Integration</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#ollamaclient-rest-api-client" id="toc-ollamaclient-rest-api-client">4.1 OllamaClient (REST API
+Client)</a></li>
+<li><a class="toc-link" href="#oahttptransport-http-client" id="toc-oahttptransport-http-client">4.2 OAHttpTransport (HTTP
+Client)</a></li>
+<li><a class="toc-link" href="#omodelregistry-model-discovery" id="toc-omodelregistry-model-discovery">4.3 OModelRegistry (Model
+Discovery)</a></li>
+<li><a class="toc-link" href="#omodelspec-model-specification" id="toc-omodelspec-model-specification">4.4 OModelSpec (Model
+Specification)</a></li>
+<li><a class="toc-link" href="#omodelcatalog-built-in-models" id="toc-omodelcatalog-built-in-models">4.5 OModelCatalog (Built-in
+Models)</a></li>
+</ul></li>
+<li><a class="toc-link" href="#completion-engine" id="toc-completion-engine">5.
+Completion Engine</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#response-cleaning" id="toc-response-cleaning">5.1 Response
+Cleaning</a></li>
+<li><a class="toc-link" href="#context-extraction" id="toc-context-extraction">5.2
+Context Extraction</a></li>
+</ul></li>
+<li><a class="toc-link" href="#evaluation-system" id="toc-evaluation-system">6.
+Evaluation System</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#cosuggestionevaluator-metrics-tracker" id="toc-cosuggestionevaluator-metrics-tracker">6.1 CoSuggestionEvaluator
+(Metrics Tracker)</a></li>
+<li><a class="toc-link" href="#coevaluationreport-report-generator" id="toc-coevaluationreport-report-generator">6.2 CoEvaluationReport
+(Report Generator)</a></li>
+<li><a class="toc-link" href="#coevaluationentry-evaluation-record" id="toc-coevaluationentry-evaluation-record">6.3 CoEvaluationEntry
+(Evaluation Record)</a></li>
+<li><a class="toc-link" href="#coevaluationannouncement-event-notification" id="toc-coevaluationannouncement-event-notification">6.4
+CoEvaluationAnnouncement (Event Notification)</a></li>
+</ul></li>
+<li><a class="toc-link" href="#fill-in-the-middle-fim-templates" id="toc-fill-in-the-middle-fim-templates">7. Fill-in-the-Middle (FIM)
+Templates</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#template-system" id="toc-template-system">7.1 Template
+System</a></li>
+<li><a class="toc-link" href="#template-storage" id="toc-template-storage">7.2 Template
+Storage</a></li>
+<li><a class="toc-link" href="#model-metadata" id="toc-model-metadata">7.3 Model
+Metadata</a></li>
+</ul></li>
+<li><a class="toc-link" href="#installation-setup" id="toc-installation-setup">8.
+Installation &amp; Setup</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#prerequisites" id="toc-prerequisites">8.1
+Prerequisites</a></li>
+<li><a class="toc-link" href="#installation" id="toc-installation">8.2
+Installation</a></li>
+<li><a class="toc-link" href="#ollama-setup" id="toc-ollama-setup">8.3 Ollama
+Setup</a></li>
+<li><a class="toc-link" href="#initial-configuration" id="toc-initial-configuration">8.4
+Initial Configuration</a></li>
+<li><a class="toc-link" href="#system-settings-ui" id="toc-system-settings-ui">8.5 System
+Settings UI</a></li>
+</ul></li>
+<li><a class="toc-link" href="#usage-guide" id="toc-usage-guide">9. Usage Guide</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#basic-completion" id="toc-basic-completion">9.1 Basic
+Completion</a></li>
+<li><a class="toc-link" href="#context-aware-completion" id="toc-context-aware-completion">9.2 Context-Aware Completion</a></li>
+<li><a class="toc-link" href="#fill-in-the-middle" id="toc-fill-in-the-middle">9.3
+Fill-in-the-Middle</a></li>
+<li><a class="toc-link" href="#evaluation-feedback" id="toc-evaluation-feedback">9.4
+Evaluation &amp; Feedback</a></li>
+<li><a class="toc-link" href="#viewing-logs" id="toc-viewing-logs">9.5 Viewing
+Logs</a></li>
+</ul></li>
+<li><a class="toc-link" href="#configuration-settings" id="toc-configuration-settings">10. Configuration &amp; Settings</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#copilotsettings-global-configuration" id="toc-copilotsettings-global-configuration">10.1 CopilotSettings
+(Global Configuration)</a></li>
+<li><a class="toc-link" href="#model-auto-installation" id="toc-model-auto-installation">10.2 Model Auto-Installation</a></li>
+<li><a class="toc-link" href="#custom-client-factory" id="toc-custom-client-factory">10.3
+Custom Client Factory</a></li>
+<li><a class="toc-link" href="#settings-snapshot-restore" id="toc-settings-snapshot-restore">10.4 Settings Snapshot &amp;
+Restore</a></li>
+</ul></li>
+<li><a class="toc-link" href="#extension-points" id="toc-extension-points">11. Extension
+Points</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#custom-models" id="toc-custom-models">11.1 Custom
+Models</a></li>
+<li><a class="toc-link" href="#custom-fim-templates" id="toc-custom-fim-templates">11.2
+Custom FIM Templates</a></li>
+<li><a class="toc-link" href="#custom-result-processing" id="toc-custom-result-processing">11.3 Custom Result Processing</a></li>
+<li><a class="toc-link" href="#evaluation-listeners" id="toc-evaluation-listeners">11.4
+Evaluation Listeners</a></li>
+</ul></li>
+<li><a class="toc-link" href="#troubleshooting" id="toc-troubleshooting">12.
+Troubleshooting</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#common-issues" id="toc-common-issues">12.1 Common
+Issues</a></li>
+<li><a class="toc-link" href="#debugging" id="toc-debugging">12.2 Debugging</a></li>
+<li><a class="toc-link" href="#reset-clean-start" id="toc-reset-clean-start">12.3 Reset
+&amp; Clean Start</a></li>
+</ul></li>
+<li><a class="toc-link" href="#testing-suite" id="toc-testing-suite">13. Testing
+Suite</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#test-organization" id="toc-test-organization">13.1 Test
+Organization</a></li>
+<li><a class="toc-link" href="#mock-infrastructure" id="toc-mock-infrastructure">13.2
+Mock Infrastructure</a></li>
+<li><a class="toc-link" href="#key-test-classes" id="toc-key-test-classes">13.3 Key Test
+Classes</a></li>
+<li><a class="toc-link" href="#running-tests" id="toc-running-tests">13.4 Running
+Tests</a></li>
+</ul></li>
+<li><a class="toc-link" href="#appendix-a-class-reference" id="toc-appendix-a-class-reference">Appendix A: Class Reference</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#core-package-ai-pharo-copilot" id="toc-core-package-ai-pharo-copilot">Core Package
+(AI-Pharo-Copilot)</a></li>
+<li><a class="toc-link" href="#ollama-package-ai-pharo-copilot-ollama" id="toc-ollama-package-ai-pharo-copilot-ollama">Ollama Package
+(AI-Pharo-Copilot-Ollama)</a></li>
+<li><a class="toc-link" href="#evaluator-package-ai-pharo-copilot-evaluator" id="toc-evaluator-package-ai-pharo-copilot-evaluator">Evaluator Package
+(AI-Pharo-Copilot-Evaluator)</a></li>
+<li><a class="toc-link" href="#test-package-ai-pharo-copilot-tests" id="toc-test-package-ai-pharo-copilot-tests">Test Package
+(AI-Pharo-Copilot-Tests)</a></li>
+</ul></li>
+<li><a class="toc-link" href="#appendix-b-configuration-files" id="toc-appendix-b-configuration-files">Appendix B: Configuration
+Files</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#directory-structure" id="toc-directory-structure">Directory Structure</a></li>
+<li><a class="toc-link" href="#log-file-formats" id="toc-log-file-formats">Log File
+Formats</a></li>
+</ul></li>
+<li><a class="toc-link" href="#appendix-c-api-reference" id="toc-appendix-c-api-reference">Appendix C: API Reference</a>
+<ul class="list-unstyled">
+<li><a class="toc-link" href="#quick-reference" id="toc-quick-reference">Quick
+Reference</a></li>
+</ul></li>
+<li><a class="toc-link" href="#contributors" id="toc-contributors">Contributors</a></li>
+<li><a class="toc-link" href="#license" id="toc-license">License</a></li>
+<li><a class="toc-link" href="#repository" id="toc-repository">Repository</a></li>
+<li><a class="toc-link" href="#acknowledgments" id="toc-acknowledgments">Acknowledgments</a></li>
+</ul></li>
+</ul>
+</nav>
+      </div>
+    </aside>
+    
+
+    <section class="col">
+      <article class="border rounded-3 p-4">
+        <body>
+
+<p>{ “title” : “Pharo-Copilot Documentation”, “layout”: “index”,
+“publishDate”: “2025-11-30” }</p>
+<h1 id="pharo-copilot-system-documentation">Pharo Copilot – System
+Documentation</h1>
+<p>Table of Contents 1. Executive Summary 2. Architecture Overview 3.
+Core Components 4. Ollama Integration 5. Completion Engine 6. Evaluation
+System 7. Fill-in-the-Middle (FIM) Templates 8. Installation &amp; Setup
+9. Usage Guide 10. Configuration &amp; Settings 11. Extension Points 12.
+Troubleshooting 13. Testing Suite</p>
+<hr/>
+<h2 id="executive-summary">1. Executive Summary</h2>
+<p>AI-Pharo-Copilot is an AI-powered code completion assistant
+integrated directly into the Pharo Smalltalk development environment. It
+provides intelligent, context-aware code suggestions using Large
+Language Models (LLMs) running locally via Ollama, eliminating the need
+to send code to external servers.</p>
+<h3 id="key-features">Key Features</h3>
+<ul>
+<li><strong>Local LLM Integration</strong>: Runs models locally via
+Ollama for complete privacy</li>
+<li><strong>Context-Aware Completions</strong>: Analyzes class
+structure, methods, and surrounding code</li>
+<li><strong>Fill-in-the-Middle (FIM) Support</strong>: Completes code
+based on prefix and suffix context</li>
+<li><strong>Real-time Evaluation</strong>: Tracks suggestion acceptance
+rates and quality metrics</li>
+<li><strong>Asynchronous Processing</strong>: Non-blocking completion
+fetching for smooth editing</li>
+<li><strong>Comprehensive Logging</strong>: Detailed activity tracking
+for debugging and analysis</li>
+<li><strong>Auto-Installation</strong>: Automatically pulls recommended
+models when missing</li>
+<li><strong>Extensive Testing</strong>: Full test suite with mock
+support for reliable development</li>
+</ul>
+<h3 id="technology-stack">Technology Stack</h3>
+<ul>
+<li><strong>Language</strong>: Pharo Smalltalk (13 &amp; 14
+compatible)</li>
+<li><strong>LLM Backend</strong>: Ollama (local inference server)</li>
+<li><strong>Completion Framework</strong>: Pharo’s native Completion
+Engine</li>
+<li><strong>HTTP Client</strong>: ZnClient (Zinc HTTP Components)</li>
+<li><strong>Persistence</strong>: STON (Smalltalk Object Notation) and
+JSONL</li>
+<li><strong>Logging</strong>: File-based logging with structured
+events</li>
+</ul>
+<hr/>
+<h2 id="architecture-overview">2. Architecture Overview</h2>
+<p>AI-Pharo-Copilot follows a layered architecture with clear separation
+of concerns:</p>
+<pre><code>┌─────────────────────────────────────────────────────────┐
+│                   Editor Integration                    │
+│        (RubSmalltalkEditor, Completion Engine)          │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│                 Completion Layer                        │
+│  (CoCompletionEnginePharoCopilot, ResultSetBuilder)    │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│                   Client Layer                          │
+│    (OllamaClient, HTTP Transport, FIM Template)         │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│                Evaluation &amp; Logging                     │
+│  (CoSuggestionEvaluator, CoCopilotLogger, Reports)      │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│              Settings &amp; Configuration                   │
+│  (CopilotSettings, OModelRegistry, Model Catalog)       │
+└─────────────────────────────────────────────────────────┘</code></pre>
+<h3 id="package-structure">Package Structure</h3>
+<table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>Package</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>AI-Pharo-Copilot</strong></td>
+<td>Core completion engine, result builder, context, and logging</td>
+</tr>
+<tr>
+<td><strong>AI-Pharo-Copilot-Ollama</strong></td>
+<td>Ollama client, HTTP transport, model registry, and settings</td>
+</tr>
+<tr>
+<td><strong>AI-Pharo-Copilot-Evaluator</strong></td>
+<td>Suggestion evaluation, metrics tracking, and reporting</td>
+</tr>
+<tr>
+<td><strong>AI-Pharo-Copilot-Tests</strong></td>
+<td>Comprehensive test suite with mock infrastructure</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="core-components">3. Core Components</h2>
+<h3 id="cocompletionenginepharocopilot-completion-engine">3.1
+CoCompletionEnginePharoCopilot (Completion Engine)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot/CoCompletionEnginePharoCopilot.class.st</code></p>
+<p><strong>Purpose</strong>: The main completion engine that integrates
+with Pharo’s editor.</p>
+<p><strong>Responsibilities</strong>: - Provides completion builder
+instance - Handles token replacement in editor - Maintains cursor
+position after insertion - Logs completion requests</p>
+<p><strong>Key Methods</strong>:</p>
+<pre class="smalltalk"><code>CoCompletionEnginePharoCopilot &gt;&gt; completionBuilder
+    "Returns memoized CoPharoCopilotResultSetBuilder instance"
+    ^ completionBuilder ifNil: [ 
+        completionBuilder := CoPharoCopilotResultSetBuilder new ]
+
+CoCompletionEnginePharoCopilot &gt;&gt; replaceTokenInEditorWith: newString
+    "Replaces text and maintains original cursor position"
+    | originalCaretPosition |
+    originalCaretPosition := self editor caret.
+    super replaceTokenInEditorWith: newString.
+    self editor selectAt: originalCaretPosition.</code></pre>
+<p><strong>Integration</strong>:</p>
+<pre class="smalltalk"><code>"Set as active completion engine"
+RubSmalltalkEditor completionEngineClass: CoCompletionEnginePharoCopilot</code></pre>
+<hr/>
+<h3 id="copharocopilotresultsetbuilder-result-builder">3.2
+CoPharoCopilotResultSetBuilder (Result Builder)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot/CoPharoCopilotResultSetBuilder.class.st</code></p>
+<p><strong>Purpose</strong>: Builds completion result sets by
+coordinating with Ollama and processing responses.</p>
+<p><strong>Responsibilities</strong>: - Extracts code context (class
+definition, methods, prefix/suffix) - Dispatches asynchronous completion
+requests - Cleans and normalizes LLM responses - Applies suggestions to
+editor</p>
+<p><strong>Key Attributes</strong>:</p>
+<pre class="smalltalk"><code>completionContext    "The completion context from editor"</code></pre>
+<p><strong>Key Methods</strong>:</p>
+<pre class="smalltalk"><code>buildCompletion
+    "Main entry point - dispatches async fetch and returns empty result set"
+    
+classContextFor: aContext
+    "Extracts class definition and all methods for context"
+    
+processCompletionFor: aContext prefix: prefix suffix: suffix contextInfo: dict
+    "Background worker that queries Ollama and applies result"
+    
+cleanedContentFrom: aString
+    "Removes markdown fences and language specifiers"</code></pre>
+<p><strong>Process Flow</strong>:</p>
+<ol type="1">
+<li><strong>Context Extraction</strong>: Gathers class definition,
+instance methods, class methods</li>
+<li><strong>Async Dispatch</strong>: Forks background process at
+<code>userBackgroundPriority</code></li>
+<li><strong>API Call</strong>: Sends request to OllamaClient with FIM
+template</li>
+<li><strong>Response Cleaning</strong>: Removes ```smalltalk fences and
+metadata</li>
+<li><strong>Editor Update</strong>: Applies cleaned suggestion to
+editor</li>
+<li><strong>Logging</strong>: Records all stages with detailed
+context</li>
+</ol>
+<p><strong>Context Structure</strong>:</p>
+<pre class="smalltalk"><code>contextInfo := Dictionary new
+    at: #contextClass put: context class name;
+    at: #cursorPosition put: context position;
+    at: #sourceSize put: context source size;
+    at: #fullSource put: context source;
+    at: #prefix put: prefix;
+    at: #suffix put: suffix;
+    at: #classContextLength put: classContext size;
+    yourself.</code></pre>
+<hr/>
+<h3 id="copharocopilotcontext-completion-context">3.3
+CoPharoCopilotContext (Completion Context)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot/CoPharoCopilotContext.class.st</code></p>
+<p><strong>Purpose</strong>: Specialized completion context for Pharo
+Copilot.</p>
+<p><strong>Initialization</strong>:</p>
+<pre class="smalltalk"><code>CoPharoCopilotContext &gt;&gt; initialize
+    super initialize.
+    completionBuilder := CoPharoCopilotResultSetBuilder 
+        initializeOnContext: self</code></pre>
+<hr/>
+<h3 id="cocopilotentry-suggestion-entry">3.4 CoCopilotEntry (Suggestion
+Entry)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot/CoCopilotEntry.class.st</code></p>
+<p><strong>Purpose</strong>: Represents a single completion
+suggestion.</p>
+<p><strong>Attributes</strong>:</p>
+<pre class="smalltalk"><code>text    "The completion text"</code></pre>
+<p><strong>Key Methods</strong>:</p>
+<pre class="smalltalk"><code>CoCopilotEntry class &gt;&gt; contents: aString
+    "Factory method"
+    ^ self new text: aString; yourself.
+
+activateOn: aCoCompletionContext
+    "Apply suggestion to editor"
+    aCoCompletionContext replaceTokenInEditorWith: text
+
+displayString
+    "Truncate long suggestions for display"
+    ^ text size &gt; 120
+        ifTrue: [ (text copyFrom: 1 to: 117), '…' ]
+        ifFalse: [ text ]</code></pre>
+<hr/>
+<h3 id="cocopilotlogger-activity-logger">3.5 CoCopilotLogger (Activity
+Logger)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot/CoCopilotLogger.class.st</code></p>
+<p><strong>Purpose</strong>: Centralized logging system for all copilot
+activities.</p>
+<p><strong>Log Files</strong>: - <strong>Activity Log</strong>:
+<code>pharo-copilot/copilot-logs/copilot.log</code> - <strong>Evaluation
+Log</strong>:
+<code>pharo-copilot/copilot-logs/copilot-evaluation-log.jsonl</code></p>
+<p><strong>Class Variables</strong>:</p>
+<pre class="smalltalk"><code>logFileReference
+logsDirectoryReference
+evaluationLogFileReference</code></pre>
+<p><strong>Key Methods</strong>:</p>
+<pre class="smalltalk"><code>CoCopilotLogger class &gt;&gt; logFrontEndEvent: eventName details: aDictionary
+    "Log user-facing events"
+    
+CoCopilotLogger class &gt;&gt; logBackEndEvent: eventName details: aDictionary
+    "Log backend/API events"
+    
+CoCopilotLogger class &gt;&gt; logError: eventName origin: originSymbol 
+    exception: anException payload: aDictionary
+    "Log errors with stack traces"</code></pre>
+<p><strong>Log Format</strong>:</p>
+<pre><code>===== [FRONTEND] Preparing completion request @ 2025-01-15 14:23:45 =====
+  - contextClass: CoPharoCopilotContext
+  - cursorPosition: 45
+  - sourceSize: 120
+  - fullSource: Object subclass: #MyClass...
+
+===== [BACKEND] Dispatching generate request @ 2025-01-15 14:23:46 =====
+  - endpoint: api/generate
+  - modelFullName: pharo-coder-1.5b-fim-f16.gguf:latest
+  - optionsSnapshot: {"task": "fill-in-the-middle"}
+
+===== [ERROR] Asynchronous completion failed @ 2025-01-15 14:23:50 =====
+  - origin: CoPharoCopilotResultSetBuilder
+  - error: Connection timeout
+  - stackTrace: ...</code></pre>
+<p><strong>Enabling/Disabling</strong>:</p>
+<pre class="smalltalk"><code>CopilotSettings loggingEnabled: true.   "Enable"
+CopilotSettings loggingEnabled: false.  "Disable"</code></pre>
+<hr/>
+<h2 id="ollama-integration">4. Ollama Integration</h2>
+<h3 id="ollamaclient-rest-api-client">4.1 OllamaClient (REST API
+Client)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot-Ollama/OllamaClient.class.st</code></p>
+<p><strong>Purpose</strong>: Simple client for invoking the Ollama REST
+API.</p>
+<p><strong>Attributes</strong>:</p>
+<pre class="smalltalk"><code>transport    "OAHttpTransport instance"
+modelSpec    "OModelSpec - current model"
+stream       "Boolean - streaming mode (currently false)"
+format       "Output format (optional)"
+options      "Dictionary of Ollama options"</code></pre>
+<p><strong>Key Methods</strong>:</p>
+<pre class="smalltalk"><code>generate: aPromptString
+    "Main API call to /api/generate endpoint"
+    | payload resp normalized |
+    self isNullModel ifTrue: [ ^ self class nullModelResponseString ].
+    payload := Dictionary new
+        at: #model put: modelSpec fullName;
+        at: #prompt put: aPromptString;
+        at: #stream put: stream;
+        yourself.
+    resp := transport postJsonAt: 'api/generate' body: payload.
+    ^ self normalizeResponse: resp
+
+generateForPrefix: prefixString suffix: suffixString context: contextString
+    "Fill-in-the-middle completion"
+    | prompt originalOptions response |
+    prompt := self
+        expandFimTemplate: CopilotSettings fimTemplate
+        prefix: prefixString
+        suffix: suffixString
+        context: contextString.
+    originalOptions := options copy.
+    options at: #task put: 'fill-in-the-middle'.
+    response := self generate: prompt.
+    options := originalOptions.
+    ^ response
+
+listModels
+    "Query available models from Ollama"
+    ^ transport getJsonAt: 'api/tags'</code></pre>
+<p><strong>Null Model</strong>:</p>
+<p>When no model is configured, Copilot uses a special “null model”:</p>
+<pre class="smalltalk"><code>OllamaClient class &gt;&gt; nullModelFullName
+    ^ 'pharo-copilot-null'
+
+OllamaClient class &gt;&gt; nullModelResponseString
+    ^ 'no output, please configure.'</code></pre>
+<hr/>
+<h3 id="oahttptransport-http-client">4.2 OAHttpTransport (HTTP
+Client)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot-Ollama/OAHttpTransport.class.st</code></p>
+<p><strong>Purpose</strong>: Performs HTTP JSON requests against the
+local Ollama server.</p>
+<p><strong>Attributes</strong>:</p>
+<pre class="smalltalk"><code>host             "Server host (default: 127.0.0.1)"
+port             "Server port (default: 11434)"
+defaultHeaders   "HTTP headers dictionary"
+jsonReader       "STON JSON reader"
+jsonWriter       "STON JSON writer"</code></pre>
+<p><strong>Key Methods</strong>:</p>
+<pre class="smalltalk"><code>postJsonAt: aPath body: aDictionary
+    "POST request with JSON payload"
+    | cl |
+    cl := ZnClient new.
+    cl accept: ZnMimeType applicationJson.
+    cl contentWriter: [:data | ZnEntity json: (jsonWriter toString: data) ].
+    cl host: host; port: port; path: aPath.
+    cl forJsonREST.
+    cl contentReader: [:entity | jsonReader fromString: entity contents ].
+    cl contents: aDictionary.
+    ^ cl post.
+
+getJsonAt: aPath
+    "GET request returning JSON"
+    | cl |
+    cl := ZnEasy client.
+    cl forJsonREST; host: host; port: port; path: aPath.
+    ^ cl get</code></pre>
+<hr/>
+<h3 id="omodelregistry-model-discovery">4.3 OModelRegistry (Model
+Discovery)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot-Ollama/OModelRegistry.class.st</code></p>
+<p><strong>Purpose</strong>: Registry that builds and looks up available
+model specs.</p>
+<p><strong>Class Variables</strong>:</p>
+<pre class="smalltalk"><code>current         "Singleton instance"
+modelsFetcher   "Optional block to override model fetching"</code></pre>
+<p><strong>Attributes</strong>:</p>
+<pre class="smalltalk"><code>byFullName    "Dictionary of specs by full name (e.g., 'codellama:7b')"
+byLabel       "Dictionary of specs by friendly label"</code></pre>
+<p><strong>Key Methods</strong>:</p>
+<pre class="smalltalk"><code>OModelRegistry class &gt;&gt; refresh
+    "Rebuild registry from Ollama API"
+    current := self new.
+    current rebuild.
+    ^ current
+
+rebuild
+    "Fetch models from Ollama and create specs"
+    | knownSpecs nullSpec |
+    byFullName := Dictionary new.
+    byLabel := Dictionary new.
+    knownSpecs := Dictionary new.
+    
+    "Collect pragmas"
+    (Pragma allNamed: #ollamaModel:tag:label:) do: [ :p |
+        | fam tag label spec full |
+        fam := p arguments first.
+        tag := p arguments second.
+        label := p arguments third.
+        spec := OModelSpec family: fam tag: tag label: label.
+        full := spec fullName.
+        knownSpecs at: full put: spec ].
+    
+    "Fetch from Ollama"
+    [ | resp models |
+        resp := self class fetchModelsResponse.
+        models := resp at: #models ifAbsent: [ #() ].
+        models do: [ :m |
+            | name spec |
+            name := m at: #name.
+            spec := knownSpecs at: name ifAbsent: [
+                self specFromModelName: name ].
+            self addSpec: spec ]
+    ] on: Error do: [ :ex | "ignore if server unreachable" ]
+
+domainValuesForSettings
+    "Returns array of label -&gt; fullName associations for UI"
+    ^ (self allSpecs collect: [ :spec | 
+        spec label -&gt; spec fullName ]) asArray</code></pre>
+<p><strong>Model Spec Format</strong>:</p>
+<pre class="smalltalk"><code>OModelSpec
+    family: 'codellama'    "Base model name"
+    tag: '7b'              "Size/variant tag"
+    label: 'Code Llama 7B' "Human-readable label"</code></pre>
+<hr/>
+<h3 id="omodelspec-model-specification">4.4 OModelSpec (Model
+Specification)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot-Ollama/OModelSpec.class.st</code></p>
+<p><strong>Purpose</strong>: Represents an Ollama model identified by
+family, tag, and label.</p>
+<p><strong>Attributes</strong>:</p>
+<pre class="smalltalk"><code>family    "Base model name (e.g., 'codellama')"
+tag       "Version/size tag (e.g., '7b')"
+label     "Human-readable display name"</code></pre>
+<p><strong>Key Methods</strong>:</p>
+<pre class="smalltalk"><code>fullName
+    "Returns family:tag format"
+    ^ tag
+        ifNil:  [ family ]
+        ifNotNil: [ family , ':' , tag ]</code></pre>
+<p><strong>Example</strong>:</p>
+<pre class="smalltalk"><code>spec := OModelSpec 
+    family: 'pharo-coder-1.5b-fim-f16.gguf' 
+    tag: 'latest' 
+    label: 'Pharo Coder 1.5B'.
+
+spec fullName.  "=&gt; 'pharo-coder-1.5b-fim-f16.gguf:latest'"
+spec label.     "=&gt; 'Pharo Coder 1.5B'"</code></pre>
+<hr/>
+<h3 id="omodelcatalog-built-in-models">4.5 OModelCatalog (Built-in
+Models)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot-Ollama/OModelCatalog.class.st</code></p>
+<p><strong>Purpose</strong>: Catalog of built-in Ollama model
+definitions using pragmas.</p>
+<p><strong>Example Pragma</strong>:</p>
+<pre class="smalltalk"><code>OModelCatalog class &gt;&gt; pharoCopilotNull
+    &lt;ollamaModel: 'pharo-copilot-null' tag: nil label: 'Pharo Null Copilot'&gt;</code></pre>
+<p>Custom models can be registered by adding methods with the
+<code>&lt;ollamaModel:tag:label:&gt;</code> pragma.</p>
+<hr/>
+<h2 id="completion-engine">5. Completion Engine</h2>
+<h3 id="response-cleaning">5.1 Response Cleaning</h3>
+<p>The result builder includes sophisticated response cleaning to handle
+various LLM output formats:</p>
+<p><strong>Markdown Fence Removal</strong>:</p>
+<pre class="smalltalk"><code>cleanedContentFrom: aString
+    "Removes ```language fences and extracts code"
+    | text start rest closingIndex body |
+    text := (aString ifNil: [ '' ]) asString.
+    
+    "Find opening fence"
+    start := text indexOfSubCollection: '```' startingAt: 1.
+    start &gt; 0 ifTrue: [
+        rest := text copyFrom: start + 3 to: text size.
+        closingIndex := self indexOfClosingFenceIn: rest.
+        body := rest copyFrom: 1 to: closingIndex - 1.
+        
+        "Remove language specifier line"
+        newlineIndex := body indexOf: Character lf.
+        newlineIndex &gt; 0 ifTrue: [
+            firstLine := body copyFrom: 1 to: newlineIndex - 1.
+            (self isLanguageSpec: firstLine) ifTrue: [
+                body := body copyFrom: newlineIndex + 1 to: body size ] ].
+        ^ body trimBoth ].
+    
+    "No fence - return up to double newline"
+    idx := text indexOfSubCollection: String lf , String lf.
+    body := idx = 0
+        ifTrue: [ text ]
+        ifFalse: [ text copyFrom: 1 to: idx - 1 ].
+    ^ body trimBoth</code></pre>
+<p><strong>Language Specifier Detection</strong>:</p>
+<pre class="smalltalk"><code>isLanguageSpec: aString
+    "Check if line is a language identifier"
+    | trimmed |
+    trimmed := aString trimBoth.
+    ^ (#('smalltalk' 'pharo' 'bash' 'python' 'javascript' 'json' ...)
+        includes: trimmed asLowercase)
+        or: [ trimmed allSatisfy: [ :ch |
+            ch isLetter or: [ ch isDigit or: [ '#+-_' includes: ch ] ] ] ]</code></pre>
+<hr/>
+<h3 id="context-extraction">5.2 Context Extraction</h3>
+<p><strong>Class Context Building</strong>:</p>
+<pre class="smalltalk"><code>classContextFor: aContext
+    "Extract comprehensive class information"
+    | behavior compiledMethod methodClass classDefinition instanceSide classSide |
+    
+    "Get behavior from context"
+    behavior := (aContext respondsTo: #behavior)
+        ifTrue: [ [ aContext behavior ] on: Error do: [ nil ] ]
+        ifFalse: [ nil ].
+    
+    "Get method if available"
+    compiledMethod := (aContext respondsTo: #method)
+        ifTrue: [ [ aContext method ] on: Error do: [ nil ] ]
+        ifFalse: [ nil ].
+    
+    "Determine method class"
+    methodClass := behavior 
+        ifNil: [ compiledMethod ifNotNil: [ compiledMethod methodClass ] ] 
+        ifNotNil: [ behavior ].
+    
+    "Build context string"
+    classDefinition := self safeDefinitionStringFor: methodClass.
+    instanceSide := self methodSourcesFor: methodClass.
+    classSide := self methodSourcesFor: (methodClass ifNotNil: [ methodClass class ]).
+    
+    ^ self
+        classDefinition: classDefinition
+        instanceMethods: instanceSide
+        classMethods: classSide</code></pre>
+<p><strong>Method Sources Extraction</strong>:</p>
+<pre class="smalltalk"><code>methodSourcesFor: aBehavior
+    "Collect all method sources from a behavior"
+    aBehavior ifNil: [ ^ '' ].
+    ^ String streamContents: [ :stream |
+        [ (aBehavior selectors asSortedCollection) do: [ :selector |
+            | source |
+            source := [ aBehavior sourceCodeAt: selector ] 
+                on: Error do: [ nil ].
+            source ifNotNil: [
+                stream
+                    nextPutAll: source;
+                    cr; cr ] ] ]
+            on: Error do: [ ] ]</code></pre>
+<hr/>
+<h2 id="evaluation-system">6. Evaluation System</h2>
+<h3 id="cosuggestionevaluator-metrics-tracker">6.1 CoSuggestionEvaluator
+(Metrics Tracker)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot-Evaluator/CoSuggestionEvaluator.class.st</code></p>
+<p><strong>Purpose</strong>: Tracks suggestion acceptance rates and
+generates comprehensive reports.</p>
+<p><strong>Attributes</strong>:</p>
+<pre class="smalltalk"><code>acceptedEntries     "OrderedCollection of CoEvaluationEntry"
+rejectedEntries     "OrderedCollection of CoEvaluationEntry"
+sessionStats        "Dictionary of current session statistics"
+persistentStats     "Dictionary of lifetime statistics"</code></pre>
+<p><strong>Class Methods</strong>:</p>
+<pre class="smalltalk"><code>CoSuggestionEvaluator class &gt;&gt; default
+    "Singleton instance"
+    ^ default ifNil: [ default := self new ]</code></pre>
+<p><strong>Key Methods</strong>:</p>
+<pre class="smalltalk"><code>recordSuggestionAccepted: aCopilotEntry context: aContext
+    "Record accepted suggestion"
+    | entry contextType |
+    entry := CoEvaluationEntry new
+        suggestion: aCopilotEntry;
+        context: aContext;
+        timestamp: DateAndTime now;
+        action: #accepted;
+        yourself.
+    acceptedEntries add: entry.
+    self updateSessionStats: entry.
+    self announceEvaluation: entry.
+
+recordSuggestionRejected: aCopilotEntry context: aContext reason: reasonString
+    "Record rejected suggestion with reason"
+    | entry |
+    entry := CoEvaluationEntry new
+        suggestion: aCopilotEntry;
+        context: aContext;
+        timestamp: DateAndTime now;
+        action: #rejected;
+        rejectionReason: reasonString;
+        yourself.
+    rejectedEntries add: entry.
+    self updateSessionStats: entry.
+    self announceEvaluation: entry.
+
+acceptanceRate
+    "Calculate percentage of accepted suggestions"
+    | total accepted |
+    total := sessionStats at: #totalSuggestions ifAbsent: [ 0 ].
+    total = 0 ifTrue: [ ^ 0 ].
+    accepted := sessionStats at: #totalAccepted ifAbsent: [ 0 ].
+    ^ (accepted / total * 100) rounded</code></pre>
+<p><strong>Session Statistics Structure</strong>:</p>
+<pre class="smalltalk"><code>sessionStats := Dictionary new
+    at: #sessionStartTime put: DateAndTime now;
+    at: #totalSuggestions put: 0;
+    at: #totalAccepted put: 0;
+    at: #totalRejected put: 0;
+    at: #modelStats put: Dictionary new;
+    at: #contextStats put: Dictionary new;
+    at: #lengthStats put: Dictionary new;
+    yourself.</code></pre>
+<p><strong>Context Type Classification</strong>:</p>
+<pre class="smalltalk"><code>determineContextType: aContext
+    "Classify the code context"
+    | src |
+    src := aContext source.
+    (self isClassDef: src)         ifTrue: [ ^ #classDef ].
+    (self isMethodDef: src)        ifTrue: [ ^ #method ].
+    (self hasTopLevel: '^' in: src)    ifTrue: [ ^ #return ].
+    (self hasTopLevel: ':=' in: src)   ifTrue: [ ^ #assignment ].
+    (self hasAnyTopLevel: self iterationSelectors in: src)
+        ifTrue: [ ^ #iteration ].
+    (self hasAnyTopLevel: self conditionSelectors in: src)
+        ifTrue: [ ^ #condition ].
+    ^ #other</code></pre>
+<p><strong>Export to CSV</strong>:</p>
+<pre class="smalltalk"><code>exportToCSV: filename
+    "Export evaluation data for external analysis"
+    filename asFileReference writeStreamDo: [ :stream |
+        "Header"
+        stream nextPutAll: 'Timestamp,Action,Suggestion,Context,Model,Length,Reason'; lf.
+        
+        "Data rows"
+        (acceptedEntries , rejectedEntries) do: [ :entry |
+            stream 
+                nextPutAll: entry timestamp asString; nextPut: $,;
+                nextPutAll: entry action asString; nextPut: $,;
+                nextPutAll: '"', (entry suggestion contents 
+                    copyReplaceAll: '"' with: '""'), '"'; nextPut: $,;
+                nextPutAll: '"', (entry context source copyFrom: 1 
+                    to: (50 min: entry context source size)), '"'; nextPut: $,;
+                nextPutAll: CopilotSettings modelName; nextPut: $,;
+                nextPutAll: entry suggestion contents size asString; nextPut: $,;
+                nextPutAll: (entry rejectionReason ifNil: [ '' ]); lf ] ]</code></pre>
+<hr/>
+<h3 id="coevaluationreport-report-generator">6.2 CoEvaluationReport
+(Report Generator)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot-Evaluator/CoEvaluationReport.class.st</code></p>
+<p><strong>Purpose</strong>: Generates comprehensive evaluation
+reports.</p>
+<p><strong>Report Sections</strong>:</p>
+<ol type="1">
+<li><strong>Overview</strong>: Total suggestions, acceptance rate,
+rejection rate</li>
+<li><strong>Model Performance</strong>: Statistics per model</li>
+<li><strong>Context Analysis</strong>: Acceptance rates by code context
+type</li>
+<li><strong>Length Analysis</strong>: Success rates by suggestion
+length</li>
+<li><strong>Top Rejection Reasons</strong>: Most common rejection
+causes</li>
+<li><strong>Recommendations</strong>: Actionable insights</li>
+</ol>
+<p><strong>Example Report</strong>:</p>
+<pre><code>=== Copilot Evaluation Report ===
+
+OVERVIEW
+--------
+Session started: 2025-01-15 14:23:45
+Total suggestions: 150
+Accepted: 105 (70%)
+Rejected: 30 (20%)
+Ignored: 15
+
+MODEL PERFORMANCE
+----------------
+pharo-coder-1.5b-fim-f16.gguf:latest: 105/150 accepted (70%)
+
+CONTEXT ANALYSIS
+----------------
+method: 80/100 accepted (80%)
+assignment: 15/25 accepted (60%)
+return: 10/25 accepted (40%)
+
+SUGGESTION LENGTH ANALYSIS
+--------------------------
+short suggestions: 60/75 accepted (80%)
+medium suggestions: 35/50 accepted (70%)
+long suggestions: 10/25 accepted (40%)
+
+TOP REJECTION REASONS
+--------------------
+Incorrect syntax: 12 times
+Incomplete suggestion: 8 times
+Wrong method name: 5 times
+Irrelevant context: 5 times
+
+RECOMMENDATIONS
+---------------
+• High acceptance rate - model is performing well
+• Export data to CSV for detailed analysis: CoSuggestionEvaluator default exportToCSV: 'evaluation.csv'</code></pre>
+<hr/>
+<h3 id="coevaluationentry-evaluation-record">6.3 CoEvaluationEntry
+(Evaluation Record)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot-Evaluator/CoEvaluationEntry.class.st</code></p>
+<p><strong>Purpose</strong>: Represents a single evaluation record.</p>
+<p><strong>Attributes</strong>:</p>
+<pre class="smalltalk"><code>suggestion         "CoCopilotEntry - the suggestion"
+context            "CoPharoCopilotContext - code context"
+timestamp          "DateAndTime - when recorded"
+action             "Symbol - #accepted, #rejected, or #ignored"
+rejectionReason    "String - why rejected (optional)"
+metadata           "Dictionary - additional data"</code></pre>
+<hr/>
+<h3 id="coevaluationannouncement-event-notification">6.4
+CoEvaluationAnnouncement (Event Notification)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot-Evaluator/CoEvaluationAnnouncement.class.st</code></p>
+<p><strong>Purpose</strong>: Announcement broadcast when evaluations are
+recorded.</p>
+<p><strong>Usage</strong>:</p>
+<pre class="smalltalk"><code>"Listen for evaluation events"
+SystemAnnouncer uniqueInstance weak
+    when: CoEvaluationAnnouncement
+    send: #handleEvaluation:
+    to: self.
+
+handleEvaluation: anAnnouncement
+    | entry |
+    entry := anAnnouncement entry.
+    "Process evaluation..."</code></pre>
+<hr/>
+<h2 id="fill-in-the-middle-fim-templates">7. Fill-in-the-Middle (FIM)
+Templates</h2>
+<h3 id="template-system">7.1 Template System</h3>
+<p>FIM templates define how to format the prompt for models that support
+fill-in-the-middle completion.</p>
+<p><strong>Template Placeholders</strong>:</p>
+<ul>
+<li><code>{{ .Prompt }}</code> or <code>{{.Prompt}}</code> - Code before
+cursor (prefix)</li>
+<li><code>{{ .Suffix }}</code> or <code>{{.Suffix}}</code> - Code after
+cursor (suffix)</li>
+<li><code>{{ .Context }}</code> or <code>{{.Context}}</code> -
+Class/method context</li>
+<li><code>{1}</code>, <code>{2}</code>, <code>{3}</code> - Positional
+format strings (prefix, suffix, context)</li>
+</ul>
+<p><strong>Template Expansion</strong>:</p>
+<pre class="smalltalk"><code>expandFimTemplate: templateString prefix: prefixString 
+    suffix: suffixString context: contextString
+    
+    | prompt safePrefix safeSuffix safeContext includesContextPlaceholder |
+    safePrefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
+    safeSuffix := suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ].
+    safeContext := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
+    
+    prompt := templateString ifNil: [ '' ].
+    
+    "Check if context placeholder exists"
+    includesContextPlaceholder := (prompt includesSubstring: '{{ .Context }}')
+        or: [ (prompt includesSubstring: '{{.Context}}') 
+        or: [ prompt includesSubstring: '{3}' ] ].
+    
+    "Replace placeholders"
+    prompt := prompt copyReplaceAll: '{{ .Prompt }}' with: safePrefix.
+    prompt := prompt copyReplaceAll: '{{.Prompt}}' with: safePrefix.
+    prompt := prompt copyReplaceAll: '{{ .Suffix }}' with: safeSuffix.
+    prompt := prompt copyReplaceAll: '{{.Suffix}}' with: safeSuffix.
+    prompt := prompt copyReplaceAll: '{{ .Context }}' with: safeContext.
+    prompt := prompt copyReplaceAll: '{{.Context}}' with: safeContext.
+    
+    "Positional format"
+    prompt := prompt format: { safePrefix. safeSuffix. safeContext }.
+    
+    "Prepend context if not in template"
+    (includesContextPlaceholder not and: [ safeContext isEmpty not ]) 
+        ifTrue: [ prompt := self prependContext: safeContext toPrompt: prompt ].
+    
+    ^ prompt</code></pre>
+<hr/>
+<h3 id="template-storage">7.2 Template Storage</h3>
+<p><strong>Locations</strong>:</p>
+<ol type="1">
+<li><strong>Bundled Templates</strong>:
+<code>pharo-copilot/templates/</code> directory</li>
+<li><strong>Cached Templates</strong>:
+<code>pharo-copilot/copilot-logs/{model-name}/template.txt</code></li>
+</ol>
+<p><strong>Template Discovery</strong>:</p>
+<pre class="smalltalk"><code>CopilotSettings class &gt;&gt; defaultFimTemplate
+    "Returns FIM template for current model"
+    | template cacheFile |
+    
+    "Try cached template first"
+    cacheFile := self templateFileForModelNamed: self modelName.
+    template := self fimTemplateFromFile: cacheFile.
+    template ifNotNil: [ ^ template ].
+    
+    "Fall back to bundled templates"
+    template := self fimTemplateFromBundledTemplates.
+    template ifNotNil: [ ^ template ].
+    
+    "Error if no template found"
+    self logMissingFimTemplate.
+    ^ self error: 'No fill-in-the-middle template is available 
+        for the current Copilot model.'</code></pre>
+<p><strong>Example Template</strong> (CodeLlama format):</p>
+<pre><code>&lt;PRE&gt; {{ .Prompt }} &lt;SUF&gt; {{ .Suffix }} &lt;MID&gt;</code></pre>
+<p><strong>Example Template</strong> (Pharo Coder format):</p>
+<pre><code>Complete the following Smalltalk code:
+
+Class Context:
+{{ .Context }}
+
+Code to complete:
+{{ .Prompt }}&lt;FILL&gt;{{ .Suffix }}
+
+Completion:</code></pre>
+<hr/>
+<h3 id="model-metadata">7.3 Model Metadata</h3>
+<p>Model metadata is fetched from Ollama and cached locally:</p>
+<p><strong>Fetch Metadata</strong>:</p>
+<pre class="smalltalk"><code>CopilotSettings class &gt;&gt; fetchModelMetadata
+    "Query model details from Ollama"
+    | client response metadata |
+    client := self newOllamaClient.
+    
+    [ response := client showModelNamed: self modelName.
+      metadata := self populateMetadata: Dictionary new fromResponse: response.
+      self saveModelMetadataToDisk: metadata forModel: self modelName.
+    ] on: Error do: [ :ex |
+        metadata := self nullModelMetadata ].
+    
+    ^ metadata</code></pre>
+<p><strong>Metadata Structure</strong>:</p>
+<pre class="smalltalk"><code>metadata := Dictionary new
+    at: #model put: 'pharo-coder-1.5b-fim-f16.gguf:latest';
+    at: #template put: '&lt;PRE&gt; {1} &lt;SUF&gt; {2} &lt;MID&gt;';
+    at: #system put: 'You are a Smalltalk code completion assistant...';
+    at: #parameters put: '{"temperature": 0.3, ...}';
+    at: #modelfile put: 'FROM pharo-coder-1.5b-fim-f16.gguf...';
+    yourself.</code></pre>
+<hr/>
+<h2 id="installation-setup">8. Installation &amp; Setup</h2>
+<h3 id="prerequisites">8.1 Prerequisites</h3>
+<ol type="1">
+<li><strong>Pharo 13 or 14</strong>: Download from <a href="https://pharo.org">pharo.org</a></li>
+<li><strong>Ollama</strong>: Install from <a href="https://ollama.com">ollama.com</a></li>
+<li><strong>Git</strong> (optional): For cloning repository</li>
+</ol>
+<hr/>
+<h3 id="installation">8.2 Installation</h3>
+<p><strong>Option 1: Metacello (Recommended)</strong></p>
+<pre class="smalltalk"><code>"Latest stable release"
+Metacello new
+    repository: 'github://omarabedelkader/Pharo-Copilot:main/src';
+    baseline: 'PharoCopilot';
+    load.
+
+**Option 2: Manual Loading**
+
+```smalltalk
+"Clone repository and load packages"
+repo := IceRepositoryCreator new
+    location: '/path/to/pharo-copilot';
+    createRepository.
+
+"Load packages in order"
+#(
+    'AI-Pharo-Copilot'
+    'AI-Pharo-Copilot-Ollama'
+    'AI-Pharo-Copilot-Evaluator'
+    'AI-Pharo-Copilot-Tests'
+) do: [ :pkgName |
+    Metacello new
+        baseline: pkgName;
+        repository: 'gitlocal:///path/to/pharo-copilot';
+        load ].</code></pre>
+<hr/>
+<h3 id="ollama-setup">8.3 Ollama Setup</h3>
+<p><strong>1. Install Ollama</strong></p>
+<div class="sourceCode" id="cb47"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb47-1"><a aria-hidden="true" href="#cb47-1" tabindex="-1"></a><span class="co"># macOS/Linux</span></span>
+<span id="cb47-2"><a aria-hidden="true" href="#cb47-2" tabindex="-1"></a><span class="ex">curl</span> https://ollama.ai/install.sh <span class="kw">|</span> <span class="fu">sh</span></span>
+<span id="cb47-3"><a aria-hidden="true" href="#cb47-3" tabindex="-1"></a></span>
+<span id="cb47-4"><a aria-hidden="true" href="#cb47-4" tabindex="-1"></a><span class="co"># Windows</span></span>
+<span id="cb47-5"><a aria-hidden="true" href="#cb47-5" tabindex="-1"></a><span class="co"># Download installer from ollama.com</span></span></code></pre></div>
+<p><strong>2. Start Ollama Service</strong></p>
+<div class="sourceCode" id="cb48"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb48-1"><a aria-hidden="true" href="#cb48-1" tabindex="-1"></a><span class="ex">ollama</span> serve</span></code></pre></div>
+<p><strong>3. Pull Recommended Model</strong></p>
+<div class="sourceCode" id="cb49"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb49-1"><a aria-hidden="true" href="#cb49-1" tabindex="-1"></a><span class="co"># Recommended for Pharo</span></span>
+<span id="cb49-2"><a aria-hidden="true" href="#cb49-2" tabindex="-1"></a><span class="ex">ollama</span> pull pharo-coder-1.5b-fim-f16.gguf:latest</span>
+<span id="cb49-3"><a aria-hidden="true" href="#cb49-3" tabindex="-1"></a></span>
+<span id="cb49-4"><a aria-hidden="true" href="#cb49-4" tabindex="-1"></a><span class="co"># Alternative: CodeLlama</span></span>
+<span id="cb49-5"><a aria-hidden="true" href="#cb49-5" tabindex="-1"></a><span class="ex">ollama</span> pull codellama:7b</span></code></pre></div>
+<p><strong>4. Verify Installation</strong></p>
+<div class="sourceCode" id="cb50"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb50-1"><a aria-hidden="true" href="#cb50-1" tabindex="-1"></a><span class="co"># List installed models</span></span>
+<span id="cb50-2"><a aria-hidden="true" href="#cb50-2" tabindex="-1"></a><span class="ex">ollama</span> list</span>
+<span id="cb50-3"><a aria-hidden="true" href="#cb50-3" tabindex="-1"></a></span>
+<span id="cb50-4"><a aria-hidden="true" href="#cb50-4" tabindex="-1"></a><span class="co"># Test model</span></span>
+<span id="cb50-5"><a aria-hidden="true" href="#cb50-5" tabindex="-1"></a><span class="ex">ollama</span> run pharo-coder-1.5b-fim-f16.gguf:latest <span class="st">"Hello"</span></span></code></pre></div>
+<hr/>
+<h3 id="initial-configuration">8.4 Initial Configuration</h3>
+<p><strong>1. Enable Copilot Engine</strong></p>
+<pre class="smalltalk"><code>"Set as active completion engine"
+RubSmalltalkEditor completionEngineClass: CoCompletionEnginePharoCopilot.
+
+"Verify"
+RubSmalltalkEditor completionEngineClass.
+"=&gt; CoCompletionEnginePharoCopilot"</code></pre>
+<p><strong>2. Configure Settings</strong></p>
+<pre class="smalltalk"><code>"Enable copilot"
+CopilotSettings copilotEnabled: true.
+
+"Set provider"
+CopilotSettings copilotProvider: #ollama.
+
+"Select model"
+CopilotSettings modelName: 'pharo-coder-1.5b-fim-f16.gguf:latest'.
+
+"Configure host/port (defaults: 127.0.0.1:11434)"
+CopilotSettings host: '127.0.0.1'.
+CopilotSettings port: 11434.
+
+"Enable logging"
+CopilotSettings loggingEnabled: true.
+
+"Enable auto-install"
+CopilotSettings autoInstallModelScriptEnabled: true.</code></pre>
+<p><strong>3. Test Connection</strong></p>
+<pre class="smalltalk"><code>"Verify Ollama is reachable"
+client := OllamaClient new.
+models := client listModels.
+models inspect.
+
+"Test generation"
+client generate: 'Hello, world!'.</code></pre>
+<hr/>
+<h3 id="system-settings-ui">8.5 System Settings UI</h3>
+<p>Access settings through Pharo’s Settings Browser:</p>
+<ol type="1">
+<li>Open <strong>Settings Browser</strong>:
+<code>Settings &gt; System Settings</code></li>
+<li>Navigate to <strong>Code Browsing &gt; Copilot</strong></li>
+<li>Configure:
+<ul>
+<li><strong>Provider</strong>: Select <code>ollama</code></li>
+<li><strong>Model</strong>: Choose from dropdown (auto-populated from
+Ollama)</li>
+<li><strong>Enable logging</strong>: Check to enable activity logs</li>
+<li><strong>Auto-install model</strong>: Check to auto-pull recommended
+model</li>
+<li><strong>Server host</strong>: Default <code>127.0.0.1</code></li>
+<li><strong>Server port</strong>: Default <code>11434</code></li>
+</ul></li>
+</ol>
+<hr/>
+<h2 id="usage-guide">9. Usage Guide</h2>
+<h3 id="basic-completion">9.1 Basic Completion</h3>
+<p><strong>1. Open a Browser/Playground</strong></p>
+<pre class="smalltalk"><code>"Open System Browser"
+Smalltalk tools browser open.
+
+"Or Playground"
+Smalltalk tools playground open.</code></pre>
+<p><strong>2. Start Typing Code</strong></p>
+<pre class="smalltalk"><code>Object subclass: #MyClass
+    instanceVariableNames: 'name age'
+    classVariableNames: ''
+    package: 'MyPackage'
+
+MyClass &gt;&gt; initialize
+    super initialize.
+    "Place cursor here and wait for suggestions"</code></pre>
+<p><strong>3. Accept Suggestion</strong></p>
+<ul>
+<li>Suggestion appears automatically after brief pause</li>
+<li>Press <strong>Tab</strong> to accept</li>
+<li>Press <strong>Esc</strong> to reject</li>
+<li>Continue typing to ignore</li>
+</ul>
+<hr/>
+<h3 id="context-aware-completion">9.2 Context-Aware Completion</h3>
+<p>Copilot provides better suggestions with more context:</p>
+<p><strong>Example 1: Method Completion</strong></p>
+<pre class="smalltalk"><code>"Given class:"
+Person &gt;&gt; initialize
+    super initialize.
+    name := ''.
+    age := 0.
+
+"Type this:"
+Person &gt;&gt; description
+    "Copilot suggests:"
+    ^ String streamContents: [ :s |
+        s nextPutAll: 'Person: '.
+        s nextPutAll: name.
+        s nextPutAll: ', Age: '.
+        s nextPutAll: age asString ]</code></pre>
+<p><strong>Example 2: Iterating Collections</strong></p>
+<pre class="smalltalk"><code>"Type this:"
+collection := #(1 2 3 4 5).
+collection collect: [ :each | 
+    "Copilot suggests:"
+    each squared ]</code></pre>
+<p><strong>Example 3: Conditional Logic</strong></p>
+<pre class="smalltalk"><code>"Type this:"
+value ifNil: [ 
+    "Copilot suggests:"
+    ^ self defaultValue ]
+ifNotNil: [ :v |
+    ^ v + 1 ]</code></pre>
+<hr/>
+<h3 id="fill-in-the-middle">9.3 Fill-in-the-Middle</h3>
+<p>Copilot uses FIM to complete code in the middle of a method:</p>
+<pre class="smalltalk"><code>"Before cursor:"
+MyClass &gt;&gt; processData
+    | result |
+    result := data collect: [ :item | item * 2 ].
+    "Place cursor here"
+
+"After cursor:"
+    ^ result
+
+"Copilot suggests between lines:"
+    result := result select: [ :each | each &gt; 10 ].</code></pre>
+<hr/>
+<h3 id="evaluation-feedback">9.4 Evaluation &amp; Feedback</h3>
+<p><strong>Track Your Usage</strong>:</p>
+<pre class="smalltalk"><code>"View session statistics"
+CoSuggestionEvaluator default sessionStats inspect.
+
+"Generate report"
+report := CoSuggestionEvaluator default generateReport.
+report inspect.
+
+"Export to CSV"
+CoSuggestionEvaluator default exportToCSV: 'copilot-evaluation.csv'.
+
+"Check acceptance rate"
+CoSuggestionEvaluator default acceptanceRate.
+"=&gt; 75"</code></pre>
+<p><strong>Manual Rejection</strong>:</p>
+<pre class="smalltalk"><code>"If you want to explicitly mark a suggestion as rejected"
+entry := CoCopilotEntry contents: 'bad suggestion'.
+context := CoPharoCopilotContext new.
+CoSuggestionEvaluator default
+    recordSuggestionRejected: entry
+    context: context
+    reason: 'Incorrect syntax'.</code></pre>
+<hr/>
+<h3 id="viewing-logs">9.5 Viewing Logs</h3>
+<p><strong>Activity Log</strong>:</p>
+<pre class="smalltalk"><code>"Open log file"
+logFile := CoCopilotLogger logFileReference.
+logFile exists ifTrue: [ 
+    logFile openWithShell ].
+
+"Or inspect contents"
+logFile contents inspect.</code></pre>
+<p><strong>Evaluation Log (JSONL)</strong>:</p>
+<pre class="smalltalk"><code>"Open evaluation log"
+evalLog := CoCopilotLogger evaluationLogFileReference.
+evalLog exists ifTrue: [
+    evalLog openWithShell ].
+
+"Parse JSON lines"
+lines := evalLog contents lines.
+entries := lines collect: [ :line |
+    STONJSON fromString: line ].
+entries inspect.</code></pre>
+<hr/>
+<h2 id="configuration-settings">10. Configuration &amp; Settings</h2>
+<h3 id="copilotsettings-global-configuration">10.1 CopilotSettings
+(Global Configuration)</h3>
+<p><strong>Location</strong>:
+<code>src/AI-Pharo-Copilot-Ollama/CopilotSettings.class.st</code></p>
+<p><strong>Class Variables</strong>:</p>
+<pre class="smalltalk"><code>Enabled                        "Boolean - enable/disable copilot"
+Provider                       "Symbol - backend provider (#ollama)"
+ModelName                      "String - selected model full name"
+Host                           "String - Ollama server host"
+Port                           "Integer - Ollama server port"
+ModelMetadata                  "Dictionary - cached model info"
+OllamaClientFactory            "Block - factory for creating clients"
+AutoInstallModelScriptEnabled  "Boolean - auto-pull missing models"
+LoggingEnabled                 "Boolean - enable activity logging"
+TemplatesDirectory             "FileReference - FIM templates location"</code></pre>
+<p><strong>Key Methods</strong>:</p>
+<pre class="smalltalk"><code>CopilotSettings class &gt;&gt; copilotEnabled
+    "Check if copilot is enabled"
+    ^ Enabled ifNil: [ Enabled := true ].
+
+CopilotSettings class &gt;&gt; copilotEnabled: aBool
+    "Enable/disable copilot"
+    Enabled := aBool.
+
+CopilotSettings class &gt;&gt; modelName
+    "Get current model name"
+    ^ ModelName ifNil: [ ModelName := OllamaClient defaultModelFullName ]
+
+CopilotSettings class &gt;&gt; modelName: aString
+    "Set model and clear cached metadata"
+    ModelName := aString.
+    self clearCachedModelMetadata.
+
+CopilotSettings class &gt;&gt; availableModelNames
+    "Returns array of label-&gt;fullName pairs for UI"
+    ^ OModelRegistry refresh domainValuesForSettings
+
+CopilotSettings class &gt;&gt; newOllamaClient
+    "Create new Ollama client instance"
+    ^ self ollamaClientFactory value</code></pre>
+<hr/>
+<h3 id="model-auto-installation">10.2 Model Auto-Installation</h3>
+<p>When configured model is missing, Copilot can automatically pull it
+from Ollama:</p>
+<p><strong>Configuration</strong>:</p>
+<pre class="smalltalk"><code>"Enable auto-install for recommended model"
+CopilotSettings autoInstallModelScriptEnabled: true.</code></pre>
+<p><strong>Auto-Install Process</strong>:</p>
+<pre class="smalltalk"><code>CopilotSettings class &gt;&gt; attemptAutoInstallForModelNamed: modelName 
+    usingInitialResponse: response
+    
+    "Check if auto-install is enabled and model is recommended"
+    (self shouldAutoInstallModelNamed: modelName) ifFalse: [ ^ false ].
+    
+    "Log attempt"
+    CoCopilotLogger
+        logBackEndEvent: 'Attempting auto-install for missing Ollama model'
+        details: (Dictionary new
+            at: #model put: modelName;
+            at: #availableModelsBefore put: (self modelNamesFromResponse: response);
+            yourself).
+    
+    "Run install script"
+    (self installModelNamed: modelName) ifFalse: [ ^ false ].
+    
+    "Verify model is now available"
+    [ | refreshedResponse refreshedModels |
+        refreshedResponse := self newOllamaClient listModels.
+        refreshedModels := self modelNamesFromResponse: refreshedResponse.
+        (refreshedModels includes: modelName) ifTrue: [
+            OModelRegistry refresh.
+            ^ true ].
+    ] on: Error do: [ :ex | self logError: ex ].
+    
+    ^ false</code></pre>
+<p><strong>Recommended Model</strong>:</p>
+<pre class="smalltalk"><code>CopilotSettings class &gt;&gt; shouldAutoInstallModelNamed: modelName
+    (self autoInstallModelScriptEnabled) ifFalse: [ ^ false ].
+    modelName ifNil: [ ^ false ].
+    ^ modelName = 'pharo-coder-1.5b-fim-f16.gguf:latest'</code></pre>
+<hr/>
+<h3 id="custom-client-factory">10.3 Custom Client Factory</h3>
+<p>For testing or custom backends, override the client factory:</p>
+<pre class="smalltalk"><code>"Use mock client for testing"
+CopilotSettings ollamaClientFactory: [ MockOllamaClient new ].
+
+"Restore default"
+CopilotSettings ollamaClientFactory: [ OllamaClient new ].</code></pre>
+<hr/>
+<h3 id="settings-snapshot-restore">10.4 Settings Snapshot &amp;
+Restore</h3>
+<p><strong>Snapshot Current Settings</strong>:</p>
+<pre class="smalltalk"><code>snapshot := CopilotSettings settingsSnapshot.
+"=&gt; Dictionary with all settings"</code></pre>
+<p><strong>Restore Settings</strong>:</p>
+<pre class="smalltalk"><code>CopilotSettings restoreSettingsFromSnapshot: snapshot.</code></pre>
+<p><strong>Temporary Settings</strong>:</p>
+<pre class="smalltalk"><code>"Execute block with default settings"
+CopilotSettings withDefaultSettingsDo: [
+    "Your code here - settings are reset"
+    client := OllamaClient new.
+    client generate: 'test prompt' ].
+
+"Settings restored automatically after block"</code></pre>
+<hr/>
+<h2 id="extension-points">11. Extension Points</h2>
+<h3 id="custom-models">11.1 Custom Models</h3>
+<p><strong>Register Model via Pragma</strong>:</p>
+<pre class="smalltalk"><code>MyModelCatalog class &gt;&gt; myCustomModel
+    &lt;ollamaModel: 'mycustom' tag: 'v1' label: 'My Custom Model'&gt;</code></pre>
+<p><strong>After registration</strong>:</p>
+<pre class="smalltalk"><code>"Refresh registry to pick up new pragmas"
+OModelRegistry refresh.
+
+"Model appears in settings dropdown"
+CopilotSettings availableModelNames.
+"=&gt; includes: 'My Custom Model' -&gt; 'mycustom:v1'"</code></pre>
+<hr/>
+<h3 id="custom-fim-templates">11.2 Custom FIM Templates</h3>
+<p><strong>Create Template File</strong>:</p>
+<pre><code>pharo-copilot/templates/mycustom-v1-template.txt</code></pre>
+<p><strong>Template Content</strong>:</p>
+<pre><code>&lt;|fim_prefix|&gt;{{ .Prompt }}&lt;|fim_suffix|&gt;{{ .Suffix }}&lt;|fim_middle|&gt;</code></pre>
+<p><strong>Or provide via code</strong>:</p>
+<pre class="smalltalk"><code>"Override template method"
+CopilotSettings class &gt;&gt; fimTemplateForModel: modelName
+    modelName = 'mycustom:v1' ifTrue: [
+        ^ '&lt;|fim_prefix|&gt;{1}&lt;|fim_suffix|&gt;{2}&lt;|fim_middle|&gt;' ].
+    ^ super fimTemplateForModel: modelName</code></pre>
+<hr/>
+<h3 id="custom-result-processing">11.3 Custom Result Processing</h3>
+<p><strong>Subclass Result Builder</strong>:</p>
+<pre class="smalltalk"><code>CoPharoCopilotResultSetBuilder subclass: #MyCustomResultSetBuilder
+    instanceVariableNames: ''
+    classVariableNames: ''
+    package: 'MyExtension'
+
+MyCustomResultSetBuilder &gt;&gt; cleanedContentFrom: aString
+    "Custom cleaning logic"
+    | cleaned |
+    cleaned := super cleanedContentFrom: aString.
+    
+    "Additional processing"
+    cleaned := self removeComments: cleaned.
+    cleaned := self formatCode: cleaned.
+    
+    ^ cleaned</code></pre>
+<p><strong>Use Custom Builder</strong>:</p>
+<pre class="smalltalk"><code>CoPharoCopilotContext &gt;&gt; initialize
+    super initialize.
+    completionBuilder := MyCustomResultSetBuilder initializeOnContext: self</code></pre>
+<hr/>
+<h3 id="evaluation-listeners">11.4 Evaluation Listeners</h3>
+<p><strong>Subscribe to Evaluation Events</strong>:</p>
+<pre class="smalltalk"><code>Object subclass: #MyEvaluationListener
+    instanceVariableNames: ''
+    classVariableNames: ''
+    package: 'MyExtension'
+
+MyEvaluationListener &gt;&gt; initialize
+    super initialize.
+    SystemAnnouncer uniqueInstance weak
+        when: CoEvaluationAnnouncement
+        send: #handleEvaluation:
+        to: self.
+
+MyEvaluationListener &gt;&gt; handleEvaluation: anAnnouncement
+    | entry |
+    entry := anAnnouncement entry.
+    
+    entry action = #accepted ifTrue: [
+        "Log accepted suggestion to external service"
+        self logToExternalService: entry ].
+    
+    entry action = #rejected ifTrue: [
+        "Analyze rejection for improvement"
+        self analyzeRejection: entry ]</code></pre>
+<hr/>
+<h2 id="troubleshooting">12. Troubleshooting</h2>
+<h3 id="common-issues">12.1 Common Issues</h3>
+<p><strong>Issue 1: “Ollama service unavailable”</strong></p>
+<p><strong>Symptoms</strong>: No completions, error in log</p>
+<p><strong>Checks</strong>:</p>
+<div class="sourceCode" id="cb81"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb81-1"><a aria-hidden="true" href="#cb81-1" tabindex="-1"></a><span class="co"># Verify Ollama is running</span></span>
+<span id="cb81-2"><a aria-hidden="true" href="#cb81-2" tabindex="-1"></a><span class="fu">ps</span> aux <span class="kw">|</span> <span class="fu">grep</span> ollama</span>
+<span id="cb81-3"><a aria-hidden="true" href="#cb81-3" tabindex="-1"></a></span>
+<span id="cb81-4"><a aria-hidden="true" href="#cb81-4" tabindex="-1"></a><span class="co"># Test API</span></span>
+<span id="cb81-5"><a aria-hidden="true" href="#cb81-5" tabindex="-1"></a><span class="ex">curl</span> http://127.0.0.1:11434/api/tags</span>
+<span id="cb81-6"><a aria-hidden="true" href="#cb81-6" tabindex="-1"></a></span>
+<span id="cb81-7"><a aria-hidden="true" href="#cb81-7" tabindex="-1"></a><span class="co"># Check port</span></span>
+<span id="cb81-8"><a aria-hidden="true" href="#cb81-8" tabindex="-1"></a><span class="ex">lsof</span> <span class="at">-i</span> :11434</span></code></pre></div>
+<p><strong>Solutions</strong>:</p>
+<div class="sourceCode" id="cb82"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb82-1"><a aria-hidden="true" href="#cb82-1" tabindex="-1"></a><span class="co"># Start Ollama</span></span>
+<span id="cb82-2"><a aria-hidden="true" href="#cb82-2" tabindex="-1"></a><span class="ex">ollama</span> serve</span>
+<span id="cb82-3"><a aria-hidden="true" href="#cb82-3" tabindex="-1"></a></span>
+<span id="cb82-4"><a aria-hidden="true" href="#cb82-4" tabindex="-1"></a><span class="co"># Or restart service</span></span>
+<span id="cb82-5"><a aria-hidden="true" href="#cb82-5" tabindex="-1"></a><span class="ex">pkill</span> ollama <span class="kw">&amp;&amp;</span> <span class="ex">ollama</span> serve</span></code></pre></div>
+<hr/>
+<p><strong>Issue 2: “Model not found”</strong></p>
+<p><strong>Symptoms</strong>: Error message, null model fallback</p>
+<p><strong>Checks</strong>:</p>
+<div class="sourceCode" id="cb83"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb83-1"><a aria-hidden="true" href="#cb83-1" tabindex="-1"></a><span class="co"># List installed models</span></span>
+<span id="cb83-2"><a aria-hidden="true" href="#cb83-2" tabindex="-1"></a><span class="ex">ollama</span> list</span>
+<span id="cb83-3"><a aria-hidden="true" href="#cb83-3" tabindex="-1"></a></span>
+<span id="cb83-4"><a aria-hidden="true" href="#cb83-4" tabindex="-1"></a><span class="co"># Check if model exists in Ollama</span></span>
+<span id="cb83-5"><a aria-hidden="true" href="#cb83-5" tabindex="-1"></a><span class="ex">ollama</span> show pharo-coder-1.5b-fim-f16.gguf:latest</span></code></pre></div>
+<p><strong>Solutions</strong>:</p>
+<div class="sourceCode" id="cb84"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb84-1"><a aria-hidden="true" href="#cb84-1" tabindex="-1"></a><span class="co"># Pull missing model</span></span>
+<span id="cb84-2"><a aria-hidden="true" href="#cb84-2" tabindex="-1"></a><span class="ex">ollama</span> pull pharo-coder-1.5b-fim-f16.gguf:latest</span>
+<span id="cb84-3"><a aria-hidden="true" href="#cb84-3" tabindex="-1"></a></span>
+<span id="cb84-4"><a aria-hidden="true" href="#cb84-4" tabindex="-1"></a><span class="co"># Or enable auto-install</span></span></code></pre></div>
+<pre class="smalltalk"><code>CopilotSettings autoInstallModelScriptEnabled: true.</code></pre>
+<hr/>
+<p><strong>Issue 3: “No completions appearing”</strong></p>
+<p><strong>Checks</strong>:</p>
+<pre class="smalltalk"><code>"Verify copilot is enabled"
+CopilotSettings copilotEnabled.
+
+"Check completion engine"
+RubSmalltalkEditor completionEngineClass.
+"Should be: CoCompletionEnginePharoCopilot"
+
+"Test client manually"
+client := OllamaClient new.
+client generate: 'test'.</code></pre>
+<p><strong>Solutions</strong>:</p>
+<pre class="smalltalk"><code>"Enable copilot"
+CopilotSettings copilotEnabled: true.
+
+"Set correct engine"
+RubSmalltalkEditor completionEngineClass: CoCompletionEnginePharoCopilot.
+
+"Refresh model registry"
+OModelRegistry refresh.</code></pre>
+<hr/>
+<p><strong>Issue 4: “Slow completions”</strong></p>
+<p><strong>Checks</strong>:</p>
+<pre class="smalltalk"><code>"Check if large context is being sent"
+CoCopilotLogger logFileReference contents inspect.
+"Look for 'classContextLength' in logs"</code></pre>
+<p><strong>Solutions</strong>:</p>
+<div class="sourceCode" id="cb89"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb89-1"><a aria-hidden="true" href="#cb89-1" tabindex="-1"></a><span class="co"># Use smaller, faster model</span></span>
+<span id="cb89-2"><a aria-hidden="true" href="#cb89-2" tabindex="-1"></a><span class="ex">ollama</span> pull codellama:7b  <span class="co"># Instead of 34b</span></span>
+<span id="cb89-3"><a aria-hidden="true" href="#cb89-3" tabindex="-1"></a></span>
+<span id="cb89-4"><a aria-hidden="true" href="#cb89-4" tabindex="-1"></a><span class="co"># Or use quantized model</span></span>
+<span id="cb89-5"><a aria-hidden="true" href="#cb89-5" tabindex="-1"></a><span class="ex">ollama</span> pull pharo-coder-1.5b-fim-f16.gguf:latest  <span class="co"># Optimized</span></span></code></pre></div>
+<pre class="smalltalk"><code>"Reduce context size (future enhancement)"
+"Currently sends all methods - consider filtering"</code></pre>
+<hr/>
+<p><strong>Issue 5: “Template not found”</strong></p>
+<p><strong>Symptoms</strong>: Error about missing FIM template</p>
+<p><strong>Checks</strong>:</p>
+<pre class="smalltalk"><code>"Check template file"
+CopilotSettings templateFileForModelNamed: CopilotSettings modelName.
+"Check if file exists"
+
+"Check bundled templates"
+CopilotSettings templatesDirectory entries inspect.</code></pre>
+<p><strong>Solutions</strong>:</p>
+<pre class="smalltalk"><code>"Fetch metadata to create cached template"
+CopilotSettings fetchModelMetadata.
+
+"Or create template manually"
+templateFile := CopilotSettings templateFileForModelNamed: CopilotSettings modelName.
+templateFile parent ensureCreateDirectory.
+templateFile writeStreamDo: [ :s |
+    s nextPutAll: '&lt;PRE&gt; {1} &lt;SUF&gt; {2} &lt;MID&gt;' ].</code></pre>
+<hr/>
+<h3 id="debugging">12.2 Debugging</h3>
+<p><strong>Enable Verbose Logging</strong>:</p>
+<pre class="smalltalk"><code>"Ensure logging is enabled"
+CopilotSettings loggingEnabled: true.
+
+"Check log location"
+CoCopilotLogger logFileReference fullName.
+"=&gt; '/path/to/pharo-copilot/copilot-logs/copilot.log'"
+
+"Tail log file"
+CoCopilotLogger logFileReference contents inspect.</code></pre>
+<p><strong>Inspect Internal State</strong>:</p>
+<pre class="smalltalk"><code>"Check settings"
+CopilotSettings settingsSnapshot inspect.
+
+"Check current model"
+client := OllamaClient new.
+client instVarNamed: 'modelSpec'.
+
+"Check evaluator stats"
+CoSuggestionEvaluator default sessionStats inspect.
+
+"Check registry"
+OModelRegistry current allSpecs inspect.</code></pre>
+<p><strong>Manual Completion Test</strong>:</p>
+<pre class="smalltalk"><code>"Create mock context"
+context := CoPharoCopilotContext new.
+context source: 'Object subclass: #Test'.
+
+"Build completion manually"
+builder := CoPharoCopilotResultSetBuilder new.
+builder initializeOnContext: context.
+
+"Extract context"
+classContext := builder classContextFor: context.
+classContext inspect.
+
+"Test with client"
+client := OllamaClient new.
+response := client generateForPrefix: 'Object &gt;&gt; test' suffix: '' context: classContext.
+response inspect.</code></pre>
+<hr/>
+<h3 id="reset-clean-start">12.3 Reset &amp; Clean Start</h3>
+<p><strong>Reset Settings to Default</strong>:</p>
+<pre class="smalltalk"><code>CopilotSettings resetToDefaultSettings.</code></pre>
+<p><strong>Clear Caches</strong>:</p>
+<pre class="smalltalk"><code>"Clear model metadata cache"
+CopilotSettings clearCachedModelMetadata.
+
+"Reset model registry"
+OModelRegistry reset.
+OModelRegistry refresh.
+
+"Reset evaluator"
+CoSuggestionEvaluator reset.</code></pre>
+<p><strong>Delete Logs</strong>:</p>
+<pre class="smalltalk"><code>"Delete activity log"
+CoCopilotLogger logFileReference delete.
+
+"Delete evaluation log"
+CoCopilotLogger evaluationLogFileReference delete.
+
+"Re-initialize logger"
+CoCopilotLogger initialize.</code></pre>
+<hr/>
+<h2 id="testing-suite">13. Testing Suite</h2>
+<h3 id="test-organization">13.1 Test Organization</h3>
+<p><strong>Test Packages</strong>:</p>
+<ul>
+<li><strong>AI-Pharo-Copilot-Tests</strong>: Main test suite</li>
+<li><strong>AI-Pharo-Copilot-Tests-Mock</strong>: Mock
+infrastructure</li>
+</ul>
+<p><strong>Test Categories</strong>:</p>
+<ol type="1">
+<li><strong>Unit Tests</strong>: Component-level testing</li>
+<li><strong>Integration Tests</strong>: Cross-component workflows</li>
+<li><strong>Regression Tests</strong>: Prevent known issues</li>
+<li><strong>Usability Tests</strong>: User experience validation</li>
+<li><strong>Stress Tests</strong>: Performance and scalability</li>
+<li><strong>Advanced Tests</strong>: Complex evaluation scenarios</li>
+</ol>
+<hr/>
+<h3 id="mock-infrastructure">13.2 Mock Infrastructure</h3>
+<p><strong>CopilotMockModelTestCase</strong>:</p>
+<p>Base test case that sets up mock models:</p>
+<pre class="smalltalk"><code>CopilotMockModelTestCase &gt;&gt; setUp
+    super setUp.
+    mockContext := OTestModelSupport beginMockModels.
+
+CopilotMockModelTestCase &gt;&gt; tearDown
+    [ super tearDown ] ensure: [
+        OTestModelSupport endMockModels: mockContext.
+        mockContext := nil ].</code></pre>
+<p><strong>OTestModelSupport</strong>:</p>
+<p>Utility class for mock model management:</p>
+<pre class="smalltalk"><code>OTestModelSupport class &gt;&gt; beginMockModels
+    "Setup mock models for testing"
+    | context originalFetcher |
+    context := Dictionary new.
+    
+    "Save original fetcher"
+    originalFetcher := OModelRegistry modelsFetcher.
+    context at: #originalFetcher put: originalFetcher.
+    
+    "Install mock fetcher"
+    OModelRegistry modelsFetcher: [
+        self mockModelsResponse ].
+    
+    "Refresh registry with mocks"
+    OModelRegistry refresh.
+    
+    ^ context
+
+OTestModelSupport class &gt;&gt; endMockModels: context
+    "Restore original state"
+    | originalFetcher |
+    originalFetcher := context at: #originalFetcher ifAbsent: [ nil ].
+    OModelRegistry modelsFetcher: originalFetcher.
+    OModelRegistry refresh.
+
+OTestModelSupport class &gt;&gt; mockModelsResponse
+    "Returns mock models list"
+    ^ Dictionary new
+        at: #models put: #(
+            #{ #name -&gt; 'mock:model' }
+            #{ #name -&gt; 'test:7b' }
+        );
+        yourself</code></pre>
+<hr/>
+<h3 id="key-test-classes">13.3 Key Test Classes</h3>
+<p><strong>OAHttpTransportTest</strong>:</p>
+<p>Tests HTTP transport layer:</p>
+<pre class="smalltalk"><code>testDefaultHostAndPort
+    | transport |
+    transport := OAHttpTransport new.
+    self assert: transport host equals: '127.0.0.1'.
+    self assert: transport port equals: 11434.
+
+testJsonReaderWriterInitialization
+    | transport |
+    transport := OAHttpTransport new.
+    self assert: transport jsonReader notNil.
+    self assert: transport jsonWriter notNil.</code></pre>
+<p><strong>CopilotSettingsValidationTest</strong>:</p>
+<p>Tests settings validation:</p>
+<pre class="smalltalk"><code>testModelNameWithInvalidValues
+    | old longName |
+    old := CopilotSettings modelName.
+    [
+        "Empty string should not crash"
+        CopilotSettings modelName: ''.
+        self assert: CopilotSettings modelName equals: ''.
+        
+        "Long name"
+        longName := String new: 1000 withAll: $m.
+        CopilotSettings modelName: longName.
+        self assert: CopilotSettings modelName equals: longName.
+    ] ensure: [ CopilotSettings modelName: old ]</code></pre>
+<p><strong>UsabilityTest</strong>:</p>
+<p>Tests user experience:</p>
+<pre class="smalltalk"><code>testEntryDisplayStringIsInformative
+    | shortEntry longEntry |
+    shortEntry := CoCopilotEntry contents: 'def method'.
+    longEntry := CoCopilotEntry contents: (String new: 200 withAll: $x).
+    
+    "Short content shown completely"
+    self assert: shortEntry displayString equals: 'def method'.
+    
+    "Long content truncated with indicator"
+    self assert: longEntry displayString size &lt; 200.
+    self assert: (longEntry displayString endsWith: '…').
+
+testAvailableModelNamesAreUserFriendly
+    | modelNames |
+    modelNames := CopilotSettings availableModelNames.
+    modelNames do: [ :assoc |
+        "Keys should be human-readable labels"
+        self assert: assoc key isString.
+        self deny: assoc key isEmpty.
+        "Labels should be more readable than identifiers"
+        self deny: assoc key equals: assoc value ]</code></pre>
+<p><strong>RegressionTest</strong>:</p>
+<p>Tests for known issues:</p>
+<pre class="smalltalk"><code>testCleanedContentFromDoesNotAlterOriginalString
+    | builder original result |
+    builder := CoPharoCopilotResultSetBuilder new.
+    original := '```smalltalk', String lf, 'original code', String lf, '```'.
+    result := builder cleanedContentFrom: original.
+    
+    "Original unchanged"
+    self assert: (original includesSubstring: '```smalltalk').
+    self assert: result equals: 'original code'.
+
+testDefaultModelConsistency
+    | defaultModel client1 client2 |
+    defaultModel := OllamaClient defaultModelFullName.
+    client1 := OllamaClient new.
+    client2 := OllamaClient new.
+    
+    "Both clients use same model"
+    self assert: (client1 instVarNamed: 'modelSpec') fullName equals: defaultModel.
+    self assert: (client2 instVarNamed: 'modelSpec') fullName 
+        equals: (client1 instVarNamed: 'modelSpec') fullName.</code></pre>
+<p><strong>CoSuggestionEvaluatorAdvancedTest</strong>:</p>
+<p>Tests evaluation system:</p>
+<pre class="smalltalk"><code>testComplexEvaluationScenario
+    | evaluator context suggestions lengthStats |
+    evaluator := CoSuggestionEvaluator new.
+    context := CoPharoCopilotContext new.
+    
+    "Create variety of suggestions"
+    suggestions := {
+        CoCopilotEntry contents: 'short'.
+        CoCopilotEntry contents: (String new: 30 withAll: $m).
+        CoCopilotEntry contents: (String new: 100 withAll: $l) }.
+    
+    "Record actions"
+    evaluator recordSuggestionAccepted: suggestions first context: context.
+    evaluator recordSuggestionIgnored: suggestions second context: context.
+    evaluator recordSuggestionAccepted: suggestions third context: context.
+    
+    "Verify statistics"
+    self assert: (evaluator sessionStats at: #totalSuggestions) equals: 3.
+    self assert: (evaluator sessionStats at: #totalAccepted) equals: 2.
+    self assert: evaluator acceptanceRate equals: 67.</code></pre>
+<p><strong>OModelRegistryStressTest</strong>:</p>
+<p>Tests scalability:</p>
+<pre class="smalltalk"><code>testMassiveModelRegistry
+    | registry |
+    registry := OModelRegistry new.
+    
+    1 to: 100 do: [:i |
+        | spec |
+        spec := OModelSpec
+            family: ('model', i asString)
+            tag:    ('v', i asString)
+            label:  ('Model ', i asString).
+        registry addSpec: spec ].
+    
+    self assert: registry byFullName size equals: 100.
+    self assert: registry byLabel size equals: 100.
+    self assert: registry allSpecs size equals: 100.</code></pre>
+<hr/>
+<h3 id="running-tests">13.4 Running Tests</h3>
+<p><strong>Run All Tests</strong>:</p>
+<pre class="smalltalk"><code>"Run all copilot tests"
+testRunner := TestRunner new.
+testRunner selectPackage: 'AI-Pharo-Copilot-Tests'.
+testRunner runAll.
+
+"Or use SUnit"
+(TestCase allSubclasses select: [ :tc |
+    tc category includesSubstring: 'Copilot' ]) do: [ :tc |
+        tc suite run ].</code></pre>
+<p><strong>Run Specific Test Class</strong>:</p>
+<pre class="smalltalk"><code>"Run single test class"
+UsabilityTest suite run.
+
+"Run specific test"
+UsabilityTest new testEntryDisplayStringIsInformative.</code></pre>
+<p><strong>CI Integration</strong>:</p>
+<div class="sourceCode" id="cb109"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb109-1"><a aria-hidden="true" href="#cb109-1" tabindex="-1"></a><span class="co"># Run tests from command line</span></span>
+<span id="cb109-2"><a aria-hidden="true" href="#cb109-2" tabindex="-1"></a><span class="ex">pharo</span> Pharo.image test <span class="at">--junit-xml-output</span> <span class="st">'AI-Pharo-Copilot-Tests'</span></span></code></pre></div>
+<hr/>
+<h2 id="appendix-a-class-reference">Appendix A: Class Reference</h2>
+<h3 id="core-package-ai-pharo-copilot">Core Package
+(AI-Pharo-Copilot)</h3>
+<table>
+<colgroup>
+<col style="width: 43%"/>
+<col style="width: 56%"/>
+</colgroup>
+<thead>
+<tr>
+<th>Class</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CoCompletionEnginePharoCopilot</strong></td>
+<td>Main completion engine integration</td>
+</tr>
+<tr>
+<td><strong>CoPharoCopilotResultSetBuilder</strong></td>
+<td>Builds completion result sets</td>
+</tr>
+<tr>
+<td><strong>CoPharoCopilotContext</strong></td>
+<td>Specialized completion context</td>
+</tr>
+<tr>
+<td><strong>CoCopilotEntry</strong></td>
+<td>Single completion suggestion</td>
+</tr>
+<tr>
+<td><strong>CoCopilotLogger</strong></td>
+<td>Centralized activity logging</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ollama-package-ai-pharo-copilot-ollama">Ollama Package
+(AI-Pharo-Copilot-Ollama)</h3>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OllamaClient</strong></td>
+<td>REST API client for Ollama</td>
+</tr>
+<tr>
+<td><strong>OAHttpTransport</strong></td>
+<td>HTTP transport layer</td>
+</tr>
+<tr>
+<td><strong>CopilotSettings</strong></td>
+<td>Global configuration</td>
+</tr>
+<tr>
+<td><strong>OModelRegistry</strong></td>
+<td>Model discovery and management</td>
+</tr>
+<tr>
+<td><strong>OModelSpec</strong></td>
+<td>Model specification</td>
+</tr>
+<tr>
+<td><strong>OModelCatalog</strong></td>
+<td>Built-in model definitions</td>
+</tr>
+</tbody>
+</table>
+<h3 id="evaluator-package-ai-pharo-copilot-evaluator">Evaluator Package
+(AI-Pharo-Copilot-Evaluator)</h3>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CoSuggestionEvaluator</strong></td>
+<td>Tracks suggestion metrics</td>
+</tr>
+<tr>
+<td><strong>CoEvaluationReport</strong></td>
+<td>Generates evaluation reports</td>
+</tr>
+<tr>
+<td><strong>CoEvaluationEntry</strong></td>
+<td>Single evaluation record</td>
+</tr>
+<tr>
+<td><strong>CoEvaluationAnnouncement</strong></td>
+<td>Evaluation event notification</td>
+</tr>
+</tbody>
+</table>
+<h3 id="test-package-ai-pharo-copilot-tests">Test Package
+(AI-Pharo-Copilot-Tests)</h3>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CopilotMockModelTestCase</strong></td>
+<td>Base test with mock setup</td>
+</tr>
+<tr>
+<td><strong>OTestModelSupport</strong></td>
+<td>Mock infrastructure utilities</td>
+</tr>
+<tr>
+<td><strong>OAHttpTransportTest</strong></td>
+<td>Tests HTTP transport</td>
+</tr>
+<tr>
+<td><strong>CopilotSettingsValidationTest</strong></td>
+<td>Tests settings validation</td>
+</tr>
+<tr>
+<td><strong>UsabilityTest</strong></td>
+<td>Tests user experience</td>
+</tr>
+<tr>
+<td><strong>RegressionTest</strong></td>
+<td>Tests for known issues</td>
+</tr>
+<tr>
+<td><strong>CoSuggestionEvaluatorAdvancedTest</strong></td>
+<td>Tests evaluation system</td>
+</tr>
+<tr>
+<td><strong>OModelRegistryStressTest</strong></td>
+<td>Tests scalability</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="appendix-b-configuration-files">Appendix B: Configuration
+Files</h2>
+<h3 id="directory-structure">Directory Structure</h3>
+<pre><code>pharo-image-directory/
+├── pharo-copilot/
+│   ├── templates/                    # FIM templates
+│   │   ├── codellama-7b-template.txt
+│   │   ├── pharo-coder-template.txt
+│   │   └── ...
+│   └── copilot-logs/                 # Activity logs
+│       ├── copilot.log               # Main activity log
+│       ├── copilot-evaluation-log.jsonl  # Evaluation data
+│       └── {model-name}/             # Per-model metadata
+│           ├── template.txt
+│           ├── system.txt
+│           ├── parameters.txt
+│           └── modelfile.txt</code></pre>
+<h3 id="log-file-formats">Log File Formats</h3>
+<p><strong>Activity Log</strong> (<code>copilot.log</code>):</p>
+<pre><code>===== [FRONTEND] Preparing completion request @ 2025-01-15 14:23:45 =====
+  - contextClass: CoPharoCopilotContext
+  - cursorPosition: 45
+  - sourceSize: 120
+
+===== [BACKEND] Dispatching generate request @ 2025-01-15 14:23:46 =====
+  - endpoint: api/generate
+  - modelFullName: pharo-coder-1.5b-fim-f16.gguf:latest</code></pre>
+<hr/>
+<h2 id="appendix-c-api-reference">Appendix C: API Reference</h2>
+<h3 id="quick-reference">Quick Reference</h3>
+<p><strong>Enable Copilot</strong>:</p>
+<pre class="smalltalk"><code>RubSmalltalkEditor completionEngineClass: CoCompletionEnginePharoCopilot.
+CopilotSettings copilotEnabled: true.</code></pre>
+<p><strong>Configure Model</strong>:</p>
+<pre class="smalltalk"><code>CopilotSettings modelName: 'pharo-coder-1.5b-fim-f16.gguf:latest'.</code></pre>
+<p><strong>Test Connection</strong>:</p>
+<pre class="smalltalk"><code>OllamaClient new listModels.</code></pre>
+<p><strong>View Statistics</strong>:</p>
+<pre class="smalltalk"><code>CoSuggestionEvaluator default sessionStats inspect.
+CoSuggestionEvaluator default generateReport inspect.</code></pre>
+<p><strong>Export Data</strong>:</p>
+<pre class="smalltalk"><code>CoSuggestionEvaluator default exportToCSV: 'evaluation.csv'.</code></pre>
+<p><strong>View Logs</strong>:</p>
+<pre class="smalltalk"><code>CoCopilotLogger logFileReference openWithShell.</code></pre>
+<hr/>
+<h2 id="contributors">Contributors</h2>
+<ul>
+<li>Omar AbedelKader - Original author and maintainer</li>
+</ul>
+<h2 id="license">License</h2>
+<p>MIT License - See LICENSE file</p>
+<h2 id="repository">Repository</h2>
+<p>https://github.com/omarabedelkader/Pharo-Copilot</p>
+<hr/>
+<h2 id="acknowledgments">Acknowledgments</h2>
+<ul>
+<li><strong>Pharo Community</strong> - For the robust Smalltalk
+environment</li>
+<li><strong>Ollama Team</strong> - For making local LLMs accessible</li>
+<li><strong>All Contributors</strong> - For testing and feedback</li>
+</ul>
+<hr/>
+<p><strong>Document Version</strong>: 1.0<br/>
+<strong>Last Updated</strong>: January 2026<br/>
+<strong>Compatible with</strong>: Pharo 13, Pharo 14, Ollama 0.1.0+</p>
+<hr/>
+</body>
+      </article>
+    </section>
+
+  </div>
+</main>
+
+<script src="assets/js.js"></script>
+</body>
 </html>
