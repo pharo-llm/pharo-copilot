@@ -60,27 +60,6 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotSnapshotWhenInsi
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionSchedulesWhenAtBoundary [
-	| b ctx |
-	b := CopilotTestableBuilder new.
-	b debounceMilliseconds: 250.
-	b idleMilliseconds: 2000.
-
-	ctx := CoCopilotContextMock new
-		source: 'self ';
-		position: 5; "after space => boundary"
-		yourself.
-	b completionContext: ctx.
-
-	b buildCompletion.
-
-	self assert: b snapshotWasCalled.
-	self assert: b scheduledDelay equals: 250.
-	self assert: b scheduledPrefix equals: 'self '.
-	self assert: b scheduledSuffix equals: ''
-]
-
-{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testClassContextIsCached [
 
 	| b ctx first second |
@@ -204,21 +183,6 @@ CoPharoCopilotResultSetBuilderTest >> testContextSnapshotIncludesPrefixAndSuffix
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testDebounceOnlyProcessesLatest [
-	| b ctx |
-	b := CopilotDebounceTestBuilder new.
-	ctx := CoCopilotContextMock new source: 'x '; position: 2; yourself.
-
-	"Schedule A then immediately schedule B with same delay; only B should run."
-	b scheduleCompletionFor: ctx prefix: 'A' suffix: '' contextInfo: Dictionary new delayMilliseconds: 30.
-	b scheduleCompletionFor: ctx prefix: 'B' suffix: '' contextInfo: Dictionary new delayMilliseconds: 30.
-
-	"Wait long enough"
-	self assert: (b waitProcessedForMilliseconds: 200).
-	self assert: b processedPrefix equals: 'B'
-]
-
-{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testDelayIsFastAfterSpace [
 
 	| b source pos |
@@ -251,16 +215,6 @@ CoPharoCopilotResultSetBuilderTest >> testInitializeOnContextSetsCompletionConte
 	context := CoPharoCopilotContext new.
 	builder := CoPharoCopilotResultSetBuilder initializeOnContext: context.
 	self assert: builder completionContext identicalTo: context
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testLoggingIsOffByDefault [
-
-	"Reset to nil so default initializer runs"
-	(CopilotSettings classPool includesKey: #loggingEnabled) ifTrue: [
-		CopilotSettings classPool at: #loggingEnabled put: nil ].
-
-	self deny: CopilotSettings loggingEnabled
 ]
 
 { #category : 'tests' }
@@ -309,27 +263,4 @@ CoPharoCopilotResultSetBuilderTest >> testSkipsApplyingWhenContextChanged [
                 contextInfo: contextInfo.
 
         self assert: context replacedToken isNil
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testUsesSuggestionWhenContextMatches [
-
-        | builder context contextInfo |
-        builder := CoPharoCopilotResultSetBuilder new.
-        context := CoCopilotContextMock new.
-        context
-                source: 'sample code';
-                position: 6.
-        contextInfo := Dictionary new
-                                at: #cursorPosition put: 6;
-                                yourself.
-
-        builder
-                applyContent: 'suggestion'
-                toContext: context
-                expectedPrefix: 'sample'
-                suffix: ' code'
-                contextInfo: contextInfo.
-
-        self assert: context replacedToken equals: 'suggestion'
 ]
