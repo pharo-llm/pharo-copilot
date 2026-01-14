@@ -1,5 +1,8 @@
 "
-Represents an Ollama model identified by family, tag, and label.
+OModelSpec is a small value object that describes an Ollama model using a
+model family (name), an optional tag (version/variant), and a human-friendly label.
+It also knows how to produce the model's full name as expected by Ollama: 'family' or 'family:tag'.
+
 "
 Class {
 	#name : 'OModelSpec',
@@ -14,55 +17,63 @@ Class {
 }
 
 { #category : 'instance creation' }
-OModelSpec class >> family: aString tag: aTag label: aLabelString [
+OModelSpec class >> family: aFamilyString tag: aTagStringOrNil label: aLabelString [
+	"Create a model spec with a family name, optional tag, and a display label."
 
-  ^ self new
-    family: aString;
-    tag: aTag;
-    label: aLabelString;
-    yourself
+	^ self new
+		family: aFamilyString;
+		tag: aTagStringOrNil;
+		label: aLabelString;
+		yourself
 ]
 
 { #category : 'accessing' }
 OModelSpec >> family [
+	"Answer the model family (base name)."
 
 	^ family
 ]
 
 { #category : 'accessing' }
-OModelSpec >> family: anObject [
+OModelSpec >> family: aFamilyString [
+	"Set the model family (base name)."
 
-	family := anObject
+	family := aFamilyString
 ]
 
 { #category : 'accessing' }
-OModelSpec >> fullName [ 
+OModelSpec >> fullName [
+	"Answer the Ollama model identifier: 'family' when tag is nil, otherwise 'family:tag'."
 
-  ^ tag
-    ifNil:  [ family ]
-    ifNotNil: [ family , ':' , tag ]
+	^ tag
+		ifNil: [ family ]
+		ifNotNil: [ family , ':' , tag ]
 ]
 
 { #category : 'accessing' }
 OModelSpec >> label [
+	"Answer the human-friendly label for this model."
 
 	^ label
 ]
 
 { #category : 'accessing' }
-OModelSpec >> label: anObject [
+OModelSpec >> label: aLabelString [
+	"Set the human-friendly label for this model."
 
-	label := anObject
+	label := aLabelString
 ]
 
 { #category : 'accessing' }
 OModelSpec >> tag [
+	"Answer the model tag (version/variant) or nil if not set."
 
 	^ tag
 ]
 
 { #category : 'accessing' }
-OModelSpec >> tag: anObject [
+OModelSpec >> tag: aTagStringOrNil [
+	"Set the model tag (version/variant). Use nil when there is no tag."
 
-	tag := anObject
+	tag := aTagStringOrNil
 ]
