@@ -1,0 +1,80 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #6a737d;
+  --border: #d0d7de;
+  --link: #0969da;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #8b949e;
+    --border: #30363d;
+    --link: #58a6ff;
+  }
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+a {
+  color: var(--link);
+}
+
+.border {
+  border-color: var(--border) !important;
+}
+
+article {
+  background: var(--bg);
+}
+
+#sidebar {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+.toc-link {
+  display: block;
+  padding: 0.25rem 0;
+  text-decoration: none;
+  color: var(--fg);
+}
+
+.toc-link:hover {
+  text-decoration: underline;
+}
+
+/* Active section */
+.toc-link.active {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* Collapsible indicators */
+.toc-link.collapsible::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.35rem;
+  transform: translateY(-1px);
+  transition: transform 0.15s ease;
+}
+
+.toc-link.open::before {
+  transform: rotate(90deg);
+}
+
+/* Nested TOC spacing */
+.toc ul {
+  margin-left: 0.75rem;
+}
+
+
+
