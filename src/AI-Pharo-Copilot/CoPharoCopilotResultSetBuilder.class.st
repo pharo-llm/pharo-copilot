@@ -8,7 +8,9 @@ Class {
 	#instVars : [
 		'debounceProcess',
 		'debounceToken',
-		'debounceMilliseconds'
+		'debounceMilliseconds',
+		'idleMilliseconds',
+		'classContextCache'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -23,80 +25,83 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
 		yourself
 ]
 
-{ #category : 'private' }
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
-	"Apply a suggestion into the editor only if the context still matches the prefix/suffix we requested for."
+	"Never delete user-typed text. Prefer INSERT at caret; fallback to safe append."
 
-	| snapshot |
-	contentString isEmpty ifTrue: [
-		^ CoCopilotLogger
-			logFrontEndEvent: 'No suggestion content to apply'
-			details: (Dictionary new
-				at: #reason put: 'Generated content was empty';
-				at: #rawResponse put: (contextInfo at: #rawResponse ifAbsent: [ '' ]);
-				yourself) ].
-
-	aContext ifNil: [
-		^ CoCopilotLogger
-			logFrontEndEvent: 'Skipped applying suggestion - missing context'
-			details: (Dictionary new
-				at: #appliedContent put: contentString;
-				at: #appliedLength put: contentString size;
-				at: #reason put: 'Completion context was nil';
-				yourself) ].
+	| snapshot currentPrefix currentSuffix source pos inserted |
+	contentString isEmpty ifTrue: [ ^ self ].
+	aContext ifNil: [ ^ self ].
 
 	snapshot := self contextSnapshotFor: aContext.
-	(((snapshot at: #prefix) = expectedPrefix) and: [ (snapshot at: #suffix) = expectedSuffix ])
-		ifFalse: [
-			^ CoCopilotLogger
-				logFrontEndEvent: 'Skipped applying suggestion - context changed'
-				details: (Dictionary new
-					at: #appliedContent put: contentString;
-					at: #appliedLength put: contentString size;
-					at: #expectedPrefixLength put: expectedPrefix size;
-					at: #expectedSuffixLength put: expectedSuffix size;
-					at: #currentPrefixLength put: (snapshot at: #prefix) size;
-					at: #currentSuffixLength put: (snapshot at: #suffix) size;
-					at: #requestedPosition put: (contextInfo at: #cursorPosition ifAbsent: [ nil ]);
-					at: #currentPosition put: (snapshot at: #position);
-					yourself) ].
+	currentPrefix := snapshot at: #prefix.
+	currentSuffix := snapshot at: #suffix.
 
-	aContext replaceTokenInEditorWith: contentString.
-	CoCopilotLogger
-		logFrontEndEvent: 'Applied suggestion to editor'
-		details: (Dictionary new
-			at: #appliedContent put: contentString;
-			at: #appliedLength put: contentString size;
-			yourself)
+	((currentPrefix = expectedPrefix) and: [ currentSuffix = expectedSuffix ]) ifFalse: [ ^ self ].
+
+	"1) Best case: insert at caret (Copilot-like behavior: user's text stays)."
+	inserted := false.
+	self deferUI: [
+		inserted := self insertAtCaretIfPossibleIn: aContext text: contentString
+	].
+
+	inserted ifTrue: [ ^ self ].
+
+	"2) Fallback: append without rewriting what user already typed (safe)."
+	source := [ aContext source ifNil: [ '' ] ] on: Error do: [ '' ].
+	pos := [ aContext position ifNil: [ 0 ] ] on: Error do: [ 0 ].
+	pos := (pos max: 0) min: source size.
+
+	"Only do fallback when cursor is NOT inside a word (avoid corrupting)."
+	(pos < source size and: [ (self isWordChar: (source at: pos)) and: [ self isWordChar: (source at: pos + 1) ] ])
+		ifTrue: [ ^ self ].
+
+	self deferUI: [
+		aContext replaceTokenInEditorWith: (contentString "replace token only when we cannot insert")
+	]
 ]
 
-{ #category : 'private' }
+{ #category : 'API - building' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
-	"Prepare a result set and (if appropriate) schedule an async completion request for the current editor state."
+	"Only schedule when we're at a word boundary (or idle after finishing a word)."
 
-	| context prefix suffix contextInfo fetcher |
+	| context pair source pos delay snapshot prefix suffix contextInfo fetcher |
 	context := completionContext.
 
-	prefix := context source copyFrom: 1 to: context position.
-	suffix := context position < context source size
-		ifTrue: [ context source copyFrom: context position + 1 to: context source size ]
-		ifFalse: [ '' ].
+	(self shouldRequestCompletionForContext: context) ifFalse: [
+		fetcher := CoCollectionFetcher onCollection: #().
+		^ CoResultSet fetcher: fetcher
+	].
+
+	pair := self safeSourceAndPositionFor: context.
+	source := pair first.
+	pos := pair second.
+
+	delay := self requestDelayForSource: source position: pos.
+
+	"Only now take the full snapshot (prefix/suffix copies) — not on every keystroke."
+	snapshot := self contextSnapshotFor: context.
+	prefix := snapshot at: #prefix.
+	suffix := snapshot at: #suffix.
 
 	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
 
-	(self shouldRequestCompletionForPrefix: prefix suffix: suffix)
-		ifTrue: [ self scheduleCompletionFor: context prefix: prefix suffix: suffix contextInfo: contextInfo ].
+	self
+		scheduleCompletionFor: context
+		prefix: prefix
+		suffix: suffix
+		contextInfo: contextInfo
+		delayMilliseconds: delay.
 
-	"Result sets are handled by applying directly into the editor once the async request returns."
 	fetcher := CoCollectionFetcher onCollection: #().
 	^ CoResultSet fetcher: fetcher
 ]
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> classContextFor: aContext [
-	"Build a textual snapshot of the class around the completion context (definition + methods) for better suggestions."
+	"Cached + limited class context."
+	| behavior compiledMethod methodClass selector stamp cached classDefinition instanceSide classSide context |
 
-	| behavior compiledMethod methodClass classDefinition instanceSide classSide |
 	behavior := (aContext respondsTo: #behavior)
 		ifTrue: [ [ aContext behavior ] on: Error do: [ nil ] ]
 		ifFalse: [ nil ].
@@ -109,14 +114,33 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext [
 		ifNil: [ compiledMethod ifNotNil: [ compiledMethod methodClass ] ]
 		ifNotNil: [ behavior ].
 
-	classDefinition := self safeDefinitionStringFor: methodClass.
-	instanceSide := self methodSourcesFor: methodClass.
-	classSide := self methodSourcesFor: (methodClass ifNotNil: [ methodClass class ]).
+	selector := compiledMethod ifNotNil: [ compiledMethod selector ].
 
-	^ self
+	classContextCache ifNil: [ classContextCache := Dictionary new ].
+
+	stamp := self classStampFor: methodClass.
+	cached := classContextCache at: methodClass ifAbsent: [ nil ].
+	(cached notNil and: [ (cached at: #stamp ifAbsent: [ #(0 0) ]) = stamp ]) ifTrue: [
+		^ cached at: #context ifAbsent: [ '' ]
+	].
+
+	classDefinition := self safeDefinitionStringFor: methodClass.
+
+	"Limit methods hard — you can tune these numbers."
+	instanceSide := self methodSourcesFor: methodClass around: selector limit: 30.
+	classSide := self methodSourcesFor: (methodClass ifNotNil: [ methodClass class ]) around: nil limit: 15.
+
+	context := self
 		classDefinition: classDefinition
 		instanceMethods: instanceSide
-		classMethods: classSide
+		classMethods: classSide.
+
+	classContextCache at: methodClass put: (Dictionary new
+		at: #stamp put: stamp;
+		at: #context put: context;
+		yourself).
+
+	^ context
 ]
 
 { #category : 'initialization' }
@@ -151,6 +175,14 @@ CoPharoCopilotResultSetBuilder >> classDefinition: classDefinitionString instanc
 				nextPutAll: 'Class Side Methods:';
 				cr;
 				nextPutAll: classMethodsString ] ]
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> classStampFor: aBehavior [
+
+	"Cheap stamp: changes when methodDict is replaced or selector count changes."
+	aBehavior ifNil: [ ^ #(0 0) ].
+	^ { aBehavior methodDict identityHash. aBehavior selectors size }
 ]
 
 { #category : 'initialization' }
@@ -247,6 +279,20 @@ CoPharoCopilotResultSetBuilder >> debounceMilliseconds: anInteger [
 	debounceMilliseconds := anInteger
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> deferUI: aBlock [
+
+	"Best-effort: run editor mutation on UI process."
+	| uiClass ui |
+	uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
+	(uiClass notNil and: [ uiClass respondsTo: #default ]) ifTrue: [
+		ui := uiClass default.
+		(ui respondsTo: #defer:) ifTrue: [ ^ ui defer: aBlock ].
+	].
+
+	^ aBlock value
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> ebounceMilliseconds [
 	"Return the current debounce delay used before firing a completion request."
@@ -279,6 +325,17 @@ CoPharoCopilotResultSetBuilder >> extractResponseContentFromRaw: rawResponseStri
 					yourself) ].
 
 	^ content asString
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> idleMilliseconds [
+	"Idle delay used when user finishes a word and pauses."
+	^ idleMilliseconds ifNil: [ idleMilliseconds := 2000 ]
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> idleMilliseconds: anInteger [
+	idleMilliseconds := anInteger
 ]
 
 { #category : 'initialization' }
@@ -327,6 +384,37 @@ CoPharoCopilotResultSetBuilder >> initializeOnContext: aSystemCompletionContext 
 	completionContext := aSystemCompletionContext
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> insertAtCaretIfPossibleIn: aContext text: aString [
+	"Try hard to INSERT (not replace) so user text is never deleted."
+
+	| editor |
+
+	(aString isNil or: [ aString isEmpty ]) ifTrue: [ ^ false ].
+	(aContext respondsTo: #editor) ifFalse: [ ^ false ].
+
+	editor := [ aContext editor ] on: Error do: [ nil ].
+	editor ifNil: [ ^ false ].
+
+	"Preferred: real insertion at caret"
+	(editor respondsTo: #addString:) ifTrue: [
+		editor addString: aString.
+		^ true
+	].
+
+	"Fallback: replace empty selection only"
+	(editor respondsTo: #selectionInterval)
+		ifTrue: [
+			editor selectionInterval isEmpty ifTrue: [
+				editor replaceSelectionWith: aString.
+				^ true
+			]
+		].
+
+	^ false
+
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> isLanguageSpec: aString [
 	"Answer true if the string looks like a code-fence language marker (e.g., 'smalltalk', 'pharo', 'json')."
@@ -351,6 +439,23 @@ CoPharoCopilotResultSetBuilder >> isLanguageSpec: aString [
 				or: [ '#+-_' includes: ch ] ] ] ]
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> isTriggerBoundaryChar: ch [
+	"Characters that indicate a boundary (space/newline/punct)."
+	ch ifNil: [ ^ true ].
+	(ch isSeparator) ifTrue: [ ^ true ].
+	^ '.;:,()[]{}' includes: ch
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> isWordChar: ch [
+
+	ch ifNil: [ ^ false ].
+	^ ch isLetter
+		or: [ ch isDigit
+		or: [ ch = $_ ] ]
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> methodSourcesFor: aBehavior [
 	"Collect and concatenate the source of all methods of the given behavior (sorted), ignoring failures."
@@ -369,6 +474,34 @@ CoPharoCopilotResultSetBuilder >> methodSourcesFor: aBehavior [
 						cr ] ] ]
 			on: Error
 			do: [ ] ]
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> methodSourcesFor: aBehavior around: aSelector limit: limitInteger [ 
+
+	"Only a window of methods; avoids huge prompt building."
+	| sorted idx half start end |
+	aBehavior ifNil: [ ^ '' ].
+
+	sorted := aBehavior selectors asSortedCollection asArray.
+	sorted isEmpty ifTrue: [ ^ '' ].
+
+	idx := (aSelector isNil)
+		ifTrue: [ 1 ]
+		ifFalse: [ sorted indexOf: aSelector ifAbsent: [ 1 ] ].
+
+	half := limitInteger // 2.
+	start := (idx - half) max: 1.
+	end := (start + limitInteger - 1) min: sorted size.
+	start := (end - limitInteger + 1) max: 1.
+
+	^ String streamContents: [ :stream |
+		(start to: end) do: [ :i |
+			| sel src |
+			sel := sorted at: i.
+			src := [ aBehavior sourceCodeAt: sel ] on: Error do: [ nil ].
+			src ifNotNil: [
+				stream nextPutAll: src; cr; cr ] ] ]
 ]
 
 { #category : 'initialization' }
@@ -439,6 +572,18 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 					yourself) ]
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> requestDelayForSource: source position: pos [
+	| before |
+	before := pos > 0 ifTrue: [ source at: pos ] ifFalse: [ nil ].
+
+	"Fast when user just hit a boundary (like space)."
+	(self isTriggerBoundaryChar: before) ifTrue: [ ^ self debounceMilliseconds ].
+
+	"Otherwise wait for real idle."
+	^ self idleMilliseconds
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> safeDefinitionStringFor: aBehavior [
 	"Return the class definition string for a behavior, or empty string if unavailable."
@@ -447,33 +592,69 @@ CoPharoCopilotResultSetBuilder >> safeDefinitionStringFor: aBehavior [
 	^ [ aBehavior definition asString ] on: Error do: [ '' ]
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> safeSourceAndPositionFor: aContext [
+	| source pos |
+	source := [ aContext source ifNil: [ '' ] ] on: Error do: [ '' ].
+	pos := [ aContext position ifNil: [ 0 ] ] on: Error do: [ 0 ].
+	pos := (pos max: 0) min: source size.
+	^ { source. pos }
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
-	"Debounce completion requests: cancel any pending request and schedule a new one for the latest editor state."
+	^ self
+		scheduleCompletionFor: aContext
+		prefix: prefixString
+		suffix: suffixString
+		contextInfo: contextInfo
+		delayMilliseconds: self debounceMilliseconds
+]
 
-	| token |
+{ #category : 'API - building' }
+CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo delayMilliseconds: delayMs [
+	"Debounce: cancel pending, schedule only latest."
+
+	| token priority |
 	debounceToken ifNil: [ debounceToken := 0 ].
 	debounceToken := debounceToken + 1.
 	token := debounceToken.
 
 	debounceProcess ifNotNil: [ debounceProcess terminate ].
 
+	priority := (Processor class includesSelector: #userSchedulingPriority)
+		ifTrue: [ Processor userSchedulingPriority ]
+		ifFalse: [ Processor userBackgroundPriority ].
+
 	debounceProcess := [
-		(Delay forMilliseconds: self debounceMilliseconds) wait.
+		(Delay forMilliseconds: delayMs) wait.
 		token = debounceToken ifTrue: [
 			self
 				processCompletionFor: aContext
 				prefix: prefixString
 				suffix: suffixString
-				contextInfo: contextInfo ] ] forkAt: Processor userBackgroundPriority.
+				contextInfo: contextInfo ] ] forkAt: priority
+]
 
-	CoCopilotLogger
-		logBackEndEvent: 'Dispatched debounced completion fetch'
-		details: (Dictionary new
-			at: #processPriority put: Processor userBackgroundPriority;
-			at: #processId put: debounceProcess identityHash;
-			at: #debounceMilliseconds put: self debounceMilliseconds;
-			yourself)
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
+	"NO trigger while cursor is inside the same word."
+	| pair source pos before after |
+	aContext ifNil: [ ^ false ].
+
+	pair := self safeSourceAndPositionFor: aContext.
+	source := pair first.
+	pos := pair second.
+
+	(pos < self minimumPrefixLength) ifTrue: [ ^ false ].
+
+	before := pos > 0 ifTrue: [ source at: pos ] ifFalse: [ nil ].
+	after := pos < source size ifTrue: [ source at: pos + 1 ] ifFalse: [ nil ].
+
+	"Cursor inside a word => do NOT initialize completion engine."
+	((self isWordChar: before) and: [ self isWordChar: after ]) ifTrue: [ ^ false ].
+
+	^ true
 ]
 
 { #category : 'initialization' }
