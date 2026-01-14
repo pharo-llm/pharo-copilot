@@ -7,6 +7,96 @@ Class {
 }
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testApplyContentDoesNothingOnSnapshotMismatch [
+	| b ctx ed |
+	b := CopilotTestableBuilder new.
+	ed := CoCopilotMockEditor new.
+	ctx := CoCopilotContextMock new
+		source: 'self ';
+		position: 5;
+		editor: ed;
+		yourself.
+
+	"Mismatch expectedPrefix => should not insert/replace."
+	b applyContent: 'assert: ' toContext: ctx expectedPrefix: 'WRONG' suffix: '' contextInfo: Dictionary new.
+
+	self assert: ed insertedText equals: ''.
+	self assert: ctx replaceCount equals: 0
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testApplyContentInsertsAtCaretWhenEditorSupportsAddString [
+	| b ctx ed |
+	b := CopilotTestableBuilder new.
+	ed := CoCopilotMockEditor new.
+	ctx := CoCopilotContextMock new
+		source: 'self ';
+		position: 5;
+		editor: ed;
+		yourself.
+
+	"Expected prefix/suffix must match snapshot."
+	b applyContent: 'assert: ' toContext: ctx expectedPrefix: 'self ' suffix: '' contextInfo: Dictionary new.
+
+	self assert: ed insertedText equals: 'assert: '.
+	self assert: ctx replaceCount equals: 0
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotSnapshotWhenInsideWord [
+
+	| b ctx |
+	b := CopilotTestableBuilder new.
+	ctx := CoCopilotContextMock new
+		source: 'assert';
+		position: 3;  "inside word"
+		yourself.
+	b completionContext: ctx.
+
+	b buildCompletion.
+
+	self deny: b snapshotWasCalled.
+	self assert: b scheduledDelay isNil
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionSchedulesWhenAtBoundary [
+	| b ctx |
+	b := CopilotTestableBuilder new.
+	b debounceMilliseconds: 250.
+	b idleMilliseconds: 2000.
+
+	ctx := CoCopilotContextMock new
+		source: 'self ';
+		position: 5; "after space => boundary"
+		yourself.
+	b completionContext: ctx.
+
+	b buildCompletion.
+
+	self assert: b snapshotWasCalled.
+	self assert: b scheduledDelay equals: 250.
+	self assert: b scheduledPrefix equals: 'self '.
+	self assert: b scheduledSuffix equals: ''
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testClassContextIsCached [
+
+	| b ctx first second |
+	b := CopilotCacheTestBuilder new.
+	ctx := CoCopilotContextMock new behavior: Object; yourself.
+
+	first := b classContextFor: ctx.
+	second := b classContextFor: ctx.
+
+	"First call should build instance+class side => 2 calls.
+	Second call should be cached => still 2."
+	self assert: b methodSourcesCallCount equals: 2.
+	self assert: first equals: second
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromEmptyResponse [
 	| builder context |
 	context := CoPharoCopilotContext new.
@@ -114,12 +204,88 @@ CoPharoCopilotResultSetBuilderTest >> testContextSnapshotIncludesPrefixAndSuffix
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testDebounceOnlyProcessesLatest [
+	| b ctx |
+	b := CopilotDebounceTestBuilder new.
+	ctx := CoCopilotContextMock new source: 'x '; position: 2; yourself.
+
+	"Schedule A then immediately schedule B with same delay; only B should run."
+	b scheduleCompletionFor: ctx prefix: 'A' suffix: '' contextInfo: Dictionary new delayMilliseconds: 30.
+	b scheduleCompletionFor: ctx prefix: 'B' suffix: '' contextInfo: Dictionary new delayMilliseconds: 30.
+
+	"Wait long enough"
+	self assert: (b waitProcessedForMilliseconds: 200).
+	self assert: b processedPrefix equals: 'B'
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testDelayIsFastAfterSpace [
+
+	| b source pos |
+	b := CoPharoCopilotResultSetBuilder new.
+	b debounceMilliseconds: 250.
+	b idleMilliseconds: 2000.
+
+	source := 'self '.
+	pos := source size. "caret after space"
+	self assert: (b requestDelayForSource: source position: pos) equals: 250
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testDelayIsIdleWhenNoBoundaryTyped [
+
+	| b source pos |
+	b := CoPharoCopilotResultSetBuilder new.
+	b debounceMilliseconds: 250.
+	b idleMilliseconds: 2000.
+
+	source := 'self'.
+	pos := source size. "caret after 'f' (letter), not boundary"
+	self assert: (b requestDelayForSource: source position: pos) equals: 2000
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testInitializeOnContextSetsCompletionContext [
 
 	| builder context |
 	context := CoPharoCopilotContext new.
 	builder := CoPharoCopilotResultSetBuilder initializeOnContext: context.
 	self assert: builder completionContext identicalTo: context
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testLoggingIsOffByDefault [
+
+	"Reset to nil so default initializer runs"
+	(CopilotSettings classPool includesKey: #loggingEnabled) ifTrue: [
+		CopilotSettings classPool at: #loggingEnabled put: nil ].
+
+	self deny: CopilotSettings loggingEnabled
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerInsideWord [
+
+	| b ctx |
+	b := CoPharoCopilotResultSetBuilder new.
+	ctx := CoCopilotContextMock new
+		source: 'assert';
+		position: 3;  "as|sert -> before='s' after='s' => inside word"
+		yourself.
+
+	self deny: (b shouldRequestCompletionForContext: ctx)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testShouldTriggerAtWordEnd [
+	| b ctx |
+	b := CoPharoCopilotResultSetBuilder new.
+	ctx := CoCopilotContextMock new
+		source: 'assert';
+		position: 6;  "assert| -> after=nil"
+		yourself.
+
+	self assert: (b shouldRequestCompletionForContext: ctx)
 ]
 
 { #category : 'tests' }
