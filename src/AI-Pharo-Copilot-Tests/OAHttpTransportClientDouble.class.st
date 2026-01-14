@@ -69,6 +69,14 @@ OAHttpTransportClientDouble >> acceptedMime: anObject [
 	acceptedMime := anObject
 ]
 
+{ #category : 'as yet unclassified' }
+OAHttpTransportClientDouble >> beOneShot [
+	"ZnEasy>>client sends #beOneShot to make the request single-use.
+	No-op in the test double."
+
+	^ self
+]
+
 { #category : 'accessing' }
 OAHttpTransportClientDouble >> body [
 

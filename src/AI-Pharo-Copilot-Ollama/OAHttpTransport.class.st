@@ -19,15 +19,15 @@ Class {
 
 { #category : 'private' }
 OAHttpTransport >> applyDefaultHeadersTo: aClient [
-	"Apply the transport default headers to the given Zinc client."
+	"Apply the transport default headers to the given client."
 
 	defaultHeaders keysAndValuesDo: [ :key :value |
 		aClient headerAt: key put: value ]
 ]
 
-{ #category : 'requests' }
+{ #category : 'private' }
 OAHttpTransport >> configureJsonOn: aClient [
-	"Configure JSON accept/content reader/writer on the given Zinc client using the transport JSON reader/writer."
+	"Configure JSON accept/content reader/writer on the given client using the transport JSON reader/writer."
 
 	aClient accept: ZnMimeType applicationJson.
 
@@ -115,12 +115,12 @@ OAHttpTransport >> jsonWriter: anObject [
 	jsonWriter := anObject
 ]
 
-{ #category : 'requests' }
+{ #category : 'private' }
 OAHttpTransport >> newJsonClientForPath: aPath [
-	"Create and configure a Zinc client for JSON REST calls to the configured host/port and the given path."
+	"Create and configure a Zinc client for JSON REST calls using ZnEasy (so tests can replace it)."
 
 	| client |
-	client := ZnClient new.
+	client := ZnEasy client.
 	client forJsonREST.
 	client host: host; port: port; path: aPath.
 
@@ -146,7 +146,7 @@ OAHttpTransport >> port: anObject [
 
 { #category : 'requests' }
 OAHttpTransport >> postJsonAt: aPath body: aDictionary [
-	"Perform a POST request on the given path with the given Smalltalk object as JSON body, answering the decoded JSON response."
+	"Perform a POST request on the given path with the given object as JSON body, answering the decoded JSON response."
 
 	| client |
 	client := self newJsonClientForPath: aPath.
