@@ -85,6 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 });
+
 document.addEventListener("DOMContentLoaded", () => {
   const btn = document.getElementById("theme-toggle");
   if (!btn) return;
@@ -112,6 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setTheme(current === "dark" ? "light" : "dark");
   });
 });
+
 document.addEventListener("DOMContentLoaded", () => {
   const scrollTopBtn = document.getElementById("scroll-top");
   if (!scrollTopBtn) return;

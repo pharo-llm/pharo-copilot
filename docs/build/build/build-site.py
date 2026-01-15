@@ -22,7 +22,14 @@ OUT_DIR = DOCS_DIR
 SRC_ASSETS = SRC_DIR / "assets"
 OUT_ASSETS = OUT_DIR / "assets"
 
-BASE_URL = "https://docs.example.com"  # change to your site URL
+BASE_URL = "https://omarabedelkader.github.io/Pharo-Copilot/"  # change to your site URL
+
+# External resources shown in the top navbar (edit these!)
+RESOURCES: list[tuple[str, str]] = [
+    ("GitHub", "https://github.com/omarabedelkader/Pharo-Copilot"),
+    ("Hugging Face", "https://huggingface.co/Pharo-Copilot"),
+    ("Ollama", "https://ollama.com/omarabedelkader"),
+]
 
 # -----------------------------
 # PAGE TEMPLATE (SEO-READY)
@@ -68,8 +75,45 @@ PAGE_TEMPLATE = Template(
 
 <header class="border-bottom">
   <div class="container-xxl py-3 d-flex justify-content-between align-items-center">
-    <div class="fw-semibold">{{ site_name }}</div>
+
+    <a class="fw-semibold text-decoration-none" href="{{ home_href }}">{{ site_name }}</a>
+
     <div class="d-flex gap-3 align-items-center">
+
+      <!-- Desktop: show direct resource links -->
+      <nav class="d-none d-md-flex gap-3 align-items-center" aria-label="Resources">
+        {% for label, url in resources %}
+          <a class="link-secondary small"
+             href="{{ url }}"
+             target="_blank"
+             rel="noopener noreferrer">
+            {{ label }}
+          </a>
+        {% endfor %}
+      </nav>
+
+      <!-- Mobile: dropdown -->
+      <div class="dropdown d-md-none">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false">
+          Resources
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          {% for label, url in resources %}
+            <li>
+              <a class="dropdown-item"
+                 href="{{ url }}"
+                 target="_blank"
+                 rel="noopener noreferrer">
+                {{ label }}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+
       <button
         id="theme-toggle"
         class="btn btn-sm btn-outline-secondary"
@@ -111,6 +155,8 @@ PAGE_TEMPLATE = Template(
   ↑
 </button>
 
+<!-- Bootstrap JS bundle needed for dropdown -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ asset_prefix }}/js.js"></script>
 </body>
 </html>
@@ -162,7 +208,7 @@ def rewrite_internal_links(soup: BeautifulSoup) -> None:
         if href.endswith(".md"):
             a["href"] = href[:-3] + ".html"
 
-def convert_one(md_path: Path, title: str) -> tuple[str, str]:
+def convert_one(md_path: Path) -> tuple[str, str]:
     html = pypandoc.convert_file(
         str(md_path),
         to="html5",
@@ -170,31 +216,40 @@ def convert_one(md_path: Path, title: str) -> tuple[str, str]:
         extra_args=["--standalone", "--toc", "--toc-depth=3"],
     )
     soup = BeautifulSoup(html, "html.parser")
+
     toc_html = ""
     toc = soup.find("nav", id="TOC")
     if toc:
         toc_html = clean_toc(str(toc))
         toc.decompose()
+
     body = soup.body or soup
     rewrite_internal_links(body)
-    return toc_html, str(body)
+
+    # Avoid injecting a nested <body> tag inside <article>
+    body_html = body.decode_contents() if getattr(body, "name", None) == "body" else str(body)
+    return toc_html, body_html
 
 def extract_description_and_keywords(md_path: Path) -> tuple[str, str]:
     text = md_path.read_text(errors="ignore")
-    # Description = first paragraph
+
+    # Description = first non-empty paragraph
+    description = ""
     for para in text.split("\n\n"):
         stripped = para.strip()
         if stripped:
             description = stripped.replace("\n", " ")
             break
-    else:
+    if not description:
         description = guess_title(md_path)
+
     # Keywords = headings
     keywords = []
     for line in text.splitlines():
         if line.startswith("#"):
             keywords.append(line.lstrip("#").strip())
     keywords_str = ", ".join(keywords[:10])
+
     return description, keywords_str
 
 def canonical_url_for(rel_html: Path) -> str:
@@ -215,21 +270,24 @@ def copy_assets() -> None:
 def main() -> int:
     copy_assets()
     md_files = list_markdown_files()
+
     for md in md_files:
         rel_md = md.relative_to(SRC_DIR)
         rel_html = md_rel_to_html_rel(rel_md)
         out = OUT_DIR / rel_html
         out.parent.mkdir(parents=True, exist_ok=True)
 
-        toc_html, body_html = convert_one(md, guess_title(md))
+        toc_html, body_html = convert_one(md)
         description, keywords = extract_description_and_keywords(md)
         asset_prefix = os.path.relpath(OUT_ASSETS, out.parent)
         home_href = os.path.relpath(OUT_DIR / "index.html", out.parent)
         canonical_url = canonical_url_for(rel_html)
 
+        title = guess_title(md)
+
         html = PAGE_TEMPLATE.render(
             site_name="Pharo-Copilot Documentation",
-            title=guess_title(md),
+            title=title,
             description=description,
             keywords=keywords,
             canonical_url=canonical_url,
@@ -237,6 +295,7 @@ def main() -> int:
             body_html=body_html,
             asset_prefix=asset_prefix,
             home_href=home_href,
+            resources=RESOURCES,
         )
 
         out.write_text(html, encoding="utf-8")

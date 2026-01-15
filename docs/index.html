@@ -6,13 +6,13 @@
   <title>Pharo Copilot – Documentation</title>
   <meta name="description" content="# Pharo Copilot – Documentation">
   <meta name="keywords" content="Pharo Copilot – Documentation, 1. Executive Summary, Key Features, Technology Stack, 2. Architecture Overview, Package Structure, 3. Core Components, 3.1 CoCompletionEnginePharoCopilot (Completion Engine), 3.2 CoPharoCopilotResultSetBuilder (Result Builder), 3.3 CoPharoCopilotContext (Completion Context)">
-  <link rel="canonical" href="https://docs.example.com/index.html">
+  <link rel="canonical" href="https://omarabedelkader.github.io/Pharo-Copilot//index.html">
 
   <!-- Open Graph -->
   <meta property="og:title" content="Pharo Copilot – Documentation">
   <meta property="og:description" content="# Pharo Copilot – Documentation">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://docs.example.com/index.html">
+  <meta property="og:url" content="https://omarabedelkader.github.io/Pharo-Copilot//index.html">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -26,7 +26,7 @@
     "@type": "TechArticle",
     "headline": "Pharo Copilot – Documentation",
     "description": "# Pharo Copilot – Documentation",
-    "url": "https://docs.example.com/index.html",
+    "url": "https://omarabedelkader.github.io/Pharo-Copilot//index.html",
     "author": { "@type": "Organization", "name": "Pharo-Copilot Documentation" }
   }
   </script>
@@ -38,8 +38,77 @@
 
 <header class="border-bottom">
   <div class="container-xxl py-3 d-flex justify-content-between align-items-center">
-    <div class="fw-semibold">Pharo-Copilot Documentation</div>
+
+    <a class="fw-semibold text-decoration-none" href="index.html">Pharo-Copilot Documentation</a>
+
     <div class="d-flex gap-3 align-items-center">
+
+      <!-- Desktop: show direct resource links -->
+      <nav class="d-none d-md-flex gap-3 align-items-center" aria-label="Resources">
+        
+          <a class="link-secondary small"
+             href="https://github.com/omarabedelkader/Pharo-Copilot"
+             target="_blank"
+             rel="noopener noreferrer">
+            GitHub
+          </a>
+        
+          <a class="link-secondary small"
+             href="https://huggingface.co/Pharo-Copilot"
+             target="_blank"
+             rel="noopener noreferrer">
+            Hugging Face
+          </a>
+        
+          <a class="link-secondary small"
+             href="https://ollama.com/omarabedelkader"
+             target="_blank"
+             rel="noopener noreferrer">
+            Ollama
+          </a>
+        
+      </nav>
+
+      <!-- Mobile: dropdown -->
+      <div class="dropdown d-md-none">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false">
+          Resources
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          
+            <li>
+              <a class="dropdown-item"
+                 href="https://github.com/omarabedelkader/Pharo-Copilot"
+                 target="_blank"
+                 rel="noopener noreferrer">
+                GitHub
+              </a>
+            </li>
+          
+            <li>
+              <a class="dropdown-item"
+                 href="https://huggingface.co/Pharo-Copilot"
+                 target="_blank"
+                 rel="noopener noreferrer">
+                Hugging Face
+              </a>
+            </li>
+          
+            <li>
+              <a class="dropdown-item"
+                 href="https://ollama.com/omarabedelkader"
+                 target="_blank"
+                 rel="noopener noreferrer">
+                Ollama
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+
       <button
         id="theme-toggle"
         class="btn btn-sm btn-outline-secondary"
@@ -237,7 +306,7 @@ Reference</a></li>
 
     <section class="col">
       <article class="border rounded-3 p-4">
-        <body>
+        
 
 <h1 id="pharo-copilot-documentation">Pharo Copilot – Documentation</h1>
 <hr/>
@@ -2028,7 +2097,7 @@ environment</li>
 <strong>Last Updated</strong>: January 2026<br/>
 <strong>Compatible with</strong>: Pharo 13, Pharo 14, Ollama 0.1.0+</p>
 <hr/>
-</body>
+
       </article>
     </section>
 
@@ -2044,6 +2113,8 @@ environment</li>
   ↑
 </button>
 
+<!-- Bootstrap JS bundle needed for dropdown -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="assets/js.js"></script>
 </body>
 </html>

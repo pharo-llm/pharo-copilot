@@ -6,14 +6,6 @@
   --link: #0969da;
 }
 
-:root {
-  --bg: #ffffff;
-  --fg: #1f2328;
-  --muted: #6a737d;
-  --border: #d0d7de;
-  --link: #0969da;
-}
-
 html[data-bs-theme="dark"] {
   --bg: #0d1117;
   --fg: #e6edf3;
@@ -101,5 +93,3 @@ article {
 html[data-bs-theme="dark"] .scroll-top {
   box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5);
 }
-
-
