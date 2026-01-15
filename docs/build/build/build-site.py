@@ -10,7 +10,9 @@ import pypandoc
 from bs4 import BeautifulSoup
 from jinja2 import Template
 
-
+# -----------------------------
+# CONFIG
+# -----------------------------
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DOCS_DIR = REPO_ROOT / "docs"
 
@@ -20,7 +22,11 @@ OUT_DIR = DOCS_DIR
 SRC_ASSETS = SRC_DIR / "assets"
 OUT_ASSETS = OUT_DIR / "assets"
 
+BASE_URL = "https://docs.example.com"  # change to your site URL
 
+# -----------------------------
+# PAGE TEMPLATE (SEO-READY)
+# -----------------------------
 PAGE_TEMPLATE = Template(
     """<!doctype html>
 <html lang="en" data-bs-theme="light">
@@ -28,6 +34,32 @@ PAGE_TEMPLATE = Template(
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>{{ title }}</title>
+  <meta name="description" content="{{ description }}">
+  <meta name="keywords" content="{{ keywords }}">
+  <link rel="canonical" href="{{ canonical_url }}">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="{{ title }}">
+  <meta property="og:description" content="{{ description }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ canonical_url }}">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ title }}">
+  <meta name="twitter:description" content="{{ description }}">
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "{{ title }}",
+    "description": "{{ description }}",
+    "url": "{{ canonical_url }}",
+    "author": { "@type": "Organization", "name": "{{ site_name }}" }
+  }
+  </script>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="{{ asset_prefix }}/css.css" rel="stylesheet">
@@ -37,7 +69,6 @@ PAGE_TEMPLATE = Template(
 <header class="border-bottom">
   <div class="container-xxl py-3 d-flex justify-content-between align-items-center">
     <div class="fw-semibold">{{ site_name }}</div>
-
     <div class="d-flex gap-3 align-items-center">
       <a href="{{ home_href }}">Home</a>
       <button
@@ -46,11 +77,10 @@ PAGE_TEMPLATE = Template(
         type="button"
         aria-label="Toggle theme">
         🌙
-    </button>
+      </button>
     </div>
   </div>
 </header>
-
 
 <main class="container-xxl my-4">
   <div class="row g-4">
@@ -78,7 +108,9 @@ PAGE_TEMPLATE = Template(
 </html>"""
 )
 
-
+# -----------------------------
+# DATACLASS
+# -----------------------------
 @dataclass(frozen=True)
 class Page:
     src: Path
@@ -86,10 +118,11 @@ class Page:
     rel_html: Path
     title: str
 
-
+# -----------------------------
+# UTILITIES
+# -----------------------------
 def list_markdown_files() -> list[Path]:
     return sorted(p for p in SRC_DIR.rglob("*.md") if SRC_ASSETS not in p.parents)
-
 
 def guess_title(md_path: Path) -> str:
     for line in md_path.read_text(errors="ignore").splitlines():
@@ -97,26 +130,20 @@ def guess_title(md_path: Path) -> str:
             return line[2:].strip()
     return md_path.stem.replace("-", " ").title()
 
-
 def md_rel_to_html_rel(rel_md: Path) -> Path:
     return Path("index.html") if rel_md.name.lower() == "index.md" else rel_md.with_suffix(".html")
-
 
 def clean_toc(toc_html: str) -> str:
     soup = BeautifulSoup(toc_html, "html.parser")
     nav = soup.find("nav", id="TOC")
     if not nav:
         return ""
-
     nav["class"] = ["toc"]
     for ul in nav.find_all("ul"):
         ul["class"] = ["list-unstyled"]
-
     for a in nav.find_all("a"):
         a["class"] = ["toc-link"]
-
     return str(nav)
-
 
 def rewrite_internal_links(soup: BeautifulSoup) -> None:
     for a in soup.find_all("a"):
@@ -126,7 +153,6 @@ def rewrite_internal_links(soup: BeautifulSoup) -> None:
         if href.endswith(".md"):
             a["href"] = href[:-3] + ".html"
 
-
 def convert_one(md_path: Path, title: str) -> tuple[str, str]:
     html = pypandoc.convert_file(
         str(md_path),
@@ -134,20 +160,36 @@ def convert_one(md_path: Path, title: str) -> tuple[str, str]:
         format="md",
         extra_args=["--standalone", "--toc", "--toc-depth=3"],
     )
-
     soup = BeautifulSoup(html, "html.parser")
-
     toc_html = ""
     toc = soup.find("nav", id="TOC")
     if toc:
         toc_html = clean_toc(str(toc))
         toc.decompose()
-
     body = soup.body or soup
     rewrite_internal_links(body)
-
     return toc_html, str(body)
 
+def extract_description_and_keywords(md_path: Path) -> tuple[str, str]:
+    text = md_path.read_text(errors="ignore")
+    # Description = first paragraph
+    for para in text.split("\n\n"):
+        stripped = para.strip()
+        if stripped:
+            description = stripped.replace("\n", " ")
+            break
+    else:
+        description = guess_title(md_path)
+    # Keywords = headings
+    keywords = []
+    for line in text.splitlines():
+        if line.startswith("#"):
+            keywords.append(line.lstrip("#").strip())
+    keywords_str = ", ".join(keywords[:10])
+    return description, keywords_str
+
+def canonical_url_for(rel_html: Path) -> str:
+    return f"{BASE_URL}/{str(rel_html).replace(os.sep, '/')}"
 
 def copy_assets() -> None:
     OUT_ASSETS.mkdir(parents=True, exist_ok=True)
@@ -158,26 +200,30 @@ def copy_assets() -> None:
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(p, dest)
 
-
+# -----------------------------
+# MAIN
+# -----------------------------
 def main() -> int:
     copy_assets()
-
     md_files = list_markdown_files()
     for md in md_files:
         rel_md = md.relative_to(SRC_DIR)
         rel_html = md_rel_to_html_rel(rel_md)
-
         out = OUT_DIR / rel_html
         out.parent.mkdir(parents=True, exist_ok=True)
 
         toc_html, body_html = convert_one(md, guess_title(md))
-
+        description, keywords = extract_description_and_keywords(md)
         asset_prefix = os.path.relpath(OUT_ASSETS, out.parent)
         home_href = os.path.relpath(OUT_DIR / "index.html", out.parent)
+        canonical_url = canonical_url_for(rel_html)
 
         html = PAGE_TEMPLATE.render(
             site_name="Pharo-Copilot Documentation",
             title=guess_title(md),
+            description=description,
+            keywords=keywords,
+            canonical_url=canonical_url,
             toc_html=toc_html,
             body_html=body_html,
             asset_prefix=asset_prefix,
@@ -188,7 +234,6 @@ def main() -> int:
         print("Wrote", out)
 
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
