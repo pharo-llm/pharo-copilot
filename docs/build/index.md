@@ -1,4 +1,4 @@
-# Pharo Copilot – System Documentation
+# Pharo Copilot – Documentation
 
 ---
 
