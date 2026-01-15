@@ -70,7 +70,6 @@ PAGE_TEMPLATE = Template(
   <div class="container-xxl py-3 d-flex justify-content-between align-items-center">
     <div class="fw-semibold">{{ site_name }}</div>
     <div class="d-flex gap-3 align-items-center">
-      <a href="{{ home_href }}">Home</a>
       <button
         id="theme-toggle"
         class="btn btn-sm btn-outline-secondary"
@@ -103,9 +102,19 @@ PAGE_TEMPLATE = Template(
   </div>
 </main>
 
+<!-- Scroll to top button -->
+<button
+  id="scroll-top"
+  class="btn btn-primary scroll-top"
+  type="button"
+  aria-label="Scroll to top">
+  ↑
+</button>
+
 <script src="{{ asset_prefix }}/js.js"></script>
 </body>
-</html>"""
+</html>
+"""
 )
 
 # -----------------------------

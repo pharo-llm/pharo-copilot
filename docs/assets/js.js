@@ -112,3 +112,29 @@ document.addEventListener("DOMContentLoaded", () => {
     setTheme(current === "dark" ? "light" : "dark");
   });
 });
+document.addEventListener("DOMContentLoaded", () => {
+  const scrollTopBtn = document.getElementById("scroll-top");
+  if (!scrollTopBtn) return;
+
+  const toggleVisibility = () => {
+    if (window.scrollY > 200) {
+      scrollTopBtn.style.display = "inline-flex";
+    } else {
+      scrollTopBtn.style.display = "none";
+    }
+  };
+
+  // Initial state
+  toggleVisibility();
+
+  // Show/hide on scroll
+  window.addEventListener("scroll", toggleVisibility);
+
+  // Smooth scroll to top on click
+  scrollTopBtn.addEventListener("click", () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  });
+});
