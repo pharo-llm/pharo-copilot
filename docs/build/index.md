@@ -1,26 +1,4 @@
-{
-"title" : "Pharo-Copilot Documentation",
-"layout": "index",
-"publishDate": "2025-11-30"
-}
-
-
 # Pharo Copilot – System Documentation
-
-Table of Contents
-1. Executive Summary
-2. Architecture Overview
-3. Core Components
-4. Ollama Integration
-5. Completion Engine
-6. Evaluation System
-7. Fill-in-the-Middle (FIM) Templates
-8. Installation & Setup
-9. Usage Guide
-10. Configuration & Settings
-11. Extension Points
-12. Troubleshooting
-13. Testing Suite
 
 ---
 
