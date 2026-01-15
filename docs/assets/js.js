@@ -85,3 +85,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 });
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("theme-toggle");
+  if (!btn) return;
+
+  const root = document.documentElement;
+
+  const getPreferred = () =>
+    window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+
+  const saved = localStorage.getItem("theme");
+  const initial = saved || getPreferred();
+
+  const setTheme = (theme) => {
+    root.setAttribute("data-bs-theme", theme);
+    btn.textContent = theme === "dark" ? "☀️" : "🌙";
+    localStorage.setItem("theme", theme);
+  };
+
+  setTheme(initial);
+
+  btn.addEventListener("click", () => {
+    const current = root.getAttribute("data-bs-theme") || "light";
+    setTheme(current === "dark" ? "light" : "dark");
+  });
+});

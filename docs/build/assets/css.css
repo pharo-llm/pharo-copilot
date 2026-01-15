@@ -6,14 +6,20 @@
   --link: #0969da;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d1117;
-    --fg: #e6edf3;
-    --muted: #8b949e;
-    --border: #30363d;
-    --link: #58a6ff;
-  }
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #6a737d;
+  --border: #d0d7de;
+  --link: #0969da;
+}
+
+html[data-bs-theme="dark"] {
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --muted: #8b949e;
+  --border: #30363d;
+  --link: #58a6ff;
 }
 
 body {

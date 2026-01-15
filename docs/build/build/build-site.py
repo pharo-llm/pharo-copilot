@@ -23,7 +23,7 @@ OUT_ASSETS = OUT_DIR / "assets"
 
 PAGE_TEMPLATE = Template(
     """<!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -35,11 +35,22 @@ PAGE_TEMPLATE = Template(
 <body>
 
 <header class="border-bottom">
-  <div class="container-xxl py-3 d-flex justify-content-between">
+  <div class="container-xxl py-3 d-flex justify-content-between align-items-center">
     <div class="fw-semibold">{{ site_name }}</div>
-    <a href="{{ home_href }}">Home</a>
+
+    <div class="d-flex gap-3 align-items-center">
+      <a href="{{ home_href }}">Home</a>
+      <button
+        id="theme-toggle"
+        class="btn btn-sm btn-outline-secondary"
+        type="button"
+        aria-label="Toggle theme">
+        🌙
+    </button>
+    </div>
   </div>
 </header>
+
 
 <main class="container-xxl my-4">
   <div class="row g-4">
