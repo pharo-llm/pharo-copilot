@@ -22,7 +22,7 @@ OUT_DIR = DOCS_DIR
 SRC_ASSETS = SRC_DIR / "assets"
 OUT_ASSETS = OUT_DIR / "assets"
 
-BASE_URL = "https:/omarabedelkader.github.io/Pharo-Copilot/"  # change to your site URL
+BASE_URL = "https:/omarabedelkader.github.io/Pharo-Copilot"  # change to your site URL
 
 # External resources shown in the top navbar (edit these!)
 RESOURCES: list[tuple[str, str]] = [
