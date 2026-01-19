@@ -93,6 +93,23 @@ OAHttpTransportTest >> testInitializationUsesCopilotSettingsHostAndPort [
 ]
 
 { #category : 'tests' }
+OAHttpTransportTest >> testInitializationUsesCopilotSettingsTimeout [
+
+    | originalTimeout transport client |
+    originalTimeout := CopilotSettings requestTimeoutSeconds.
+    [
+        CopilotSettings requestTimeoutSeconds: 12.
+        self replaceGlobal: #ZnEasy with: OAHttpTransportEasyDouble during: [
+            OAHttpTransportEasyDouble reset.
+            transport := OAHttpTransport new.
+            transport getJsonAt: '/models'.
+            client := OAHttpTransportClientDouble lastCreated.
+            self assert: client timeoutSeconds equals: 12
+        ]
+    ] ensure: [ CopilotSettings requestTimeoutSeconds: originalTimeout ]
+]
+
+{ #category : 'tests' }
 OAHttpTransportTest >> testJsonReaderWriterInitialization [
 	| transport |
 	transport := OAHttpTransport new.

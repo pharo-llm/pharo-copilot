@@ -10,7 +10,8 @@ Class {
 		'path',
 		'body',
 		'jsonRestEnabled',
-		'postEntity'
+		'postEntity',
+		'timeoutSeconds'
 	],
 	#classInstVars : [
 		'lastCreated',
@@ -199,6 +200,17 @@ OAHttpTransportClientDouble >> readerBlock [
 OAHttpTransportClientDouble >> readerBlock: anObject [
 
 	readerBlock := anObject
+]
+
+{ #category : 'accessing' }
+OAHttpTransportClientDouble >> timeout: aNumber [
+	timeoutSeconds := aNumber
+]
+
+{ #category : 'accessing' }
+OAHttpTransportClientDouble >> timeoutSeconds [
+
+	^ timeoutSeconds
 ]
 
 { #category : 'accessing' }

@@ -471,6 +471,18 @@ CopilotSettingsTest >> testPortStringInputParsesToNumber [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testRequestTimeoutSecondsNormalization [
+    CopilotSettings withDefaultSettingsDo: [
+        CopilotSettings requestTimeoutSeconds: 0.
+        self assert: CopilotSettings requestTimeoutSeconds equals: 5.
+        CopilotSettings requestTimeoutSeconds: 200.
+        self assert: CopilotSettings requestTimeoutSeconds equals: 120.
+        CopilotSettings requestTimeoutSeconds: 15.
+        self assert: CopilotSettings requestTimeoutSeconds equals: 15.
+    ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testShouldShowDetailedSettingsReflectsCopilotEnabled [ 
     | old |
     old := CopilotSettings copilotEnabled.
@@ -482,6 +494,38 @@ CopilotSettingsTest >> testShouldShowDetailedSettingsReflectsCopilotEnabled [
     ] ensure: [
         CopilotSettings copilotEnabled: old.
     ].
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testTimingSettingsNormalization [
+    CopilotSettings withDefaultSettingsDo: [
+        CopilotSettings completionDebounceMilliseconds: 0.
+        self assert: CopilotSettings completionDebounceMilliseconds equals: 250.
+        CopilotSettings completionIdleMilliseconds: -10.
+        self assert: CopilotSettings completionIdleMilliseconds equals: 2000.
+        CopilotSettings completionDebounceMilliseconds: 70000.
+        self assert: CopilotSettings completionDebounceMilliseconds equals: 60000.
+        CopilotSettings completionIdleMilliseconds: 2.
+        self assert: CopilotSettings completionIdleMilliseconds equals: 2.
+    ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testTimingSettingsSnapshotRestore [
+    CopilotSettings withDefaultSettingsDo: [
+        | snapshot |
+        CopilotSettings completionDebounceMilliseconds: 300.
+        CopilotSettings completionIdleMilliseconds: 2400.
+        CopilotSettings requestTimeoutSeconds: 9.
+        snapshot := CopilotSettings settingsSnapshot.
+        CopilotSettings completionDebounceMilliseconds: 1200.
+        CopilotSettings completionIdleMilliseconds: 4000.
+        CopilotSettings requestTimeoutSeconds: 30.
+        CopilotSettings restoreSettingsFromSnapshot: snapshot.
+        self assert: CopilotSettings completionDebounceMilliseconds equals: 300.
+        self assert: CopilotSettings completionIdleMilliseconds equals: 2400.
+        self assert: CopilotSettings requestTimeoutSeconds equals: 9.
+    ]
 ]
 
 { #category : 'tests' }

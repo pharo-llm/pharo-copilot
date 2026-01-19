@@ -18,7 +18,10 @@ Class {
 		'ollamaClientFactory',
 		'autoInstallModelScriptEnabled',
 		'loggingEnabled',
-		'templatesDirectory'
+		'templatesDirectory',
+		'completionDebounceMilliseconds',
+		'completionIdleMilliseconds',
+		'requestTimeoutSeconds'
 	],
 	#category : 'AI-Pharo-Copilot-Ollama',
 	#package : 'AI-Pharo-Copilot-Ollama'
@@ -65,6 +68,34 @@ CopilotSettings class >> clearCachedModelMetadata [
 	"Drop the in-memory cached model metadata so it will be recomputed."
 
 	modelMetadata := nil
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> completionDebounceMilliseconds [
+	"Answer the debounce delay (milliseconds) before firing completion requests."
+
+	^ completionDebounceMilliseconds ifNil: [ completionDebounceMilliseconds := 250 ]
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> completionDebounceMilliseconds: anObject [
+	"Set the debounce delay (milliseconds) before firing completion requests."
+
+	completionDebounceMilliseconds := self normalizedDuration: anObject default: 250 minimum: 1 maximum: 60000
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> completionIdleMilliseconds [
+	"Answer the idle delay (milliseconds) before firing completion requests."
+
+	^ completionIdleMilliseconds ifNil: [ completionIdleMilliseconds := 2000 ]
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> completionIdleMilliseconds: anObject [
+	"Set the idle delay (milliseconds) before firing completion requests."
+
+	completionIdleMilliseconds := self normalizedDuration: anObject default: 2000 minimum: 1 maximum: 60000
 ]
 
 { #category : 'private' }
@@ -714,6 +745,18 @@ CopilotSettings class >> newOllamaClient [
 ]
 
 { #category : 'settings' }
+CopilotSettings class >> normalizedDuration: anObject default: defaultValue minimum: minValue maximum: maxValue [
+	"Normalize a duration, enforcing a non-zero range."
+
+	| candidate |
+	anObject ifNil: [ ^ defaultValue ].
+	candidate := [ anObject asInteger ] on: Error do: [ defaultValue ].
+	candidate <= 0 ifTrue: [ ^ defaultValue max: minValue ].
+	candidate := candidate max: minValue.
+	^ candidate min: maxValue
+]
+
+{ #category : 'settings' }
 CopilotSettings class >> notifyUser: aString [
 	"Display a message to the user (UIManager if available, otherwise Transcript)."
 
@@ -938,6 +981,20 @@ CopilotSettings class >> removeMetadataTextFilesFrom: aDirectory [
 	] on: Error do: [ :ignored | ].
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> requestTimeoutSeconds [
+	"Answer the HTTP request timeout (seconds) for Ollama calls."
+
+	^ requestTimeoutSeconds ifNil: [ requestTimeoutSeconds := 5 ]
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> requestTimeoutSeconds: anObject [
+	"Set the HTTP request timeout (seconds) for Ollama calls."
+
+	requestTimeoutSeconds := self normalizedDuration: anObject default: 5 minimum: 1 maximum: 120
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> resetToDefaultSettings [
 	"Reset all settings to defaults (by clearing class-side state)."
@@ -951,7 +1008,10 @@ CopilotSettings class >> resetToDefaultSettings [
 	ollamaClientFactory := nil.
 	autoInstallModelScriptEnabled := nil.
 	loggingEnabled := nil.
-	templatesDirectory := nil
+	templatesDirectory := nil.
+	completionDebounceMilliseconds := nil.
+	completionIdleMilliseconds := nil.
+	requestTimeoutSeconds := nil
 ]
 
 { #category : 'accessing' }
@@ -968,6 +1028,9 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	autoInstallModelScriptEnabled := aDictionary at: #autoInstallModelScriptEnabled ifAbsent: [ aDictionary at: #AutoInstallModelScriptEnabled ifAbsent: [ nil ] ].
 	loggingEnabled := aDictionary at: #loggingEnabled ifAbsent: [ aDictionary at: #LoggingEnabled ifAbsent: [ nil ] ].
 	templatesDirectory := aDictionary at: #templatesDirectory ifAbsent: [ aDictionary at: #TemplatesDirectory ifAbsent: [ nil ] ].
+		completionDebounceMilliseconds := aDictionary at: #completionDebounceMilliseconds ifAbsent: [ aDictionary at: #CompletionDebounceMilliseconds ifAbsent: [ nil ] ].
+	completionIdleMilliseconds := aDictionary at: #completionIdleMilliseconds ifAbsent: [ aDictionary at: #CompletionIdleMilliseconds ifAbsent: [ nil ] ].
+	requestTimeoutSeconds := aDictionary at: #requestTimeoutSeconds ifAbsent: [ aDictionary at: #RequestTimeoutSeconds ifAbsent: [ nil ] ].
 ]
 
 { #category : 'accessing' }
@@ -1048,6 +1111,33 @@ CopilotSettings class >> settingsOn: aBuilder [
 				default: self autoInstallModelScriptEnabled;
 				description: 'When enabled, Pharo Copilot automatically runs the installation script if the "pharo-coder-1.5b-fim-f16.gguf:latest" model is missing.'.
 
+(aBuilder setting: #completionDebounceMilliseconds)
+				order: 0.5;
+				label: 'Completion debounce (ms)';
+				target: self;
+				getSelector: #completionDebounceMilliseconds;
+				setSelector: #completionDebounceMilliseconds:;
+				default: self completionDebounceMilliseconds;
+				description: 'Milliseconds to wait after a boundary before requesting completions (1-60000).'.
+
+			(aBuilder setting: #completionIdleMilliseconds)
+				order: 0.6;
+				label: 'Completion idle (ms)';
+				target: self;
+				getSelector: #completionIdleMilliseconds;
+				setSelector: #completionIdleMilliseconds:;
+				default: self completionIdleMilliseconds;
+				description: 'Milliseconds to wait after typing stops before requesting completions (1-60000).'.
+
+			(aBuilder setting: #requestTimeoutSeconds)
+				order: 0.7;
+				label: 'Request timeout (sec)';
+				target: self;
+				getSelector: #requestTimeoutSeconds;
+				setSelector: #requestTimeoutSeconds:;
+				default: self requestTimeoutSeconds;
+				description: 'Seconds to wait for Ollama responses before timing out (1-120).'.
+
 			(aBuilder setting: #host)
 				order: 1;
 				label: 'Server host';
@@ -1071,17 +1161,20 @@ CopilotSettings class >> settingsSnapshot [
 	"Capture all settings into a dictionary so they can be restored later."
 
 	^ Dictionary new
-		at: #enabled put: enabled;
-		at: #provider put: provider;
-		at: #modelName put: modelName;
-		at: #host put: host;
-		at: #port put: port;
-		at: #modelMetadata put: modelMetadata;
-		at: #ollamaClientFactory put: ollamaClientFactory;
-		at: #autoInstallModelScriptEnabled put: autoInstallModelScriptEnabled;
-		at: #loggingEnabled put: loggingEnabled;
-		at: #templatesDirectory put: templatesDirectory;
-		yourself
+		  at: #enabled put: enabled;
+		  at: #provider put: provider;
+		  at: #modelName put: modelName;
+		  at: #host put: host;
+		  at: #port put: port;
+		  at: #modelMetadata put: modelMetadata;
+		  at: #ollamaClientFactory put: ollamaClientFactory;
+		  at: #autoInstallModelScriptEnabled put: autoInstallModelScriptEnabled;
+		  at: #loggingEnabled put: loggingEnabled;
+		  at: #templatesDirectory put: templatesDirectory;
+				at: #completionDebounceMilliseconds put: completionDebounceMilliseconds;
+		at: #completionIdleMilliseconds put: completionIdleMilliseconds;
+		at: #requestTimeoutSeconds put: requestTimeoutSeconds;
+		  yourself
 ]
 
 { #category : 'accessing' }

@@ -269,14 +269,14 @@ CoPharoCopilotResultSetBuilder >> contextSnapshotFor: aContext [
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> debounceMilliseconds [
 
-	^ debounceMilliseconds ifNil: [ 250 ]
+	^ debounceMilliseconds ifNil: [ CopilotSettings completionDebounceMilliseconds ]
 ]
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> debounceMilliseconds: anInteger [
 	"Set the debounce delay (milliseconds) used before firing a completion request."
 
-	debounceMilliseconds := anInteger
+	debounceMilliseconds := self normalizedDelayMilliseconds: anInteger default: CopilotSettings completionDebounceMilliseconds
 ]
 
 { #category : 'private' }
@@ -330,12 +330,14 @@ CoPharoCopilotResultSetBuilder >> extractResponseContentFromRaw: rawResponseStri
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> idleMilliseconds [
 	"Idle delay used when user finishes a word and pauses."
-	^ idleMilliseconds ifNil: [ idleMilliseconds := 2000 ]
+
+	^ idleMilliseconds ifNil: [ CopilotSettings completionIdleMilliseconds]
 ]
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> idleMilliseconds: anInteger [
-	idleMilliseconds := anInteger
+
+	idleMilliseconds := self normalizedDelayMilliseconds: anInteger default: CopilotSettings completionIdleMilliseconds
 ]
 
 { #category : 'initialization' }
@@ -373,7 +375,6 @@ CoPharoCopilotResultSetBuilder >> initialize [
 	"Initialize default debounce settings."
 
 	super initialize.
-	debounceMilliseconds := 250.
 	debounceToken := 0
 ]
 
@@ -509,6 +510,18 @@ CoPharoCopilotResultSetBuilder >> minimumPrefixLength [
 	"Minimum prefix length required before we request a completion."
 
 	^ 2
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> normalizedDelayMilliseconds: anObject default: defaultValue [
+	"Normalize a delay, enforcing a non-zero millisecond range."
+
+	| candidate |
+	anObject ifNil: [ ^ defaultValue ].
+	candidate := [ anObject asInteger ] on: Error do: [ defaultValue ].
+	candidate <= 0 ifTrue: [ ^ defaultValue ].
+	candidate := candidate max: 1.
+	^ candidate min: 60000
 ]
 
 { #category : 'initialization' }
