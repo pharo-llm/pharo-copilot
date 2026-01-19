@@ -75,38 +75,27 @@ PAGE_TEMPLATE = Template(
 
 <header class="border-bottom">
   <div class="container-xxl py-3 d-flex justify-content-between align-items-center">
-
     <a class="fw-semibold text-decoration-none" href="{{ home_href }}">{{ site_name }}</a>
 
     <div class="d-flex gap-3 align-items-center">
-
-      <!-- Desktop: show direct resource links -->
       <nav class="d-none d-md-flex gap-3 align-items-center" aria-label="Resources">
         {% for label, url in resources %}
-          <a class="link-secondary small"
-             href="{{ url }}"
-             target="_blank"
-             rel="noopener noreferrer">
+          <a class="link-secondary small" href="{{ url }}" target="_blank" rel="noopener noreferrer">
             {{ label }}
           </a>
         {% endfor %}
       </nav>
 
-      <!-- Mobile: dropdown -->
       <div class="dropdown d-md-none">
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
                 type="button"
-                data-bs-toggle="dropdown"
-                aria-expanded="false">
+                data-bs-toggle="dropdown">
           Resources
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
           {% for label, url in resources %}
             <li>
-              <a class="dropdown-item"
-                 href="{{ url }}"
-                 target="_blank"
-                 rel="noopener noreferrer">
+              <a class="dropdown-item" href="{{ url }}" target="_blank" rel="noopener noreferrer">
                 {{ label }}
               </a>
             </li>
@@ -114,11 +103,7 @@ PAGE_TEMPLATE = Template(
         </ul>
       </div>
 
-      <button
-        id="theme-toggle"
-        class="btn btn-sm btn-outline-secondary"
-        type="button"
-        aria-label="Toggle theme">
+      <button id="theme-toggle" class="btn btn-sm btn-outline-secondary" type="button">
         🌙
       </button>
     </div>
@@ -146,16 +131,22 @@ PAGE_TEMPLATE = Template(
   </div>
 </main>
 
+<!-- Footer -->
+<footer class="border-top mt-5">
+  <div class="container-xxl py-4 text-center small text-secondary">
+    © <span id="year"></span> Copyright Omar AbedelKader
+  </div>
+</footer>
+
+<script>
+  document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+
 <!-- Scroll to top button -->
-<button
-  id="scroll-top"
-  class="btn btn-primary scroll-top"
-  type="button"
-  aria-label="Scroll to top">
+<button id="scroll-top" class="btn btn-primary scroll-top" type="button">
   ↑
 </button>
 
-<!-- Bootstrap JS bundle needed for dropdown -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ asset_prefix }}/js.js"></script>
 </body>
