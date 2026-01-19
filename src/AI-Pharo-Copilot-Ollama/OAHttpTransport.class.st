@@ -152,8 +152,17 @@ OAHttpTransport >> port: anObject [
 OAHttpTransport >> postJsonAt: aPath body: aDictionary [
 	"Perform a POST request on the given path with the given object as JSON body, answering the decoded JSON response."
 
+	^ self postJsonAt: aPath body: aDictionary timeoutSeconds: nil
+]
+
+{ #category : 'requests' }
+OAHttpTransport >> postJsonAt: aPath body: aDictionary timeoutSeconds: timeoutSeconds [
+	"Perform a POST request with an optional timeout override."
+
 	| client |
 	client := self newJsonClientForPath: aPath.
+	(timeoutSeconds notNil and: [ client respondsTo: #timeout: ])
+		ifTrue: [ client timeout: timeoutSeconds ].
 	client contents: aDictionary.
 	^ client post
 ]

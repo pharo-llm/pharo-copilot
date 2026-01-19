@@ -354,9 +354,17 @@ OllamaClient >> prependContext: contextString toPrompt: promptString [
 OllamaClient >> pullModelNamed: aString [
 	"Request Ollama to pull/install the given model name."
 
+	^ self pullModelNamed: aString timeoutSeconds: CopilotSettings modelInstallTimeoutSeconds
+]
+
+{ #category : 'ollama' }
+OllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds [ 
+	"Request Ollama to pull/install the given model name with a timeout override."
+
 	| payload response |
 	payload := Dictionary new
 		at: #name put: aString;
+		at: #stream put: false;
 		yourself.
 
 	CoCopilotLogger
@@ -366,8 +374,9 @@ OllamaClient >> pullModelNamed: aString [
 			at: #model put: aString;
 			at: #payload put: payload;
 			yourself).
-
-	response := transport postJsonAt: 'api/pull' body: payload.
+			
+		
+response := transport postJsonAt: 'api/pull' body: payload timeoutSeconds: timeoutSeconds.
 
 	CoCopilotLogger
 		logBackEndEvent: 'Ollama model install request acknowledged'

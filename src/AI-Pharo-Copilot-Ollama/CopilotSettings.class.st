@@ -21,7 +21,8 @@ Class {
 		'templatesDirectory',
 		'completionDebounceMilliseconds',
 		'completionIdleMilliseconds',
-		'requestTimeoutSeconds'
+		'requestTimeoutSeconds',
+		'modelInstallTimeoutSeconds'
 	],
 	#category : 'AI-Pharo-Copilot-Ollama',
 	#package : 'AI-Pharo-Copilot-Ollama'
@@ -379,31 +380,67 @@ CopilotSettings class >> installModelNamed: aModelName [
 	[
 		client := self newOllamaClient.
 
-		self notifyUser: ('Downloading... This may take a few minutes.' format: { aModelName }).
-		CoCopilotLogger
-			logBackEndEvent: 'Invoking Ollama model install script'
-			details: (Dictionary new
-				at: #model put: aModelName;
-				yourself).
+		self notifyUser: ('Downloading {1}... This may take a few minutes.' format: { aModelName }).
+		CoCopilotLogger logBackEndEvent: 'Invoking Ollama model install script' details: (Dictionary new
+				 at: #model put: aModelName;
+				 yourself).
 
-		client pullModelNamed: aModelName.
+		client pullModelNamed: aModelName timeoutSeconds: self modelInstallTimeoutSeconds.
 
-		CoCopilotLogger
-			logBackEndEvent: 'Ollama model install script completed'
-			details: (Dictionary new
-				at: #model put: aModelName;
-				yourself).
-		^ true
-	] on: Error do: [ :ex |
-		CoCopilotLogger
-			logError: 'Failed to invoke Ollama model install script'
-			origin: #CopilotSettings
-			exception: ex
-			payload: (Dictionary new
-				at: #model put: aModelName;
-				yourself).
+		CoCopilotLogger logBackEndEvent: 'Ollama model install script completed' details: (Dictionary new
+				 at: #model put: aModelName;
+				 yourself).
+				self notifyUser: ('Download completed for {1}.' format: { aModelName }).
+		^ true ]
+		on: Error
+		do: [ :ex |
+				CoCopilotLogger
+					logError: 'Failed to invoke Ollama model install script'
+					origin: #CopilotSettings
+					exception: ex
+					payload: (Dictionary new
+							 at: #model put: aModelName;
+							 yourself).
+							self notifyUser: ('Failed to download {1}. Please check Ollama logs.' format: { aModelName }).
+				^ false ]
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> installSelectedModelNow [
+	"Install the currently selected model via Ollama pull."
+
+	| selectedModelName response |
+	selectedModelName := self modelName.
+	(selectedModelName isNil or: [ selectedModelName isEmpty ]) ifTrue: [
+		self notifyUser: 'Please select an Ollama model before installing.'.
 		^ false
-	]
+	].
+
+	response := self ensureOllamaServiceAvailable.
+	response ifNil: [ ^ self handleMissingOllamaForModelNamed: selectedModelName ].
+
+	(self installModelNamed: selectedModelName) ifFalse: [ ^ false ].
+
+	(self refreshModelsAfterInstallOf: selectedModelName usingInitialResponse: response)
+		ifTrue: [ ^ true ].
+
+	self notifyUser:
+		'Model download is still in progress. Please wait and refresh the model list.'.
+	^ false
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> installSelectedModelNowSetting [
+	"Settings UI helper: always unchecked."
+
+	^ false
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> installSelectedModelNowSetting: aBoolean [
+	"Trigger a model pull from the settings UI when checked."
+
+	aBoolean ifTrue: [ self installSelectedModelNow ]
 ]
 
 { #category : 'accessing' }
@@ -645,6 +682,20 @@ CopilotSettings class >> metadataStringForKey: aKey default: defaultString [
 	].
 
 	^ self metadataJsonStringFor: value default: defaultString
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> modelInstallTimeoutSeconds [
+	"Answer the timeout (seconds) for Ollama model pulls."
+
+	^ modelInstallTimeoutSeconds ifNil: [ modelInstallTimeoutSeconds := 600 ]
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> modelInstallTimeoutSeconds: anObject [
+	"Set the timeout (seconds) for Ollama model pulls."
+
+	modelInstallTimeoutSeconds := self normalizedDuration: anObject default: 600 minimum: 30 maximum: 3600
 ]
 
 { #category : 'accessing' }
@@ -1024,7 +1075,8 @@ CopilotSettings class >> resetToDefaultSettings [
 	templatesDirectory := nil.
 	completionDebounceMilliseconds := nil.
 	completionIdleMilliseconds := nil.
-	requestTimeoutSeconds := nil
+	requestTimeoutSeconds := nil.
+	modelInstallTimeoutSeconds := nil.
 ]
 
 { #category : 'accessing' }
@@ -1038,12 +1090,21 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	port := aDictionary at: #port ifAbsent: [ aDictionary at: #Port ifAbsent: [ nil ] ].
 	modelMetadata := aDictionary at: #modelMetadata ifAbsent: [ aDictionary at: #ModelMetadata ifAbsent: [ nil ] ].
 	ollamaClientFactory := aDictionary at: #ollamaClientFactory ifAbsent: [ aDictionary at: #OllamaClientFactory ifAbsent: [ nil ] ].
-	autoInstallModelScriptEnabled := aDictionary at: #autoInstallModelScriptEnabled ifAbsent: [ aDictionary at: #AutoInstallModelScriptEnabled ifAbsent: [ nil ] ].
+	autoInstallModelScriptEnabled := aDictionary
+		                                 at: #autoInstallModelScriptEnabled
+		                                 ifAbsent: [ aDictionary at: #AutoInstallModelScriptEnabled ifAbsent: [ nil ] ].
 	loggingEnabled := aDictionary at: #loggingEnabled ifAbsent: [ aDictionary at: #LoggingEnabled ifAbsent: [ nil ] ].
 	templatesDirectory := aDictionary at: #templatesDirectory ifAbsent: [ aDictionary at: #TemplatesDirectory ifAbsent: [ nil ] ].
-		completionDebounceMilliseconds := aDictionary at: #completionDebounceMilliseconds ifAbsent: [ aDictionary at: #CompletionDebounceMilliseconds ifAbsent: [ nil ] ].
-	completionIdleMilliseconds := aDictionary at: #completionIdleMilliseconds ifAbsent: [ aDictionary at: #CompletionIdleMilliseconds ifAbsent: [ nil ] ].
-	requestTimeoutSeconds := aDictionary at: #requestTimeoutSeconds ifAbsent: [ aDictionary at: #RequestTimeoutSeconds ifAbsent: [ nil ] ].
+	completionDebounceMilliseconds := aDictionary
+		                                  at: #completionDebounceMilliseconds
+		                                  ifAbsent: [ aDictionary at: #CompletionDebounceMilliseconds ifAbsent: [ nil ] ].
+	completionIdleMilliseconds := aDictionary
+		                              at: #completionIdleMilliseconds
+		                              ifAbsent: [ aDictionary at: #CompletionIdleMilliseconds ifAbsent: [ nil ] ].
+	requestTimeoutSeconds := aDictionary
+		                         at: #requestTimeoutSeconds
+		                         ifAbsent: [ aDictionary at: #RequestTimeoutSeconds ifAbsent: [ nil ] ].
+		modelInstallTimeoutSeconds := aDictionary at: #modelInstallTimeoutSeconds ifAbsent: [ aDictionary at: #ModelInstallTimeoutSeconds ifAbsent: [ nil ] ].
 ]
 
 { #category : 'accessing' }
@@ -1080,7 +1141,6 @@ CopilotSettings class >> settingsOn: aBuilder [
 	"Register Copilot settings in the system settings UI."
 
 	<systemsettings>
-
 	(aBuilder setting: #CopilotSettings)
 		target: self;
 		parentName: #codeBrowsing;
@@ -1090,83 +1150,100 @@ CopilotSettings class >> settingsOn: aBuilder [
 		label: 'Copilot';
 		description: 'Configure Pharo Copilot AI completion settings.';
 		with: [
-			(aBuilder pickOne: #provider)
-				order: -1;
-				label: 'Provider';
-				target: self;
-				getSelector: #copilotProvider;
-				setSelector: #copilotProvider:;
-				domainValues: self availableProviders.
+				(aBuilder pickOne: #provider)
+					order: -1;
+					label: 'Provider';
+					target: self;
+					getSelector: #copilotProvider;
+					setSelector: #copilotProvider:;
+					domainValues: self availableProviders.
 
-			(aBuilder pickOne: #modelName)
-				label: 'Model';
-				target: self;
-				getSelector: #modelName;
-				setSelector: #modelName:;
-				default: self modelName;
-				domainValues: self availableModelNames.
+				(aBuilder pickOne: #modelName)
+					label: 'Model';
+					target: self;
+					getSelector: #modelName;
+					setSelector: #modelName:;
+					default: self modelName;
+					domainValues: self availableModelNames.
 
-			(aBuilder setting: #loggingEnabled)
-				order: 0.3;
-				label: 'Enable logging';
-				target: self;
-				getSelector: #loggingEnabled;
-				setSelector: #loggingEnabled:;
-				default: self loggingEnabled;
-				description: 'When disabled, Copilot will not record activity or evaluation logs.'.
+				(aBuilder setting: #loggingEnabled)
+					order: 0.3;
+					label: 'Enable logging';
+					target: self;
+					getSelector: #loggingEnabled;
+					setSelector: #loggingEnabled:;
+					default: self loggingEnabled;
+					description: 'When disabled, Copilot will not record activity or evaluation logs.'.
 
-			(aBuilder setting: #autoInstallModelScriptEnabled)
-				order: 0.4;
-				label: 'Auto-install Pharo coder model';
-				target: self;
-				getSelector: #autoInstallModelScriptEnabled;
-				setSelector: #autoInstallModelScriptEnabled:;
-				default: self autoInstallModelScriptEnabled;
-				description: 'When enabled, Pharo Copilot automatically runs the installation script if the "pharo-coder-1.5b-fim-f16.gguf:latest" model is missing.'.
+				(aBuilder setting: #autoInstallModelScriptEnabled)
+					order: 0.4;
+					label: 'Auto-install Pharo coder model';
+					target: self;
+					getSelector: #autoInstallModelScriptEnabled;
+					setSelector: #autoInstallModelScriptEnabled:;
+					default: self autoInstallModelScriptEnabled;
+					description:
+						'When enabled, Pharo Copilot automatically runs the installation script if the "pharo-coder-1.5b-fim-f16.gguf:latest" model is missing.'.
+						
+				(aBuilder setting: #installSelectedModelNowSetting)
+					order: 0.45;
+					label: 'Install selected model now';
+					target: self;
+					getSelector: #installSelectedModelNowSetting;
+					setSelector: #installSelectedModelNowSetting:;
+					description: 'Manually pull the currently selected Ollama model.'.
 
-(aBuilder setting: #completionDebounceMilliseconds)
-				order: 0.5;
-				label: 'Completion debounce (ms)';
-				target: self;
-				getSelector: #completionDebounceMilliseconds;
-				setSelector: #completionDebounceMilliseconds:;
-				default: self completionDebounceMilliseconds;
-				description: 'Milliseconds to wait after a boundary before requesting completions (1-60000).'.
+				(aBuilder setting: #completionDebounceMilliseconds)
+					order: 0.5;
+					label: 'Completion debounce (ms)';
+					target: self;
+					getSelector: #completionDebounceMilliseconds;
+					setSelector: #completionDebounceMilliseconds:;
+					default: self completionDebounceMilliseconds;
+					description: 'Milliseconds to wait after a boundary before requesting completions (1-60000).'.
 
-			(aBuilder setting: #completionIdleMilliseconds)
-				order: 0.6;
-				label: 'Completion idle (ms)';
-				target: self;
-				getSelector: #completionIdleMilliseconds;
-				setSelector: #completionIdleMilliseconds:;
-				default: self completionIdleMilliseconds;
-				description: 'Milliseconds to wait after typing stops before requesting completions (1-60000).'.
+				(aBuilder setting: #completionIdleMilliseconds)
+					order: 0.6;
+					label: 'Completion idle (ms)';
+					target: self;
+					getSelector: #completionIdleMilliseconds;
+					setSelector: #completionIdleMilliseconds:;
+					default: self completionIdleMilliseconds;
+					description: 'Milliseconds to wait after typing stops before requesting completions (1-60000).'.
 
-			(aBuilder setting: #requestTimeoutSeconds)
-				order: 0.7;
-				label: 'Request timeout (sec)';
+				(aBuilder setting: #requestTimeoutSeconds)
+					order: 0.7;
+					label: 'Request timeout (sec)';
+					target: self;
+					getSelector: #requestTimeoutSeconds;
+					setSelector: #requestTimeoutSeconds:;
+					default: self requestTimeoutSeconds;
+					description: 'Seconds to wait for Ollama responses before timing out (1-120).'.
+			
+						(aBuilder setting: #modelInstallTimeoutSeconds)
+				order: 0.75;
+				label: 'Model install timeout (sec)';
 				target: self;
-				getSelector: #requestTimeoutSeconds;
-				setSelector: #requestTimeoutSeconds:;
-				default: self requestTimeoutSeconds;
-				description: 'Seconds to wait for Ollama responses before timing out (1-120).'.
+				getSelector: #modelInstallTimeoutSeconds;
+				setSelector: #modelInstallTimeoutSeconds:;
+				default: self modelInstallTimeoutSeconds;
+				description: 'Seconds to wait for Ollama model downloads before timing out (30-3600).'.
 
-			(aBuilder setting: #host)
-				order: 1;
-				label: 'Server host';
-				target: self;
-				getSelector: #host;
-				setSelector: #host:;
-				default: self host.
+				(aBuilder setting: #host)
+					order: 1;
+					label: 'Server host';
+					target: self;
+					getSelector: #host;
+					setSelector: #host:;
+					default: self host.
 
-			(aBuilder setting: #port)
-				order: 2;
-				label: 'Server port';
-				target: self;
-				getSelector: #port;
-				setSelector: #port:;
-				default: self port
-		]
+				(aBuilder setting: #port)
+					order: 2;
+					label: 'Server port';
+					target: self;
+					getSelector: #port;
+					setSelector: #port:;
+					default: self port ]
 ]
 
 { #category : 'accessing' }
@@ -1184,9 +1261,10 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #autoInstallModelScriptEnabled put: autoInstallModelScriptEnabled;
 		  at: #loggingEnabled put: loggingEnabled;
 		  at: #templatesDirectory put: templatesDirectory;
-				at: #completionDebounceMilliseconds put: completionDebounceMilliseconds;
-		at: #completionIdleMilliseconds put: completionIdleMilliseconds;
-		at: #requestTimeoutSeconds put: requestTimeoutSeconds;
+		  at: #completionDebounceMilliseconds put: completionDebounceMilliseconds;
+		  at: #completionIdleMilliseconds put: completionIdleMilliseconds;
+		  at: #requestTimeoutSeconds put: requestTimeoutSeconds;
+		at: #modelInstallTimeoutSeconds put: modelInstallTimeoutSeconds;
 		  yourself
 ]
 
