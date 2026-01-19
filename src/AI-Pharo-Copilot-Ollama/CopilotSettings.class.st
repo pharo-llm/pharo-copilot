@@ -216,26 +216,23 @@ CopilotSettings class >> ensureSelectedModelAvailable [
 	(self isNullModelName: selectedModelName) ifTrue: [ ^ true ].
 
 	response := self ensureOllamaServiceAvailable.
-	response ifNil: [ ^ false ].
+	response ifNil: [ ^ self handleMissingOllamaForModelNamed: selectedModelName ].
 
 	availableModels := self modelNamesFromResponse: response.
 	self logValidatedModelAvailability: selectedModelName availableModels: availableModels.
 
 	(availableModels includes: selectedModelName) ifTrue: [ ^ true ].
-	(self autoInstallModelScriptEnabled) ifFalse: [ ^ false ].
+	self autoInstallModelScriptEnabled ifFalse: [ ^ false ].
 
 	(self attemptAutoInstallForModelNamed: selectedModelName usingInitialResponse: response) ifTrue: [ ^ true ].
 
-	(self promptToInstallMissingModelNamed: selectedModelName availableModels: availableModels)
-		ifTrue: [
-			(self performInstallOfModelNamed: selectedModelName usingInitialResponse: response)
-				ifTrue: [ ^ true ]
-		].
+	(self promptToInstallMissingModelNamed: selectedModelName availableModels: availableModels) ifTrue: [
+		(self performInstallOfModelNamed: selectedModelName usingInitialResponse: response) ifTrue: [ ^ true ] ].
 
 	self logMissingModel: selectedModelName availableModels: availableModels.
 	self notifyUser:
 		('We could not find this model in your Ollama installation. If you recently requested its installation, please wait while it completes.'
-			format: { selectedModelName }).
+			 format: { selectedModelName }).
 	^ false
 ]
 
@@ -341,6 +338,19 @@ CopilotSettings class >> fimTemplateFromFile: aFileReference [
 	contents isEmpty ifTrue: [ ^ nil ].
 
 	^ contents
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> handleMissingOllamaForModelNamed: selectedModelName [
+
+	"Handle cases where the Ollama service is missing; attempt install or fall back to the null model."
+
+	(self promptToInstallMissingModelNamed: selectedModelName availableModels: #())
+		ifTrue: [
+			(self installModelNamed: selectedModelName) ifTrue: [ ^ true ] ].
+
+	self switchToNullModelDueToMissingOllamaFor: selectedModelName.
+	^ self isNullModelName: self modelName
 ]
 
 { #category : 'accessing' }
@@ -1221,6 +1231,21 @@ CopilotSettings class >> showInstallCompletionDialog [
 		(transcript respondsTo: #show:)
 			ifTrue: [ transcript show: message; cr ]
 	]
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> switchToNullModelDueToMissingOllamaFor: selectedModelName [
+	"Fall back to the null model when Ollama is unavailable and the user declines installation."
+
+	CoCopilotLogger
+		logBackEndEvent: 'Falling back to null model due to missing Ollama'
+		details: (Dictionary new
+			at: #model put: selectedModelName;
+			at: #nullModel put: self nullModelFullName;
+			yourself).
+
+	self modelName: self nullModelFullName.
+	self notifyUser: 'Ollama is not available. Pharo Copilot will use the null model until you configure an Ollama model.'
 ]
 
 { #category : 'accessing' }
