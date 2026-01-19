@@ -385,12 +385,14 @@ CopilotSettings class >> installModelNamed: aModelName [
 				 at: #model put: aModelName;
 				 yourself).
 
-		client pullModelNamed: aModelName timeoutSeconds: self modelInstallTimeoutSeconds.
+			(client respondsTo: #pullModelNamed:timeoutSeconds:)
+			ifTrue: [ client pullModelNamed: aModelName timeoutSeconds: self modelInstallTimeoutSeconds ]
+			ifFalse: [ client pullModelNamed: aModelName ].
 
 		CoCopilotLogger logBackEndEvent: 'Ollama model install script completed' details: (Dictionary new
 				 at: #model put: aModelName;
 				 yourself).
-				self notifyUser: ('Download completed for {1}.' format: { aModelName }).
+		self notifyUser: ('Download completed for {1}.' format: { aModelName }).
 		^ true ]
 		on: Error
 		do: [ :ex |
@@ -401,7 +403,7 @@ CopilotSettings class >> installModelNamed: aModelName [
 					payload: (Dictionary new
 							 at: #model put: aModelName;
 							 yourself).
-							self notifyUser: ('Failed to download {1}. Please check Ollama logs.' format: { aModelName }).
+				self notifyUser: ('Failed to download {1}. Please check Ollama logs.' format: { aModelName }).
 				^ false ]
 ]
 
