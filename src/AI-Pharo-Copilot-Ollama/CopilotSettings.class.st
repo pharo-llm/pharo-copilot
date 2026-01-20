@@ -791,6 +791,16 @@ CopilotSettings class >> modelSystemPrompt: ignored [
 	"Ignore attempts to set read-only metadata from the settings UI."
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> modelSystemPromptIfAvailable [
+	"Answer the system prompt if one is provided by the model, otherwise answer an empty string."
+
+	| prompt |
+	prompt := self modelSystemPrompt.
+	(prompt isNil or: [ prompt isEmpty or: [ prompt = 'Not provided by model.' ] ]) ifTrue: [ ^ '' ].
+	^ prompt
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> modelTemplate [
 	"Answer the model template metadata string."
