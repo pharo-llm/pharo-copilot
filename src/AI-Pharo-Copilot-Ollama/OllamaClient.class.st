@@ -106,50 +106,43 @@ OllamaClient >> generate: aPromptString [
 
 	| payload response normalized |
 	self isNullModel ifTrue: [
-		CoCopilotLogger
-			logBackEndEvent: 'Null model responded to completion request'
-			details: (Dictionary new
-				at: #modelFullName put: (modelSpec
-					ifNil: [ self class nullModelFullName ]
-					ifNotNil: [ modelSpec fullName ]);
-				yourself).
-		^ self class nullModelResponseString ].
+			CoCopilotLogger logBackEndEvent: 'Null model responded to completion request' details: (Dictionary new
+					 at: #modelFullName put: (modelSpec ifNil: [ self class nullModelFullName ] ifNotNil: [ modelSpec fullName ]);
+					 yourself).
+			^ self class nullModelResponseString ].
 
 	payload := Dictionary new
-		at: #model put: modelSpec fullName;
-		at: #prompt put: aPromptString;
-		at: #stream put: stream;
-		yourself.
+		           at: #model put: modelSpec fullName;
+		           at: #prompt put: aPromptString;
+		           at: #stream put: stream;
+		           yourself.
 
 	format ifNotNil: [ payload at: #format put: format ].
 	(options notNil and: [ options isEmpty not ]) ifTrue: [ payload at: #options put: options ].
 
-	CoCopilotLogger
-		logBackEndEvent: 'Dispatching generate request'
-		details: (Dictionary new
-			at: #endpoint put: 'api/generate';
-			at: #modelFullName put: modelSpec fullName;
-			at: #payload put: payload;
-			at: #optionsSnapshot put: options copy;
-			yourself).
+	self haltOnce.
+	CoCopilotLogger logBackEndEvent: 'Dispatching generate request' details: (Dictionary new
+			 at: #endpoint put: 'api/generate';
+			 at: #modelFullName put: modelSpec fullName;
+			 at: #payload put: payload;
+			 at: #optionsSnapshot put: options copy;
+			 yourself).
 
 	response := transport postJsonAt: 'api/generate' body: payload.
 
-	CoCopilotLogger
-		logBackEndEvent: 'Received generate response'
-		details: (Dictionary new
-			at: #responseClass put: (response ifNil: [ 'nil' ] ifNotNil: [ response class name ]);
-			at: #rawResponse put: ([ response asString ] on: Error do: [ response printString ]);
-			yourself).
+	CoCopilotLogger logBackEndEvent: 'Received generate response' details: (Dictionary new
+			 at: #responseClass put: (response ifNil: [ 'nil' ] ifNotNil: [ response class name ]);
+			 at: #rawResponse put: ([ response asString ]
+					  on: Error
+					  do: [ response printString ]);
+			 yourself).
 
 	normalized := self normalizeResponse: response.
 
-	CoCopilotLogger
-		logBackEndEvent: 'Normalized generate response'
-		details: (Dictionary new
-			at: #normalizedResponse put: normalized;
-			at: #normalizedLength put: normalized size;
-			yourself).
+	CoCopilotLogger logBackEndEvent: 'Normalized generate response' details: (Dictionary new
+			 at: #normalizedResponse put: normalized;
+			 at: #normalizedLength put: normalized size;
+			 yourself).
 
 	^ normalized
 ]
@@ -158,44 +151,37 @@ OllamaClient >> generate: aPromptString [
 OllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
 	"Generate a fill-in-the-middle completion by expanding the configured FIM template."
 
-	| prompt originalOptions response |
-	CoCopilotLogger
-		logBackEndEvent: 'Preparing fill-in-the-middle request'
-		details: (Dictionary new
-			at: #prefix put: prefixString;
-			at: #suffix put: suffixString;
-			at: #contextBytes put: contextString size;
-			at: #template put: CopilotSettings fimTemplate;
-			at: #optionsBefore put: options copy;
-			yourself).
+		| prompt originalOptions response combinedContext |
+	combinedContext := self systemPromptPrefixedContextFor: contextString.
+	CoCopilotLogger logBackEndEvent: 'Preparing fill-in-the-middle request' details: (Dictionary new
+			 at: #prefix put: prefixString;
+			 at: #suffix put: suffixString;
+			 at: #contextBytes put: combinedContext size;
+			 at: #template put: CopilotSettings fimTemplate;
+			 at: #optionsBefore put: options copy;
+			 yourself).
 
 	prompt := self
-		expandFimTemplate: CopilotSettings fimTemplate
-		prefix: prefixString
-		suffix: suffixString
-		context: contextString.
+		          expandFimTemplate: CopilotSettings fimTemplate
+		          prefix: prefixString
+		          suffix: suffixString
+		          context: combinedContext.
 
-	CoCopilotLogger
-		logBackEndEvent: 'Expanded fill-in-the-middle template'
-		details: (Dictionary new
-			at: #prompt put: prompt;
-			yourself).
+	CoCopilotLogger logBackEndEvent: 'Expanded fill-in-the-middle template' details: (Dictionary new
+			 at: #prompt put: prompt;
+			 yourself).
 
 	originalOptions := options copy.
-	[	self optionAt: #task put: 'fill-in-the-middle'.
-		CoCopilotLogger
-			logBackEndEvent: 'Augmented Ollama options for fill-in-the-middle'
-			details: (Dictionary new
-				at: #optionsAfter put: options copy;
-				yourself).
-		response := self generate: prompt
-	] ensure: [
-		options := originalOptions.
-		CoCopilotLogger
-			logBackEndEvent: 'Restored Ollama options after fill-in-the-middle'
-			details: (Dictionary new
-				at: #optionsRestored put: options copy;
-				yourself) ].
+	[
+		self optionAt: #task put: 'fill-in-the-middle'.
+		CoCopilotLogger logBackEndEvent: 'Augmented Ollama options for fill-in-the-middle' details: (Dictionary new
+				 at: #optionsAfter put: options copy;
+				 yourself).
+		response := self generate: prompt ] ensure: [
+			options := originalOptions.
+			CoCopilotLogger logBackEndEvent: 'Restored Ollama options after fill-in-the-middle' details: (Dictionary new
+					 at: #optionsRestored put: options copy;
+					 yourself) ].
 
 	^ response
 ]
@@ -414,6 +400,28 @@ OllamaClient >> showModelNamed: aModelFullName [
 			yourself).
 
 	^ response
+]
+
+{ #category : 'generation-operations' }
+OllamaClient >> systemPromptPrefixedContextFor: contextString [
+	"Combine the model system prompt with the provided context, if available."
+
+	| systemPrompt safeContext |
+	systemPrompt := CopilotSettings modelSystemPromptIfAvailable.
+	safeContext := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
+
+	(systemPrompt isEmpty and: [ safeContext isEmpty ]) ifTrue: [ ^ safeContext ].
+
+	^ String streamContents: [ :stream |
+		systemPrompt isEmpty ifFalse: [
+			stream
+				nextPutAll: 'System Prompt:';
+				cr;
+				nextPutAll: systemPrompt;
+				cr;
+				cr ].
+		safeContext isEmpty ifFalse: [
+			stream nextPutAll: safeContext ] ]
 ]
 
 { #category : 'model-operations' }

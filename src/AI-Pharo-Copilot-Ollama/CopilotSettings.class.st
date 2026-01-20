@@ -791,6 +791,16 @@ CopilotSettings class >> modelSystemPrompt: ignored [
 	"Ignore attempts to set read-only metadata from the settings UI."
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> modelSystemPromptIfAvailable [
+	"Answer the system prompt if one is provided by the model, otherwise answer an empty string."
+
+	| prompt |
+	prompt := self modelSystemPrompt.
+	(prompt isNil or: [ prompt isEmpty or: [ prompt = 'Not provided by model.' ] ]) ifTrue: [ ^ '' ].
+	^ prompt
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> modelTemplate [
 	"Answer the model template metadata string."
@@ -1186,7 +1196,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					default: self autoInstallModelScriptEnabled;
 					description:
 						'When enabled, Pharo Copilot automatically runs the installation script if the "pharo-coder-1.5b-fim-f16.gguf:latest" model is missing.'.
-						
+
 				(aBuilder setting: #installSelectedModelNowSetting)
 					order: 0.45;
 					label: 'Install selected model now';
@@ -1213,6 +1223,17 @@ CopilotSettings class >> settingsOn: aBuilder [
 					default: self completionIdleMilliseconds;
 					description: 'Milliseconds to wait after typing stops before requesting completions (1-60000).'.
 
+				(aBuilder pickOne: #contextMode)
+					order: 0.65;
+					label: 'Context mode';
+					target: CopilotContextSettings;
+					getSelector: #mode;
+					setSelector: #mode:;
+					default: CopilotContextSettings mode;
+					domainValues: CopilotContextSettings availableModes;
+					description: 'Controls whether completions use full source or selectors-only class context.'.
+
+
 				(aBuilder setting: #requestTimeoutSeconds)
 					order: 0.7;
 					label: 'Request timeout (sec)';
@@ -1221,15 +1242,15 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #requestTimeoutSeconds:;
 					default: self requestTimeoutSeconds;
 					description: 'Seconds to wait for Ollama responses before timing out (1-120).'.
-			
-						(aBuilder setting: #modelInstallTimeoutSeconds)
-				order: 0.75;
-				label: 'Model install timeout (sec)';
-				target: self;
-				getSelector: #modelInstallTimeoutSeconds;
-				setSelector: #modelInstallTimeoutSeconds:;
-				default: self modelInstallTimeoutSeconds;
-				description: 'Seconds to wait for Ollama model downloads before timing out (30-3600).'.
+
+				(aBuilder setting: #modelInstallTimeoutSeconds)
+					order: 0.75;
+					label: 'Model install timeout (sec)';
+					target: self;
+					getSelector: #modelInstallTimeoutSeconds;
+					setSelector: #modelInstallTimeoutSeconds:;
+					default: self modelInstallTimeoutSeconds;
+					description: 'Seconds to wait for Ollama model downloads before timing out (30-3600).'.
 
 				(aBuilder setting: #host)
 					order: 1;

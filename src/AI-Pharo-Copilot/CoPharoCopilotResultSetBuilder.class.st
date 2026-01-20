@@ -98,10 +98,9 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 ]
 
 { #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> classContextFor: aContext [
-	"Cached + limited class context."
-	| behavior compiledMethod methodClass selector stamp cached classDefinition instanceSide classSide context |
+CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString [ 
 
+	| behavior compiledMethod methodClass selector stamp cached builder context classDefinition instanceSide classSide |
 	behavior := (aContext respondsTo: #behavior)
 		ifTrue: [ [ aContext behavior ] on: Error do: [ nil ] ]
 		ifFalse: [ nil ].
@@ -122,6 +121,16 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext [
 	cached := classContextCache at: methodClass ifAbsent: [ nil ].
 	(cached notNil and: [ (cached at: #stamp ifAbsent: [ #(0 0) ]) = stamp ]) ifTrue: [
 		^ cached at: #context ifAbsent: [ '' ]
+	].
+
+	builder := selector ifNotNil: [ CopilotContextFactory forSelector: selector ].
+	builder ifNotNil: [
+		context := builder buildForFIMWithPrefix: prefixString.
+		classContextCache at: methodClass put: (Dictionary new
+			at: #stamp put: stamp;
+			at: #context put: context;
+			yourself).
+		^ context
 	].
 
 	classDefinition := self safeDefinitionStringFor: methodClass.
@@ -534,7 +543,7 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 		CoCopilotLogger logFrontEndEvent: 'Preparing completion request' details: contextInfo.
 
 		client := OllamaClient new.
-		classContext := self classContextFor: aContext.
+		classContext := self classContextFor: aContext prefix: prefixString.
 
 		contextInfo
 			at: #classContextLength put: classContext size;
