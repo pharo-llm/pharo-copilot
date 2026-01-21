@@ -100,20 +100,13 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString [ 
 
-	| behavior compiledMethod methodClass selector stamp cached builder context classDefinition instanceSide classSide |
-	behavior := (aContext respondsTo: #behavior)
-		ifTrue: [ [ aContext behavior ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ].
-
-	compiledMethod := (aContext respondsTo: #method)
-		ifTrue: [ [ aContext method ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ].
-
-	methodClass := behavior
-		ifNil: [ compiledMethod ifNotNil: [ compiledMethod methodClass ] ]
-		ifNotNil: [ behavior ].
-
-	selector := compiledMethod ifNotNil: [ compiledMethod selector ].
+	| behavior extractor ast compiledMethod methodClass selector stamp cached builder context classDefinition instanceSide classSide |
+	behavior := aContext completionClass.
+	extractor := CNSelectorExtractor new.
+	ast := OCParser parseFaultyMethod: prefixString.
+	selector := extractor extractSelectorFromAST: ast atPosition: 1.
+	compiledMethod := behavior compiledMethodAt: selector.
+	methodClass := compiledMethod methodClass.
 
 	classContextCache ifNil: [ classContextCache := Dictionary new ].
 
@@ -548,6 +541,8 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 		contextInfo
 			at: #classContextLength put: classContext size;
 			at: #classContextPresent put: classContext isEmpty not.
+			
+		self haltOnce.
 
 		rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
 
