@@ -423,6 +423,12 @@ OllamaClient >> systemPromptPrefixedContextFor: contextString [
 			stream nextPutAll: safeContext ] ]
 ]
 
+{ #category : 'accessing' }
+OllamaClient >> transport [
+
+	^ transport
+]
+
 { #category : 'model-operations' }
 OllamaClient >> useDefaultModel [
 	"Switch to the default model as defined on the class side."

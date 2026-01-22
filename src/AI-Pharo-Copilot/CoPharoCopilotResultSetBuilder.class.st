@@ -461,19 +461,51 @@ CoPharoCopilotResultSetBuilder >> menuClosed [
 CoPharoCopilotResultSetBuilder >> menuPositionFor: aContext [
 	"Calculate the position where the menu should appear, near the cursor."
 
-	| editor morph cursorRect |
+	| editor textArea position charBlock worldOrigin |
 	[ editor := aContext editor ] on: Error do: [ ^ 0 @ 0 ].
 	editor ifNil: [ ^ 0 @ 0 ].
 
-	[ morph := editor morph ] on: Error do: [ ^ 0 @ 0 ].
-	morph ifNil: [ ^ 0 @ 0 ].
+	"Get the text area (try textArea first, then morph)"
+	textArea := [ editor textArea ] on: Error do: [ nil ].
+	textArea ifNil: [
+		textArea := [ editor morph ] on: Error do: [ nil ].
+		textArea ifNil: [ ^ 0 @ 0 ]
+	].
 
-	"Try to get cursor rectangle"
-	cursorRect := [ editor selectionPosition: '' ] on: Error do: [ nil ].
-	cursorRect ifNotNil: [ ^ cursorRect bottomLeft ].
+	"Get the cursor text position from context or editor"
+	position := [ aContext position ] on: Error do: [ nil ].
+	position ifNil: [
+		position := [ editor caret ] on: Error do: [ 1 ]
+	].
+	position ifNil: [ position := 1 ].
 
-	"Fallback: use morph position"
-	^ morph boundsInWorld bottomLeft
+	"Try to get character block at cursor position for precise positioning"
+	[
+		| paragraph |
+		paragraph := textArea paragraph.
+		paragraph ifNotNil: [
+			charBlock := paragraph characterBlockAtIndex: position.
+			charBlock ifNotNil: [
+				worldOrigin := textArea boundsInWorld origin.
+				^ worldOrigin + charBlock bottomLeft
+			]
+		]
+	] on: Error do: [ "fall through to fallback" ].
+
+	"Try cursor bounds if available (Rubric text areas)"
+	[
+		| cursor cursorBounds |
+		cursor := textArea cursor.
+		cursor ifNotNil: [
+			cursorBounds := cursor bounds.
+			cursorBounds ifNotNil: [
+				^ (textArea localPointToGlobal: cursorBounds bottomLeft)
+			]
+		]
+	] on: Error do: [ "fall through to fallback" ].
+
+	"Fallback: use text area position"
+	^ textArea boundsInWorld bottomLeft
 ]
 
 { #category : 'initialization' }
