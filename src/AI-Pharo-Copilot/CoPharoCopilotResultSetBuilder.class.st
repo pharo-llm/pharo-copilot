@@ -118,11 +118,21 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 			(aContext respondsTo: #behavior)
 				ifTrue: [ aContext behavior ]
 				ifFalse: [ nil ] ].
+	behavior ifNil: [ ^ '' ].
+	"behavior := aContext completionClass."
 	extractor := CNSelectorExtractor new.
 	ast := OCParser parseFaultyMethod: prefixString.
 	selector := extractor extractSelectorFromAST: ast atPosition: 1.
-	compiledMethod := behavior compiledMethodAt: selector.
-	methodClass := compiledMethod methodClass.
+	"compiledMethod := behavior compiledMethodAt: selector.
+	methodClass := compiledMethod methodClass."
+	
+		compiledMethod := selector
+		ifNotNil: [ behavior compiledMethodAt: selector ifAbsent: [ nil ] ]
+		ifNil: [ nil ].
+	methodClass := compiledMethod
+		ifNotNil: [ compiledMethod methodClass ]
+		ifNil: [ behavior ].
+
 
 	classContextCache ifNil: [ classContextCache := Dictionary new ].
 
