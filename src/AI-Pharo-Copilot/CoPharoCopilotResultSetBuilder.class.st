@@ -315,29 +315,9 @@ CoPharoCopilotResultSetBuilder >> ebounceMilliseconds [
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> extractResponseContentFromRaw: rawResponseString [
-	"Extract the suggestion text from the raw Ollama payload (JSON or plain text)."
+	"Convert the response to a string. The response is already normalized by OllamaClient"
 
-	| content |
-	content := rawResponseString.
-
-	[
-		| parsed |
-		parsed := STONJSON fromString: rawResponseString.
-		(parsed isKindOf: Dictionary) ifTrue: [
-			content := parsed
-				at: #response
-				ifAbsent: [ parsed at: 'response' ifAbsent: [ rawResponseString ] ] ]
-	]
-		on: Error
-		do: [ :ex |
-			CoCopilotLogger
-				logBackEndEvent: 'Failed to parse suggestion payload as JSON'
-				details: (Dictionary new
-					at: #error put: ex messageText;
-					at: #rawResponse put: rawResponseString;
-					yourself) ].
-
-	^ content asString
+	^ rawResponseString asString
 ]
 
 { #category : 'initialization' }
