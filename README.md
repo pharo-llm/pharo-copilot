@@ -18,7 +18,7 @@ To install stable version of `pharo-copilot` in your image you can use:
 
 ```smalltalk
 Metacello new
-  githubUser: 'omarabedelkader' project: 'pharo-copilot' commitish: 'X.X.X' path: 'src';
+  githubUser: 'pharo-llm' project: 'pharo-copilot' commitish: 'X.X.X' path: 'src';
   baseline: 'AIPharoCopilot';
   load
 ```
@@ -28,7 +28,7 @@ To install development version of `pharo-copilot` in your image you can use:
 
 ```smalltalk
 Metacello new
-  githubUser: 'omarabedelkader' project: 'pharo-copilot' commitish: 'main' path: 'src';
+  githubUser: 'pharo-llm' project: 'pharo-copilot' commitish: 'main' path: 'src';
   baseline: 'AIPharoCopilot';
   load.
 ```
