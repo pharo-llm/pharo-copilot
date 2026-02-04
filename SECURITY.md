@@ -21,6 +21,11 @@ If you believe you have found a security vulnerability, please report it private
 
 Security fixes are provided for currently supported versions. If you are using an older version, you may be asked to upgrade to a supported release to receive a fix.
 
+| Version    | Supported          |
+| ---------- | ------------------ |
+| Pharo 14-dev | ✅ Yes           |
+| Pharo 13     | ✅ Yes           |
+
 ## Thank You
 
 Thank you for helping keep the project and its users safe.
