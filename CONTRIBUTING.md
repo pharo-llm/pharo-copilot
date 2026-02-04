@@ -12,7 +12,7 @@ Thanks for your interest in improving Pharo-Copilot! This guide explains how to 
 2. Load the project into your image using Metacello:
    ```smalltalk
    Metacello new
-     githubUser: 'omarabedelkader' project: 'Pharo-Copilot' commitish: 'main' path: 'src';
+     githubUser: 'pharo-llm' project: 'pharo-copilot' commitish: 'main' path: 'src';
      baseline: 'AIPharoCopilot';
      load
    ```
