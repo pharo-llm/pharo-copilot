@@ -1,6 +1,3 @@
-# Pharo Copilot – Documentation
-
----
 
 ## 1. Executive Summary
 
