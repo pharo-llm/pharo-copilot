@@ -1,31 +1,32 @@
 # Contributing to Pharo-Copilot
 
-Thanks for your interest in improving Pharo-Copilot! This guide explains how to propose changes and what to expect during review.
+Thank you for contributing to **ChatPharo**! These guidelines are here to keep collaboration smooth, consistent, and welcoming.
 
-## Ways to contribute
-- Report bugs or request features by opening an issue.
-- Improve documentation and examples.
-- Submit pull requests for fixes and new features.
+## Getting Started
 
-## Development setup
-1. Install **Pharo 13 or 14** and **[Ollama](https://ollama.com/)**.
-2. Load the project into your image using Metacello:
-   ```smalltalk
-   Metacello new
-     githubUser: 'pharo-llm' project: 'pharo-copilot' commitish: 'main' path: 'src';
-     baseline: 'AIPharoCopilot';
-     load
-   ```
-3. Ensure you have internet access so the completion engine can reach the underlying model.
+1. **Fork the repository** and create a new branch from `main`.
+2. Follow the setup instructions in the project documentation so you can run and test things locally.
+3. Before starting work, check existing issues and discussions to avoid duplicates. If needed, open a new issue describing what you want to change and why.
 
-## Pull request guidelines
-- Discuss large changes in an issue before opening a PR.
-- Keep PRs focused and clearly describe the motivation and approach.
-- Update or add tests when relevant and ensure the test suite passes.
-- Follow existing code style and avoid introducing unrelated formatting changes.
+## Development Guidelines
 
-## Commit messages
-Use clear, descriptive commit messages that explain the change. Reference related issues when applicable.
+* Follow the existing coding style and conventions used in the project.
+* Add or update tests when you change behavior (features, fixes, refactors).
+* Run the test suite locally before opening a pull request.
 
-## Code of conduct
-Please be respectful and collaborative. Interactions in issues, discussions, and pull requests should remain constructive and inclusive.
+## Submitting a Pull Request
+
+1. Keep your branch up to date with `main`.
+2. Make focused commits with clear messages.
+3. Open a pull request to `main` and explain:
+
+   * what problem it solves,
+   * what changed,
+   * how it was tested.
+4. Be responsive to review feedback—updates may be requested before merging.
+
+## Code of Conduct
+
+Be respectful and constructive. We want this to be a friendly place for everyone to collaborate.
+
+Thanks again, and happy building!
