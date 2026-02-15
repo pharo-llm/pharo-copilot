@@ -1,6 +1,6 @@
 # Contributing to Pharo-Copilot
 
-Thank you for contributing to **ChatPharo**! These guidelines are here to keep collaboration smooth, consistent, and welcoming.
+Thank you for contributing to **Pharo-Copilot**! These guidelines are here to keep collaboration smooth, consistent, and welcoming.
 
 ## Getting Started
 
