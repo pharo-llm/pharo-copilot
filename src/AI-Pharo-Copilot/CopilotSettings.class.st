@@ -194,7 +194,8 @@ CopilotSettings class >> copilotEnabled: aBoolean [
 CopilotSettings class >> copilotProvider [
 	"Answer the configured provider; default to #ollama."
 
-	^ provider ifNil: [ provider := #ollama ]
+	^ provider ifNil: [ provider := #ollama ].
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -1353,17 +1354,22 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	repeatPenalty := aDictionary at: #repeatPenalty ifAbsent: [ nil ].
 	numCtx := aDictionary at: #numCtx ifAbsent: [ nil ].
 	seed := aDictionary at: #seed ifAbsent: [ nil ].
-	customParameters := aDictionary at: #customParameters ifAbsent: [ Dictionary new ].
+	customParameters := aDictionary at: #customParameters ifAbsent: [ Dictionary new ]. 
+	maxInstanceMethods := aDictionary at: #maxInstanceMethods ifAbsent: [ nil ].
+	maxClassMethods := aDictionary at: #maxClassMethods ifAbsent: [ nil ].
+	minimumPrefixLength := aDictionary at: #minimumPrefixLength ifAbsent: [ nil ].
 
+	"Restore context mode if saved"
+	(aDictionary at: #contextMode ifAbsent: [ nil ]) ifNotNil: [ :savedMode |
+		CopilotContextSettings mode: savedMode ].
 	"Convert templatesDirectory path string back to FileReference"
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
 	templatesPath ifNotNil: [
-		templatesDirectory := [ templatesPath asFileReference ] on: Error do: [ nil ]
-	].
-
-	"Don't restore modelMetadata and ollamaClientFactory - these are runtime-only"
+			templatesDirectory := [ templatesPath asFileReference ]
+				                      on: Error
+				                      do: [ nil ] ]. "Don't restore modelMetadata and ollamaClientFactory - these are runtime-only"
 	modelMetadata := nil.
-	ollamaClientFactory := nil.
+	ollamaClientFactory := nil
 ]
 
 { #category : 'accessing' }
@@ -1507,9 +1513,10 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #numCtx put: numCtx;
 		            at: #seed put: seed;
 		            at: #customParameters put: (customParameters ifNil: [ Dictionary new ]);
-			at: #maxInstanceMethods put: maxInstanceMethods;
-		at: #maxClassMethods put: maxClassMethods;
-		at: #minimumPrefixLength put: minimumPrefixLength;
+		            at: #maxInstanceMethods put: maxInstanceMethods;
+		            at: #maxClassMethods put: maxClassMethods;
+		            at: #minimumPrefixLength put: minimumPrefixLength;
+		at: #contextMode put: CopilotContextSettings mode;
 		            yourself.
 	templatesDirectory ifNotNil: [
 			templatesPath := [ templatesDirectory pathString ]
@@ -1890,7 +1897,8 @@ CopilotSettings class >> templatesDirectory [
 CopilotSettings class >> templatesDirectory: aFileReference [
 	"Set the directory containing bundled templates."
 
-	templatesDirectory := aFileReference asFileReference
+	templatesDirectory := aFileReference asFileReference.
+	self autoSaveSettings
 ]
 
 { #category : 'ollama' }

@@ -97,10 +97,10 @@ CoBenchmarkReport >> exportJson [
 
 	| data |
 	data := Dictionary new
-		at: #metadata put: self metadataDictionary;
-		at: #results put: (results collect: [ :r | r asDictionary ]);
-		at: #statistics put: self statisticsDictionary;
-		yourself.
+		        at: #metadata put: self metadataDictionary;
+		        at: #results put: (results collect: [ :r | r asDictionary ]) asArray;
+		        at: #statistics put: self statisticsDictionary;
+		        yourself.
 	(self outputDirectory / 'results.json') writeStream
 		nextPutAll: (STONJSON toStringPretty: data);
 		close

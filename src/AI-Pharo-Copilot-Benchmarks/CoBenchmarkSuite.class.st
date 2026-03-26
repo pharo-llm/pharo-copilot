@@ -278,7 +278,7 @@ CoBenchmarkSuite >> includeStrategyComparison: aBoolean [
 CoBenchmarkSuite >> initialize [
 
 	super initialize.
-	models := #('qwen2.5-coder:3b').
+	models := #( 'omarabedelkader/pharo-qwen-coder-plus-20296:3b' ).
 	runsPerScenario := 3.
 	numPredict := 150.
 	numCtx := 8192.
