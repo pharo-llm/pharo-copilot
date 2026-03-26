@@ -31,6 +31,18 @@ Class {
 }
 
 { #category : 'as yet unclassified' }
+CoBenchmarkResult class >> csvHeader [
+
+	^ #('model' 'scenario' 'run' 'success' 'cold_start' 'context_strategy'
+	     'num_ctx' 'num_predict' 'temperature'
+	     'context_size_chars' 'context_size_bytes' 'prefix_size_chars' 'suffix_size_chars'
+	     'total_prompt_size_chars' 'estimated_prompt_tokens'
+	     'prompt_tokens' 'completion_tokens'
+	     'total_time_s' 'prompt_eval_time_s' 'eval_time_s' 'tokens_per_second'
+	     'error')
+]
+
+{ #category : 'as yet unclassified' }
 CoBenchmarkResult class >> errorFor: aScenario model: modelName error: anError startMillis: start endMillis: end [
 
 	| result |

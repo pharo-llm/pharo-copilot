@@ -110,6 +110,30 @@ CoBenchmarkSuite class >> runQuick [
 ]
 
 { #category : 'initialization' }
+CoBenchmarkSuite >> buildPromptFor: aScenario [
+
+	| template |
+	template := CoBenchmarkPharoCopilotRunner defaultTemplate.
+	^ (((template
+		copyReplaceAll: '<|fim_prefix|>' with: aScenario prefix)
+		copyReplaceAll: '<|fim_suffix|>' with: aScenario suffix)
+		copyReplaceAll: '<|fim_context|>' with: aScenario context)
+		copyReplaceAll: '<|fim_middle|>' with: ''
+]
+
+{ #category : 'private' }
+CoBenchmarkSuite >> clearModelCacheFor: modelName [
+
+	[ client transport
+		postJsonAt: 'api/generate'
+		body: (Dictionary new
+			at: #model put: modelName;
+			at: #keep_alive put: 0;
+			yourself)
+	] on: Error do: [ :ex | "ignore" ]
+]
+
+{ #category : 'initialization' }
 CoBenchmarkSuite >> coldStart [
 	^ coldStart
 ]
@@ -120,10 +144,134 @@ CoBenchmarkSuite >> coldStart: aBoolean [
 	coldStart := aBoolean
 ]
 
+{ #category : 'private' }
+CoBenchmarkSuite >> collectScenarios [
+
+	| scenarios |
+	scenarios := Dictionary new.
+	includeCodeScenarios ifTrue: [
+		scenarios addAll: CoBenchmarkScenarioCatalog defaultScenarios ].
+	includeContextScaling ifTrue: [
+		scenarios addAll: CoBenchmarkContextScenario contextSizeScenarios ].
+	includeFimQuality ifTrue: [
+		scenarios addAll: CoBenchmarkContextScenario fimQualityScenarios ].
+	includeStrategyComparison ifTrue: [
+		scenarios addAll: CoBenchmarkContextScenario contextStrategyScenarios ].
+	^ scenarios
+]
+
+{ #category : 'private' }
+CoBenchmarkSuite >> ensureModelAvailable: modelName [
+
+	| modelsResponse modelNames |
+	[
+		modelsResponse := client listModels.
+		modelNames := modelsResponse
+			ifNil: [ #() ]
+			ifNotNil: [
+				| list |
+				list := modelsResponse at: #models ifAbsent: [
+					modelsResponse at: 'models' ifAbsent: [ #() ] ].
+				list collect: [ :each |
+					each at: #name ifAbsent: [ each at: 'name' ifAbsent: [ '' ] ] ] ].
+		(modelNames includes: modelName) ifTrue: [ ^ true ].
+
+		"Try to pull the model"
+		client transport
+			postJsonAt: 'api/pull'
+			body: (Dictionary new at: #name put: modelName; at: #stream put: false; yourself).
+		^ true
+	] on: Error do: [ ^ false ]
+]
+
+{ #category : 'initialization' }
+CoBenchmarkSuite >> executeScenario: aScenario model: modelName [
+
+	| prompt payload options startMillis response endMillis result |
+	prompt := self buildPromptFor: aScenario.
+	options := Dictionary new
+		at: #num_predict put: numPredict;
+		at: #num_ctx put: numCtx;
+		at: #temperature put: temperature;
+		at: #top_p put: 0.95;
+		yourself.
+	payload := Dictionary new
+		at: #model put: modelName;
+		at: #prompt put: prompt;
+		at: #stream put: false;
+		at: #keep_alive put: '10m';
+		at: #options put: options;
+		yourself.
+
+	startMillis := Time millisecondClockValue.
+	[
+		response := client transport postJsonAt: 'api/generate' body: payload.
+		endMillis := Time millisecondClockValue.
+
+		result := CoBenchmarkResult
+			fromOllamaResponse: response
+			scenario: aScenario
+			model: modelName
+			startMillis: startMillis
+			endMillis: endMillis.
+		result promptText: prompt.
+		^ result
+	] on: Error do: [ :ex |
+		endMillis := Time millisecondClockValue.
+		^ CoBenchmarkResult
+			errorFor: aScenario
+			model: modelName
+			error: ex
+			startMillis: startMillis
+			endMillis: endMillis ]
+]
+
 { #category : 'initialization' }
 CoBenchmarkSuite >> includeCodeScenarios [
 
 	^ includeCodeScenarios
+]
+
+{ #category : 'initialization' }
+CoBenchmarkSuite >> includeCodeScenarios: aBoolean [
+
+	includeCodeScenarios := aBoolean
+]
+
+{ #category : 'initialization' }
+CoBenchmarkSuite >> includeContextScaling [
+
+	^ includeContextScaling
+]
+
+{ #category : 'initialization' }
+CoBenchmarkSuite >> includeContextScaling: aBoolean [
+
+	includeContextScaling := aBoolean
+]
+
+{ #category : 'initialization' }
+CoBenchmarkSuite >> includeFimQuality [
+
+	^ includeFimQuality
+]
+
+{ #category : 'initialization' }
+CoBenchmarkSuite >> includeFimQuality: aBoolean [
+
+	includeFimQuality := aBoolean
+]
+
+{ #category : 'initialization' }
+CoBenchmarkSuite >> includeStrategyComparison [
+
+	^ includeStrategyComparison
+]
+
+{ #category : 'initialization' }
+CoBenchmarkSuite >> includeStrategyComparison: aBoolean [
+
+	includeStrategyComparison := aBoolean
 ]
 
 { #category : 'initialization' }
@@ -180,12 +328,97 @@ CoBenchmarkSuite >> numPredict: anInteger [
 ]
 
 { #category : 'initialization' }
+CoBenchmarkSuite >> outputDirectory [
+
+	^ outputDirectory
+]
+
+{ #category : 'initialization' }
+CoBenchmarkSuite >> outputDirectory: aFileReference [
+
+	outputDirectory := aFileReference
+]
+
+{ #category : 'report' }
+CoBenchmarkSuite >> report [
+	"Return a CoBenchmarkReport for the collected results."
+
+	| report |
+	report := CoBenchmarkReport on: results.
+	outputDirectory ifNotNil: [ report outputDirectory: outputDirectory ].
+	^ report
+]
+
+{ #category : 'initialization' }
+CoBenchmarkSuite >> results [
+
+	^ results
+]
+
+{ #category : 'running' }
+CoBenchmarkSuite >> run [
+	"Execute the full benchmark suite."
+
+	| scenarios |
+	results := OrderedCollection new.
+	client := OllamaClient new.
+	scenarios := self collectScenarios.
+
+	Transcript show: '=== Pharo Copilot Benchmark Suite ==='; cr.
+	Transcript show: 'Models: ', ($, join: models); cr.
+	Transcript show: 'Scenarios: ', scenarios size asString; cr.
+	Transcript show: 'Runs per scenario: ', runsPerScenario asString; cr.
+	Transcript show: 'Total runs: ', (models size * scenarios size * runsPerScenario) asString; cr.
+	Transcript show: '===================================='; cr.
+
+	models do: [ :modelName |
+		Transcript show: '[+] Testing model: ', modelName; cr.
+		(self ensureModelAvailable: modelName)
+			ifTrue: [ self runModel: modelName scenarios: scenarios ]
+			ifFalse: [
+				Transcript show: '[-] Model not available: ', modelName; cr.
+				scenarios keysAndValuesDo: [ :name :scenario |
+					1 to: runsPerScenario do: [ :i |
+						| r |
+						r := CoBenchmarkResult new.
+						r model: modelName; scenario: name; runIndex: i; success: false;
+							errorMessage: 'Model not available'.
+						results add: r ] ] ] ].
+
+	Transcript show: '=== Benchmark complete: ', results size asString, ' results ==='; cr.
+	^ results
+]
+
+{ #category : 'running' }
+CoBenchmarkSuite >> runModel: modelName scenarios: scenarios [
+
+	scenarios keysAndValuesDo: [ :name :scenario |
+		Transcript show: '  [*] Scenario: ', name; cr.
+		1 to: runsPerScenario do: [ :runIndex |
+			| result |
+			coldStart ifTrue: [ self clearModelCacheFor: modelName ].
+			result := self executeScenario: scenario model: modelName.
+			result runIndex: runIndex.
+			result coldStart: coldStart.
+			result numCtx: numCtx.
+			result numPredict: numPredict.
+			result temperature: temperature.
+			results add: result.
+			Transcript show: '    Run ', runIndex asString, ': ',
+				(result success
+					ifTrue: [ (result totalTimeSeconds printShowingDecimalPlaces: 3), 's  ',
+						(result tokensPerSecond printShowingDecimalPlaces: 1), ' tok/s  ',
+						result completionTokens asString, ' tokens' ]
+					ifFalse: [ 'FAILED - ', result errorMessage ]); cr ] ]
+]
+
+{ #category : 'running' }
 CoBenchmarkSuite >> runsPerScenario [
 
 	^ runsPerScenario
 ]
 
-{ #category : 'initialization' }
+{ #category : 'running' }
 CoBenchmarkSuite >> runsPerScenario: anInteger [
 
 	runsPerScenario := anInteger
