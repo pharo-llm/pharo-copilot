@@ -119,12 +119,9 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 				ifTrue: [ aContext behavior ]
 				ifFalse: [ nil ] ].
 	behavior ifNil: [ ^ '' ].
-	"behavior := aContext completionClass."
 	extractor := CNSelectorExtractor new.
 	ast := OCParser parseFaultyMethod: prefixString.
 	selector := extractor extractSelectorFromAST: ast atPosition: 1.
-	"compiledMethod := behavior compiledMethodAt: selector.
-	methodClass := compiledMethod methodClass."
 	
 		compiledMethod := selector
 		ifNotNil: [ behavior compiledMethodAt: selector ifAbsent: [ nil ] ]
@@ -155,8 +152,8 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 	classDefinition := self safeDefinitionStringFor: methodClass.
 
 	"Limit methods hard — you can tune these numbers."
-	instanceSide := self methodSourcesFor: methodClass around: selector limit: 30.
-	classSide := self methodSourcesFor: (methodClass ifNotNil: [ methodClass class ]) around: nil limit: 15.
+	instanceSide := self methodSourcesFor: methodClass around: selector limit: CopilotSettings maxInstanceMethods.
+	classSide := self methodSourcesFor: (methodClass ifNotNil: [ methodClass class ]) around: nil limit: CopilotSettings maxClassMethods.
 
 	context := self
 		classDefinition: classDefinition
@@ -585,7 +582,7 @@ CoPharoCopilotResultSetBuilder >> methodSourcesFor: aBehavior around: aSelector 
 CoPharoCopilotResultSetBuilder >> minimumPrefixLength [
 	"Minimum prefix length required before we request a completion."
 
-	^ 2
+	^ CopilotSettings minimumPrefixLength
 ]
 
 { #category : 'initialization' }

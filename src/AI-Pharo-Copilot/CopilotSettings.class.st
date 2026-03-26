@@ -30,7 +30,10 @@ Class {
 		'repeatPenalty',
 		'numCtx',
 		'seed',
-		'customParameters'
+		'customParameters',
+		'maxInstanceMethods',
+		'maxClassMethods',
+		'minimumPrefixLength'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -82,7 +85,8 @@ CopilotSettings class >> autoInstallModelScriptEnabled [
 CopilotSettings class >> autoInstallModelScriptEnabled: aBoolean [
 	"Enable/disable auto-install of missing models."
 
-	autoInstallModelScriptEnabled := aBoolean
+	autoInstallModelScriptEnabled := aBoolean.
+	self autoSaveSettings
 ]
 
 { #category : 'persistence' }
@@ -126,7 +130,12 @@ CopilotSettings class >> completionDebounceMilliseconds [
 CopilotSettings class >> completionDebounceMilliseconds: anObject [
 	"Set the debounce delay (milliseconds) before firing completion requests."
 
-	completionDebounceMilliseconds := self normalizedDuration: anObject default: 250 minimum: 1 maximum: 60000
+	completionDebounceMilliseconds := self
+		                                  normalizedDuration: anObject
+		                                  default: 250
+		                                  minimum: 1
+		                                  maximum: 60000.
+		self autoSaveSettings
 ]
 
 { #category : 'settings' }
@@ -140,7 +149,12 @@ CopilotSettings class >> completionIdleMilliseconds [
 CopilotSettings class >> completionIdleMilliseconds: anObject [
 	"Set the idle delay (milliseconds) before firing completion requests."
 
-	completionIdleMilliseconds := self normalizedDuration: anObject default: 2000 minimum: 1 maximum: 60000
+	completionIdleMilliseconds := self
+		                              normalizedDuration: anObject
+		                              default: 2000
+		                              minimum: 1
+		                              maximum: 60000.
+		self autoSaveSettings.
 ]
 
 { #category : 'private' }
@@ -731,14 +745,45 @@ CopilotSettings class >> logValidatedModelAvailability: aModelName availableMode
 CopilotSettings class >> loggingEnabled [
 	"Answer whether logging is enabled; default to true."
 
-	^ loggingEnabled ifNil: [ loggingEnabled := true ]
+	^ loggingEnabled ifNil: [ loggingEnabled := true ].
 ]
 
 { #category : 'accessing' }
 CopilotSettings class >> loggingEnabled: aBoolean [
 	"Enable/disable logging."
 
-	loggingEnabled := aBoolean
+	loggingEnabled := aBoolean.
+	self autoSaveSettings
+]
+
+{ #category : 'context' }
+CopilotSettings class >> maxClassMethods [
+	"Answer the maximum number of class-side methods to include in context. Default: 15"
+
+	^ maxClassMethods ifNil: [ maxClassMethods := 15 ]
+]
+
+{ #category : 'context' }
+CopilotSettings class >> maxClassMethods: anObject [
+	"Set the maximum number of class-side methods for context (1 to 100, default: 15)."
+
+	maxClassMethods := self normalizedDuration: anObject default: 15 minimum: 1 maximum: 100.
+	self autoSaveSettings
+]
+
+{ #category : 'context' }
+CopilotSettings class >> maxInstanceMethods [
+	"Answer the maximum number of instance-side methods to include in context. Default: 30"
+
+	^ maxInstanceMethods ifNil: [ maxInstanceMethods := 30 ]
+]
+
+{ #category : 'context' }
+CopilotSettings class >> maxInstanceMethods: anObject [
+	"Set the maximum number of instance-side methods for context (1 to 200, default: 30)."
+
+	maxInstanceMethods := self normalizedDuration: anObject default: 30 minimum: 1 maximum: 200.
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -785,6 +830,21 @@ CopilotSettings class >> metadataStringForKey: aKey default: defaultString [
 	^ self metadataJsonStringFor: value default: defaultString
 ]
 
+{ #category : 'context' }
+CopilotSettings class >> minimumPrefixLength [
+	"Answer the minimum prefix length required before requesting a completion. Default: 2"
+
+	^ minimumPrefixLength ifNil: [ minimumPrefixLength := 2 ]
+]
+
+{ #category : 'context' }
+CopilotSettings class >> minimumPrefixLength: anObject [
+	"Set the minimum prefix length (1 to 20, default: 2)."
+
+	minimumPrefixLength := self normalizedDuration: anObject default: 2 minimum: 1 maximum: 20.
+	self autoSaveSettings
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> modelInstallTimeoutSeconds [
 	"Answer the timeout (seconds) for Ollama model pulls."
@@ -796,7 +856,12 @@ CopilotSettings class >> modelInstallTimeoutSeconds [
 CopilotSettings class >> modelInstallTimeoutSeconds: anObject [
 	"Set the timeout (seconds) for Ollama model pulls."
 
-	modelInstallTimeoutSeconds := self normalizedDuration: anObject default: 600 minimum: 30 maximum: 3600
+	modelInstallTimeoutSeconds := self
+		                              normalizedDuration: anObject
+		                              default: 600
+		                              minimum: 30
+		                              maximum: 3600.
+		self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -1017,7 +1082,7 @@ CopilotSettings class >> nullModelMetadata [
 CopilotSettings class >> numCtx [
 	"Answer the num_ctx parameter for Ollama (context window size). Default: nil (use model default)"
 
-	^ numCtx
+	^ numCtx ifNil: [ 2048 ]
 ]
 
 { #category : 'ollama' }
@@ -1219,14 +1284,19 @@ CopilotSettings class >> repeatPenalty: aNumber [
 CopilotSettings class >> requestTimeoutSeconds [
 	"Answer the HTTP request timeout (seconds) for Ollama calls."
 
-	^ requestTimeoutSeconds ifNil: [ requestTimeoutSeconds := 5 ]
+	^ requestTimeoutSeconds ifNil: [ requestTimeoutSeconds := 100 ]
 ]
 
 { #category : 'settings' }
 CopilotSettings class >> requestTimeoutSeconds: anObject [
 	"Set the HTTP request timeout (seconds) for Ollama calls."
 
-	requestTimeoutSeconds := self normalizedDuration: anObject default: 5 minimum: 1 maximum: 120
+	requestTimeoutSeconds := self
+		                         normalizedDuration: anObject
+		                         default: 100
+		                         minimum: 1
+		                         maximum: 120.
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -1247,7 +1317,7 @@ CopilotSettings class >> resetToDefaultSettings [
 	completionIdleMilliseconds := nil.
 	requestTimeoutSeconds := nil.
 	modelInstallTimeoutSeconds := nil.
-temperature := nil.
+	temperature := nil.
 	topP := nil.
 	topK := nil.
 	numPredict := nil.
@@ -1255,6 +1325,9 @@ temperature := nil.
 	numCtx := nil.
 	seed := nil.
 	customParameters := nil.
+	maxInstanceMethods := nil.
+	maxClassMethods := nil.
+	minimumPrefixLength := nil.
 ]
 
 { #category : 'persistence' }
@@ -1329,6 +1402,9 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	numCtx := aDictionary at: #numCtx ifAbsent: [ nil ].
 	seed := aDictionary at: #seed ifAbsent: [ nil ].
 	customParameters := aDictionary at: #customParameters ifAbsent: [ Dictionary new ].
+maxInstanceMethods := aDictionary at: #maxInstanceMethods ifAbsent: [ aDictionary at: #MaxInstanceMethods ifAbsent: [ nil ] ].
+	maxClassMethods := aDictionary at: #maxClassMethods ifAbsent: [ aDictionary at: #MaxClassMethods ifAbsent: [ nil ] ].
+	minimumPrefixLength := aDictionary at: #minimumPrefixLength ifAbsent: [ aDictionary at: #MinimumPrefixLength ifAbsent: [ nil ] ].
 ]
 
 { #category : 'accessing' }
@@ -1395,7 +1471,7 @@ CopilotSettings class >> saveSettingsToFile [
 CopilotSettings class >> seed [
 	"Answer the seed parameter for Ollama (for reproducible generation). Default: nil (random)"
 
-	^ seed
+	^ seed ifNil: [ 0 ]
 ]
 
 { #category : 'ollama' }
@@ -1412,35 +1488,36 @@ CopilotSettings class >> serializableSettingsSnapshot [
 
 	| snapshot templatesPath |
 	snapshot := Dictionary new
-		at: #enabled put: enabled;
-		at: #provider put: provider;
-		at: #modelName put: modelName;
-		at: #host put: host;
-		at: #port put: port;
-		at: #autoInstallModelScriptEnabled put: autoInstallModelScriptEnabled;
-		at: #loggingEnabled put: loggingEnabled;
-		at: #completionDebounceMilliseconds put: completionDebounceMilliseconds;
-		at: #completionIdleMilliseconds put: completionIdleMilliseconds;
-		at: #requestTimeoutSeconds put: requestTimeoutSeconds;
-		at: #modelInstallTimeoutSeconds put: modelInstallTimeoutSeconds;
-		at: #temperature put: temperature;
-		at: #topP put: topP;
-		at: #topK put: topK;
-		at: #numPredict put: numPredict;
-		at: #repeatPenalty put: repeatPenalty;
-		at: #numCtx put: numCtx;
-		at: #seed put: seed;
-		at: #customParameters put: (customParameters ifNil: [ Dictionary new ]);
-		yourself.
-
-	"Convert templatesDirectory to a path string for serialization"
+		            at: #enabled put: enabled;
+		            at: #provider put: provider;
+		            at: #modelName put: modelName;
+		            at: #host put: host;
+		            at: #port put: port;
+		            at: #autoInstallModelScriptEnabled put: autoInstallModelScriptEnabled;
+		            at: #loggingEnabled put: loggingEnabled;
+		            at: #completionDebounceMilliseconds put: completionDebounceMilliseconds;
+		            at: #completionIdleMilliseconds put: completionIdleMilliseconds;
+		            at: #requestTimeoutSeconds put: requestTimeoutSeconds;
+		            at: #modelInstallTimeoutSeconds put: modelInstallTimeoutSeconds;
+		            at: #temperature put: temperature;
+		            at: #topP put: topP;
+		            at: #topK put: topK;
+		            at: #numPredict put: numPredict;
+		            at: #repeatPenalty put: repeatPenalty;
+		            at: #numCtx put: numCtx;
+		            at: #seed put: seed;
+		            at: #customParameters put: (customParameters ifNil: [ Dictionary new ]);
+			at: #maxInstanceMethods put: maxInstanceMethods;
+		at: #maxClassMethods put: maxClassMethods;
+		at: #minimumPrefixLength put: minimumPrefixLength;
+		            yourself.
 	templatesDirectory ifNotNil: [
-		templatesPath := [ templatesDirectory pathString ] on: Error do: [ nil ].
-		templatesPath ifNotNil: [ snapshot at: #templatesDirectory put: templatesPath ]
-	].
+			templatesPath := [ templatesDirectory pathString ]
+				                 on: Error
+				                 do: [ nil ].
+			templatesPath ifNotNil: [ snapshot at: #templatesDirectory put: templatesPath ] ].
 
 	^ snapshot
-
 ]
 
 { #category : 'ollama' }
@@ -1466,7 +1543,6 @@ CopilotSettings class >> settingsOn: aBuilder [
 	"Register Copilot settings in the system settings UI."
 
 	<systemsettings>
-	
 	(aBuilder setting: #CopilotSettings)
 		target: self;
 		parentName: #codeBrowsing;
@@ -1548,6 +1624,33 @@ CopilotSettings class >> settingsOn: aBuilder [
 					description: 'Controls whether completions use full source or selectors-only class context.'.
 
 
+				(aBuilder setting: #maxInstanceMethods)
+					order: 0.66;
+					label: 'Max instance methods in context';
+					target: self;
+					getSelector: #maxInstanceMethods;
+					setSelector: #maxInstanceMethods:;
+					default: self maxInstanceMethods;
+					description: 'Maximum number of instance-side methods to include in the class context sent with completions (1-200). Default: 30'.
+
+				(aBuilder setting: #maxClassMethods)
+					order: 0.67;
+					label: 'Max class methods in context';
+					target: self;
+					getSelector: #maxClassMethods;
+					setSelector: #maxClassMethods:;
+					default: self maxClassMethods;
+					description: 'Maximum number of class-side methods to include in the class context sent with completions (1-100). Default: 15'.
+
+				(aBuilder setting: #minimumPrefixLength)
+					order: 0.68;
+					label: 'Minimum prefix length';
+					target: self;
+					getSelector: #minimumPrefixLength;
+					setSelector: #minimumPrefixLength:;
+					default: self minimumPrefixLength;
+					description: 'Minimum number of characters typed before requesting a completion (1-20). Default: 2'.
+					
 				(aBuilder setting: #requestTimeoutSeconds)
 					order: 0.7;
 					label: 'Request timeout (sec)';
@@ -1677,6 +1780,9 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #numCtx put: numCtx;
 		  at: #seed put: seed;
 		  at: #customParameters put: customParameters;
+		 at: #maxInstanceMethods put: maxInstanceMethods;
+		  at: #maxClassMethods put: maxClassMethods;
+		  at: #minimumPrefixLength put: minimumPrefixLength;
 		  yourself
 ]
 
