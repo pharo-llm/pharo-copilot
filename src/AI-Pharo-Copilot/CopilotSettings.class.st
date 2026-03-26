@@ -1292,18 +1292,14 @@ CopilotSettings class >> requestTimeoutSeconds [
 CopilotSettings class >> requestTimeoutSeconds: anObject [
 	"Set the HTTP request timeout (seconds) for Ollama calls."
 
-	requestTimeoutSeconds := self
-		                         normalizedDuration: anObject
-		                         default: 100
-		                         minimum: 1
-		                         maximum: 120.
+	requestTimeoutSeconds := anObject.
 	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
 CopilotSettings class >> resetToDefaultSettings [
 	"Reset all settings to defaults (by clearing class-side state)."
-
+	<script>
 	enabled := nil.
 	provider := nil.
 	modelName := nil.
@@ -1328,7 +1324,7 @@ CopilotSettings class >> resetToDefaultSettings [
 	customParameters := nil.
 	maxInstanceMethods := nil.
 	maxClassMethods := nil.
-	minimumPrefixLength := nil.
+	minimumPrefixLength := nil
 ]
 
 { #category : 'persistence' }

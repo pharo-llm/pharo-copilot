@@ -60,6 +60,47 @@ CoBenchmarkResult class >> errorFor: aScenario model: modelName error: anError s
 	^ result
 ]
 
+{ #category : 'as yet unclassified' }
+CoBenchmarkResult class >> fromOllamaResponse: response scenario: aScenario model: modelName startMillis: start endMillis: end [
+	"Build a successful benchmark result from a raw Ollama api/generate response dictionary."
+ 
+	| result completionText promptEval evalDuration promptTokens completionTokens tokPerSec |
+	result := self new.
+	result model: modelName.
+	result scenario: aScenario name.
+	result timestamp: DateAndTime now.
+	result success: true.
+	result totalTimeSeconds: (end - start) / 1000.0.
+	result contextSizeChars: aScenario context size.
+	result prefixSizeChars: aScenario prefix size.
+	result suffixSizeChars: aScenario suffix size.
+	result contextSizeBytes: aScenario context utf8Encoded size.
+ 
+	completionText := response
+		ifNil: [ '' ]
+		ifNotNil: [
+			response at: #response ifAbsent: [
+				response at: 'response' ifAbsent: [ '' ] ] ].
+	result completionText: completionText.
+ 
+	promptEval := (result safeNumber: response key: #prompt_eval_duration) / 1e9.
+	evalDuration := (result safeNumber: response key: #eval_duration) / 1e9.
+	promptTokens := result safeNumber: response key: #prompt_eval_count.
+	completionTokens := result safeNumber: response key: #eval_count.
+ 
+	result promptEvalTimeSeconds: promptEval.
+	result evalTimeSeconds: evalDuration.
+	result promptTokens: promptTokens.
+	result completionTokens: completionTokens.
+ 
+	tokPerSec := evalDuration > 0
+		ifTrue: [ completionTokens / evalDuration ]
+		ifFalse: [ 0 ].
+	result tokensPerSecond: tokPerSec.
+ 
+	^ result
+]
+
 { #category : 'export' }
 CoBenchmarkResult >> asCsvFields [
 
@@ -93,31 +134,31 @@ CoBenchmarkResult >> asCsvFields [
 CoBenchmarkResult >> asDictionary [
 
 	^ Dictionary new
-		at: #model put: self model;
-		at: #scenario put: self scenario;
-		at: #run put: self runIndex;
-		at: #success put: self success;
-		at: #coldStart put: self coldStart;
-		at: #contextStrategy put: self contextStrategy;
-		at: #numCtx put: self numCtx;
-		at: #numPredict put: self numPredict;
-		at: #temperature put: self temperature;
-		at: #contextSizeChars put: self contextSizeChars;
-		at: #contextSizeBytes put: self contextSizeBytes;
-		at: #prefixSizeChars put: self prefixSizeChars;
-		at: #suffixSizeChars put: self suffixSizeChars;
-		at: #totalPromptSizeChars put: self totalPromptSizeChars;
-		at: #estimatedPromptTokens put: self estimatedPromptTokens;
-		at: #promptTokens put: self promptTokens;
-		at: #completionTokens put: self completionTokens;
-		at: #totalTimeSeconds put: self totalTimeSeconds;
-		at: #promptEvalTimeSeconds put: self promptEvalTimeSeconds;
-		at: #evalTimeSeconds put: self evalTimeSeconds;
-		at: #tokensPerSecond put: self tokensPerSecond;
-		at: #completionText put: self completionText;
-		at: #errorMessage put: self errorMessage;
-		at: #timestamp put: self timestamp;
-		yourself
+		  at: #model put: self model;
+		  at: #scenario put: self scenario;
+		  at: #run put: self runIndex;
+		  at: #success put: self success;
+		  at: #coldStart put: self coldStart;
+		  at: #contextStrategy put: self contextStrategy;
+		  at: #numCtx put: self numCtx;
+		  at: #numPredict put: self numPredict;
+		  at: #temperature put: self temperature;
+		  at: #contextSizeChars put: self contextSizeChars;
+		  at: #contextSizeBytes put: self contextSizeBytes;
+		  at: #prefixSizeChars put: self prefixSizeChars;
+		  at: #suffixSizeChars put: self suffixSizeChars;
+		  at: #totalPromptSizeChars put: self totalPromptSizeChars;
+		  at: #estimatedPromptTokens put: self estimatedPromptTokens;
+		  at: #promptTokens put: self promptTokens;
+		  at: #completionTokens put: self completionTokens;
+		  at: #totalTimeSeconds put: self totalTimeSeconds;
+		  at: #promptEvalTimeSeconds put: self promptEvalTimeSeconds;
+		  at: #evalTimeSeconds put: self evalTimeSeconds;
+		  at: #tokensPerSecond put: self tokensPerSecond;
+		  at: #completionText put: self completionText;
+		  at: #errorMessage put: self errorMessage;
+		  at: #timestamp put: self timestamp asString;
+		  yourself
 ]
 
 { #category : 'accessing' }
