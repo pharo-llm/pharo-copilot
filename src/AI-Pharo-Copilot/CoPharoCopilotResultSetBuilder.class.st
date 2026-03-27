@@ -11,7 +11,8 @@ Class {
 		'debounceMilliseconds',
 		'idleMilliseconds',
 		'classContextCache',
-		'menuMorph'
+		'menuMorph',
+		'completionCache'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -310,6 +311,19 @@ CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix
 	contextInfo at: #rawSuggestions put: collected asArray.
 	^ collected asArray
 	
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> completionCache [
+	"Return the completion cache, creating it lazily."
+
+	^ completionCache ifNil: [ completionCache := CoPharoCopilotCompletionCache new ]
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> completionCache: aCache [
+
+	completionCache := aCache
 ]
 
 { #category : 'private' }
@@ -647,7 +661,7 @@ CoPharoCopilotResultSetBuilder >> normalizedDelayMilliseconds: anObject default:
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 	"Call Ollama, collect multiple completion alternatives, and apply them if the editor context is unchanged."
 
-	| classContext |
+	| classContext cachedContent content |
 	[
 		| client suggestions |
 		CoCopilotLogger logFrontEndEvent: 'Preparing completion request' details: contextInfo.
@@ -659,38 +673,69 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			at: #classContextLength put: classContext size;
 			at: #classContextPresent put: classContext isEmpty not.
 
+
+
+		"Check the completion cache first"
+		cachedContent := self completionCache
+			at: prefixString suffix: suffixString context: classContext
+			ifPresent: [ :cached | cached ].
+
+		cachedContent ifNotNil: [
+			contextInfo at: #cacheHit put: true.
+			CoCopilotLogger
+				logBackEndEvent: 'Cache hit - reusing cached completion'
+				details: (Dictionary new
+					at: #cleanedContent put: cachedContent;
+					at: #cleanedLength put: cachedContent size;
+					yourself).
+			^ self
+				applyContent: cachedContent
+				toContext: aContext
+				expectedPrefix: prefixString
+				suffix: suffixString
+				contextInfo: contextInfo ].
+
+		contextInfo at: #cacheHit put: false.
+		
+		
 		suggestions := self
-			collectNormalizedSuggestionsFor: client
-			prefix: prefixString
-			suffix: suffixString
-			context: classContext
-			contextInfo: contextInfo.
+			               collectNormalizedSuggestionsFor: client
+			               prefix: prefixString
+			               suffix: suffixString
+			               context: classContext
+			               contextInfo: contextInfo.
 
-		CoCopilotLogger
-			logBackEndEvent: 'Normalized suggestion content'
-			details: (Dictionary new
+
+	"Store in cache for future lookups"
+		content isEmpty ifFalse: [
+			self completionCache
+				at: prefixString suffix: suffixString context: classContext
+				put: content ].
 			
-		at: #suggestionCount put: suggestions size;
-				at: #suggestions put: suggestions;
-				yourself).
+			
+			
+		CoCopilotLogger logBackEndEvent: 'Normalized suggestion content' details: (Dictionary new
+				 at: #suggestionCount put: suggestions size;
+				 at: #suggestions put: suggestions;
+				 yourself).
 
-		self applyContents: suggestions
+		self
+			applyContents: suggestions
 			toContext: aContext
 			expectedPrefix: prefixString
 			suffix: suffixString
-			contextInfo: contextInfo
-	]
+			contextInfo: contextInfo ]
 		on: Error
 		do: [ :ex |
-			CoCopilotLogger
-				logError: 'Asynchronous completion failed'
-				origin: #CoPharoCopilotResultSetBuilder
-				exception: ex
-				payload: (Dictionary new
-					at: #requestDetails put: contextInfo copy;
-					at: #prefixLength put: prefixString size;
-					at: #suffixLength put: suffixString size;
-					yourself) ]
+				CoCopilotLogger
+					logError: 'Asynchronous completion failed'
+					origin: #CoPharoCopilotResultSetBuilder
+					exception: ex
+					payload: (Dictionary new
+							 at: #requestDetails put: contextInfo copy;
+							 at: #prefixLength put: prefixString size;
+							 at: #suffixLength put: suffixString size;
+							 yourself) ]
 ]
 
 { #category : 'initialization' }

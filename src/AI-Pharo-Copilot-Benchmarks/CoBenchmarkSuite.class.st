@@ -149,14 +149,11 @@ CoBenchmarkSuite >> collectScenarios [
 
 	| scenarios |
 	scenarios := Dictionary new.
-	includeCodeScenarios ifTrue: [
-		scenarios addAll: CoBenchmarkScenarioCatalog defaultScenarios ].
-	includeContextScaling ifTrue: [
-		scenarios addAll: CoBenchmarkContextScenario contextSizeScenarios ].
-	includeFimQuality ifTrue: [
-		scenarios addAll: CoBenchmarkContextScenario fimQualityScenarios ].
-	includeStrategyComparison ifTrue: [
-		scenarios addAll: CoBenchmarkContextScenario contextStrategyScenarios ].
+	includeCodeScenarios ifTrue: [ scenarios addAll: CoBenchmarkScenarioCatalog defaultScenarios ].
+	scenarios addAll: CoBenchmarkCacheScenario allScenarios.
+	includeContextScaling ifTrue: [ scenarios addAll: CoBenchmarkContextScenario contextSizeScenarios ].
+	includeFimQuality ifTrue: [ scenarios addAll: CoBenchmarkContextScenario fimQualityScenarios ].
+	includeStrategyComparison ifTrue: [ scenarios addAll: CoBenchmarkContextScenario contextStrategyScenarios ].
 	^ scenarios
 ]
 
