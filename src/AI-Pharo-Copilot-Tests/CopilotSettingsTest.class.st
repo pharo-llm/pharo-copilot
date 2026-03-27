@@ -94,6 +94,32 @@ CopilotSettingsTest >> testClearCachedModelMetadataForcesNextFetch [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testCompletionSuggestionsCountNormalization [
+
+	CopilotSettings withDefaultSettingsDo: [
+		CopilotSettings completionSuggestionsCount: 0.
+		self assert: CopilotSettings completionSuggestionsCount equals: 3.
+		CopilotSettings completionSuggestionsCount: 42.
+		self assert: CopilotSettings completionSuggestionsCount equals: 10.
+		CopilotSettings completionSuggestionsCount: 4.
+		self assert: CopilotSettings completionSuggestionsCount equals: 4.
+		]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testCompletionSuggestionsCountSnapshotRestore [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		CopilotSettings completionSuggestionsCount: 5.
+		snapshot := CopilotSettings settingsSnapshot.
+		CopilotSettings completionSuggestionsCount: 1.
+		CopilotSettings restoreSettingsFromSnapshot: snapshot.
+		self assert: CopilotSettings completionSuggestionsCount equals: 5.
+	]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testCopilotEnabledAccessor [
     | old |
     old := CopilotSettings copilotEnabled.
