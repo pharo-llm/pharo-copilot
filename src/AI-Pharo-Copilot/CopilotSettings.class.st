@@ -33,7 +33,8 @@ Class {
 		'customParameters',
 		'maxInstanceMethods',
 		'maxClassMethods',
-		'minimumPrefixLength'
+		'minimumPrefixLength',
+		'completionSuggestionsCount'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -155,6 +156,25 @@ CopilotSettings class >> completionIdleMilliseconds: anObject [
 		                              minimum: 1
 		                              maximum: 60000.
 		self autoSaveSettings.
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> completionSuggestionsCount [
+	"Answer how many completion alternatives should be requested per completion trigger."
+
+	^ completionSuggestionsCount ifNil: [ completionSuggestionsCount := 3 ]
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> completionSuggestionsCount: anObject [
+	"Set how many completion alternatives should be requested per completion trigger."
+
+	completionSuggestionsCount := self
+		                              normalizedDuration: anObject
+		                              default: 3
+		                              minimum: 1
+		                              maximum: 10.
+	self autoSaveSettings
 ]
 
 { #category : 'private' }
@@ -1299,6 +1319,7 @@ CopilotSettings class >> requestTimeoutSeconds: anObject [
 { #category : 'accessing' }
 CopilotSettings class >> resetToDefaultSettings [
 	"Reset all settings to defaults (by clearing class-side state)."
+
 	<script>
 	enabled := nil.
 	provider := nil.
@@ -1324,7 +1345,8 @@ CopilotSettings class >> resetToDefaultSettings [
 	customParameters := nil.
 	maxInstanceMethods := nil.
 	maxClassMethods := nil.
-	minimumPrefixLength := nil
+	minimumPrefixLength := nil.
+	completionSuggestionsCount := nil
 ]
 
 { #category : 'persistence' }
@@ -1350,15 +1372,12 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	repeatPenalty := aDictionary at: #repeatPenalty ifAbsent: [ nil ].
 	numCtx := aDictionary at: #numCtx ifAbsent: [ nil ].
 	seed := aDictionary at: #seed ifAbsent: [ nil ].
-	customParameters := aDictionary at: #customParameters ifAbsent: [ Dictionary new ]. 
+	customParameters := aDictionary at: #customParameters ifAbsent: [ Dictionary new ].
 	maxInstanceMethods := aDictionary at: #maxInstanceMethods ifAbsent: [ nil ].
 	maxClassMethods := aDictionary at: #maxClassMethods ifAbsent: [ nil ].
 	minimumPrefixLength := aDictionary at: #minimumPrefixLength ifAbsent: [ nil ].
-
-	"Restore context mode if saved"
-	(aDictionary at: #contextMode ifAbsent: [ nil ]) ifNotNil: [ :savedMode |
-		CopilotContextSettings mode: savedMode ].
-	"Convert templatesDirectory path string back to FileReference"
+		completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ nil ].
+	(aDictionary at: #contextMode ifAbsent: [ nil ]) ifNotNil: [ :savedMode | CopilotContextSettings mode: savedMode ]. "Convert templatesDirectory path string back to FileReference"
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
 	templatesPath ifNotNil: [
 			templatesDirectory := [ templatesPath asFileReference ]
@@ -1404,9 +1423,10 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	numCtx := aDictionary at: #numCtx ifAbsent: [ nil ].
 	seed := aDictionary at: #seed ifAbsent: [ nil ].
 	customParameters := aDictionary at: #customParameters ifAbsent: [ Dictionary new ].
-maxInstanceMethods := aDictionary at: #maxInstanceMethods ifAbsent: [ aDictionary at: #MaxInstanceMethods ifAbsent: [ nil ] ].
+	maxInstanceMethods := aDictionary at: #maxInstanceMethods ifAbsent: [ aDictionary at: #MaxInstanceMethods ifAbsent: [ nil ] ].
 	maxClassMethods := aDictionary at: #maxClassMethods ifAbsent: [ aDictionary at: #MaxClassMethods ifAbsent: [ nil ] ].
 	minimumPrefixLength := aDictionary at: #minimumPrefixLength ifAbsent: [ aDictionary at: #MinimumPrefixLength ifAbsent: [ nil ] ].
+completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ aDictionary at: #CompletionSuggestionsCount ifAbsent: [ nil ] ].
 ]
 
 { #category : 'accessing' }
@@ -1512,7 +1532,8 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #maxInstanceMethods put: maxInstanceMethods;
 		            at: #maxClassMethods put: maxClassMethods;
 		            at: #minimumPrefixLength put: minimumPrefixLength;
-		at: #contextMode put: CopilotContextSettings mode;
+		            at: #contextMode put: CopilotContextSettings mode;
+		at: #completionSuggestionsCount put: completionSuggestionsCount;
 		            yourself.
 	templatesDirectory ifNotNil: [
 			templatesPath := [ templatesDirectory pathString ]
@@ -1634,7 +1655,8 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #maxInstanceMethods;
 					setSelector: #maxInstanceMethods:;
 					default: self maxInstanceMethods;
-					description: 'Maximum number of instance-side methods to include in the class context sent with completions (1-200). Default: 30'.
+					description:
+						'Maximum number of instance-side methods to include in the class context sent with completions (1-200). Default: 30'.
 
 				(aBuilder setting: #maxClassMethods)
 					order: 0.67;
@@ -1643,7 +1665,8 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #maxClassMethods;
 					setSelector: #maxClassMethods:;
 					default: self maxClassMethods;
-					description: 'Maximum number of class-side methods to include in the class context sent with completions (1-100). Default: 15'.
+					description:
+						'Maximum number of class-side methods to include in the class context sent with completions (1-100). Default: 15'.
 
 				(aBuilder setting: #minimumPrefixLength)
 					order: 0.68;
@@ -1653,7 +1676,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #minimumPrefixLength:;
 					default: self minimumPrefixLength;
 					description: 'Minimum number of characters typed before requesting a completion (1-20). Default: 2'.
-					
+
 				(aBuilder setting: #requestTimeoutSeconds)
 					order: 0.7;
 					label: 'Request timeout (sec)';
@@ -1663,6 +1686,15 @@ CopilotSettings class >> settingsOn: aBuilder [
 					default: self requestTimeoutSeconds;
 					description: 'Seconds to wait for Ollama responses before timing out (1-120).'.
 
+	(aBuilder setting: #completionSuggestionsCount)
+					order: 0.69;
+					label: 'Completion suggestions';
+					target: self;
+					getSelector: #completionSuggestionsCount;
+					setSelector: #completionSuggestionsCount:;
+					default: self completionSuggestionsCount;
+					description: 'How many completion alternatives to request per trigger (1-10). Default: 3'.
+					
 				(aBuilder setting: #modelInstallTimeoutSeconds)
 					order: 0.75;
 					label: 'Model install timeout (sec)';
@@ -1783,9 +1815,10 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #numCtx put: numCtx;
 		  at: #seed put: seed;
 		  at: #customParameters put: customParameters;
-		 at: #maxInstanceMethods put: maxInstanceMethods;
+		  at: #maxInstanceMethods put: maxInstanceMethods;
 		  at: #maxClassMethods put: maxClassMethods;
 		  at: #minimumPrefixLength put: minimumPrefixLength;
+		 at: #completionSuggestionsCount put: completionSuggestionsCount;
 		  yourself
 ]
 

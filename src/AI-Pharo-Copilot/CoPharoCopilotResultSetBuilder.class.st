@@ -28,27 +28,39 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
-	"Never delete user-typed text. Prefer INSERT at caret; fallback to safe append."
-	"Instead of directly inserting, show a menu with the suggestion for the user to select."
+	
+	"Backward compatible single-content entry point."
+
+	self
+		applyContents: { contentString }
+		toContext: aContext
+		expectedPrefix: expectedPrefix
+		suffix: expectedSuffix
+		contextInfo: contextInfo
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [ 
+
+| snapshot currentPrefix currentSuffix entries position |
+aContext ifNil: [ ^ self ].
  
-	| snapshot currentPrefix currentSuffix entry entries position |
-	contentString isEmpty ifTrue: [ ^ self ].
-	aContext ifNil: [ ^ self ].
- 
-	snapshot := self contextSnapshotFor: aContext.
+	contentCollection ifNil: [ ^ self ].
+		snapshot := self contextSnapshotFor: aContext.
 	currentPrefix := snapshot at: #prefix.
 	currentSuffix := snapshot at: #suffix.
  
+
 	((currentPrefix = expectedPrefix) and: [ currentSuffix = expectedSuffix ]) ifFalse: [ ^ self ].
- 
-	"Create an entry for this suggestion"
-	entry := CoCopilotEntry contents: contentString.
-	entries := { entry }.
- 
-	"Get the cursor position for the menu"
+	
+	entries := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
+		select: [ :each | each isEmpty not ].
+	entries := entries collect: [ :each | CoCopilotEntry contents: each ].
+	entries isEmpty ifTrue: [ ^ self ].
+
 	position := self menuPositionFor: aContext.
- 
-	"Show the menu on the UI thread"
+	
+	
 	self deferUI: [
 		self closeMenu.
 		menuMorph := CopilotMenuMorph
@@ -56,10 +68,9 @@ CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContex
 			context: aContext
 			entries: entries
 			position: position.
- 
-		"Take keyboard focus"
-		menuMorph takeKeyboardFocus
-		]
+			
+				menuMorph takeKeyboardFocus ]
+	
 ]
 
 { #category : 'API - building' }
@@ -264,6 +275,41 @@ CoPharoCopilotResultSetBuilder >> closeMenu [
 		menuMorph isClosed ifFalse: [ menuMorph delete ].
 		menuMorph := nil
 	]
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix: prefixString suffix: suffixString context: classContext contextInfo: contextInfo [
+
+
+| desiredCount collected seen |
+	desiredCount := CopilotSettings completionSuggestionsCount.
+	collected := OrderedCollection new.
+	seen := Set new.
+
+	1 to: desiredCount do: [ :attempt |
+		| rawResponse rawResponseString content |
+		rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
+		rawResponseString := [ rawResponse asString ]
+			on: Error
+			do: [ rawResponse printString ].
+
+		CoCopilotLogger
+			logBackEndEvent: 'Received raw suggestion payload'
+			details: (Dictionary new
+				at: #attempt put: attempt;
+				at: #rawResponseClass put: rawResponse class name;
+				at: #rawResponse put: rawResponseString;
+				yourself).
+				content := self extractResponseContentFromRaw: rawResponseString.
+		content := self cleanedContentFrom: content.
+		(content isEmpty not and: [ seen includes: content ]) ifFalse: [
+			content isEmpty ifFalse: [
+				seen add: content.
+				collected add: content ] ] ].
+
+	contextInfo at: #rawSuggestions put: collected asArray.
+	^ collected asArray
+	
 ]
 
 { #category : 'private' }
@@ -599,11 +645,11 @@ CoPharoCopilotResultSetBuilder >> normalizedDelayMilliseconds: anObject default:
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
-	"Call Ollama, normalize the response into plain text, then apply it if the editor context is unchanged."
+	"Call Ollama, collect multiple completion alternatives, and apply them if the editor context is unchanged."
 
 	| classContext |
 	[
-		| client rawResponse rawResponseString content |
+		| client suggestions |
 		CoCopilotLogger logFrontEndEvent: 'Preparing completion request' details: contextInfo.
 
 		client := OllamaClient new.
@@ -612,35 +658,23 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 		contextInfo
 			at: #classContextLength put: classContext size;
 			at: #classContextPresent put: classContext isEmpty not.
-		
 
-		rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
-
-		rawResponseString := [ rawResponse asString ]
-			on: Error
-			do: [ rawResponse printString ].
-
-		CoCopilotLogger
-			logBackEndEvent: 'Received raw suggestion payload'
-			details: (Dictionary new
-				at: #rawResponseClass put: rawResponse class name;
-				at: #rawResponse put: rawResponseString;
-				yourself).
-
-		contextInfo at: #rawResponse put: rawResponseString.
-
-		content := self extractResponseContentFromRaw: rawResponseString.
-		content := self cleanedContentFrom: content.
+		suggestions := self
+			collectNormalizedSuggestionsFor: client
+			prefix: prefixString
+			suffix: suffixString
+			context: classContext
+			contextInfo: contextInfo.
 
 		CoCopilotLogger
 			logBackEndEvent: 'Normalized suggestion content'
 			details: (Dictionary new
-				at: #cleanedContent put: content;
-				at: #cleanedLength put: content size;
+			
+		at: #suggestionCount put: suggestions size;
+				at: #suggestions put: suggestions;
 				yourself).
 
-		self
-			applyContent: content
+		self applyContents: suggestions
 			toContext: aContext
 			expectedPrefix: prefixString
 			suffix: suffixString
@@ -657,6 +691,27 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 					at: #prefixLength put: prefixString size;
 					at: #suffixLength put: suffixString size;
 					yourself) ]
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> removeEchoedPrefix: contentString prefix: prefixString [
+	"Strip the prefix from the beginning of the content if the model echoed it back.
+	In FIM mode the model should only return the middle (new) text, not repeat the prefix."
+
+	| trimmedPrefix trimmedContent |
+	(contentString isEmpty or: [ prefixString isEmpty ]) ifTrue: [ ^ contentString ].
+
+	"Exact match"
+	(contentString beginsWith: prefixString) ifTrue: [
+		^ contentString allButFirst: prefixString size ].
+
+	"Trimmed match — some models add/remove whitespace around the echoed prefix"
+	trimmedPrefix := prefixString trimRight.
+	trimmedContent := contentString trimLeft.
+	(trimmedPrefix isEmpty not and: [ trimmedContent beginsWith: trimmedPrefix ]) ifTrue: [
+		^ trimmedContent allButFirst: trimmedPrefix size ].
+
+	^ contentString
 ]
 
 { #category : 'private' }
