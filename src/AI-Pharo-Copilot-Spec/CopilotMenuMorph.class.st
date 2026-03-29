@@ -19,7 +19,7 @@ Class {
 { #category : 'accessing' }
 CopilotMenuMorph class >> backgroundColor [ 
 
-	^ Color r: 0.95 g: 0.95 b: 0.97 "Soft light blue-gray background"
+^ CopilotSettings backgroundColor
 
 ]
 

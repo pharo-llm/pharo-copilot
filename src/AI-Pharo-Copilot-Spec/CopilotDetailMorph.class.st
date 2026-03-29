@@ -43,7 +43,7 @@ CopilotDetailMorph >> contentBounds [
 { #category : 'accessing - defaults' }
 CopilotDetailMorph >> defaultColor [
 
-	^ Color r: 0.96 g: 0.96 b: 0.98 "Soft light gray-blue background matching menu"
+	^ CopilotSettings backgroundColor
 ]
 
 { #category : 'geometry' }

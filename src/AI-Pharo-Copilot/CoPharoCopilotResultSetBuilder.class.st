@@ -55,6 +55,7 @@ CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aC
 	(currentPrefix = expectedPrefix and: [ currentSuffix = expectedSuffix ]) ifFalse: [ ^ self ].
 
 	entries := (contentCollection collect: [ :each | self cleanedContentFrom: each ]) select: [ :each | each isEmpty not ].
+	entries isEmpty ifTrue: [ ^ self ].
 	entries := entries collect: [ :each | CoCopilotEntry contents: each ].
 
 	position := self menuPositionFor: aContext.
@@ -538,48 +539,48 @@ CoPharoCopilotResultSetBuilder >> menuClosed [
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> menuPositionFor: aContext [
-	| editor textArea position |
 
-	[ editor := aContext editor ] on: Error do: [ ^ nil ].
+	| editor textArea position |
+	[ editor := aContext editor ]
+		on: Error
+		do: [ ^ nil ].
 	editor ifNil: [ ^ nil ].
 
-	textArea := [ editor textArea ] on: Error do: [ nil ].
+	textArea := [ editor textArea ]
+		            on: Error
+		            do: [ nil ].
 	textArea ifNil: [
-		textArea := [ editor morph ] on: Error do: [ nil ].
-		textArea ifNil: [ ^ nil ]
-	].
+			textArea := [ editor morph ]
+				            on: Error
+				            do: [ nil ].
+			textArea ifNil: [ ^ nil ] ].
 
-	position := [ aContext position ] on: Error do: [ nil ].
+	position := [ aContext position ]
+		            on: Error
+		            do: [ nil ].
 	position ifNil: [
-		position := [ editor caret ] on: Error do: [ nil ]
-	].
+			position := [ editor caret ]
+				            on: Error
+				            do: [ nil ] ].
 	position ifNil: [ ^ nil ].
 
 	[
 		| paragraph charBlock |
 		paragraph := textArea paragraph.
 		paragraph ifNotNil: [
-			charBlock := paragraph characterBlockForIndex: position.
-			charBlock ifNotNil: [
-				^ textArea localPointToGlobal: charBlock bottomLeft
-			]
-		]
-	] on: Error do: [ "fall through to fallback" ].
-
-	"Try cursor bounds if available (Rubric text areas)"
+				charBlock := paragraph characterBlockForIndex: position.
+				charBlock ifNotNil: [ ^ textArea localPointToGlobal: charBlock bottomLeft ] ] ]
+		on: Error
+		do: [ "" ].
 	[
 		| cursor cursorBounds |
 		cursor := textArea cursor.
 		cursor ifNotNil: [
-			cursorBounds := cursor bounds.
-			cursorBounds ifNotNil: [
-				^ textArea localPointToGlobal: cursorBounds bottomLeft
-			]
-		]
-	] on: Error do: [ "fall through to fallback" ].
-
-	"No reliable position found"
-	^ nil
+				cursorBounds := cursor bounds.
+				cursorBounds ifNotNil: [ ^ textArea localPointToGlobal: cursorBounds bottomLeft ] ] ]
+		on: Error
+		do: [ "" ].
+	^ [ textArea boundsInWorld bottomLeft ] on: Error do: [ nil ]
 ]
 
 { #category : 'initialization' }

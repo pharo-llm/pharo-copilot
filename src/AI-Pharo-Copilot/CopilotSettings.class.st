@@ -34,7 +34,8 @@ Class {
 		'maxInstanceMethods',
 		'maxClassMethods',
 		'minimumPrefixLength',
-		'completionSuggestionsCount'
+		'completionSuggestionsCount',
+		'backgroundColor'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -111,6 +112,21 @@ CopilotSettings class >> availableProviders [
 	"Answer the supported provider symbols."
 
 	^ { #ollama }
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> backgroundColor [
+	"Answer the background color for the Copilot completion menu."
+
+	^ backgroundColor ifNil: [ self defaultBackgroundColor ]
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> backgroundColor: aColor [
+	"Set the background color for the Copilot completion menu."
+
+	backgroundColor := aColor.
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -238,6 +254,13 @@ CopilotSettings class >> customParameters: aDictionary [
 
 	customParameters := aDictionary ifNil: [ Dictionary new ].
 	self autoSaveSettings
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> defaultBackgroundColor [
+	"Answer the default background color for the Copilot completion menu."
+
+	^ Color r: 0.95 g: 0.95 b: 0.97
 ]
 
 { #category : 'accessing' }
@@ -1346,7 +1369,8 @@ CopilotSettings class >> resetToDefaultSettings [
 	maxInstanceMethods := nil.
 	maxClassMethods := nil.
 	minimumPrefixLength := nil.
-	completionSuggestionsCount := nil
+	completionSuggestionsCount := nil.
+	backgroundColor := nil
 ]
 
 { #category : 'persistence' }
@@ -1377,6 +1401,7 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	maxClassMethods := aDictionary at: #maxClassMethods ifAbsent: [ nil ].
 	minimumPrefixLength := aDictionary at: #minimumPrefixLength ifAbsent: [ nil ].
 		completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ nil ].
+		backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ nil ].
 	(aDictionary at: #contextMode ifAbsent: [ nil ]) ifNotNil: [ :savedMode | CopilotContextSettings mode: savedMode ]. "Convert templatesDirectory path string back to FileReference"
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
 	templatesPath ifNotNil: [
@@ -1427,6 +1452,7 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	maxClassMethods := aDictionary at: #maxClassMethods ifAbsent: [ aDictionary at: #MaxClassMethods ifAbsent: [ nil ] ].
 	minimumPrefixLength := aDictionary at: #minimumPrefixLength ifAbsent: [ aDictionary at: #MinimumPrefixLength ifAbsent: [ nil ] ].
 completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ aDictionary at: #CompletionSuggestionsCount ifAbsent: [ nil ] ].
+backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ aDictionary at: #BackgroundColor ifAbsent: [ nil ] ].
 ]
 
 { #category : 'accessing' }
@@ -1534,6 +1560,7 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #minimumPrefixLength put: minimumPrefixLength;
 		            at: #contextMode put: CopilotContextSettings mode;
 		at: #completionSuggestionsCount put: completionSuggestionsCount;
+		at: #backgroundColor put: backgroundColor;
 		            yourself.
 	templatesDirectory ifNotNil: [
 			templatesPath := [ templatesDirectory pathString ]
@@ -1719,6 +1746,15 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #port;
 					setSelector: #port:;
 					default: self port.
+					
+				(aBuilder setting: #backgroundColor)
+					order: 2.5;
+					label: 'Background Color';
+					target: self;
+					getSelector: #backgroundColor;
+					setSelector: #backgroundColor:;
+					default: self defaultBackgroundColor;
+					description: 'Background color for the Copilot completion popup menu.'.
 				(aBuilder group: #ollamaParameters)
 					order: 3;
 					label: 'Ollama Parameters';
@@ -1819,6 +1855,7 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #maxClassMethods put: maxClassMethods;
 		  at: #minimumPrefixLength put: minimumPrefixLength;
 		 at: #completionSuggestionsCount put: completionSuggestionsCount;
+		at: #backgroundColor put: backgroundColor;
 		  yourself
 ]
 
