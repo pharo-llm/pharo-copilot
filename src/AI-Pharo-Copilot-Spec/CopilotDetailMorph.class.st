@@ -97,25 +97,27 @@ CopilotDetailMorph >> initialize [
 
 { #category : 'geometry' }
 CopilotDetailMorph >> position: aPoint menuWidth: anInteger [
-
 	"Position the detail morph next to the menu, accounting for screen boundaries."
 
-	| y x |
+	| world y x |
 	arrowPosition := aPoint.
 
 	"Try to position to the right of the menu"
 	x := aPoint x + 10.
 	y := aPoint y.
 
+	world := self currentWorld.
+	world ifNil: [ ^ self position: x @ y ].
+
 	"If it would go off screen, position to the left instead"
-	(x + self class width > self currentWorld width) ifTrue: [
+	(x + self class width > world width) ifTrue: [
 		x := aPoint x - self class width - anInteger - 10.
 		arrowPosition := (aPoint x - anInteger) @ aPoint y
 	].
 
 	"Keep it on screen vertically"
-	(y + self class height > self currentWorld height) ifTrue: [
-		y := self currentWorld height - self class height
+	(y + self class height > world height) ifTrue: [
+		y := world height - self class height
 	].
 
 	self position: x @ y

@@ -44,32 +44,93 @@ CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContex
 CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
 
 	| snapshot currentPrefix currentSuffix entries position |
-	aContext ifNil: [ ^ self ].
+	aContext ifNil: [
+		CoCopilotLogger
+			logFrontEndEvent: 'Skipping completion menu: nil context'
+			details: Dictionary new.
+		^ self
+	].
 
-	contentCollection ifNil: [ ^ self ].
+	contentCollection ifNil: [
+		CoCopilotLogger
+			logFrontEndEvent: 'Skipping completion menu: nil content collection'
+			details: Dictionary new.
+		^ self
+	].
+
 	snapshot := self contextSnapshotFor: aContext.
 	currentPrefix := snapshot at: #prefix.
 	currentSuffix := snapshot at: #suffix.
 
+	(currentPrefix = expectedPrefix and: [ currentSuffix = expectedSuffix ]) ifFalse: [
+		CoCopilotLogger
+			logFrontEndEvent: 'Skipping completion menu: stale context'
+			details: (Dictionary new
+				at: #expectedPrefixLength put: expectedPrefix size;
+				at: #currentPrefixLength put: currentPrefix size;
+				at: #expectedSuffixLength put: expectedSuffix size;
+				at: #currentSuffixLength put: currentSuffix size;
+				yourself).
+		^ self
+	].
 
-	(currentPrefix = expectedPrefix and: [ currentSuffix = expectedSuffix ]) ifFalse: [ ^ self ].
+	entries := (contentCollection
+		collect: [ :each | self cleanedContentFrom: each ])
+		select: [ :each | each isEmpty not ].
 
-	entries := (contentCollection collect: [ :each | self cleanedContentFrom: each ]) select: [ :each | each isEmpty not ].
-	entries isEmpty ifTrue: [ ^ self ].
+	entries isEmpty ifTrue: [
+		CoCopilotLogger
+			logFrontEndEvent: 'Skipping completion menu: no entries after cleaning'
+			details: (Dictionary new
+				at: #rawSuggestionCount put: contentCollection size;
+				yourself).
+		^ self
+	].
+
 	entries := entries collect: [ :each | CoCopilotEntry contents: each ].
 
 	position := self menuPositionFor: aContext.
-	position ifNil: [ ^ self ].
+	position ifNil: [
+		CoCopilotLogger
+			logFrontEndEvent: 'Completion menu position unavailable'
+			details: (Dictionary new
+				at: #contextClass put: aContext class name;
+				at: #hasEditorAccessor put: (aContext respondsTo: #editor);
+				yourself).
+		position := 20 @ 20
+	].
 
 	self deferUI: [
+		[
 			self closeMenu.
 			menuMorph := CopilotMenuMorph
-				             builder: self
-				             context: aContext
-				             entries: entries
-				             position: position.
+				builder: self
+				context: aContext
+				entries: entries
+				position: position.
 
-			menuMorph takeKeyboardFocus ]
+			(menuMorph respondsTo: #takeKeyboardFocus) ifTrue: [
+				menuMorph takeKeyboardFocus
+			].
+
+			CoCopilotLogger
+				logFrontEndEvent: 'Opened completion menu'
+				details: (Dictionary new
+					at: #entryCount put: entries size;
+					at: #position put: position printString;
+					yourself)
+		]
+			on: Error
+			do: [ :ex |
+				CoCopilotLogger
+					logError: 'Failed to open completion menu'
+					origin: #CoPharoCopilotResultSetBuilder
+					exception: ex
+					payload: (Dictionary new
+						at: #entryCount put: entries size;
+						at: #position put: position printString;
+						yourself) ]
+	]
 ]
 
 { #category : 'API - building' }
@@ -279,8 +340,7 @@ CoPharoCopilotResultSetBuilder >> closeMenu [
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix: prefixString suffix: suffixString context: classContext contextInfo: contextInfo [
 
-
-| desiredCount collected seen |
+	| desiredCount collected seen |
 	desiredCount := CopilotSettings completionSuggestionsCount.
 	collected := OrderedCollection new.
 	seen := Set new.
@@ -299,8 +359,11 @@ CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix
 				at: #rawResponseClass put: rawResponse class name;
 				at: #rawResponse put: rawResponseString;
 				yourself).
-				content := self extractResponseContentFromRaw: rawResponseString.
+
+		content := self extractResponseContentFromRaw: rawResponseString.
+		content := self removeEchoedPrefix: content prefix: prefixString.
 		content := self cleanedContentFrom: content.
+
 		(content isEmpty not and: [ seen includes: content ]) ifFalse: [
 			content isEmpty ifFalse: [
 				seen add: content.
@@ -308,7 +371,6 @@ CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix
 
 	contextInfo at: #rawSuggestions put: collected asArray.
 	^ collected asArray
-	
 ]
 
 { #category : 'initialization' }
@@ -372,15 +434,20 @@ CoPharoCopilotResultSetBuilder >> debounceMilliseconds: anInteger [
 	debounceMilliseconds := self normalizedDelayMilliseconds: anInteger default: CopilotSettings completionDebounceMilliseconds
 ]
 
-{ #category : 'private' }
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> deferUI: aBlock [
+	"Run UI work on Morphic's deferred UI queue when possible."
 
-	"Best-effort: run editor mutation on UI process."
-	| uiClass ui |
+	| worldStateClass uiClass ui |
+	worldStateClass := Smalltalk globals at: #WorldState ifAbsent: [ nil ].
+	(worldStateClass notNil and: [ worldStateClass respondsTo: #addDeferredUIMessage: ]) ifTrue: [
+		^ worldStateClass addDeferredUIMessage: aBlock
+	].
+
 	uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
 	(uiClass notNil and: [ uiClass respondsTo: #default ]) ifTrue: [
 		ui := uiClass default.
-		(ui respondsTo: #defer:) ifTrue: [ ^ ui defer: aBlock ].
+		(ui respondsTo: #defer:) ifTrue: [ ^ ui defer: aBlock ]
 	].
 
 	^ aBlock value

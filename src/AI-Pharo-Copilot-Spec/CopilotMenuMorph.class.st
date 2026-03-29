@@ -78,21 +78,23 @@ CopilotMenuMorph >> builder: aBuilder context: aContext entries: entryCollection
 	entries := entryCollection asArray.
 
 	self resize.
+	self openInWorld.
 	self position: (self clampPosition: aPoint).
 	self selectedIndex: (entries isEmpty
-			 ifTrue: [ 0 ]
-			 ifFalse: [ 1 ]).
-	self openInWorld
+		ifTrue: [ 0 ]
+		ifFalse: [ 1 ]).
+	self changed
 ]
 
 { #category : 'private' }
 CopilotMenuMorph >> clampPosition: aPoint [
-
 	"Ensure the menu stays within the visible screen area."
 
-	| x y worldWidth worldHeight |
-	worldWidth := self currentWorld width.
-	worldHeight := self currentWorld height.
+	| world x y worldWidth worldHeight |
+	world := self currentWorld ifNil: [ ^ aPoint ].
+
+	worldWidth := world width.
+	worldHeight := world height.
 	x := aPoint x.
 	y := aPoint y.
 
