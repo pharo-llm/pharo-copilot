@@ -78,6 +78,7 @@ CopilotMenuMorph >> builder: aBuilder context: aContext entries: entryCollection
 	entries := entryCollection asArray.
 
 	self resize.
+	self position: (self clampPosition: aPoint).
 	self selectedIndex: (entries isEmpty
 			 ifTrue: [ 0 ]
 			 ifFalse: [ 1 ]).

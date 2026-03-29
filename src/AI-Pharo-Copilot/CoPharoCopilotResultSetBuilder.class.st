@@ -58,7 +58,7 @@ CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aC
 	entries := entries collect: [ :each | CoCopilotEntry contents: each ].
 
 	position := self menuPositionFor: aContext.
-
+	position ifNil: [ ^ self ].
 
 	self deferUI: [
 			self closeMenu.
@@ -538,29 +538,23 @@ CoPharoCopilotResultSetBuilder >> menuClosed [
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> menuPositionFor: aContext [
-	"Calculate the position where the menu should appear, near the cursor.
-	Returns nil when a reliable position cannot be determined."
-
 	| editor textArea position |
 
 	[ editor := aContext editor ] on: Error do: [ ^ nil ].
 	editor ifNil: [ ^ nil ].
 
-	"Get the text area (try textArea first, then morph)"
 	textArea := [ editor textArea ] on: Error do: [ nil ].
 	textArea ifNil: [
 		textArea := [ editor morph ] on: Error do: [ nil ].
 		textArea ifNil: [ ^ nil ]
 	].
 
-	"Get the cursor text position from context or editor"
 	position := [ aContext position ] on: Error do: [ nil ].
 	position ifNil: [
 		position := [ editor caret ] on: Error do: [ nil ]
 	].
 	position ifNil: [ ^ nil ].
 
-	"Try to get character block at cursor position for precise positioning"
 	[
 		| paragraph charBlock |
 		paragraph := textArea paragraph.
@@ -659,7 +653,7 @@ CoPharoCopilotResultSetBuilder >> normalizedDelayMilliseconds: anObject default:
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 	"Call Ollama, collect multiple completion alternatives, and apply them if the editor context is unchanged."
 
-	| classContext cachedContent content |
+	| classContext cachedContent |
 	[
 		| client suggestions |
 		CoCopilotLogger logFrontEndEvent: 'Preparing completion request' details: contextInfo.
@@ -705,10 +699,10 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 
 
 	"Store in cache for future lookups"
-		content isEmpty ifFalse: [
+		suggestions isEmpty ifFalse: [
 			self completionCache
 				at: prefixString suffix: suffixString context: classContext
-				put: content ].
+				put: suggestions first ].
 			
 			
 			
