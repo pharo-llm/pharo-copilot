@@ -41,37 +41,34 @@ CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContex
 ]
 
 { #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [ 
+CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
 
-| snapshot currentPrefix currentSuffix entries position |
-aContext ifNil: [ ^ self ].
- 
+	| snapshot currentPrefix currentSuffix entries position |
+	aContext ifNil: [ ^ self ].
+
 	contentCollection ifNil: [ ^ self ].
-		snapshot := self contextSnapshotFor: aContext.
+	snapshot := self contextSnapshotFor: aContext.
 	currentPrefix := snapshot at: #prefix.
 	currentSuffix := snapshot at: #suffix.
- 
 
-	((currentPrefix = expectedPrefix) and: [ currentSuffix = expectedSuffix ]) ifFalse: [ ^ self ].
-	
-	entries := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
-		select: [ :each | each isEmpty not ].
+
+	(currentPrefix = expectedPrefix and: [ currentSuffix = expectedSuffix ]) ifFalse: [ ^ self ].
+
+	entries := (contentCollection collect: [ :each | self cleanedContentFrom: each ]) select: [ :each | each isEmpty not ].
 	entries := entries collect: [ :each | CoCopilotEntry contents: each ].
-	entries isEmpty ifTrue: [ ^ self ].
 
 	position := self menuPositionFor: aContext.
-	
-	
+
+
 	self deferUI: [
-		self closeMenu.
-		menuMorph := CopilotMenuMorph
-			builder: self
-			context: aContext
-			entries: entries
-			position: position.
-			
-				menuMorph takeKeyboardFocus ]
-	
+			self closeMenu.
+			menuMorph := CopilotMenuMorph
+				             builder: self
+				             context: aContext
+				             entries: entries
+				             position: position.
+
+			menuMorph takeKeyboardFocus ]
 ]
 
 { #category : 'API - building' }
@@ -541,35 +538,36 @@ CoPharoCopilotResultSetBuilder >> menuClosed [
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> menuPositionFor: aContext [
-	"Calculate the position where the menu should appear, near the cursor."
+	"Calculate the position where the menu should appear, near the cursor.
+	Returns nil when a reliable position cannot be determined."
 
-	| editor textArea position charBlock worldOrigin |
-	[ editor := aContext editor ] on: Error do: [ ^ 0 @ 0 ].
-	editor ifNil: [ ^ 0 @ 0 ].
+	| editor textArea position |
+
+	[ editor := aContext editor ] on: Error do: [ ^ nil ].
+	editor ifNil: [ ^ nil ].
 
 	"Get the text area (try textArea first, then morph)"
 	textArea := [ editor textArea ] on: Error do: [ nil ].
 	textArea ifNil: [
 		textArea := [ editor morph ] on: Error do: [ nil ].
-		textArea ifNil: [ ^ 0 @ 0 ]
+		textArea ifNil: [ ^ nil ]
 	].
 
 	"Get the cursor text position from context or editor"
 	position := [ aContext position ] on: Error do: [ nil ].
 	position ifNil: [
-		position := [ editor caret ] on: Error do: [ 1 ]
+		position := [ editor caret ] on: Error do: [ nil ]
 	].
-	position ifNil: [ position := 1 ].
+	position ifNil: [ ^ nil ].
 
 	"Try to get character block at cursor position for precise positioning"
 	[
-		| paragraph |
+		| paragraph charBlock |
 		paragraph := textArea paragraph.
 		paragraph ifNotNil: [
-			charBlock := paragraph characterBlockAtIndex: position.
+			charBlock := paragraph characterBlockForIndex: position.
 			charBlock ifNotNil: [
-				worldOrigin := textArea boundsInWorld origin.
-				^ worldOrigin + charBlock bottomLeft
+				^ textArea localPointToGlobal: charBlock bottomLeft
 			]
 		]
 	] on: Error do: [ "fall through to fallback" ].
@@ -581,13 +579,13 @@ CoPharoCopilotResultSetBuilder >> menuPositionFor: aContext [
 		cursor ifNotNil: [
 			cursorBounds := cursor bounds.
 			cursorBounds ifNotNil: [
-				^ (textArea localPointToGlobal: cursorBounds bottomLeft)
+				^ textArea localPointToGlobal: cursorBounds bottomLeft
 			]
 		]
 	] on: Error do: [ "fall through to fallback" ].
 
-	"Fallback: use text area position"
-	^ textArea boundsInWorld bottomLeft
+	"No reliable position found"
+	^ nil
 ]
 
 { #category : 'initialization' }
