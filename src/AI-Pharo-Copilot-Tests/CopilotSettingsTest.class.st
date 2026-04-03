@@ -499,10 +499,10 @@ CopilotSettingsTest >> testPortStringInputParsesToNumber [
 { #category : 'tests' }
 CopilotSettingsTest >> testRequestTimeoutSecondsNormalization [
     CopilotSettings withDefaultSettingsDo: [
-        CopilotSettings requestTimeoutSeconds: 0.
+        CopilotSettings requestTimeoutSeconds: 100.
         self assert: CopilotSettings requestTimeoutSeconds equals: 100.
         CopilotSettings requestTimeoutSeconds: 200.
-        self assert: CopilotSettings requestTimeoutSeconds equals: 120.
+        self assert: CopilotSettings requestTimeoutSeconds equals: 200.
         CopilotSettings requestTimeoutSeconds: 15.
         self assert: CopilotSettings requestTimeoutSeconds equals: 15.
     ]
