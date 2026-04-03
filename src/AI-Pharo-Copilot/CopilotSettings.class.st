@@ -118,7 +118,13 @@ CopilotSettings class >> availableProviders [
 CopilotSettings class >> backgroundColor [
 	"Answer the background color for the Copilot completion menu."
 
-	^ self theme windowColorFor: self
+	| uiThemeClass theme |
+	uiThemeClass := Smalltalk globals at: #UITheme ifAbsent: [ nil ].
+	uiThemeClass ifNotNil: [
+		(uiThemeClass respondsTo: #current) ifTrue: [
+			theme := uiThemeClass current.
+			(theme respondsTo: #windowColor) ifTrue: [ ^ theme windowColor ] ] ].
+	^ Color darkGray
 ]
 
 { #category : 'accessing' }
@@ -260,7 +266,13 @@ CopilotSettings class >> customParameters: aDictionary [
 CopilotSettings class >> defaultBackgroundColor [
 	"Answer the default background color for the Copilot completion menu."
 
-	^ self theme windowColorFor: self
+	| uiThemeClass theme |
+	uiThemeClass := Smalltalk globals at: #UITheme ifAbsent: [ nil ].
+	uiThemeClass ifNotNil: [
+		(uiThemeClass respondsTo: #current) ifTrue: [
+			theme := uiThemeClass current.
+			(theme respondsTo: #windowColor) ifTrue: [ ^ theme windowColor ] ] ].
+	^ Color darkGray
 ]
 
 { #category : 'accessing' }
