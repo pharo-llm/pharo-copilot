@@ -70,7 +70,7 @@ CopilotMenuMorph >> browse [
 ]
 
 { #category : 'private' }
-CopilotMenuMorph >> builder: aBuilder context: aContext entries: entryCollection position: aPoint [
+CopilotMenuMorph >> builder: aBuilder context: aContext entries: entryCollection position: aPoint [ 
 	"Initialize the menu with entries and display it at the given position."
 
 	builder := aBuilder.
@@ -79,7 +79,7 @@ CopilotMenuMorph >> builder: aBuilder context: aContext entries: entryCollection
 
 	self resize.
 	self openInWorld.
-	self position: (self clampPosition: aPoint).
+	self position: (self clampPosition: (aPoint - (20 @ 0))).
 	self selectedIndex: (entries isEmpty
 		ifTrue: [ 0 ]
 		ifFalse: [ 1 ]).
@@ -96,17 +96,9 @@ CopilotMenuMorph >> clampPosition: aPoint [
 	worldWidth := world width.
 	worldHeight := world height.
 	x := aPoint x.
-	y := aPoint y.
-
-	"If the menu would go off the right edge, shift left"
-	(x + self width > worldWidth) ifTrue: [
-		x := worldWidth - self width ].
-
-	"If the menu would go off the bottom edge, show it above the anchor point"
-	(y + self height > worldHeight) ifTrue: [
-		y := aPoint y - self height ].
-
-	"Keep on screen"
+	y := aPoint y. "If the menu would go off the right edge, shift left"
+	x + self width > worldWidth ifTrue: [ x := worldWidth - self width ]. "If the menu would go off the bottom edge, show it above the anchor point"
+	y + self height > worldHeight ifTrue: [ y := aPoint y - self height ]. "Keep on screen"
 	x := x max: 0.
 	y := y max: 0.
 

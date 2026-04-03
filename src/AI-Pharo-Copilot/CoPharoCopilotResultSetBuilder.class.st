@@ -45,92 +45,69 @@ CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aC
 
 	| snapshot currentPrefix currentSuffix entries position |
 	aContext ifNil: [
-		CoCopilotLogger
-			logFrontEndEvent: 'Skipping completion menu: nil context'
-			details: Dictionary new.
-		^ self
-	].
+			CoCopilotLogger logFrontEndEvent: 'Skipping completion menu: nil context' details: Dictionary new.
+			^ self ].
 
 	contentCollection ifNil: [
-		CoCopilotLogger
-			logFrontEndEvent: 'Skipping completion menu: nil content collection'
-			details: Dictionary new.
-		^ self
-	].
+			CoCopilotLogger logFrontEndEvent: 'Skipping completion menu: nil content collection' details: Dictionary new.
+			^ self ].
 
 	snapshot := self contextSnapshotFor: aContext.
 	currentPrefix := snapshot at: #prefix.
 	currentSuffix := snapshot at: #suffix.
 
 	(currentPrefix = expectedPrefix and: [ currentSuffix = expectedSuffix ]) ifFalse: [
-		CoCopilotLogger
-			logFrontEndEvent: 'Skipping completion menu: stale context'
-			details: (Dictionary new
-				at: #expectedPrefixLength put: expectedPrefix size;
-				at: #currentPrefixLength put: currentPrefix size;
-				at: #expectedSuffixLength put: expectedSuffix size;
-				at: #currentSuffixLength put: currentSuffix size;
-				yourself).
-		^ self
-	].
+			CoCopilotLogger logFrontEndEvent: 'Skipping completion menu: stale context' details: (Dictionary new
+					 at: #expectedPrefixLength put: expectedPrefix size;
+					 at: #currentPrefixLength put: currentPrefix size;
+					 at: #expectedSuffixLength put: expectedSuffix size;
+					 at: #currentSuffixLength put: currentSuffix size;
+					 yourself).
+			^ self ].
 
-	entries := (contentCollection
-		collect: [ :each | self cleanedContentFrom: each ])
-		select: [ :each | each isEmpty not ].
+	entries := (contentCollection collect: [ :each | self cleanedContentFrom: each ]) select: [ :each | each isEmpty not ].
 
 	entries isEmpty ifTrue: [
-		CoCopilotLogger
-			logFrontEndEvent: 'Skipping completion menu: no entries after cleaning'
-			details: (Dictionary new
-				at: #rawSuggestionCount put: contentCollection size;
-				yourself).
-		^ self
-	].
+			CoCopilotLogger logFrontEndEvent: 'Skipping completion menu: no entries after cleaning' details: (Dictionary new
+					 at: #rawSuggestionCount put: contentCollection size;
+					 yourself).
+			^ self ].
 
 	entries := entries collect: [ :each | CoCopilotEntry contents: each ].
 
 	position := self menuPositionFor: aContext.
 	position ifNil: [
-		CoCopilotLogger
-			logFrontEndEvent: 'Completion menu position unavailable'
-			details: (Dictionary new
-				at: #contextClass put: aContext class name;
-				at: #hasEditorAccessor put: (aContext respondsTo: #editor);
-				yourself).
-		position := 20 @ 20
-	].
+			CoCopilotLogger logFrontEndEvent: 'Completion menu position unavailable' details: (Dictionary new
+					 at: #contextClass put: aContext class name;
+					 at: #hasEditorAccessor put: (aContext respondsTo: #editor);
+					 yourself).
+			position := 200 @ 200 ].
 
 	self deferUI: [
-		[
-			self closeMenu.
-			menuMorph := CopilotMenuMorph
-				builder: self
-				context: aContext
-				entries: entries
-				position: position.
+			[
+				self closeMenu.
+				menuMorph := CopilotMenuMorph
+					             builder: self
+					             context: aContext
+					             entries: entries
+					             position: position.
 
-			(menuMorph respondsTo: #takeKeyboardFocus) ifTrue: [
-				menuMorph takeKeyboardFocus
-			].
+				(menuMorph respondsTo: #takeKeyboardFocus) ifTrue: [ menuMorph takeKeyboardFocus ].
 
-			CoCopilotLogger
-				logFrontEndEvent: 'Opened completion menu'
-				details: (Dictionary new
-					at: #entryCount put: entries size;
-					at: #position put: position printString;
-					yourself)
-		]
-			on: Error
-			do: [ :ex |
-				CoCopilotLogger
-					logError: 'Failed to open completion menu'
-					origin: #CoPharoCopilotResultSetBuilder
-					exception: ex
-					payload: (Dictionary new
-						at: #entryCount put: entries size;
-						at: #position put: position printString;
-						yourself) ]
-	]
+				CoCopilotLogger logFrontEndEvent: 'Opened completion menu' details: (Dictionary new
+						 at: #entryCount put: entries size;
+						 at: #position put: position printString;
+						 yourself) ]
+				on: Error
+				do: [ :ex |
+						CoCopilotLogger
+							logError: 'Failed to open completion menu'
+							origin: #CoPharoCopilotResultSetBuilder
+							exception: ex
+							payload: (Dictionary new
+									 at: #entryCount put: entries size;
+									 at: #position put: position printString;
+									 yourself) ] ]
 ]
 
 { #category : 'API - building' }
@@ -468,6 +445,49 @@ CoPharoCopilotResultSetBuilder >> extractResponseContentFromRaw: rawResponseStri
 ]
 
 { #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> fallbackMenuPositionFor: aContext [
+
+	| engine editor textArea position |
+	engine := [ aContext engine ] on: Error do: [ nil ].
+	editor := engine
+		ifNotNil: [ [ engine editor ] on: Error do: [ nil ] ]
+		ifNil: [ nil ].
+	editor ifNil: [ ^ nil ].
+
+	textArea := [ editor textArea ]
+		on: Error
+		do: [ [ editor morph ] on: Error do: [ nil ] ].
+	textArea ifNil: [ ^ nil ].
+
+	position := [ editor caret ]
+		on: Error
+		do: [ [ aContext position ] on: Error do: [ nil ] ].
+	position ifNil: [ ^ nil ].
+
+	[
+		| paragraph charBlock |
+		paragraph := textArea paragraph.
+		paragraph ifNotNil: [
+			charBlock := paragraph characterBlockForIndex: position.
+			charBlock ifNotNil: [
+				^ textArea localPointToGlobal: charBlock bottomLeft ] ] ]
+		on: Error
+		do: [ ].
+
+	[
+		| cursor cursorBounds |
+		cursor := textArea cursor.
+		cursor ifNotNil: [
+			cursorBounds := cursor bounds.
+			cursorBounds ifNotNil: [
+				^ textArea localPointToGlobal: cursorBounds bottomLeft ] ] ]
+		on: Error
+		do: [ ].
+
+	^ [ textArea boundsInWorld bottomLeft ] on: Error do: [ nil ]
+]
+
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> idleMilliseconds [
 	"Idle delay used when user finishes a word and pauses."
 
@@ -607,47 +627,21 @@ CoPharoCopilotResultSetBuilder >> menuClosed [
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> menuPositionFor: aContext [
 
-	| editor textArea position |
-	[ editor := aContext editor ]
-		on: Error
-		do: [ ^ nil ].
-	editor ifNil: [ ^ nil ].
+	| engine editor token |
+	engine := [ aContext engine ] on: Error do: [ nil ].
+	engine ifNil: [ ^ self fallbackMenuPositionFor: aContext ].
 
-	textArea := [ editor textArea ]
-		            on: Error
-		            do: [ nil ].
-	textArea ifNil: [
-			textArea := [ editor morph ]
-				            on: Error
-				            do: [ nil ].
-			textArea ifNil: [ ^ nil ] ].
+	editor := [ engine editor ] on: Error do: [ nil ].
+	editor ifNil: [ ^ self fallbackMenuPositionFor: aContext ].
 
-	position := [ aContext position ]
-		            on: Error
-		            do: [ nil ].
-	position ifNil: [
-			position := [ editor caret ]
-				            on: Error
-				            do: [ nil ] ].
-	position ifNil: [ ^ nil ].
+	token := [ engine completionToken ]
+		on: Error
+		do: [ [ aContext completionToken ] on: Error do: [ '' ] ].
 
-	[
-		| paragraph charBlock |
-		paragraph := textArea paragraph.
-		paragraph ifNotNil: [
-				charBlock := paragraph characterBlockForIndex: position.
-				charBlock ifNotNil: [ ^ textArea localPointToGlobal: charBlock bottomLeft ] ] ]
+	"Use the exact same anchor API as Complishon"
+	^ [ editor selectionPosition: token ]
 		on: Error
-		do: [ "" ].
-	[
-		| cursor cursorBounds |
-		cursor := textArea cursor.
-		cursor ifNotNil: [
-				cursorBounds := cursor bounds.
-				cursorBounds ifNotNil: [ ^ textArea localPointToGlobal: cursorBounds bottomLeft ] ] ]
-		on: Error
-		do: [ "" ].
-	^ [ textArea boundsInWorld bottomLeft ] on: Error do: [ nil ]
+		do: [ self fallbackMenuPositionFor: aContext ]
 ]
 
 { #category : 'initialization' }

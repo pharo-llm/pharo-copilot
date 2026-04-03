@@ -11,6 +11,12 @@ Class {
 }
 
 { #category : 'initialization' }
+CoPharoCopilotContext >> editor [
+
+	^ self engine editor
+]
+
+{ #category : 'initialization' }
 CoPharoCopilotContext >> initialize [
 	"Initialize the context and set up the completion builder that will generate Copilot results."
 
