@@ -118,7 +118,7 @@ CopilotSettings class >> availableProviders [
 CopilotSettings class >> backgroundColor [
 	"Answer the background color for the Copilot completion menu."
 
-	^ backgroundColor ifNil: [ self defaultBackgroundColor ]
+	^ self theme windowColorFor: self
 ]
 
 { #category : 'accessing' }
@@ -260,7 +260,7 @@ CopilotSettings class >> customParameters: aDictionary [
 CopilotSettings class >> defaultBackgroundColor [
 	"Answer the default background color for the Copilot completion menu."
 
-	^ Color r: 0.95 g: 0.95 b: 0.97
+	^ self theme windowColorFor: self
 ]
 
 { #category : 'accessing' }

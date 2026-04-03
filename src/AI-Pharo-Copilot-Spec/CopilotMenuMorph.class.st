@@ -37,13 +37,14 @@ CopilotMenuMorph class >> builder: aBuilder context: aContext entries: entryColl
 { #category : 'accessing' }
 CopilotMenuMorph class >> itemHeight [
 
-	^ StandardFonts codeFont height * 3 "Allow 3 lines per item for multi-line previews"
+	"One visible line only"
+	^ StandardFonts codeFont height + 6
 ]
 
 { #category : 'accessing' }
 CopilotMenuMorph class >> itemWidth [
 
-	^ 500 "Wider than completion menu to show more code"
+	^ 420
 ]
 
 { #category : 'accessing' }
@@ -116,10 +117,10 @@ CopilotMenuMorph >> currentPage [
 	^ (self selectedIndex - 1 // self pageHeight) + 1
 ]
 
-{ #category : 'private' }
+{ #category : 'accessing - defaults' }
 CopilotMenuMorph >> defaultColor [
 
-	^ self class backgroundColor
+	^ self theme windowColorFor: self
 ]
 
 { #category : 'private' }
@@ -136,37 +137,34 @@ CopilotMenuMorph >> detailPosition: aPoint [
 	self updateDetail
 ]
 
-{ #category : 'private' }
+{ #category : 'accessing - defaults' }
 CopilotMenuMorph >> drawLine: index on: aCanvas rectangle: rectangle [
+	"Draw one suggestion entry in the list using a single-line preview."
 
-	"Draw one suggestion entry in the list."
-
-	| entry displayText font previewText lines rect |
+	| entry displayText font previewText rect |
 	entry := entries at: index.
 	displayText := entry displayString.
 
-	"Highlight selection"
 	index = selectedIndex ifTrue: [
 		rect := rectangle withHeight: self class itemHeight.
-		aCanvas fillRectangle: rect color: self class scrollColor.
-		self detailPosition: rect topRight
+		aCanvas fillRectangle: rect color: self class scrollColor
 	].
 
-	"Draw the text preview (up to 3 lines)"
 	font := StandardFonts codeFont.
-	previewText := self previewTextFor: displayText maxLines: 3.
-	lines := previewText lines.
+	previewText := self previewTextFor: displayText maxLines: 1.
 
-	rect := rectangle insetBy: 2.
-	lines withIndexDo: [ :line :lineIndex |
-		| lineRect |
-		lineRect := rect withHeight: font height.
-		lineRect := lineRect translateBy: 0 @ ((lineIndex - 1) * font height).
+	rect := rectangle insetBy: 4.
+	aCanvas
+		drawString: previewText
+		in: rect
+		font: font
+		color: Color white.
+
+	index < self lastVisible ifTrue: [
 		aCanvas
-			drawString: line
-			in: lineRect
-			font: font
-			color: Color black
+			line: (rectangle bottomLeft translateBy: 6 @ -1)
+			to: (rectangle bottomRight translateBy: -6 @ -1)
+			color: (Color white alpha: 0.12)
 	]
 ]
 
@@ -232,13 +230,14 @@ CopilotMenuMorph >> hasDetail [
 	^ detailMorph isNotNil
 ]
 
-{ #category : 'private' }
+{ #category : 'accessing - defaults' }
 CopilotMenuMorph >> hideDetail [
-
 	detailMorph ifNil: [ ^ false ].
-	self removeMorph: detailMorph.
+
+	detailMorph owner ifNotNil: [ detailMorph owner delete ].
 	detailMorph delete.
 	detailMorph := nil.
+	isDetailMorphVisible := false.
 	self changed.
 	^ true
 ]
@@ -478,23 +477,33 @@ CopilotMenuMorph >> selectedIndex [
 	^ selectedIndex ifNil: [ selectedIndex := 1 ]
 ]
 
-{ #category : 'private' }
+{ #category : 'accessing - defaults' }
 CopilotMenuMorph >> selectedIndex: aNumber [
 	self itemsCount isZero ifTrue: [ ^ self ].
+
 	((1 to: self itemsCount) includes: aNumber) ifTrue: [
-		selectedIndex := aNumber
+		aNumber ~= selectedIndex ifTrue: [
+			selectedIndex := aNumber.
+			self updateDetail
+		]
 	]
 ]
 
-{ #category : 'private' }
+{ #category : 'accessing - defaults' }
 CopilotMenuMorph >> showDetail [
-	"Show detailed view of the selected suggestion."
+	"Open details in a separate window."
 
-	detailMorph ifNotNil: [ ^ self ].
 	self itemsCount isZero ifTrue: [ ^ self ].
 
-	detailMorph := CopilotDetailMorph new.
-	isDetailMorphVisible := false.
+	detailMorph ifNil: [
+		detailMorph := CopilotDetailMorph new.
+		isDetailMorphVisible := true.
+		detailMorph
+			entryText: self selectedEntry contents;
+			openInWindowLabeled: 'Copilot Suggestion'.
+		^ self
+	].
+
 	self updateDetail
 ]
 
@@ -504,16 +513,10 @@ CopilotMenuMorph >> takesKeyboardFocus [
 	^ true
 ]
 
-{ #category : 'private' }
+{ #category : 'accessing - defaults' }
 CopilotMenuMorph >> updateDetail [
+	"Update the already-open detail window with the current selection."
 
 	detailMorph ifNil: [ ^ self ].
-	detailPosition ifNil: [ ^ self ].
-	detailMorph
-		entryText: self selectedEntry contents;
-		position: detailPosition menuWidth: self width.
-	isDetailMorphVisible ifTrue: [ ^ self ].
-	self addMorph: detailMorph.
-	isDetailMorphVisible := true.
-	detailMorph openInWorld
+	detailMorph entryText: self selectedEntry contents
 ]

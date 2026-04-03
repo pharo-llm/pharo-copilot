@@ -79,7 +79,6 @@ CopilotDetailMorph >> entryText: aString [
 
 { #category : 'geometry' }
 CopilotDetailMorph >> initialize [
-
 	super initialize.
 
 	self borderStyle: (BorderStyle color: Color gray width: 1).
@@ -90,7 +89,9 @@ CopilotDetailMorph >> initialize [
 		autoFit: false;
 		bounds: self contentBounds;
 		borderWidth: 0;
-		font: StandardFonts codeFont.
+		font: StandardFonts codeFont;
+		color: self defaultColor;
+		textColor: Color white.
 
 	self addMorph: textMorph
 ]
