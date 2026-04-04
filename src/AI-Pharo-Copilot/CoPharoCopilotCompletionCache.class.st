@@ -3,7 +3,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'entries',
-		'accessOrder',
+		'timestamps',
+		'clock',
 		'maxSize',
 		'hits',
 		'misses',
@@ -52,7 +53,7 @@ CoPharoCopilotCompletionCache >> at: prefixString suffix: suffixString context: 
 		^ aValue ].
 	self ensureCapacity.
 	entries at: key put: aValue.
-	accessOrder addLast: key.
+	self touchKey: key.
 	^ aValue
 ]
 
@@ -61,18 +62,23 @@ CoPharoCopilotCompletionCache >> clear [
 	"Remove all cached entries and reset statistics."
 
 	entries removeAll.
-	accessOrder removeAll.
-	self resetStats
+	timestamps removeAll.
+	clock := 0.
 ]
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> ensureCapacity [
-	"Evict the least recently used entry if the cache is at capacity."
-
-	[ entries size >= maxSize and: [ accessOrder notEmpty ] ] whileTrue: [
-		| oldestKey |
-		oldestKey := accessOrder removeFirst.
+[ entries size >= maxSize and: [ timestamps notEmpty ] ] whileTrue: [
+		| oldestKey oldestTime |
+		oldestKey := nil.
+		oldestTime := SmallInteger maxVal.
+		timestamps keysAndValuesDo: [ :k :t |
+			t < oldestTime ifTrue: [
+				oldestKey := k.
+				oldestTime := t ] ].
+		oldestKey ifNil: [ ^ self ].
 		entries removeKey: oldestKey ifAbsent: [ ].
+		timestamps removeKey: oldestKey ifAbsent: [ ].
 		evictions := evictions + 1 ]
 ]
 
@@ -98,13 +104,13 @@ CoPharoCopilotCompletionCache >> hits [
 	^ hits
 ]
 
-{ #category : 'accessing' }
+{ #category : 'initialization' }
 CoPharoCopilotCompletionCache >> initialize [
 
 	super initialize.
 	entries := Dictionary new.
-	accessOrder := OrderedCollection new.
-	maxSize := 128.
+	timestamps := Dictionary new.
+	clock := 0.
 	self resetStats
 ]
 
@@ -112,7 +118,7 @@ CoPharoCopilotCompletionCache >> initialize [
 CoPharoCopilotCompletionCache >> keyFor: prefixString suffix: suffixString context: contextString [
 	"Compute a cache key from the three inputs."
 
-	^ (prefixString , '|||' , suffixString , '|||' , contextString) hash
+	^ { prefixString. suffixString. contextString }
 ]
 
 { #category : 'accessing' }
@@ -131,6 +137,17 @@ CoPharoCopilotCompletionCache >> maxSize: anInteger [
 CoPharoCopilotCompletionCache >> misses [
 
 	^ misses
+]
+
+{ #category : 'accessing' }
+CoPharoCopilotCompletionCache >> nearMatchAt: prefixString suffix: suffixString context: contextString ifPresent: aBlock [
+	"Try a near-match: look up with the last character of the prefix removed.
+	Useful when the user just typed one more character but the completion is still valid."
+
+	| shorterPrefix |
+	(prefixString size < 2) ifTrue: [ ^ nil ].
+	shorterPrefix := prefixString copyFrom: 1 to: prefixString size - 1.
+	^ self at: shorterPrefix suffix: suffixString context: contextString ifPresent: aBlock
 ]
 
 { #category : 'accessing' }
@@ -164,8 +181,6 @@ CoPharoCopilotCompletionCache >> statisticsDictionary [
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> touchKey: aKey [
-	"Move a key to the end of the access order (most recently used)."
-
-	accessOrder remove: aKey ifAbsent: [ ].
-	accessOrder addLast: aKey
+	clock := clock + 1.
+	timestamps at: aKey put: clock
 ]

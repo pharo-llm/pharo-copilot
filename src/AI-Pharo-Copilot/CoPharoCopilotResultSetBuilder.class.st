@@ -157,61 +157,56 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext [
 ]
 
 { #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString [ 
+CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString [
 
 	| behavior extractor ast compiledMethod methodClass selector stamp cached builder context classDefinition instanceSide classSide |
-		behavior := (aContext respondsTo: #completionClass)
-		ifTrue: [ aContext completionClass ]
-		ifFalse: [
-			(aContext respondsTo: #behavior)
-				ifTrue: [ aContext behavior ]
-				ifFalse: [ nil ] ].
+	behavior := (aContext respondsTo: #completionClass)
+		            ifTrue: [ aContext completionClass ]
+		            ifFalse: [
+				            (aContext respondsTo: #behavior)
+					            ifTrue: [ aContext behavior ]
+					            ifFalse: [ nil ] ].
 	behavior ifNil: [ ^ '' ].
 	extractor := CNSelectorExtractor new.
 	ast := OCParser parseFaultyMethod: prefixString.
 	selector := extractor extractSelectorFromAST: ast atPosition: 1.
-	
-		compiledMethod := selector
-		ifNotNil: [ behavior compiledMethodAt: selector ifAbsent: [ nil ] ]
-		ifNil: [ nil ].
-	methodClass := compiledMethod
-		ifNotNil: [ compiledMethod methodClass ]
-		ifNil: [ behavior ].
+
+	compiledMethod := selector ifNotNil: [ behavior compiledMethodAt: selector ifAbsent: [ nil ] ] ifNil: [ nil ].
+	methodClass := compiledMethod ifNotNil: [ compiledMethod methodClass ] ifNil: [ behavior ].
 
 
 	classContextCache ifNil: [ classContextCache := Dictionary new ].
 
 	stamp := self classStampFor: methodClass.
 	cached := classContextCache at: methodClass ifAbsent: [ nil ].
-	(cached notNil and: [ (cached at: #stamp ifAbsent: [ #(0 0) ]) = stamp ]) ifTrue: [
-		^ cached at: #context ifAbsent: [ '' ]
-	].
+	(cached notNil and: [ (cached at: #stamp ifAbsent: [ #( 0 0 ) ]) = stamp ]) ifTrue: [
+			cached at: #accessTime put: DateAndTime now.
+			^ cached at: #context ifAbsent: [ '' ] ].
 
 	builder := selector ifNotNil: [ CopilotContextFactory forSelector: selector ].
 	builder ifNotNil: [
-		context := builder buildForFIMWithPrefix: prefixString.
-		classContextCache at: methodClass put: (Dictionary new
-			at: #stamp put: stamp;
-			at: #context put: context;
-			yourself).
-		^ context
-	].
+			context := builder buildForFIMWithPrefix: prefixString.
+			self ensureClassContextCacheCapacity.
+			classContextCache at: methodClass put: (Dictionary new
+					 at: #stamp put: stamp;
+					 at: #context put: context;
+					 at: #accessTime put: DateAndTime now;
+					 yourself).
+			^ context ].
 
 	classDefinition := self safeDefinitionStringFor: methodClass.
-
-	"Limit methods hard — you can tune these numbers."
 	instanceSide := self methodSourcesFor: methodClass around: selector limit: CopilotSettings maxInstanceMethods.
-	classSide := self methodSourcesFor: (methodClass ifNotNil: [ methodClass class ]) around: nil limit: CopilotSettings maxClassMethods.
+	classSide := self
+		             methodSourcesFor: (methodClass ifNotNil: [ methodClass class ])
+		             around: nil
+		             limit: CopilotSettings maxClassMethods.
 
-	context := self
-		classDefinition: classDefinition
-		instanceMethods: instanceSide
-		classMethods: classSide.
+	context := self classDefinition: classDefinition instanceMethods: instanceSide classMethods: classSide.
 
 	classContextCache at: methodClass put: (Dictionary new
-		at: #stamp put: stamp;
-		at: #context put: context;
-		yourself).
+			 at: #stamp put: stamp;
+			 at: #context put: context;
+			 yourself).
 
 	^ context
 ]
@@ -323,28 +318,32 @@ CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix
 	seen := Set new.
 
 	1 to: desiredCount do: [ :attempt |
-		| rawResponse rawResponseString content |
-		rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
-		rawResponseString := [ rawResponse asString ]
-			on: Error
-			do: [ rawResponse printString ].
+			| rawResponse rawResponseString content |
+			"Short-circuit: stop making API calls once we have enough unique suggestions."
+			collected size >= desiredCount ifTrue: [
+					CoCopilotLogger logBackEndEvent: 'Short-circuited suggestion collection' details: (Dictionary new
+							 at: #collectedCount put: collected size;
+							 at: #skippedAttempt put: attempt;
+							 yourself).
+					^ collected asArray ].
+			rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
+			rawResponseString := [ rawResponse asString ]
+				                     on: Error
+				                     do: [ rawResponse printString ].
 
-		CoCopilotLogger
-			logBackEndEvent: 'Received raw suggestion payload'
-			details: (Dictionary new
-				at: #attempt put: attempt;
-				at: #rawResponseClass put: rawResponse class name;
-				at: #rawResponse put: rawResponseString;
-				yourself).
+			CoCopilotLogger logBackEndEvent: 'Received raw suggestion payload' details: (Dictionary new
+					 at: #attempt put: attempt;
+					 at: #rawResponseClass put: rawResponse class name;
+					 at: #rawResponse put: rawResponseString;
+					 yourself).
 
-		content := self extractResponseContentFromRaw: rawResponseString.
-		content := self removeEchoedPrefix: content prefix: prefixString.
-		content := self cleanedContentFrom: content.
+			content := self extractResponseContentFromRaw: rawResponseString.
+			content := self removeEchoedPrefix: content prefix: prefixString.
+			content := self cleanedContentFrom: content.
 
-		(content isEmpty not and: [ seen includes: content ]) ifFalse: [
-			content isEmpty ifFalse: [
-				seen add: content.
-				collected add: content ] ] ].
+		(content isEmpty not and: [ (seen includes: content) not ]) ifTrue: [
+			seen add: content.
+			collected add: content ] ].
 
 	contextInfo at: #rawSuggestions put: collected asArray.
 	^ collected asArray
@@ -435,6 +434,30 @@ CoPharoCopilotResultSetBuilder >> ebounceMilliseconds [
 	"Return the current debounce delay used before firing a completion request."
 
 	^ debounceMilliseconds ifNil: [ 250 ]
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> ensureClassContextCacheCapacity [
+	"Evict the least recently accessed class context entry if the cache exceeds 64 entries."
+
+	| maxClassContextCacheSize |
+	maxClassContextCacheSize := 64.
+	classContextCache ifNil: [ ^ self ].
+	classContextCache size < maxClassContextCacheSize ifTrue: [ ^ self ].
+
+	"Find and remove the oldest entry by accessTime."
+	[ classContextCache size >= maxClassContextCacheSize ] whileTrue: [
+		| oldestKey oldestTime |
+		oldestKey := nil.
+		oldestTime := nil.
+		classContextCache keysAndValuesDo: [ :k :v |
+			| accessTime |
+			accessTime := v at: #accessTime ifAbsent: [ DateAndTime epoch ].
+			(oldestTime isNil or: [ accessTime < oldestTime ]) ifTrue: [
+				oldestKey := k.
+				oldestTime := accessTime ] ].
+		oldestKey ifNil: [ ^ self ].
+		classContextCache removeKey: oldestKey ifAbsent: [ ] ]
 ]
 
 { #category : 'initialization' }
@@ -713,9 +736,8 @@ CoPharoCopilotResultSetBuilder >> normalizedDelayMilliseconds: anObject default:
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
-	"Call Ollama, collect multiple completion alternatives, and apply them if the editor context is unchanged."
 
-	| classContext cachedContent |
+	| classContext cachedContent cachedSuggestions |
 	[
 		| client suggestions |
 		CoCopilotLogger logFrontEndEvent: 'Preparing completion request' details: contextInfo.
@@ -726,32 +748,46 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 		contextInfo
 			at: #classContextLength put: classContext size;
 			at: #classContextPresent put: classContext isEmpty not.
-
-
-
-		"Check the completion cache first"
 		cachedContent := self completionCache
-			at: prefixString suffix: suffixString context: classContext
-			ifPresent: [ :cached | cached ].
+			                 at: prefixString
+			                 suffix: suffixString
+			                 context: classContext
+			                 ifPresent: [ :cached | cached ].
+
+		cachedContent ifNil: [
+				cachedContent := self completionCache
+					                 nearMatchAt: prefixString
+					                 suffix: suffixString
+					                 context: classContext
+					                 ifPresent: [ :cached |
+							                 | lastChar |
+							                 lastChar := prefixString last asString.
+							                 (cached isArray and: [ cached anySatisfy: [ :s | s beginsWith: lastChar ] ])
+								                 ifTrue: [
+										                 | filtered |
+										                 filtered := cached select: [ :s | s beginsWith: lastChar ].
+										                 filtered ifEmpty: [ nil ] ifNotEmpty: [ filtered collect: [ :s | s allButFirst: lastChar size ] ] ]
+								                 ifFalse: [ nil ] ] ].
 
 		cachedContent ifNotNil: [
-			contextInfo at: #cacheHit put: true.
-			CoCopilotLogger
-				logBackEndEvent: 'Cache hit - reusing cached completion'
-				details: (Dictionary new
-					at: #cleanedContent put: cachedContent;
-					at: #cleanedLength put: cachedContent size;
-					yourself).
-			^ self
-				applyContent: cachedContent
-				toContext: aContext
-				expectedPrefix: prefixString
-				suffix: suffixString
-				contextInfo: contextInfo ].
+				contextInfo at: #cacheHit put: true.
+							cachedSuggestions := cachedContent isArray
+				ifTrue: [ cachedContent ]
+				ifFalse: [ { cachedContent } ].
+				CoCopilotLogger logBackEndEvent: 'Cache hit - reusing cached completion' details: (Dictionary new
+						at: #suggestionCount put: cachedSuggestions size;
+					at: #cleanedLength put: (cachedSuggestions ifEmpty: [ 0 ] ifNotEmpty: [ cachedSuggestions first size ]);
+						 yourself).
+				^ self
+					  applyContent: cachedSuggestions
+					  toContext: aContext
+					  expectedPrefix: prefixString
+					  suffix: suffixString
+					  contextInfo: contextInfo ].
 
 		contextInfo at: #cacheHit put: false.
-		
-		
+
+
 		suggestions := self
 			               collectNormalizedSuggestionsFor: client
 			               prefix: prefixString
@@ -759,15 +795,15 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			               context: classContext
 			               contextInfo: contextInfo.
 
-
-	"Store in cache for future lookups"
 		suggestions isEmpty ifFalse: [
-			self completionCache
-				at: prefixString suffix: suffixString context: classContext
-				put: suggestions first ].
-			
-			
-			
+				self completionCache
+					at: prefixString
+					suffix: suffixString
+					context: classContext
+					put: suggestions asArray ].
+
+
+
 		CoCopilotLogger logBackEndEvent: 'Normalized suggestion content' details: (Dictionary new
 				 at: #suggestionCount put: suggestions size;
 				 at: #suggestions put: suggestions;
