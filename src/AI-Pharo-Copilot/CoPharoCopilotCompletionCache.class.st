@@ -111,6 +111,7 @@ CoPharoCopilotCompletionCache >> initialize [
 	entries := Dictionary new.
 	timestamps := Dictionary new.
 	clock := 0.
+	maxSize := 64.
 	self resetStats
 ]
 
