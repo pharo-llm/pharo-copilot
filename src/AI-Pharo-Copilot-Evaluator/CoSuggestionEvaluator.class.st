@@ -306,6 +306,23 @@ CoSuggestionEvaluator >> recordSuggestionIgnored: aCopilotEntry context: aComple
 ]
 
 { #category : 'initialization' }
+CoSuggestionEvaluator >> recordSuggestionRejected: aCopilotEntry context: aCompletionContext reason: aString [
+
+	| evaluationEntry |
+	evaluationEntry := CoEvaluationEntry new
+		suggestion: aCopilotEntry;
+		context: aCompletionContext;
+		timestamp: DateAndTime now;
+		action: #rejected;
+		rejectionReason: aString;
+		yourself.
+	rejectedEntries add: evaluationEntry.
+	self updateStats: evaluationEntry.
+	self savePersistentStats.
+	self announceEvaluation: evaluationEntry.
+]
+
+{ #category : 'initialization' }
 CoSuggestionEvaluator >> rejectedEntries [
 	^ rejectedEntries
 ]

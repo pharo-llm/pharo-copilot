@@ -59,24 +59,19 @@ DataIntegrityTest >> testRegistryConsistency [
 
 { #category : 'tests' }
 DataIntegrityTest >> testSessionStatsConsistency [
+
 	| evaluator context stats calculatedRate |
 	evaluator := CoSuggestionEvaluator new.
 	context := CoPharoCopilotContext new.
+	5 timesRepeat: [ evaluator recordSuggestionAccepted: (CoCopilotEntry contents: 'accepted') context: context ].
+	3 timesRepeat: [evaluator recordSuggestionRejected: (CoCopilotEntry contents: 'rejected') context: context reason: 'Not useful' ].
 	
-	"Add some entries"
-	5 timesRepeat: [
-		evaluator recordSuggestionAccepted: (CoCopilotEntry contents: 'accepted') context: context ].
-	3 timesRepeat: [
-		evaluator recordSuggestionIgnored: (CoCopilotEntry contents: 'ignored') context: context ].
-	
-	stats := evaluator sessionStats.
-	
-	"Verify totals match collections"
+	stats := evaluator sessionStats. 
 	self assert: (stats at: #totalSuggestions) equals: 8.
 	self assert: (stats at: #totalAccepted) equals: evaluator acceptedEntries size.
 	self assert: evaluator acceptedEntries size equals: 5.
-	
-	"Verify rates are consistent"
+		self assert: (stats at: #totalRejected) equals: evaluator rejectedEntries size.
+	self assert: evaluator rejectedEntries size equals: 3.
 	calculatedRate := (evaluator acceptedEntries size / 8.0 * 100) rounded.
 	self assert: evaluator acceptanceRate equals: calculatedRate
 ]

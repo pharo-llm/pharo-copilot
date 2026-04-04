@@ -93,19 +93,22 @@ CoEvaluationReport >> addRecommendationsTo: stream [
 
 { #category : 'accessing' }
 CoEvaluationReport >> addTopRejectionReasonsTo: stream [
+
 	| reasons |
 	reasons := Bag new.
-	
-	evaluator rejectedEntries do: [ :entry |
-		entry rejectionReason ifNotNil: [ :reason |
-			reasons add: reason ] ].
-	
-	stream nextPutAll: 'TOP REJECTION REASONS'; lf.
-	stream nextPutAll: '--------------------'; lf.
-	
+
+	evaluator rejectedEntries do: [ :entry | entry rejectionReason ifNotNil: [ :reason | reasons add: reason ] ].
+
+	stream
+		nextPutAll: 'TOP REJECTION REASONS';
+		lf.
+	stream
+		nextPutAll: '--------------------';
+		lf.
+
 	(reasons sortedCounts first: (5 min: reasons size)) do: [ :assoc |
-		stream nextPutAll: assoc key, ': ', assoc value asString, ' times'; lf ].
-	stream lf.
+		stream nextPutAll: assoc value, ': ', assoc key asString, ' times'; lf ].
+	stream lf
 ]
 
 { #category : 'accessing' }

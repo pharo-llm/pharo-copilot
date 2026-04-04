@@ -8,31 +8,23 @@ Class {
 
 { #category : 'tests' }
 CoSuggestionEvaluatorAdvancedTest >> testComplexEvaluationScenario [
+
 	| evaluator context suggestions lengthStats |
 	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new.
-	
-	"Create variety of suggestions"
+	context := CoPharoCopilotContext new. 
 	suggestions := {
-		CoCopilotEntry contents: 'short'.
-		CoCopilotEntry contents: (String new: 30 withAll: $m).
-		CoCopilotEntry contents: (String new: 100 withAll: $l)
-	}.
-	
-	"Accept first, ignore second, record third as accepted"
+		               (CoCopilotEntry contents: 'short').
+		               (CoCopilotEntry contents: (String new: 30 withAll: $m)).
+		               (CoCopilotEntry contents: (String new: 100 withAll: $l)) }. 
 	evaluator recordSuggestionAccepted: suggestions first context: context.
-	evaluator recordSuggestionIgnored: suggestions second context: context.
-	evaluator recordSuggestionAccepted: suggestions third context: context.
-	
-	"Verify statistics"
+	evaluator recordSuggestionRejected: suggestions second context: context reason: 'Not relevant'.
+	evaluator recordSuggestionAccepted: suggestions third context: context. 
 	self assert: (evaluator sessionStats at: #totalSuggestions) equals: 3.
 	self assert: (evaluator sessionStats at: #totalAccepted) equals: 2.
 	self assert: evaluator acceptanceRate equals: 67.
-	
-	"Verify length categorization"
 	lengthStats := evaluator sessionStats at: #lengthStats.
 	self assert: ((lengthStats at: #short) at: #accepted) equals: 1.
-	self assert: ((lengthStats at: #medium) at: #ignored) equals: 1.
+	self assert: ((lengthStats at: #medium) at: #rejected) equals: 1.
 	self assert: ((lengthStats at: #long) at: #accepted) equals: 1
 ]
 
@@ -97,16 +89,15 @@ CoSuggestionEvaluatorAdvancedTest >> testEvaluatorMemoryUsage [
 
 { #category : 'tests' }
 CoSuggestionEvaluatorAdvancedTest >> testGenerateReportWithVariedData [
+
 	| evaluator context report |
 	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new.
-	
-	"Create varied evaluation data"
+	context := CoPharoCopilotContext new. "Create varied evaluation data"
 	evaluator recordSuggestionAccepted: (CoCopilotEntry contents: 'good suggestion') context: context.
-	evaluator recordSuggestionIgnored: (CoCopilotEntry contents: 'ignored suggestion') context: context.
-	
+	evaluator recordSuggestionRejected: (CoCopilotEntry contents: 'bad suggestion') context: context reason: 'Wrong code'.
+
 	report := evaluator generateReport.
-	
+
 	self assert: report isString.
 	self assert: (report includesSubstring: 'Total suggestions: 2').
 	self assert: (report includesSubstring: 'Accepted: 1').

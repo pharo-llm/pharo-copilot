@@ -17,23 +17,17 @@ CoSuggestionEvaluatorTest >> setUp [
 
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testAcceptanceRateCalculation [
+
 	| context entry |
-	context := CoPharoCopilotContext new.
-	
-	"Record some accepted and rejected entries"
+	context := CoPharoCopilotContext new. 
 	entry := CoCopilotEntry contents: 'test1'.
 	evaluator recordSuggestionAccepted: entry context: context.
-	
+
 	entry := CoCopilotEntry contents: 'test2'.
-	evaluator recordSuggestionAccepted: entry context: context.
+	evaluator recordSuggestionAccepted: entry context: context. 
+	self assert: evaluator acceptanceRate equals: 100. 
+evaluator recordSuggestionRejected: (CoCopilotEntry contents: 'test3') context: context reason: 'Incorrect syntax'.
 	
-	"Should be 100% acceptance rate"
-	self assert: evaluator acceptanceRate equals: 100.
-	
-	"Add a rejection"
-	evaluator recordSuggestionIgnored: (CoCopilotEntry contents: 'test3') context: context.
-	
-	"Should be 67% acceptance rate (2/3)"
 	self assert: evaluator acceptanceRate equals: 67
 ]
 
@@ -153,17 +147,12 @@ CoSuggestionEvaluatorTest >> testRecordSuggestionIgnored [
 
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testRejectionRateCalculation [
+
 	| context |
-	context := CoPharoCopilotContext new.
-	
-	"Initially 0%"
-	self assert: evaluator rejectionRate equals: 0.
-	
-	"Add some entries"
+	context := CoPharoCopilotContext new. 
+	self assert: evaluator rejectionRate equals: 0. 
 	evaluator recordSuggestionAccepted: (CoCopilotEntry contents: 'accepted') context: context.
-	evaluator recordSuggestionIgnored: (CoCopilotEntry contents: 'ignored') context: context.
-	
-	"Still 0% rejected"
+evaluator recordSuggestionRejected: (CoCopilotEntry contents: 'rejected') context: context reason: 'Bad suggestion'.
 	self assert: evaluator rejectionRate equals: 0
 ]
 
