@@ -8,7 +8,9 @@ Class {
 		'maxSize',
 		'hits',
 		'misses',
-		'evictions'
+		'evictions',
+		'oldestKey',
+		'oldestTime'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -64,22 +66,32 @@ CoPharoCopilotCompletionCache >> clear [
 	entries removeAll.
 	timestamps removeAll.
 	clock := 0.
+		oldestKey := nil.
+	oldestTime := nil.
 ]
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> ensureCapacity [
-[ entries size >= maxSize and: [ timestamps notEmpty ] ] whileTrue: [
-		| oldestKey oldestTime |
-		oldestKey := nil.
-		oldestTime := SmallInteger maxVal.
-		timestamps keysAndValuesDo: [ :k :t |
-			t < oldestTime ifTrue: [
-				oldestKey := k.
-				oldestTime := t ] ].
-		oldestKey ifNil: [ ^ self ].
-		entries removeKey: oldestKey ifAbsent: [ ].
-		timestamps removeKey: oldestKey ifAbsent: [ ].
-		evictions := evictions + 1 ]
+
+	[ entries size >= maxSize and: [ timestamps notEmpty ] ] whileTrue: [
+			(oldestKey notNil and: [ entries includesKey: oldestKey ])
+				ifTrue: [
+						entries removeKey: oldestKey ifAbsent: [ ].
+						timestamps removeKey: oldestKey ifAbsent: [ ] ]
+				ifFalse: [
+						| scanOldestKey scanOldestTime |
+						scanOldestKey := nil.
+						scanOldestTime := SmallInteger maxVal.
+						timestamps keysAndValuesDo: [ :k :t |
+								t < scanOldestTime ifTrue: [
+										scanOldestKey := k.
+										scanOldestTime := t ] ].
+						scanOldestKey ifNil: [ ^ self ].
+						entries removeKey: scanOldestKey ifAbsent: [ ].
+						timestamps removeKey: scanOldestKey ifAbsent: [ ] ].
+			evictions := evictions + 1.
+			oldestKey := nil.
+			oldestTime := nil ]
 ]
 
 { #category : 'accessing' }
@@ -112,14 +124,19 @@ CoPharoCopilotCompletionCache >> initialize [
 	timestamps := Dictionary new.
 	clock := 0.
 	maxSize := 64.
+		oldestKey := nil.
+	oldestTime := nil.
 	self resetStats
 ]
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> keyFor: prefixString suffix: suffixString context: contextString [
-	"Compute a cache key from the three inputs."
 
-	^ { prefixString. suffixString. contextString }
+	| hash |
+	hash := prefixString hash.
+	hash := hash bitXor: (suffixString hash bitShift: -3).
+	hash := hash bitXor: (contextString hash bitShift: -7).
+	^ { hash. prefixString. suffixString. contextString }
 ]
 
 { #category : 'accessing' }
@@ -182,6 +199,10 @@ CoPharoCopilotCompletionCache >> statisticsDictionary [
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> touchKey: aKey [
+
 	clock := clock + 1.
-	timestamps at: aKey put: clock
+	timestamps at: aKey put: clock.
+	(oldestTime isNil or: [ clock = 1 ]) ifFalse: [ ^ self ].
+	oldestKey := aKey.
+	oldestTime := clock
 ]

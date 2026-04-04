@@ -153,7 +153,7 @@ CoSuggestionEvaluatorTest >> testRejectionRateCalculation [
 	self assert: evaluator rejectionRate equals: 0. 
 	evaluator recordSuggestionAccepted: (CoCopilotEntry contents: 'accepted') context: context.
 evaluator recordSuggestionRejected: (CoCopilotEntry contents: 'rejected') context: context reason: 'Bad suggestion'.
-	self assert: evaluator rejectionRate equals: 0
+	self assert: evaluator rejectionRate equals: 50
 ]
 
 { #category : 'running' }

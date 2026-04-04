@@ -144,9 +144,8 @@ CopilotSettings class >> clearCachedModelMetadata [
 
 { #category : 'settings' }
 CopilotSettings class >> completionDebounceMilliseconds [
-	"Answer the debounce delay (milliseconds) before firing completion requests."
 
-	^ completionDebounceMilliseconds ifNil: [ completionDebounceMilliseconds := 250 ]
+	^ completionDebounceMilliseconds ifNil: [ completionDebounceMilliseconds := 50 ]
 ]
 
 { #category : 'settings' }
@@ -155,17 +154,16 @@ CopilotSettings class >> completionDebounceMilliseconds: anObject [
 
 	completionDebounceMilliseconds := self
 		                                  normalizedDuration: anObject
-		                                  default: 250
+		                                  default: 50
 		                                  minimum: 1
 		                                  maximum: 60000.
-		self autoSaveSettings
+	self autoSaveSettings
 ]
 
 { #category : 'settings' }
 CopilotSettings class >> completionIdleMilliseconds [
-	"Answer the idle delay (milliseconds) before firing completion requests."
 
-	^ completionIdleMilliseconds ifNil: [ completionIdleMilliseconds := 2000 ]
+	^ completionIdleMilliseconds ifNil: [ completionIdleMilliseconds := 300 ]
 ]
 
 { #category : 'settings' }
@@ -174,10 +172,10 @@ CopilotSettings class >> completionIdleMilliseconds: anObject [
 
 	completionIdleMilliseconds := self
 		                              normalizedDuration: anObject
-		                              default: 2000
+		                              default: 300
 		                              minimum: 1
 		                              maximum: 60000.
-		self autoSaveSettings.
+	self autoSaveSettings
 ]
 
 { #category : 'settings' }
@@ -814,31 +812,36 @@ CopilotSettings class >> loggingEnabled: aBoolean [
 
 { #category : 'context' }
 CopilotSettings class >> maxClassMethods [
-	"Answer the maximum number of class-side methods to include in context. Default: 15"
 
-	^ maxClassMethods ifNil: [ maxClassMethods := 15 ]
+	^ maxClassMethods ifNil: [ maxClassMethods := 5 ]
 ]
 
 { #category : 'context' }
 CopilotSettings class >> maxClassMethods: anObject [
-	"Set the maximum number of class-side methods for context (1 to 100, default: 15)."
 
-	maxClassMethods := self normalizedDuration: anObject default: 15 minimum: 1 maximum: 100.
+	maxClassMethods := self
+		                   normalizedDuration: anObject
+		                   default: 5
+		                   minimum: 1
+		                   maximum: 100.
 	self autoSaveSettings
 ]
 
 { #category : 'context' }
 CopilotSettings class >> maxInstanceMethods [
-	"Answer the maximum number of instance-side methods to include in context. Default: 30"
 
-	^ maxInstanceMethods ifNil: [ maxInstanceMethods := 30 ]
+	^ maxInstanceMethods ifNil: [ maxInstanceMethods := 10 ]
 ]
 
 { #category : 'context' }
 CopilotSettings class >> maxInstanceMethods: anObject [
 	"Set the maximum number of instance-side methods for context (1 to 200, default: 30)."
 
-	maxInstanceMethods := self normalizedDuration: anObject default: 30 minimum: 1 maximum: 200.
+	maxInstanceMethods := self
+		                      normalizedDuration: anObject
+		                      default: 10
+		                      minimum: 1
+		                      maximum: 200.
 	self autoSaveSettings
 ]
 
@@ -1340,7 +1343,7 @@ CopilotSettings class >> repeatPenalty: aNumber [
 CopilotSettings class >> requestTimeoutSeconds [
 	"Answer the HTTP request timeout (seconds) for Ollama calls."
 
-	^ requestTimeoutSeconds ifNil: [ requestTimeoutSeconds := 100 ]
+	^ requestTimeoutSeconds ifNil: [ requestTimeoutSeconds := 5 ]
 ]
 
 { #category : 'settings' }

@@ -524,16 +524,16 @@ CopilotSettingsTest >> testShouldShowDetailedSettingsReflectsCopilotEnabled [
 
 { #category : 'tests' }
 CopilotSettingsTest >> testTimingSettingsNormalization [
-    CopilotSettings withDefaultSettingsDo: [
-        CopilotSettings completionDebounceMilliseconds: 0.
-        self assert: CopilotSettings completionDebounceMilliseconds equals: 250.
-        CopilotSettings completionIdleMilliseconds: -10.
-        self assert: CopilotSettings completionIdleMilliseconds equals: 2000.
-        CopilotSettings completionDebounceMilliseconds: 70000.
-        self assert: CopilotSettings completionDebounceMilliseconds equals: 60000.
-        CopilotSettings completionIdleMilliseconds: 2.
-        self assert: CopilotSettings completionIdleMilliseconds equals: 2.
-    ]
+
+	CopilotSettings withDefaultSettingsDo: [
+			CopilotSettings completionDebounceMilliseconds: 0.
+			self assert: CopilotSettings completionDebounceMilliseconds equals: 50.
+			CopilotSettings completionIdleMilliseconds: -10.
+			self assert: CopilotSettings completionIdleMilliseconds equals: 300.
+			CopilotSettings completionDebounceMilliseconds: 70000.
+			self assert: CopilotSettings completionDebounceMilliseconds equals: 60000.
+			CopilotSettings completionIdleMilliseconds: 2.
+			self assert: CopilotSettings completionIdleMilliseconds equals: 2 ]
 ]
 
 { #category : 'tests' }

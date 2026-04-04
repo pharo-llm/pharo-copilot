@@ -102,46 +102,18 @@ OllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: s
 
 { #category : 'generation-operations' }
 OllamaClient >> generate: aPromptString [
-	"Send a generate request and answer the normalized response as a String."
-
 	| payload response normalized |
-	self isNullModel ifTrue: [
-			CoCopilotLogger logBackEndEvent: 'Null model responded to completion request' details: (Dictionary new
-					 at: #modelFullName put: (modelSpec ifNil: [ self class nullModelFullName ] ifNotNil: [ modelSpec fullName ]);
-					 yourself).
-			^ self class nullModelResponseString ].
+	self isNullModel ifTrue: [ ^ self class nullModelResponseString ].
 
 	payload := Dictionary new
 		           at: #model put: modelSpec fullName;
 		           at: #prompt put: aPromptString;
 		           at: #stream put: stream;
 		           yourself.
-
 	format ifNotNil: [ payload at: #format put: format ].
 	(options notNil and: [ options isEmpty not ]) ifTrue: [ payload at: #options put: options ].
-
-	CoCopilotLogger logBackEndEvent: 'Dispatching generate request' details: (Dictionary new
-			 at: #endpoint put: 'api/generate';
-			 at: #modelFullName put: modelSpec fullName;
-			 at: #payload put: payload;
-			 at: #optionsSnapshot put: options copy;
-			 yourself).
-
 	response := transport postJsonAt: 'api/generate' body: payload.
-
-	CoCopilotLogger logBackEndEvent: 'Received generate response' details: (Dictionary new
-			 at: #responseClass put: (response ifNil: [ 'nil' ] ifNotNil: [ response class name ]);
-			 at: #rawResponse put: ([ response asString ]
-					  on: Error
-					  do: [ response printString ]);
-			 yourself).
-
 	normalized := self normalizeResponse: response.
-
-	CoCopilotLogger logBackEndEvent: 'Normalized generate response' details: (Dictionary new
-			 at: #normalizedResponse put: normalized;
-			 at: #normalizedLength put: normalized size;
-			 yourself).
 
 	^ normalized
 ]
@@ -150,44 +122,26 @@ OllamaClient >> generate: aPromptString [
 OllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
 	"Generate a fill-in-the-middle completion by expanding the configured FIM template."
 
-		| prompt originalOptions response combinedContext |
+	| prompt originalOptions response combinedContext |
 	combinedContext := self systemPromptPrefixedContextFor: contextString.
-	CoCopilotLogger logBackEndEvent: 'Preparing fill-in-the-middle request' details: (Dictionary new
-			 at: #prefix put: prefixString;
-			 at: #suffix put: suffixString;
-			 at: #contextBytes put: combinedContext size;
-			 at: #template put: CopilotSettings fimTemplate;
-			 at: #optionsBefore put: options copy;
-			 yourself).
-
 	prompt := self
 		          expandFimTemplate: CopilotSettings fimTemplate
 		          prefix: prefixString
 		          suffix: suffixString
 		          context: combinedContext.
 
-	CoCopilotLogger logBackEndEvent: 'Expanded fill-in-the-middle template' details: (Dictionary new
-			 at: #prompt put: prompt;
-			 yourself).
-
 	originalOptions := options copy.
 	[
-		self optionAt: #task put: 'fill-in-the-middle'.
-		CoCopilotLogger logBackEndEvent: 'Augmented Ollama options for fill-in-the-middle' details: (Dictionary new
-				 at: #optionsAfter put: options copy;
-				 yourself).
+		options ifNil: [ options := Dictionary new ].
+		options at: #task put: 'fill-in-the-middle'.
 		response := self generate: prompt ] ensure: [
-			options := originalOptions.
-			CoCopilotLogger logBackEndEvent: 'Restored Ollama options after fill-in-the-middle' details: (Dictionary new
-					 at: #optionsRestored put: options copy;
-					 yourself) ].
+			options := originalOptions ].
 
 	^ response
 ]
 
 { #category : 'initialization' }
 OllamaClient >> initialize [
-	"Initialize default transport, options, streaming flag, and select the configured model."
 
 	super initialize.
 	transport := OAHttpTransport new.
@@ -195,13 +149,6 @@ OllamaClient >> initialize [
 	options := Dictionary new.
 	self loadOptionsFromSettings.
 	self useModelNamed: CopilotSettings modelName.
-
-	CoCopilotLogger logBackEndEvent: 'Initialized Ollama client' details: (Dictionary new
-			 at: #transportClass put: transport class name;
-			 at: #streamingEnabled put: stream;
-			 at: #format put: format;
-			 at: #modelFullName put: (modelSpec ifNil: [ 'unassigned' ] ifNotNil: [ modelSpec fullName ]);			at: #optionsFromSettings put: options copy;
-			yourself).
 ]
 
 { #category : 'model-operations' }
@@ -240,15 +187,11 @@ OllamaClient >> loadOptionsFromSettings [
 
 	| settingsOptions |
 	settingsOptions := CopilotSettings allOllamaOptions.
-	settingsOptions keysAndValuesDo: [ :key :value |
-		options at: key put: value
-	].
+	settingsOptions keysAndValuesDo: [ :key :value | options at: key put: value ].
 
-	CoCopilotLogger
-		logBackEndEvent: 'Loaded Ollama options from settings'
-		details: (Dictionary new
-			at: #loadedOptions put: options copy;
-			yourself).
+	CoCopilotLogger logBackEndEvent: 'Loaded Ollama options from settings' details: (Dictionary new
+			 at: #loadedOptions put: options copy;
+			 yourself)
 ]
 
 { #category : 'response-normalization' }
@@ -270,46 +213,18 @@ OllamaClient >> normalizeResponse: response [
 
 { #category : 'api' }
 OllamaClient >> optionAt: aKey [
-	"Answer the option value for aKey or nil when absent."
-
-	| value |
-	value := options ifNil: [ nil ] ifNotNil: [ options at: aKey ifAbsent: [ nil ] ].
-
-	CoCopilotLogger
-		logBackEndEvent: 'Reading Ollama option'
-		details: (Dictionary new
-			at: #key put: aKey;
-			at: #value put: value;
-			yourself).
-
-	^ value
+^ options ifNil: [ nil ] ifNotNil: [ options at: aKey ifAbsent: [ nil ] ]
 ]
 
 { #category : 'api' }
 OllamaClient >> optionAt: aKey put: aValue [
-	"Set an option value and answer it."
 
 	options ifNil: [ options := Dictionary new ].
-
-	CoCopilotLogger
-		logBackEndEvent: 'Updating Ollama option'
-		details: (Dictionary new
-			at: #key put: aKey;
-			at: #value put: aValue;
-			yourself).
-
 	^ options at: aKey put: aValue
 ]
 
 { #category : 'api' }
 OllamaClient >> options [
-	"Answer the current options dictionary."
-
-	CoCopilotLogger
-		logBackEndEvent: 'Accessing Ollama options snapshot'
-		details: (Dictionary new
-			at: #options put: options;
-			yourself).
 
 	^ options
 ]
@@ -461,31 +376,17 @@ OllamaClient >> useModelNamed: aString [
 	"Resolve and set the model spec for the given full name (family[:tag])."
 
 	| tokens family tag |
-	CoCopilotLogger
-		logBackEndEvent: 'Requested Ollama model change'
-		details: (Dictionary new
-			at: #requestedName put: aString;
-			yourself).
 
 	modelSpec := OModelRegistry current specByFullName: aString.
 	modelSpec ifNil: [
-		tokens := aString findTokens: ':'.
-		family := tokens isEmpty ifTrue: [ aString ] ifFalse: [ tokens first ].
-		tag := tokens size > 1
-			ifTrue: [
-				String streamContents: [ :s |
-					(tokens copyFrom: 2 to: tokens size)
-						do: [ :each | s nextPutAll: each ]
-						separatedBy: [ s nextPut: $: ] ] ]
-			ifFalse: [ nil ].
-		modelSpec := OModelSpec family: family tag: tag label: aString ].
-
-	CoCopilotLogger
-		logBackEndEvent: 'Applied Ollama model change'
-		details: (Dictionary new
-			at: #resolvedName put: modelSpec fullName;
-			at: #modelFamily put: modelSpec family;
-			at: #modelTag put: modelSpec tag;
-			at: #modelLabel put: modelSpec label;
-			yourself).
+			tokens := aString findTokens: ':'.
+			family := tokens isEmpty
+				          ifTrue: [ aString ]
+				          ifFalse: [ tokens first ].
+			tag := tokens size > 1
+				       ifTrue: [
+						       String streamContents: [ :s |
+							       (tokens copyFrom: 2 to: tokens size) do: [ :each | s nextPutAll: each ] separatedBy: [ s nextPut: $: ] ] ]
+				       ifFalse: [ nil ].
+			modelSpec := OModelSpec family: family tag: tag label: aString ].
 ]
