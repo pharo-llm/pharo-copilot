@@ -217,6 +217,16 @@ CopilotSettingsTest >> testHostAccessor [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testInstallModelPromptMessageExplainsPluginBehavior [
+
+	| message |
+	message := CopilotSettings installModelPromptMessageForModelNamed: 'demo-model:latest'.
+	self assert: (message includesSubstring: 'uses your current editing context').
+	self assert: (message includesSubstring: 'No source code is sent to external cloud services').
+	self assert: (message includesSubstring: 'Do you consent to installing it now?')
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testLoggingEnabledDefaultsToTrue [
 
     CopilotSettings withDefaultSettingsDo: [
@@ -494,6 +504,22 @@ CopilotSettingsTest >> testPortStringInputParsesToNumber [
     ] ensure: [
         CopilotSettings port: old.
     ].
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRecordInstallModelConsentIsStoredInSnapshot [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot consentRecord |
+		CopilotSettings
+			recordInstallModelUserConsentForModelNamed: 'demo-model:latest'
+			accepted: true.
+		snapshot := CopilotSettings serializableSettingsSnapshot.
+		consentRecord := snapshot at: #installModelUserConsent.
+		self assert: (consentRecord at: #model) equals: 'demo-model:latest'.
+		self assert: (consentRecord at: #accepted) equals: true.
+		self assert: (consentRecord includesKey: #timestamp)
+	]
 ]
 
 { #category : 'tests' }

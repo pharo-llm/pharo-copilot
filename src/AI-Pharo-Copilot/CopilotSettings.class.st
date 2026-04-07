@@ -35,7 +35,8 @@ Class {
 		'maxClassMethods',
 		'minimumPrefixLength',
 		'completionSuggestionsCount',
-		'backgroundColor'
+		'backgroundColor',
+		'installModelUserConsent'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -541,6 +542,21 @@ CopilotSettings class >> installModelNamed: aModelName [
 							 yourself).
 				self notifyUser: ('Failed to download {1}. Please check Ollama logs.' format: { aModelName }).
 				^ false ]
+]
+
+{ #category : 'persistence' }
+CopilotSettings class >> installModelPromptMessageForModelNamed: aModelName [
+	"Build the consent prompt shown before model installation."
+
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: 'Pharo Copilot uses your current editing context to request code completions from your local Ollama model.';
+			nextPut: Character lf;
+			nextPutAll: 'No source code is sent to external cloud services by this plugin.';
+			nextPut: Character lf;
+			nextPutAll: 'The model "', aModelName, '" is not installed yet.';
+			nextPut: Character lf;
+			nextPutAll: 'Do you consent to installing it now?' ]
 ]
 
 { #category : 'accessing' }
@@ -1255,7 +1271,7 @@ CopilotSettings class >> promptToInstallMissingModelNamed: aModelName availableM
 	"Ask the user whether to install a missing model; answer true if accepted."
 
 	| message confirmation |
-	message := 'This model is not available, Do you want to install it ? ' format: { aModelName }.
+	message := self installModelPromptMessageForModelNamed: aModelName.
 
 	CoCopilotLogger
 		logBackEndEvent: 'Prompting user to install missing Ollama model'
@@ -1278,6 +1294,34 @@ CopilotSettings class >> promptToInstallMissingModelNamed: aModelName availableM
 			yourself).
 
 	^ confirmation
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> recordInstallModelUserConsentForModelNamed: aModelName accepted: aBoolean [
+	"Persist the most recent user consent decision and append it to the evaluation log."
+
+	| consentRecord evalFile |
+	consentRecord := Dictionary new
+		at: #model put: aModelName;
+		at: #accepted put: aBoolean;
+		at: #timestamp put: DateAndTime now asString;
+		yourself.
+
+	installModelUserConsent := consentRecord.
+	self autoSaveSettings.
+
+	[
+		CoCopilotLogger ensureEvaluationLogFileInitialized.
+		evalFile := CoCopilotLogger evaluationLogFileReference.
+		evalFile writeStreamDo: [ :stream |
+			stream setToEnd.
+			stream
+				nextPutAll: (STONJSON toString: (Dictionary new
+					at: #event put: 'model-install-consent';
+					at: #data put: consentRecord;
+					yourself));
+				nextPut: Character lf ]
+	] on: Error do: [ :ignored | ].
 ]
 
 { #category : 'settings' }
@@ -1385,7 +1429,8 @@ CopilotSettings class >> resetToDefaultSettings [
 	maxClassMethods := nil.
 	minimumPrefixLength := nil.
 	completionSuggestionsCount := nil.
-	backgroundColor := nil
+	backgroundColor := nil.
+	installModelUserConsent := nil
 ]
 
 { #category : 'persistence' }
@@ -1417,12 +1462,13 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	minimumPrefixLength := aDictionary at: #minimumPrefixLength ifAbsent: [ nil ].
 		completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ nil ].
 		backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ nil ].
+		installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ nil ].
 	(aDictionary at: #contextMode ifAbsent: [ nil ]) ifNotNil: [ :savedMode | CopilotContextSettings mode: savedMode ]. "Convert templatesDirectory path string back to FileReference"
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
 	templatesPath ifNotNil: [
 			templatesDirectory := [ templatesPath asFileReference ]
 				                      on: Error
-				                      do: [ nil ] ]. "Don't restore modelMetadata and ollamaClientFactory - these are runtime-only"
+				                      do: [ nil ] ].
 	modelMetadata := nil.
 	ollamaClientFactory := nil
 ]
@@ -1468,6 +1514,7 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	minimumPrefixLength := aDictionary at: #minimumPrefixLength ifAbsent: [ aDictionary at: #MinimumPrefixLength ifAbsent: [ nil ] ].
 completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ aDictionary at: #CompletionSuggestionsCount ifAbsent: [ nil ] ].
 backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ aDictionary at: #BackgroundColor ifAbsent: [ nil ] ].
+installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ aDictionary at: #InstallModelUserConsent ifAbsent: [ nil ] ].
 ]
 
 { #category : 'accessing' }
@@ -1574,8 +1621,9 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #maxClassMethods put: maxClassMethods;
 		            at: #minimumPrefixLength put: minimumPrefixLength;
 		            at: #contextMode put: CopilotContextSettings mode;
-		at: #completionSuggestionsCount put: completionSuggestionsCount;
-		at: #backgroundColor put: backgroundColor;
+		            at: #completionSuggestionsCount put: completionSuggestionsCount;
+		            at: #backgroundColor put: backgroundColor;
+		at: #installModelUserConsent put: installModelUserConsent;
 		            yourself.
 	templatesDirectory ifNotNil: [
 			templatesPath := [ templatesDirectory pathString ]
@@ -1869,8 +1917,9 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #maxInstanceMethods put: maxInstanceMethods;
 		  at: #maxClassMethods put: maxClassMethods;
 		  at: #minimumPrefixLength put: minimumPrefixLength;
-		 at: #completionSuggestionsCount put: completionSuggestionsCount;
-		at: #backgroundColor put: backgroundColor;
+		  at: #completionSuggestionsCount put: completionSuggestionsCount;
+		  at: #backgroundColor put: backgroundColor;
+		at: #installModelUserConsent put: installModelUserConsent;
 		  yourself
 ]
 
