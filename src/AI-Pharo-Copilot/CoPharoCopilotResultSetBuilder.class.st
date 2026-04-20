@@ -652,6 +652,32 @@ CoPharoCopilotResultSetBuilder >> isLanguageSpec: aString [
 ]
 
 { #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> isLikelyContextEcho: suggestionString forPrefix: prefixString typedFragment: typedFragment [ 
+
+	| suggestion prefix fragment trimmed first |
+	suggestion := (suggestionString ifNil: [ '' ]) asString trimBoth.
+	prefix := (prefixString ifNil: [ '' ]) asString.
+	fragment := (typedFragment ifNil: [ '' ]) asString.
+
+	suggestion isEmpty ifTrue: [ ^ true ].
+
+	"Reject chunks that already exist in the prefix/context"
+	((suggestion size > 8) and: [ prefix includesSubstring: suggestion ]) ifTrue: [
+		^ true ].
+
+	"When user is in the middle of typing a token, completion must look like a tail"
+	fragment isEmpty ifTrue: [ ^ false ].
+
+	trimmed := suggestion trimLeft.
+	trimmed isEmpty ifTrue: [ ^ true ].
+
+	first := trimmed first.
+
+	^ (self isWordChar: first) not
+		and: [ (':_' includes: first) not ]
+]
+
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> isTemplateLeakOrPromptEcho: cleanedString rawResponse: rawString prefix: prefixString [
 
 	| cleaned raw prefix leakMarkers |
@@ -787,15 +813,17 @@ CoPharoCopilotResultSetBuilder >> minimumPrefixLength [
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> normalizeSuggestion: rawResponse forPrefix: prefixString [
 
-	| raw text cleaned |
-	raw := self extractResponseContentFromRaw: rawResponse.
-	text := self removeEchoedPrefix: raw prefix: prefixString.
-	cleaned := self cleanedContentFrom: text.
+	| raw text cleaned typedFragment |
+	raw := self extractResponseContentFromRaw: rawResponse. 
+	text := self removeEchoedPrefix: raw prefix: prefixString. 
+	cleaned := self cleanedContentFrom: text. 
+	typedFragment := self trailingWordFragmentIn: prefixString.
+	cleaned := self stripTypedFragment: typedFragment fromSuggestion: cleaned. 
+	(self isTemplateLeakOrPromptEcho: cleaned rawResponse: raw prefix: prefixString) ifTrue: [ ^ '' ].
 
-	(self isTemplateLeakOrPromptEcho: cleaned rawResponse: raw prefix: prefixString)
-		ifTrue: [ ^ '' ].
+	(self isLikelyContextEcho: cleaned forPrefix: prefixString typedFragment: typedFragment) ifTrue: [ ^ '' ].
 
-	^ cleaned
+	^ cleaned trimBoth
 ]
 
 { #category : 'initialization' }
@@ -1021,4 +1049,39 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForPrefix: prefixString
 	prefixString ifNil: [ ^ false ].
 	(prefixString size < self minimumPrefixLength) ifTrue: [ ^ false ].
 	^ true
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> stripTypedFragment: typedFragment fromSuggestion: suggestionString [
+
+	| suggestion fragment trimmed |
+	suggestion := (suggestionString ifNil: [ '' ]) asString.
+	fragment := (typedFragment ifNil: [ '' ]) asString.
+
+	fragment isEmpty ifTrue: [ ^ suggestion ].
+	suggestion isEmpty ifTrue: [ ^ suggestion ].
+
+	(suggestion beginsWith: fragment) ifTrue: [
+		^ suggestion allButFirst: fragment size ].
+
+	trimmed := suggestion trimLeft.
+	(trimmed beginsWith: fragment) ifTrue: [
+		^ (trimmed allButFirst: fragment size) trimLeft ].
+
+	^ suggestion
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> trailingWordFragmentIn: aString [
+
+	| text i |
+	text := (aString ifNil: [ '' ]) asString.
+	text isEmpty ifTrue: [ ^ '' ].
+
+	i := text size.
+	[ i > 0 and: [ self isWordChar: (text at: i) ] ] whileTrue: [
+		i := i - 1 ].
+
+	i = text size ifTrue: [ ^ '' ].
+	^ text copyFrom: i + 1 to: text size
 ]
