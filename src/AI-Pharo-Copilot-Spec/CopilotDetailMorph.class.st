@@ -7,8 +7,10 @@ Class {
 	#name : 'CopilotDetailMorph',
 	#superclass : 'Morph',
 	#instVars : [
-		'textMorph',
-		'arrowPosition'
+		'title',
+		'description',
+		'arrowPosition',
+		'label'
 	],
 	#category : 'AI-Pharo-Copilot-Spec',
 	#package : 'AI-Pharo-Copilot-Spec'
@@ -17,13 +19,13 @@ Class {
 { #category : 'accessing' }
 CopilotDetailMorph class >> height [
 
-	^ 400
+	^ CopilotMenuMorph itemHeight * 5.
 ]
 
 { #category : 'accessing' }
 CopilotDetailMorph class >> width [
 
-	^ 600
+	^ CopilotMenuMorph itemWidth * 1.2
 ]
 
 { #category : 'geometry' }
@@ -35,91 +37,118 @@ CopilotDetailMorph >> bounds [
 { #category : 'geometry' }
 CopilotDetailMorph >> contentBounds [
 
-	| rectangle |
-	rectangle := self bounds insetBy: 10.
+	| factor rectangle |
+	factor := CopilotMenuMorph itemHeight + 10.
+	rectangle := self bounds top: self bounds top + 3.
+	rectangle := rectangle left: rectangle left + (factor * 2.0).
 	^ rectangle
 ]
 
 { #category : 'accessing - defaults' }
 CopilotDetailMorph >> defaultColor [
 
-	^ CopilotSettings backgroundColor
+	^ CopilotMenuMorph backgroundColor
 ]
 
 { #category : 'geometry' }
+CopilotDetailMorph >> descriptionBounds [
+
+	^ self contentBounds top: self contentBounds top + 40
+]
+
+{ #category : 'initialization' }
 CopilotDetailMorph >> drawArrowOn: aCanvas [
 
-	"Draw a small arrow pointing to the selected item in the menu."
-
-	| point polygon size |
-	size := 8.
+	| point factor polygon |
+	factor := CopilotMenuMorph itemHeight.
 	point := arrowPosition.
 	polygon := OrderedCollection new.
 	polygon add: point.
-	polygon add: (point translateBy: size @ 0).
-	polygon add: (point translateBy: size @ (size // 2)).
-	polygon add: (point translateBy: 0 @ size).
-	aCanvas drawPolygon: polygon fillStyle: (Color r: 0.4 g: 0.6 b: 0.9 alpha: 0.25)
+	polygon add: (point := point translateBy: (factor / 2) @ 0).
+	polygon add: (point := point translateBy: 0 @ (factor * -0.5)).
+	polygon add: (point := point translateBy: factor @ factor).
+	polygon add: (point := point translateBy: (factor * -1) @ factor).
+	polygon add: (point := point translateBy: 0 @ (factor * -0.5)).
+	polygon add: (point := point translateBy: (factor * -0.5) @ 0).
+	aCanvas drawPolygon: polygon fillStyle: CopilotMenuMorph scrollColor
 ]
 
-{ #category : 'geometry' }
+{ #category : 'initialization' }
 CopilotDetailMorph >> drawOn: aCanvas [
 
 	super drawOn: aCanvas.
 	arrowPosition ifNotNil: [ self drawArrowOn: aCanvas ]
 ]
 
-{ #category : 'geometry' }
-CopilotDetailMorph >> entryText: aString [
-
-	"Set the text content to display."
-
-	textMorph contents: aString
+{ #category : 'initialization' }
+CopilotDetailMorph >> entryDescription: anEntryDescription [
+	title
+		contents: (anEntryDescription title
+			ifNil: [
+				description bounds: self titleBounds.
+				String new ]
+			ifNotNil: [
+				description bounds: self descriptionBounds.
+				anEntryDescription title ]).
+	description contentsWrapped: anEntryDescription description.
+	label contents: anEntryDescription label
 ]
 
-{ #category : 'geometry' }
+{ #category : 'initialization' }
 CopilotDetailMorph >> initialize [
+
+	| childBounds |
 	super initialize.
-
-	self borderStyle: (BorderStyle color: Color gray width: 1).
 	self color: self defaultColor.
+	self borderStyle: (BorderStyle color: Color gray width: 1).
 
-	textMorph := TextMorph new.
-	textMorph
-		autoFit: false;
-		bounds: self contentBounds;
-		borderWidth: 0;
-		font: StandardFonts codeFont;
-		color: self defaultColor;
-		textColor: Color white.
+	childBounds := self contentBounds.
 
-	self addMorph: textMorph
+	label := StringMorph
+		contents: ''
+		font: StandardFonts menuFont.
+	label bounds: childBounds.
+	self addMorph: label.
+
+	title := StringMorph
+		contents: ''
+		font: StandardFonts windowTitleFont.
+	title bounds: self titleBounds.
+	self addMorph: title.
+
+	description := TextMorph new.
+	description autoFit: false.
+	description bounds: self descriptionBounds.
+	description borderWidth: 0.
+	self addMorph: description
+]
+
+{ #category : 'initialization' }
+CopilotDetailMorph >> position: aPoint menuWidth: anInteger [
+
+	| y x |
+	arrowPosition := aPoint.
+	y := aPoint y + self class height.
+	y := y > self currentWorld height
+		ifTrue: [ self currentWorld height - self class height ]
+		ifFalse: [ aPoint y - CopilotMenuMorph itemHeight ].
+	x := aPoint x.
+	x := x + self class width > self currentWorld width
+		ifTrue: [
+			arrowPosition := (self positionOnLeft: anInteger) @ aPoint y.
+			arrowPosition x ]
+		ifFalse: [ x ].
+	self position: x @ y
+]
+
+{ #category : 'initialization' }
+CopilotDetailMorph >> positionOnLeft: anInteger [
+
+	^ arrowPosition x - self class width - anInteger
 ]
 
 { #category : 'geometry' }
-CopilotDetailMorph >> position: aPoint menuWidth: anInteger [
-	"Position the detail morph next to the menu, accounting for screen boundaries."
+CopilotDetailMorph >> titleBounds [
 
-	| world y x |
-	arrowPosition := aPoint.
-
-	"Try to position to the right of the menu"
-	x := aPoint x + 10.
-	y := aPoint y.
-
-	world := self currentWorld.
-	world ifNil: [ ^ self position: x @ y ].
-
-	"If it would go off screen, position to the left instead"
-	(x + self class width > world width) ifTrue: [
-		x := aPoint x - self class width - anInteger - 10.
-		arrowPosition := (aPoint x - anInteger) @ aPoint y
-	].
-
-	"Keep it on screen vertically"
-	(y + self class height > world height) ifTrue: [
-		y := world height - self class height
-	].
-
-	self position: x @ y
+	^ self contentBounds top: self contentBounds top + 20
 ]

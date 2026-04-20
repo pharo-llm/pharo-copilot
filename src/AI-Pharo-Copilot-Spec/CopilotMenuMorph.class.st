@@ -38,7 +38,7 @@ CopilotMenuMorph class >> builder: aBuilder context: aContext entries: entryColl
 CopilotMenuMorph class >> itemHeight [
 
 	"One visible line only"
-	^ StandardFonts codeFont height + 6
+	^ StandardFonts codeFont height + 10
 ]
 
 { #category : 'accessing' }
@@ -133,15 +133,32 @@ CopilotMenuMorph >> delete [
 ]
 
 { #category : 'private' }
+CopilotMenuMorph >> detailDescriptionFor: anEntry [
+	| scopeLabel behavior |
+	behavior := (context respondsTo: #completionClass)
+		ifTrue: [ context completionClass ]
+		ifFalse: [ nil ].
+
+	scopeLabel := behavior
+		ifNil: [ 'copilot' ]
+		ifNotNil: [ behavior name ].
+
+	^ CoCopilotEntryDescription
+		label: scopeLabel
+		title: anEntry label
+		description: anEntry description
+]
+
+{ #category : 'private' }
 CopilotMenuMorph >> detailPosition: aPoint [
 
 	detailPosition := aPoint.
 	self updateDetail
 ]
 
-{ #category : 'accessing - defaults' }
+{ #category : 'private' }
 CopilotMenuMorph >> drawLine: index on: aCanvas rectangle: rectangle [
-	"Draw one suggestion entry in the list using a single-line preview."
+	"Complishon-style: selected row drives detail anchor."
 
 	| entry displayText font previewText rect |
 	entry := entries at: index.
@@ -149,7 +166,8 @@ CopilotMenuMorph >> drawLine: index on: aCanvas rectangle: rectangle [
 
 	index = selectedIndex ifTrue: [
 		rect := rectangle withHeight: self class itemHeight.
-		aCanvas fillRectangle: rect color: self class scrollColor
+		aCanvas fillRectangle: rect color: self class scrollColor.
+		self detailPosition: rect topRight
 	].
 
 	font := StandardFonts codeFont.
@@ -232,11 +250,11 @@ CopilotMenuMorph >> hasDetail [
 	^ detailMorph isNotNil
 ]
 
-{ #category : 'accessing - defaults' }
+{ #category : 'private' }
 CopilotMenuMorph >> hideDetail [
 	detailMorph ifNil: [ ^ false ].
 
-	detailMorph owner ifNotNil: [ detailMorph owner delete ].
+	self removeMorph: detailMorph.
 	detailMorph delete.
 	detailMorph := nil.
 	isDetailMorphVisible := false.
@@ -493,19 +511,11 @@ CopilotMenuMorph >> selectedIndex: aNumber [
 
 { #category : 'private' }
 CopilotMenuMorph >> showDetail [
-	"Open details in a separate window."
-
 	self itemsCount isZero ifTrue: [ ^ self ].
 
-	detailMorph ifNil: [
-		detailMorph := CopilotDetailMorph new.
-		isDetailMorphVisible := true.
-		detailMorph
-			entryText: self selectedEntry description;
-			openInWindowLabeled: 'Copilot Suggestion'.
-		^ self
-	].
+	detailMorph ifNotNil: [ ^ self updateDetail ].
 
+	detailMorph := CopilotDetailMorph new.
 	self updateDetail
 ]
 
@@ -517,8 +527,14 @@ CopilotMenuMorph >> takesKeyboardFocus [
 
 { #category : 'private' }
 CopilotMenuMorph >> updateDetail [
-	"Update the already-open detail window with the current selection."
-
 	detailMorph ifNil: [ ^ self ].
-	detailMorph entryText: self selectedEntry description
+	detailPosition ifNil: [ ^ self ].
+
+	detailMorph
+		entryDescription: (self detailDescriptionFor: self selectedEntry);
+		position: detailPosition menuWidth: self width.
+
+	isDetailMorphVisible ifTrue: [ ^ self ].
+	self addMorph: detailMorph.
+	isDetailMorphVisible := true
 ]
