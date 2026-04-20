@@ -71,6 +71,36 @@ CoSuggestionEvaluator >> announceEvaluation: anEvaluationEntry [
 ]
 
 { #category : 'initialization' }
+CoSuggestionEvaluator >> appendEvaluationEntry: anEvaluationEntry [
+	| evaluationFile data safeData |
+	CoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
+
+	evaluationFile := CoCopilotLogger evaluationLogFileReference.
+	data := Dictionary new
+		at: #timestamp put: anEvaluationEntry timestamp;
+		at: #action put: anEvaluationEntry action asString;
+		at: #suggestion put: anEvaluationEntry suggestion contents;
+		at: #contextType put: (self determineContextType: anEvaluationEntry context);
+		at: #modelName put: CopilotSettings modelName;
+		at: #rejectionReason put: anEvaluationEntry rejectionReason;
+		yourself.
+
+	safeData := self jsonSafeObject: data.
+
+	[
+		CoCopilotLogger ensureEvaluationLogFileInitialized.
+		evaluationFile writeStreamDo: [ :stream |
+			stream setToEnd.
+			stream nextPutAll: (STONJSON toString: safeData).
+			stream nextPut: Character lf ] ]
+		on: Error
+		do: [ :ex |
+			Transcript
+				show: 'Could not append evaluation entry: ', ex messageText;
+				cr ]
+]
+
+{ #category : 'initialization' }
 CoSuggestionEvaluator >> conditionSelectors [
 	^ #(' ifTrue:' ' ifFalse:' ' ifNil:' ' ifNotNil:' ' ifEmpty:' ' ifNotEmpty:' ' ifPresent:' ' ifAbsent:').
 
