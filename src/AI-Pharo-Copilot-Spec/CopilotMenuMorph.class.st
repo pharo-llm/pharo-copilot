@@ -81,10 +81,12 @@ CopilotMenuMorph >> builder: aBuilder context: aContext entries: entryCollection
 	self resize.
 	self openInWorld.
 	self position: (self clampPosition: (aPoint - (20 @ 0))).
-	self selectedIndex: (entries isEmpty
-		ifTrue: [ 0 ]
-		ifFalse: [ 1 ]).
-	self changed
+self selectedIndex: (entries isEmpty
+	ifTrue: [ 0 ]
+	ifFalse: [ 1 ]).
+
+entries isEmpty ifFalse: [ self showDetail ].
+self changed
 ]
 
 { #category : 'private' }
@@ -489,7 +491,7 @@ CopilotMenuMorph >> selectedIndex: aNumber [
 	]
 ]
 
-{ #category : 'accessing - defaults' }
+{ #category : 'private' }
 CopilotMenuMorph >> showDetail [
 	"Open details in a separate window."
 
@@ -499,7 +501,7 @@ CopilotMenuMorph >> showDetail [
 		detailMorph := CopilotDetailMorph new.
 		isDetailMorphVisible := true.
 		detailMorph
-			entryText: self selectedEntry contents;
+			entryText: self selectedEntry description;
 			openInWindowLabeled: 'Copilot Suggestion'.
 		^ self
 	].
@@ -513,10 +515,10 @@ CopilotMenuMorph >> takesKeyboardFocus [
 	^ true
 ]
 
-{ #category : 'accessing - defaults' }
+{ #category : 'private' }
 CopilotMenuMorph >> updateDetail [
 	"Update the already-open detail window with the current selection."
 
 	detailMorph ifNil: [ ^ self ].
-	detailMorph entryText: self selectedEntry contents
+	detailMorph entryText: self selectedEntry description
 ]

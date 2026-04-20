@@ -6,7 +6,9 @@ Class {
 	#name : 'CoCopilotEntry',
 	#superclass : 'Object',
 	#instVars : [
-		'text'
+		'text',
+		'description',
+		'label'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -18,6 +20,15 @@ CoCopilotEntry class >> contents: aString [
 
 	^ self new
 		text: aString;
+		yourself
+]
+
+{ #category : 'accessing' }
+CoCopilotEntry class >> contents: aString description: aDescriptionString [
+
+	^ self new
+		text: aString;
+		description: aDescriptionString;
 		yourself
 ]
 
@@ -61,13 +72,47 @@ CoCopilotEntry >> contents [
 	^ text
 ]
 
-{ #category : 'displaying' }
-CoCopilotEntry >> displayString [
-	"Answer a UI-friendly preview (truncated to 120 characters when needed)."
+{ #category : 'accessing' }
+CoCopilotEntry >> defaultLabel [
 
-	^ (self contents size > 120)
-		ifTrue: [ (self contents copyFrom: 1 to: 117), '…' ]
-		ifFalse: [ self contents ]
+	| firstLine |
+	firstLine := self contents lines
+		ifEmpty: [ '' ]
+		ifNotEmpty: [ :lines | lines first ].
+
+	^ firstLine size > 80
+		ifTrue: [ (firstLine copyFrom: 1 to: 77), '…' ]
+		ifFalse: [ firstLine ]
+]
+
+{ #category : 'accessing' }
+CoCopilotEntry >> description [
+
+	^ description ifNil: [ self contents ]
+]
+
+{ #category : 'accessing' }
+CoCopilotEntry >> description: aString [
+
+	description := aString
+]
+
+{ #category : 'accessing' }
+CoCopilotEntry >> displayString [
+
+	^ self label
+]
+
+{ #category : 'accessing' }
+CoCopilotEntry >> label [
+
+	^ label ifNil: [ self defaultLabel ]
+]
+
+{ #category : 'accessing' }
+CoCopilotEntry >> label: aString [
+
+	label := aString
 ]
 
 { #category : 'displaying' }

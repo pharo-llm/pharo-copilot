@@ -1387,7 +1387,7 @@ CopilotSettings class >> repeatPenalty: aNumber [
 CopilotSettings class >> requestTimeoutSeconds [
 	"Answer the HTTP request timeout (seconds) for Ollama calls."
 
-	^ requestTimeoutSeconds ifNil: [ requestTimeoutSeconds := 5 ]
+	^ requestTimeoutSeconds ifNil: [ requestTimeoutSeconds := 500 ]
 ]
 
 { #category : 'settings' }

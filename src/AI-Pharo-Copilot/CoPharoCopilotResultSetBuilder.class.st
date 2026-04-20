@@ -74,7 +74,10 @@ CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aC
 					 yourself).
 			^ self ].
 
-	entries := entries collect: [ :each | CoCopilotEntry contents: each ].
+	entries := entries collect: [ :each |
+	CoCopilotEntry
+		contents: each
+		description: (self descriptionForSuggestion: each inContext: aContext) ].
 
 	position := self menuPositionFor: aContext.
 	position ifNil: [
@@ -314,20 +317,15 @@ CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix
 	seen := Set new.
 
 	1 to: desiredCount do: [ :attempt |
-			| rawResponse rawResponseString content |
-			collected size >= desiredCount ifTrue: [ ^ collected asArray ].
-			rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
-			rawResponseString := [ rawResponse asString ]
-				                     on: Error
-				                     do: [ rawResponse printString ].
+		| rawResponse content |
+		collected size >= desiredCount ifTrue: [ ^ collected asArray ].
 
-			content := self extractResponseContentFromRaw: rawResponseString.
-			content := self removeEchoedPrefix: content prefix: prefixString.
-			content := self cleanedContentFrom: content.
+		rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
+		content := self normalizeSuggestion: rawResponse forPrefix: prefixString.
 
-			(content isEmpty not and: [ (seen includes: content) not ]) ifTrue: [
-					seen add: content.
-					collected add: content ] ].
+		(content isEmpty not and: [ (seen includes: content) not ]) ifTrue: [
+			seen add: content.
+			collected add: content ] ].
 
 	contextInfo at: #rawSuggestions put: collected asArray.
 	^ collected asArray
@@ -383,8 +381,9 @@ CoPharoCopilotResultSetBuilder >> contextSnapshotFor: aContext [
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> debounceMilliseconds [
+	"Return the current debounce delay used before firing a completion request."
 
-	^ debounceMilliseconds ifNil: [ CopilotSettings completionDebounceMilliseconds ]
+	^ debounceMilliseconds ifNil: [ 250 ]
 ]
 
 { #category : 'initialization' }
@@ -414,10 +413,58 @@ CoPharoCopilotResultSetBuilder >> deferUI: aBlock [
 ]
 
 { #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> ebounceMilliseconds [
-	"Return the current debounce delay used before firing a completion request."
+CoPharoCopilotResultSetBuilder >> descriptionForSuggestion: suggestionString inContext: aContext [
 
-	^ debounceMilliseconds ifNil: [ 250 ]
+	| firstLine selector behavior classComment |
+	firstLine := suggestionString lines
+		ifEmpty: [ '' ]
+		ifNotEmpty: [ :lines | lines first ].
+
+	selector := [ (OCParser parseFaultyMethod: suggestionString) selector ]
+		on: Error
+		do: [ nil ].
+
+	behavior := (aContext respondsTo: #completionClass)
+		ifTrue: [ aContext completionClass ]
+		ifFalse: [
+			(aContext respondsTo: #behavior)
+				ifTrue: [ aContext behavior ]
+				ifFalse: [ nil ] ].
+
+	classComment := behavior
+		ifNotNil: [
+			[ behavior comment asString ]
+				on: Error
+				do: [ '' ] ]
+		ifNil: [ '' ].
+
+	selector ifNotNil: [
+		^ String streamContents: [ :stream |
+			stream
+				nextPutAll: 'Suggested selector: ';
+				nextPutAll: selector asString;
+				cr; cr.
+			firstLine isEmpty ifFalse: [
+				stream
+					nextPutAll: 'Preview: ';
+					nextPutAll: firstLine;
+					cr; cr ].
+			classComment isEmpty ifFalse: [
+				stream
+					nextPutAll: 'Class comment:';
+					cr;
+					nextPutAll: classComment ] ] ].
+
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: 'Preview: ';
+			nextPutAll: firstLine.
+		classComment isEmpty ifFalse: [
+			stream
+				cr; cr;
+				nextPutAll: 'Class comment:';
+				cr;
+				nextPutAll: classComment ] ]
 ]
 
 { #category : 'initialization' }
@@ -704,6 +751,16 @@ CoPharoCopilotResultSetBuilder >> minimumPrefixLength [
 ]
 
 { #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> normalizeSuggestion: rawResponse forPrefix: prefixString [
+
+	| text |
+	text := self extractResponseContentFromRaw: rawResponse.
+	text := self removeEchoedPrefix: text prefix: prefixString.
+	text := self cleanedContentFrom: text.
+	^ text
+]
+
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> normalizedDelayMilliseconds: anObject default: defaultValue [
 	"Normalize a delay, enforcing a non-zero millisecond range."
 
@@ -733,56 +790,56 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 		contextInfo
 			at: #classContextLength put: classContext size;
 			at: #classContextPresent put: classContext isEmpty not.
+
 		cachedContent := self completionCache
-			                 at: prefixString
-			                 suffix: suffixString
-			                 context: classContext
-			                 ifPresent: [ :cached | cached ].
+			at: prefixString
+			suffix: suffixString
+			context: classContext
+			ifPresent: [ :cached | cached ].
 
 		cachedContent ifNil: [
-				cachedContent := self completionCache
-					                 nearMatchAt: prefixString
-					                 suffix: suffixString
-					                 context: classContext
-					                 ifPresent: [ :cached |
-							                 | lastChar |
-							                 lastChar := prefixString last asString.
-							                 (cached isArray and: [ cached anySatisfy: [ :s | s beginsWith: lastChar ] ])
-								                 ifTrue: [
-										                 | filtered |
-										                 filtered := cached select: [ :s | s beginsWith: lastChar ].
-										                 filtered ifEmpty: [ nil ] ifNotEmpty: [ filtered collect: [ :s | s allButFirst: lastChar size ] ] ]
-								                 ifFalse: [ nil ] ] ].
+			cachedContent := self completionCache
+				nearMatchAt: prefixString
+				suffix: suffixString
+				context: classContext
+				ifPresent: [ :cached |
+					| lastChar |
+					lastChar := prefixString last asString.
+					(cached isArray and: [ cached anySatisfy: [ :s | s beginsWith: lastChar ] ])
+						ifTrue: [
+							| filtered |
+							filtered := cached select: [ :s | s beginsWith: lastChar ].
+							filtered ifEmpty: [ nil ] ifNotEmpty: [ filtered collect: [ :s | s allButFirst: lastChar size ] ] ]
+						ifFalse: [ nil ] ] ].
 
 		cachedContent ifNotNil: [
-				contextInfo at: #cacheHit put: true.
-				cachedSuggestions := cachedContent isArray
-					                     ifTrue: [ cachedContent ]
-					                     ifFalse: [ { cachedContent } ].
-					
-				^ self
-					  applyContent: cachedSuggestions
-					  toContext: aContext
-					  expectedPrefix: prefixString
-					  suffix: suffixString
-					  contextInfo: contextInfo ].
+			contextInfo at: #cacheHit put: true.
+			cachedSuggestions := cachedContent isArray
+				ifTrue: [ cachedContent ]
+				ifFalse: [ { cachedContent } ].
+
+			^ self
+				applyContents: cachedSuggestions
+				toContext: aContext
+				expectedPrefix: prefixString
+				suffix: suffixString
+				contextInfo: contextInfo ].
 
 		contextInfo at: #cacheHit put: false.
 
-
 		suggestions := self
-			               collectNormalizedSuggestionsFor: client
-			               prefix: prefixString
-			               suffix: suffixString
-			               context: classContext
-			               contextInfo: contextInfo.
+			collectNormalizedSuggestionsFor: client
+			prefix: prefixString
+			suffix: suffixString
+			context: classContext
+			contextInfo: contextInfo.
 
 		suggestions isEmpty ifFalse: [
-				self completionCache
-					at: prefixString
-					suffix: suffixString
-					context: classContext
-					put: suggestions asArray ].
+			self completionCache
+				at: prefixString
+				suffix: suffixString
+				context: classContext
+				put: suggestions asArray ].
 
 		self
 			applyContents: suggestions
@@ -792,36 +849,46 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			contextInfo: contextInfo ]
 		on: Error
 		do: [ :ex |
-				CoCopilotLogger
-					logError: 'Asynchronous completion failed'
-					origin: #CoPharoCopilotResultSetBuilder
-					exception: ex
-					payload: (Dictionary new
-							 at: #requestDetails put: contextInfo copy;
-							 at: #prefixLength put: prefixString size;
-							 at: #suffixLength put: suffixString size;
-							 yourself) ]
+			CoCopilotLogger
+				logError: 'Asynchronous completion failed'
+				origin: #CoPharoCopilotResultSetBuilder
+				exception: ex
+				payload: (Dictionary new
+					at: #requestDetails put: contextInfo copy;
+					at: #prefixLength put: prefixString size;
+					at: #suffixLength put: suffixString size;
+					yourself) ]
 ]
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> removeEchoedPrefix: contentString prefix: prefixString [
-	"Strip the prefix from the beginning of the content if the model echoed it back.
-	In FIM mode the model should only return the middle (new) text, not repeat the prefix."
+	"Strip the user prefix when the model echoes it back.
+	Works for exact echo, leading whitespace, and fenced answers."
 
-	| trimmedPrefix trimmedContent |
-	(contentString isEmpty or: [ prefixString isEmpty ]) ifTrue: [ ^ contentString ].
+	| content prefix trimmedContent trimmedPrefix |
+	content := (contentString ifNil: [ '' ]) asString.
+	prefix := (prefixString ifNil: [ '' ]) asString.
 
-	"Exact match"
-	(contentString beginsWith: prefixString) ifTrue: [
-		^ contentString allButFirst: prefixString size ].
+	(content isEmpty or: [ prefix isEmpty ]) ifTrue: [ ^ content ].
 
-	"Trimmed match — some models add/remove whitespace around the echoed prefix"
-	trimmedPrefix := prefixString trimRight.
-	trimmedContent := contentString trimLeft.
+	(content beginsWith: prefix) ifTrue: [
+		^ content allButFirst: prefix size ].
+
+	trimmedContent := content trimLeft.
+	(trimmedContent beginsWith: prefix) ifTrue: [
+		^ (trimmedContent allButFirst: prefix size) trimLeft ].
+
+	trimmedPrefix := prefix trimRight.
 	(trimmedPrefix isEmpty not and: [ trimmedContent beginsWith: trimmedPrefix ]) ifTrue: [
-		^ trimmedContent allButFirst: trimmedPrefix size ].
+		^ (trimmedContent allButFirst: trimmedPrefix size) trimLeft ].
 
-	^ contentString
+	((trimmedContent beginsWith: '```') and: [ trimmedContent includesSubstring: prefix ]) ifTrue: [
+		| unfenced |
+		unfenced := self cleanedContentFrom: trimmedContent.
+		(unfenced beginsWith: prefix) ifTrue: [
+			^ unfenced allButFirst: prefix size ] ].
+
+	^ content
 ]
 
 { #category : 'private' }
