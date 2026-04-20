@@ -651,6 +651,40 @@ CoPharoCopilotResultSetBuilder >> isLanguageSpec: aString [
 				or: [ '#+-_' includes: ch ] ] ] ]
 ]
 
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> isTemplateLeakOrPromptEcho: cleanedString rawResponse: rawString prefix: prefixString [
+
+	| cleaned raw prefix leakMarkers |
+	cleaned := (cleanedString ifNil: [ '' ]) asString trimBoth.
+	raw := (rawString ifNil: [ '' ]) asString.
+	prefix := (prefixString ifNil: [ '' ]) asString trimBoth.
+
+	leakMarkers := #(
+		'{{'
+		'}}'
+		'{1}'
+		'{2}'
+		'{3}'
+		'%1'
+		'%2'
+		'%3'
+		'System Prompt:'
+		'Class context provided by Pharo Copilot:'
+	).
+
+	cleaned isEmpty ifTrue: [ ^ true ].
+
+	(leakMarkers anySatisfy: [ :each | raw includesSubstring: each ]) ifTrue: [ ^ true ].
+	(leakMarkers anySatisfy: [ :each | cleaned includesSubstring: each ]) ifTrue: [ ^ true ].
+
+	(prefix isEmpty not and: [
+		cleaned = prefix
+			or: [ cleaned beginsWith: prefix ] ])
+		ifTrue: [ ^ true ].
+
+	^ false
+]
+
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> isTriggerBoundaryChar: ch [
 	"Characters that indicate a boundary (space/newline/punct)."
@@ -753,11 +787,15 @@ CoPharoCopilotResultSetBuilder >> minimumPrefixLength [
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> normalizeSuggestion: rawResponse forPrefix: prefixString [
 
-	| text |
-	text := self extractResponseContentFromRaw: rawResponse.
-	text := self removeEchoedPrefix: text prefix: prefixString.
-	text := self cleanedContentFrom: text.
-	^ text
+	| raw text cleaned |
+	raw := self extractResponseContentFromRaw: rawResponse.
+	text := self removeEchoedPrefix: raw prefix: prefixString.
+	cleaned := self cleanedContentFrom: text.
+
+	(self isTemplateLeakOrPromptEcho: cleaned rawResponse: raw prefix: prefixString)
+		ifTrue: [ ^ '' ].
+
+	^ cleaned
 ]
 
 { #category : 'initialization' }

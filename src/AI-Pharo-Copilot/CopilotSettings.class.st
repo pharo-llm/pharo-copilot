@@ -403,20 +403,25 @@ CopilotSettings class >> fetchModelMetadata [
 
 { #category : 'accessing' }
 CopilotSettings class >> fimTemplate [
-	"Answer the validated FIM template from metadata or fall back to the default template."
 
-	| metadata template |
+	| metadata template promptMarkers suffixMarkers hasPrompt hasSuffix |
 	metadata := self modelMetadata.
 	metadata ifNil: [ ^ self defaultFimTemplate ].
 
-	template := metadata at: #template ifAbsent: [ metadata at: 'template' ifAbsent: [ nil ] ].
+	template := self valueForMetadataKey: #template in: metadata.
 	template ifNil: [ ^ self defaultFimTemplate ].
 	(template respondsTo: #asString) ifFalse: [ ^ self defaultFimTemplate ].
 
-	template := template asString.
-	(template isEmpty
-		or: [ ((template includesSubstring: '%1') not) or: [ (template includesSubstring: '%2') not ] ])
-		ifTrue: [ ^ self defaultFimTemplate ].
+	template := template asString trimBoth.
+	template isEmpty ifTrue: [ ^ self defaultFimTemplate ].
+
+	promptMarkers := #('{{ .Prompt }}' '{{.Prompt}}' '{1}' '%1').
+	suffixMarkers := #('{{ .Suffix }}' '{{.Suffix}}' '{2}' '%2').
+
+	hasPrompt := promptMarkers anySatisfy: [ :each | template includesSubstring: each ].
+	hasSuffix := suffixMarkers anySatisfy: [ :each | template includesSubstring: each ].
+
+	(hasPrompt and: [ hasSuffix ]) ifFalse: [ ^ self defaultFimTemplate ].
 
 	^ template
 ]

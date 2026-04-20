@@ -82,7 +82,8 @@ OllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: s
 
 	includesContext := (prompt includesSubstring: '{{ .Context }}')
 		or: [ (prompt includesSubstring: '{{.Context}}')
-		or: [ prompt includesSubstring: '{3}' ] ].
+		or: [ (prompt includesSubstring: '{3}')
+		or: [ prompt includesSubstring: '%3' ] ] ].
 
 	prompt := prompt copyReplaceAll: '{{ .Prompt }}' with: safePrefix.
 	prompt := prompt copyReplaceAll: '{{.Prompt}}' with: safePrefix.
@@ -90,6 +91,10 @@ OllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: s
 	prompt := prompt copyReplaceAll: '{{.Suffix}}' with: safeSuffix.
 	prompt := prompt copyReplaceAll: '{{ .Context }}' with: safeContext.
 	prompt := prompt copyReplaceAll: '{{.Context}}' with: safeContext.
+
+	prompt := prompt copyReplaceAll: '%1' with: safePrefix.
+	prompt := prompt copyReplaceAll: '%2' with: safeSuffix.
+	prompt := prompt copyReplaceAll: '%3' with: safeContext.
 
 	"Support {1}/{2}/{3} style formatting as well."
 	prompt := prompt format: { safePrefix. safeSuffix. safeContext }.
@@ -120,24 +125,35 @@ OllamaClient >> generate: aPromptString [
 
 { #category : 'generation-operations' }
 OllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
-	"Generate a fill-in-the-middle completion by expanding the configured FIM template."
+	"Generate a fill-in-the-middle completion using Ollama's native prompt/suffix API."
 
-	| prompt originalOptions response combinedContext |
-	combinedContext := self systemPromptPrefixedContextFor: contextString.
-	prompt := self
-		          expandFimTemplate: CopilotSettings fimTemplate
-		          prefix: prefixString
-		          suffix: suffixString
-		          context: combinedContext.
+	| safePrefix safeSuffix safeSystem payload response normalized |
+	self isNullModel ifTrue: [ ^ self class nullModelResponseString ].
 
-	originalOptions := options copy.
-	[
-		options ifNil: [ options := Dictionary new ].
-		options at: #task put: 'fill-in-the-middle'.
-		response := self generate: prompt ] ensure: [
-			options := originalOptions ].
+	safePrefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
+	safeSuffix := suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ].
+	safeSystem := self systemPromptPrefixedContextFor: contextString.
 
-	^ response
+	payload := Dictionary new
+		at: #model put: modelSpec fullName;
+		at: #prompt put: safePrefix;
+		at: #suffix put: safeSuffix;
+		at: #stream put: stream;
+		yourself.
+
+	safeSystem isEmpty ifFalse: [
+		payload at: #system put: safeSystem ].
+
+	format ifNotNil: [
+		payload at: #format put: format ].
+
+	(options notNil and: [ options isEmpty not ]) ifTrue: [
+		payload at: #options put: options copy ].
+
+	response := transport postJsonAt: 'api/generate' body: payload.
+	normalized := self normalizeResponse: response.
+
+	^ normalized
 ]
 
 { #category : 'initialization' }
