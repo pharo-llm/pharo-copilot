@@ -1,3 +1,6 @@
+"
+a cach
+"
 Class {
 	#name : 'CoPharoCopilotCompletionCache',
 	#superclass : 'Object',
