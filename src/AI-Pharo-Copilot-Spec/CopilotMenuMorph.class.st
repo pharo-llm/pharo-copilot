@@ -74,8 +74,7 @@ CopilotMenuMorph >> browse [
 ]
 
 { #category : 'private' }
-CopilotMenuMorph >> builder: aBuilder context: aContext entries: entryCollection position: aPoint [ 
-	"Initialize the menu with entries and display it at the given position."
+CopilotMenuMorph >> builder: aBuilder context: aContext entries: entryCollection position: aPoint [
 
 	builder := aBuilder.
 	context := aContext.
@@ -83,13 +82,13 @@ CopilotMenuMorph >> builder: aBuilder context: aContext entries: entryCollection
 
 	self resize.
 	self openInWorld.
-	self position: (self clampPosition: (aPoint - (20 @ 0))).
-self selectedIndex: (entries isEmpty
-	ifTrue: [ 0 ]
-	ifFalse: [ 1 ]).
+	self position: (self clampPosition: aPoint - (20 @ 0)).
+	self selectedIndex: (entries isEmpty
+			 ifTrue: [ 0 ]
+			 ifFalse: [ 1 ]).
 
-entries isEmpty ifFalse: [ self showDetail ].
-self changed
+	"entries isEmpty ifFalse: [ self showDetail ]."
+	self changed
 ]
 
 { #category : 'private' }
