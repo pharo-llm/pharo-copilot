@@ -8,7 +8,8 @@ Class {
 		'titleLabel',
 		'descriptionLabel',
 		'statusLabel',
-		'contentContainer'
+		'contentContainer',
+		'privacyConsentCheckbox'
 	],
 	#category : 'AI-Pharo-Copilot-Spec',
 	#package : 'AI-Pharo-Copilot-Spec'
@@ -58,6 +59,14 @@ PharoCopilotSetupPresenter >> descriptionLabel: anObject [
 	descriptionLabel := anObject
 ]
 
+{ #category : 'accessing' }
+PharoCopilotSetupPresenter >> handleOk [
+
+	privacyConsentCheckbox state
+		ifTrue: [ self window close ]
+		ifFalse: [ self inform: 'You must accept the privacy policy before continuing.' ]
+]
+
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> initializePresenters [
 
@@ -88,13 +97,18 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 	aWindowPresenter
 		title: 'Pharo-Copilot Setup';
 		initialExtent: 500 @ 400;
-		centered
+		centered.
+
+	aWindowPresenter whenOpenedDo: [
+		aWindowPresenter withAdapterDo: [ :anAdapter |
+			(anAdapter widget respondsTo: #makeUnclosable)
+				ifTrue: [ anAdapter widget makeUnclosable ] ] ]
 ]
 
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showWelcomeStep [
 
-	| welcomeContainer privacyLabel privacyDetailLabel termsButton okButton buttonRow privacyConsentCheckbox |
+	| welcomeContainer privacyLabel privacyDetailLabel termsButton okButton buttonRow |
 	titleLabel label: 'Welcome to Pharo-Copilot'.
 	descriptionLabel label: 'Your AI code Completion'.
 	statusLabel label: ''.
@@ -111,7 +125,7 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 		                          label: 'I agree with the privacy policy';
 		                          state: false;
 		                          yourself.
-		
+
 	termsButton := self newButton
 		               label: 'Privacy Policy & Terms';
 		               icon: (self iconNamed: #glamorousBrowse);
@@ -127,7 +141,7 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 
 	okButton := self newButton
 		            label: 'OK';
-		            action: [ self window ifNotNil: [ :w | w close ] ];
+		            action: [ self handleOk ];
 		            yourself.
 
 	buttonRow := SpBoxLayout newHorizontal
@@ -138,7 +152,7 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 	contentContainer layout: (SpBoxLayout newTopToBottom
 			 spacing: 12;
 			 add: welcomeContainer expand: true;
-			add: privacyConsentCheckbox expand: false;
+			 add: privacyConsentCheckbox expand: false;
 			 add: buttonRow expand: false;
 			 yourself).
 
