@@ -1,3 +1,6 @@
+"
+Desccription of each entry
+"
 Class {
 	#name : 'CoCopilotEntryDescription',
 	#superclass : 'Object',

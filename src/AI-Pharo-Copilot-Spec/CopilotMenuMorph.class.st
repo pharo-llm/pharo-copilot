@@ -1,3 +1,6 @@
+"
+The menu morph for the user
+"
 Class {
 	#name : 'CopilotMenuMorph',
 	#superclass : 'Morph',

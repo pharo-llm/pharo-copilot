@@ -54,6 +54,19 @@ BaselineOfAIPharoCopilot class >> loadBackgroundImage [
 ]
 
 { #category : 'baselines' }
+BaselineOfAIPharoCopilot class >> showFirstLaunchSetupIfNeeded [
+	"Show the setup dialog if ChatPharo is not yet configured.
+	Deferred to run after UI is ready."
+
+	<script>
+
+		(Delay forMilliseconds: 500) wait.
+		World ifNotNil: [
+						WorldMorph doOneCycle.
+						PharoCopilotSetupPresenter open ] 
+]
+
+{ #category : 'baselines' }
 BaselineOfAIPharoCopilot >> baseline: spec [
 
 	<baseline>
@@ -73,5 +86,6 @@ BaselineOfAIPharoCopilot >> baseline: spec [
 BaselineOfAIPharoCopilot >> postLoad [
 
 	RubSmalltalkEditor completionEngineClass: CoCompletionEnginePharoCopilot.
+	self class showFirstLaunchSetupIfNeeded
 	"CopilotSettings showInstallCompletionDialog"
 ]
