@@ -301,7 +301,7 @@ CoPharoCopilotResultSetBuilder >> closeMenu [
 ]
 
 { #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix: prefixString suffix: suffixString context: classContext contextInfo: contextInfo [
+CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix: prefixString suffix: suffixString context: classContext contextInfo: contextInfo [ 
 
 	| desiredCount collected seen |
 	desiredCount := CopilotSettings completionSuggestionsCount.
@@ -315,12 +315,22 @@ CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix
 		rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
 		content := self normalizeSuggestion: rawResponse forPrefix: prefixString.
 
+		(content isEmpty and: [ rawResponse asString trimBoth isEmpty not ]) ifTrue: [
+			CoCopilotLogger logBackEndEvent: 'Suggestion rejected after normalization' details: (Dictionary new
+				at: #attempt put: attempt;
+				at: #rawResponse put: rawResponse asString;
+				at: #prefixTail put: ((prefixString size > 80)
+					ifTrue: [ prefixString last: 80 ]
+					ifFalse: [ prefixString ]);
+				yourself) ].
+
 		(content isEmpty not and: [ (seen includes: content) not ]) ifTrue: [
 			seen add: content.
 			collected add: content ] ].
 
 	contextInfo at: #rawSuggestions put: collected asArray.
 	^ collected asArray
+
 ]
 
 { #category : 'initialization' }
@@ -620,8 +630,9 @@ CoPharoCopilotResultSetBuilder >> insertAtCaretIfPossibleIn: aContext text: aStr
 ]
 
 { #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> isLanguageSpec: aString [
-	"Answer true if the string looks like a code-fence language marker (e.g., 'smalltalk', 'pharo', 'json')."
+CoPharoCopilotResultSetBuilder >> isLanguageSpec: aString [ 
+	"Only treat known fence tags as language specs.
+	Do NOT treat arbitrary one-line code as a language marker."
 
 	| candidate trimmed |
 	aString ifNil: [ ^ false ].
@@ -631,16 +642,26 @@ CoPharoCopilotResultSetBuilder >> isLanguageSpec: aString [
 
 	trimmed := candidate trimBoth.
 	(trimmed size = candidate size) ifFalse: [ ^ false ].
-	candidate := trimmed.
 
-	^ (#('smalltalk' 'pharo' 'bash' 'sh' 'shell' 'python'
-		'javascript' 'json' 'java' 'c' 'cpp' 'xml' 'html'
-		'ruby' 'php' 'sql' 'yaml' 'yml' 'go' 'rust' 'typescript')
-		includes: candidate asLowercase)
-		or: [ candidate allSatisfy: [ :ch |
-			ch isLetter
-				or: [ ch isDigit
-				or: [ '#+-_' includes: ch ] ] ] ]
+	candidate := trimmed asLowercase.
+
+	^ #(
+		'smalltalk' 'pharo' 'st'
+		'bash' 'sh' 'shell'
+		'python'
+		'javascript' 'js'
+		'typescript' 'ts'
+		'json'
+		'java'
+		'c' 'cpp'
+		'xml' 'html'
+		'ruby' 'php'
+		'sql'
+		'yaml' 'yml'
+		'go'
+		'rust'
+	) includes: candidate
+
 ]
 
 { #category : 'initialization' }
