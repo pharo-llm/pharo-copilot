@@ -5,8 +5,9 @@ I retrieve code completion suggestions from the Pharo Copilot service and apply 
 Class {
 	#name : 'CoCompletionEnginePharoCopilot',
 	#superclass : 'CoCompletionEngine',
-	#category : 'AI-Pharo-Copilot',
-	#package : 'AI-Pharo-Copilot'
+	#category : 'AI-Pharo-Copilot-Core',
+	#package : 'AI-Pharo-Copilot',
+	#tag : 'Core'
 }
 
 { #category : 'accessing' }

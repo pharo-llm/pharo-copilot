@@ -12,8 +12,9 @@ Class {
 		'oldestKey',
 		'oldestTime'
 	],
-	#category : 'AI-Pharo-Copilot',
-	#package : 'AI-Pharo-Copilot'
+	#category : 'AI-Pharo-Copilot-Cach',
+	#package : 'AI-Pharo-Copilot',
+	#tag : 'Cach'
 }
 
 { #category : 'instance creation' }

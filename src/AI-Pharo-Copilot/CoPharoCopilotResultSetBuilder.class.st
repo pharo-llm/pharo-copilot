@@ -15,8 +15,9 @@ Class {
 		'completionCache',
 		'cachedClient'
 	],
-	#category : 'AI-Pharo-Copilot',
-	#package : 'AI-Pharo-Copilot'
+	#category : 'AI-Pharo-Copilot-Core',
+	#package : 'AI-Pharo-Copilot',
+	#tag : 'Core'
 }
 
 { #category : 'instance creation' }

@@ -6,8 +6,9 @@ based on this context.
 Class {
 	#name : 'CoPharoCopilotContext',
 	#superclass : 'CoCompletionContext',
-	#category : 'AI-Pharo-Copilot',
-	#package : 'AI-Pharo-Copilot'
+	#category : 'AI-Pharo-Copilot-Cach',
+	#package : 'AI-Pharo-Copilot',
+	#tag : 'Cach'
 }
 
 { #category : 'initialization' }

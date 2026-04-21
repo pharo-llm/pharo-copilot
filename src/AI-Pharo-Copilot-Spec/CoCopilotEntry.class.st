@@ -10,8 +10,8 @@ Class {
 		'description',
 		'label'
 	],
-	#category : 'AI-Pharo-Copilot',
-	#package : 'AI-Pharo-Copilot'
+	#category : 'AI-Pharo-Copilot-Spec',
+	#package : 'AI-Pharo-Copilot-Spec'
 }
 
 { #category : 'accessing' }
