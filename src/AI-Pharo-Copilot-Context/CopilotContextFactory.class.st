@@ -7,12 +7,8 @@ Class {
 
 { #category : 'factory' }
 CopilotContextFactory class >> classFromSelector: aSelector [
-	"Return the class that defines the selector being completed."
 
-	^ SystemNavigation default
-		allClasses
-		detect: [ :each | each includesSelector: aSelector ]
-		ifNone: [ nil ]
+	^ SystemNavigation default allClasses detect: [ :each | each includesSelector: aSelector ] ifNone: [ nil ]
 ]
 
 { #category : 'factory' }
