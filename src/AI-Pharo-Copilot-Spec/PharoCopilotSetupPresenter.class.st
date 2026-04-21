@@ -93,7 +93,6 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showWelcomeStep [
-	"Show the welcome step with privacy notice."
 
 	| welcomeContainer privacyLabel privacyDetailLabel termsButton okButton buttonRow privacyConsentCheckbox |
 	titleLabel label: 'Welcome to Pharo-Copilot'.
