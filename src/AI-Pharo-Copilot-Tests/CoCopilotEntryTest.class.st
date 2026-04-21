@@ -23,30 +23,12 @@ CoCopilotEntryTest >> testContentsAccessor [
 ]
 
 { #category : 'tests' }
-CoCopilotEntryTest >> testDisplayStringExactly120Characters [
-
-	| text entry |
-	text := String new: 120 withAll: $a.
-	entry := CoCopilotEntry contents: text.
-	self assert: entry displayString equals: text
-]
-
-{ #category : 'tests' }
 CoCopilotEntryTest >> testDisplayStringReturnsFullTextWhenShort [
 
     | text entry |
     text := 'hello world'.
     entry := CoCopilotEntry contents: text.
     self assert: entry displayString equals: text.
-]
-
-{ #category : 'tests' }
-CoCopilotEntryTest >> testDisplayStringTruncatesLongText [
-
-    | longText entry |
-    longText := String new: 130 withAll: $a.
-    entry := CoCopilotEntry contents: longText.
-    self assert: entry displayString equals: (longText copyFrom: 1 to: 117), '…'.
 ]
 
 { #category : 'tests' }

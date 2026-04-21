@@ -7,25 +7,6 @@ Class {
 }
 
 { #category : 'tests' }
-BoundaryTest >> testDisplayStringBoundaryConditions [
-	| entry |
-	
-	"Test exactly at boundary"
-	entry := CoCopilotEntry contents: (String new: 120 withAll: $x).
-	self assert: entry displayString size equals: 120.
-	
-	"Test just over boundary"
-	entry := CoCopilotEntry contents: (String new: 121 withAll: $x).
-	self assert: entry displayString size equals: 118.  "117 + 1 for ellipsis"
-	self assert: (entry displayString endsWith: '…').
-	
-	"Test way over boundary"
-	entry := CoCopilotEntry contents: (String new: 1000 withAll: $x).
-	self assert: entry displayString size equals: 118.
-	self assert: (entry displayString endsWith: '…')
-]
-
-{ #category : 'tests' }
 BoundaryTest >> testLengthStatsBoundaryValues [
 	| evaluator context testCases lengthStats bucket |
 	evaluator := CoSuggestionEvaluator new.

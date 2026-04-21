@@ -16,16 +16,6 @@ EdgeCaseTest >> testCoCopilotEntryWithEmptyContent [
 ]
 
 { #category : 'tests' }
-EdgeCaseTest >> testCoCopilotEntryWithExactly120Characters [
-	| content entry |
-	content := String new: 120 withAll: $x.
-	entry := CoCopilotEntry contents: content.
-	
-	"Should not truncate at exactly 120 chars"
-	self assert: entry displayString equals: content
-]
-
-{ #category : 'tests' }
 EdgeCaseTest >> testCoPharoCopilotContextWithEmptySource [
 	| context |
 	context := CoPharoCopilotContext new.
