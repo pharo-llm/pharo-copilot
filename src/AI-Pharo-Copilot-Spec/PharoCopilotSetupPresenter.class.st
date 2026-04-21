@@ -61,7 +61,9 @@ PharoCopilotSetupPresenter >> descriptionLabel: anObject [
 
 { #category : 'accessing' }
 PharoCopilotSetupPresenter >> handleOk [
-
+	
+	CopilotSettings recordPrivacyPolicyUserConsentAccepted:
+		privacyConsentCheckbox state.
 	privacyConsentCheckbox state
 		ifTrue: [ self window close ]
 		ifFalse: [ self inform: 'You must accept the privacy policy before continuing.' ]

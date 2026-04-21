@@ -523,6 +523,35 @@ CopilotSettingsTest >> testRecordInstallModelConsentIsStoredInSnapshot [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testRecordPrivacyPolicyConsentWritesEvaluationJsonEntr [
+
+
+	CopilotSettings withDefaultSettingsDo: [
+		| tempDir tempEvalFile originalDirRef originalEvalRef jsonLine parsed |
+		tempDir := FileLocator temp / ('copilot-privacy-consent-test-' , UUID new asString).
+		tempEvalFile := tempDir / CoCopilotLogger evaluationLogFileName.
+		originalDirRef := CoCopilotLogger rawLogsDirectoryReference.
+		originalEvalRef := CoCopilotLogger rawEvaluationLogFileReference.
+		[
+			CoCopilotLogger rawLogsDirectoryReference: tempDir.
+			CoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
+			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+
+			CopilotSettings recordPrivacyPolicyUserConsentAccepted: true.
+
+			jsonLine := tempEvalFile readStreamDo: [ :stream | stream nextLine ].
+			parsed := STONJSON fromString: jsonLine.
+			self assert: (parsed at: #event) equals: 'privacy-policy-consent'.
+			self assert: ((parsed at: #data) at: #accepted) equals: true.
+			self assert: ((parsed at: #data) includesKey: #timestamp)
+		] ensure: [
+			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+			tempDir exists ifTrue: [ tempDir ensureDelete ].
+			CoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+			CoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testRequestTimeoutSecondsNormalization [
     CopilotSettings withDefaultSettingsDo: [
         CopilotSettings requestTimeoutSeconds: 100.

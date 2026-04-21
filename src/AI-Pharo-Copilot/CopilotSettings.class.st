@@ -1329,6 +1329,29 @@ CopilotSettings class >> recordInstallModelUserConsentForModelNamed: aModelName 
 	] on: Error do: [ :ignored | ].
 ]
 
+{ #category : 'accessing' }
+CopilotSettings class >> recordPrivacyPolicyUserConsentAccepted: aBoolean [
+
+	| consentRecord evalFile |
+	consentRecord := Dictionary new
+		at: #accepted put: aBoolean;
+		at: #timestamp put: DateAndTime now asString;
+		yourself.
+
+	[
+		CoCopilotLogger ensureEvaluationLogFileInitialized.
+		evalFile := CoCopilotLogger evaluationLogFileReference.
+		evalFile writeStreamDo: [ :stream |
+			stream setToEnd.
+			stream
+				nextPutAll: (STONJSON toString: (Dictionary new
+					at: #event put: 'privacy-policy-consent';
+					at: #data put: consentRecord;
+					yourself));
+				nextPut: Character lf ]
+	] on: Error do: [ :ignored | ].
+]
+
 { #category : 'settings' }
 CopilotSettings class >> refreshModelsAfterInstallOf: aModelName usingInitialResponse: initialResponse [
 	"Re-list models after an install and verify the target model is present; answer true if found."
