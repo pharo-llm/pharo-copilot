@@ -6,9 +6,8 @@ based on this context.
 Class {
 	#name : 'CoPharoCopilotContext',
 	#superclass : 'CoCompletionContext',
-	#category : 'AI-Pharo-Copilot-Cach',
-	#package : 'AI-Pharo-Copilot',
-	#tag : 'Cach'
+	#category : 'AI-Pharo-Copilot-Context',
+	#package : 'AI-Pharo-Copilot-Context'
 }
 
 { #category : 'initialization' }
@@ -19,7 +18,6 @@ CoPharoCopilotContext >> editor [
 
 { #category : 'initialization' }
 CoPharoCopilotContext >> initialize [
-	"Initialize the context and set up the completion builder that will generate Copilot results."
 
 	super initialize.
 	self initializeCompletionBuilder
@@ -27,8 +25,6 @@ CoPharoCopilotContext >> initialize [
 
 { #category : 'initialization' }
 CoPharoCopilotContext >> initializeCompletionBuilder [
-	"Create and configure the result-set builder to operate on this context."
 
-	completionBuilder := CoPharoCopilotResultSetBuilder
-		initializeOnContext: self
+	completionBuilder := CoPharoCopilotResultSetBuilder initializeOnContext: self
 ]

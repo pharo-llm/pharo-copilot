@@ -1,3 +1,6 @@
+"
+a cach
+"
 Class {
 	#name : 'CoPharoCopilotCompletionCache',
 	#superclass : 'Object',
@@ -12,9 +15,8 @@ Class {
 		'oldestKey',
 		'oldestTime'
 	],
-	#category : 'AI-Pharo-Copilot-Cach',
-	#package : 'AI-Pharo-Copilot',
-	#tag : 'Cach'
+	#category : 'AI-Pharo-Copilot',
+	#package : 'AI-Pharo-Copilot'
 }
 
 { #category : 'instance creation' }
@@ -32,7 +34,6 @@ CoPharoCopilotCompletionCache class >> withMaxSize: anInteger [
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> at: prefixString suffix: suffixString context: contextString ifPresent: aBlock [
-	"Look up a cached completion. If found, evaluate aBlock with the cached value and return the result. Otherwise return nil."
 
 	| key value |
 	key := self keyFor: prefixString suffix: suffixString context: contextString.
@@ -46,7 +47,6 @@ CoPharoCopilotCompletionCache >> at: prefixString suffix: suffixString context: 
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> at: prefixString suffix: suffixString context: contextString put: aValue [
-	"Store a completion result in the cache. Evicts the least recently used entry if at capacity."
 
 	| key |
 	key := self keyFor: prefixString suffix: suffixString context: contextString.
@@ -62,7 +62,6 @@ CoPharoCopilotCompletionCache >> at: prefixString suffix: suffixString context: 
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> clear [
-	"Remove all cached entries and reset statistics."
 
 	entries removeAll.
 	timestamps removeAll.
@@ -103,7 +102,6 @@ CoPharoCopilotCompletionCache >> evictions [
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> hitRate [
-	"Return the cache hit rate as a float between 0.0 and 1.0."
 
 	| total |
 	total := hits + misses.
@@ -160,18 +158,19 @@ CoPharoCopilotCompletionCache >> misses [
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> nearMatchAt: prefixString suffix: suffixString context: contextString ifPresent: aBlock [
-	"Try a near-match: look up with the last character of the prefix removed.
-	Useful when the user just typed one more character but the completion is still valid."
 
 	| shorterPrefix |
-	(prefixString size < 2) ifTrue: [ ^ nil ].
+	prefixString size < 2 ifTrue: [ ^ nil ].
 	shorterPrefix := prefixString copyFrom: 1 to: prefixString size - 1.
-	^ self at: shorterPrefix suffix: suffixString context: contextString ifPresent: aBlock
+	^ self
+		  at: shorterPrefix
+		  suffix: suffixString
+		  context: contextString
+		  ifPresent: aBlock
 ]
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> resetStats [
-	"Reset hit/miss/eviction counters without clearing cache entries."
 
 	hits := 0.
 	misses := 0.
@@ -186,16 +185,15 @@ CoPharoCopilotCompletionCache >> size [
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> statisticsDictionary [
-	"Return a dictionary of cache performance statistics."
 
 	^ Dictionary new
-		at: #hits put: hits;
-		at: #misses put: misses;
-		at: #evictions put: evictions;
-		at: #hitRate put: self hitRate;
-		at: #size put: self size;
-		at: #maxSize put: maxSize;
-		yourself
+		  at: #hits put: hits;
+		  at: #misses put: misses;
+		  at: #evictions put: evictions;
+		  at: #hitRate put: self hitRate;
+		  at: #size put: self size;
+		  at: #maxSize put: maxSize;
+		  yourself
 ]
 
 { #category : 'accessing' }

@@ -21,7 +21,6 @@ Class {
 
 { #category : 'building' }
 OModelRegistry class >> build [
-	"Create and rebuild a fresh registry (does not touch the cached #current)."
 
 	| registry |
 	registry := self new.
