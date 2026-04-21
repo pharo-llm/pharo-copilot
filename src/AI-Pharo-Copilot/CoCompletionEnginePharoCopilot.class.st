@@ -12,14 +12,12 @@ Class {
 
 { #category : 'accessing' }
 CoCompletionEnginePharoCopilot >> basicReplaceTokenInEditorWith: newString [
-	"Perform the actual token replacement by delegating to the superclass implementation."
 
 	super replaceTokenInEditorWith: newString
 ]
 
 { #category : 'accessing' }
 CoCompletionEnginePharoCopilot >> completionBuilder [
-	"Answer the result-set builder used to materialize Copilot suggestions (lazily initialized), and log that it was requested."
 
 	| alreadyInitialized builderClassName |
 	alreadyInitialized := completionBuilder notNil.
@@ -41,7 +39,6 @@ CoCompletionEnginePharoCopilot >> completionBuilder [
 
 { #category : 'replacement' }
 CoCompletionEnginePharoCopilot >> replaceTokenInEditorWith: newString [
-	"Replace the current token with the given string and keep the caret where it was before the replacement."
 
 	| originalCaretPosition |
 	(newString isNil or: [ newString isEmpty ]) ifTrue: [ ^ self ].
