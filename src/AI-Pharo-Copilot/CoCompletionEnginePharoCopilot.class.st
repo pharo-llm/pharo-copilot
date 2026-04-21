@@ -24,14 +24,6 @@ CoCompletionEnginePharoCopilot >> completionBuilder [
 		ifTrue: [ completionBuilder class name ]
 		ifFalse: [ 'none' ].
 
-	CoCopilotLogger
-		logFrontEndEvent: 'Requesting completion builder'
-		details: (Dictionary new
-			at: #engineClass put: self class name;
-			at: #builderAlreadyInitialized put: alreadyInitialized;
-			at: #builderClass put: builderClassName;
-			yourself).
-
 	^ completionBuilder ifNil: [ completionBuilder := CoPharoCopilotResultSetBuilder new ]
 
 ]

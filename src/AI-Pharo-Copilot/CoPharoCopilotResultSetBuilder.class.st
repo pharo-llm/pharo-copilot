@@ -45,14 +45,6 @@ CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContex
 CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
 
 	| snapshot currentPrefix currentSuffix entries position |
-	aContext ifNil: [
-			CoCopilotLogger logFrontEndEvent: 'Skipping completion menu: nil context' details: Dictionary new.
-			^ self ].
-
-	contentCollection ifNil: [
-			CoCopilotLogger logFrontEndEvent: 'Skipping completion menu: nil content collection' details: Dictionary new.
-			^ self ].
-
 	snapshot := self contextSnapshotFor: aContext.
 	currentPrefix := snapshot at: #prefix.
 	currentSuffix := snapshot at: #suffix.

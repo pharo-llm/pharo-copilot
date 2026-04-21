@@ -628,7 +628,7 @@ CopilotSettings class >> loadSettingsFromFile [
 	"Load settings from the persistent STON file if it exists."
 
 	| fileRef stonString snapshot |
-	[
+
 		fileRef := self settingsFileReference.
 		(fileRef exists and: [ fileRef isFile ]) ifFalse: [ ^ self ].
 
@@ -639,145 +639,62 @@ CopilotSettings class >> loadSettingsFromFile [
 		snapshot := STON fromString: stonString.
 		self restoreSettingsFromSerializableSnapshot: snapshot.
 
-		CoCopilotLogger
-			logBackEndEvent: 'Loaded settings from file'
-			details: (Dictionary new
-				at: #file put: fileRef pathString;
-				at: #settingsCount put: snapshot size;
-				yourself)
-	] on: Error do: [ :ex |
-		CoCopilotLogger
-			logError: 'Failed to load settings from file'
-			origin: #CopilotSettings
-			exception: ex
-			payload: Dictionary new
-	]
+
 ]
 
 { #category : 'private' }
 CopilotSettings class >> logDetectedInstalledModel: aModelName before: initialResponse after: refreshedModels [
 	"Log that a model became available after installation."
-
-	CoCopilotLogger
-		logBackEndEvent: 'Detected newly available Ollama model after install'
-		details: (Dictionary new
-			at: #model put: aModelName;
-			at: #availableModelsBefore put: (self modelNamesFromResponse: initialResponse);
-			at: #availableModelsAfter put: refreshedModels;
-			yourself)
 ]
 
 { #category : 'private' }
 CopilotSettings class >> logFailedToFetchModelMetadataFor: aModelName error: ex [
-	"Log metadata fetch failures in a compact form."
-
-	CoCopilotLogger
-		logBackEndEvent: 'Failed to fetch Ollama model metadata'
-		details: (Dictionary new
-			at: #model put: aModelName;
-			at: #errorClass put: ex class name;
-			at: #error put: ex description;
-			yourself)
 ]
 
 { #category : 'private' }
 CopilotSettings class >> logFailedToReadFimTemplateFile: file error: ex [
 	"Log errors while reading a template file."
 
-	CoCopilotLogger
-		logError: 'Failed to read FIM template file'
-		origin: #CopilotSettings
-		exception: ex
-		payload: (Dictionary new
-			at: #file put: file pathString;
-			yourself)
 ]
 
 { #category : 'private' }
 CopilotSettings class >> logFetchedModelMetadata: metadata fallbackModelName: aModelName [
 	"Log a successful metadata fetch."
-
-	CoCopilotLogger
-		logBackEndEvent: 'Fetched Ollama model metadata'
-		details: (Dictionary new
-			at: #model put: (metadata at: #model ifAbsent: [ aModelName ]);
-			at: #keys put: metadata keys asArray;
-			yourself)
 ]
 
 { #category : 'private' }
 CopilotSettings class >> logGeneratedNullModelMetadata: metadata modelName: aModelName [
 	"Log that we generated placeholder/null metadata."
 
-	CoCopilotLogger
-		logBackEndEvent: 'Generated null model metadata'
-		details: (Dictionary new
-			at: #model put: aModelName;
-			at: #keys put: metadata keys asArray;
-			yourself)
 ]
 
 { #category : 'private' }
 CopilotSettings class >> logInstallDidNotExposeModel: aModelName before: initialResponse after: refreshedModels [
 	"Log when an install completed but the model is still not visible."
-
-	CoCopilotLogger
-		logBackEndEvent: 'Model install did not expose expected Ollama model'
-		details: (Dictionary new
-			at: #model put: aModelName;
-			at: #availableModelsBefore put: (self modelNamesFromResponse: initialResponse);
-			at: #availableModelsAfter put: refreshedModels;
-			yourself)
 ]
 
 { #category : 'accessing' }
 CopilotSettings class >> logMissingFimTemplate [
 	"Log that no FIM template could be found for the current model."
 
-	CoCopilotLogger
-		logBackEndEvent: 'Missing FIM template for model'
-		details: (Dictionary new
-			at: #model put: (self modelName ifNil: [ 'unknown-model' ]);
-			at: #templatesDirectory put: self templatesDirectory pathString;
-			yourself)
 ]
 
 { #category : 'private' }
 CopilotSettings class >> logMissingModel: aModelName availableModels: availableModels [
 	"Log that a configured model is not present in the Ollama installation."
 
-	CoCopilotLogger
-		logBackEndEvent: 'Missing Ollama model'
-		details: (Dictionary new
-			at: #model put: aModelName;
-			at: #availableModels put: availableModels;
-			yourself)
 ]
 
 { #category : 'private' }
 CopilotSettings class >> logOllamaMissingResponse [
 	"Log a nil/empty response from Ollama listModels."
 
-	CoCopilotLogger
-		logBackEndEvent: 'Missing response from Ollama service'
-		details: (Dictionary new
-			at: #host put: self host;
-			at: #port put: self port;
-			yourself)
 ]
 
 { #category : 'private' }
 CopilotSettings class >> logOllamaServiceUnavailable: ex [
 	"Log when the Ollama service cannot be reached."
 
-	CoCopilotLogger
-		logError: 'Ollama service unavailable'
-		origin: #CopilotSettings
-		exception: ex
-		payload: (Dictionary new
-			at: #host put: self host;
-			at: #port put: self port;
-			yourself)
 ]
 
 { #category : 'private' }
@@ -807,13 +724,6 @@ CopilotSettings class >> logUsingCachedFimTemplateFrom: cacheFile [
 { #category : 'private' }
 CopilotSettings class >> logValidatedModelAvailability: aModelName availableModels: availableModels [
 	"Log that model availability was checked against Ollama."
-
-	CoCopilotLogger
-		logBackEndEvent: 'Validated Ollama model availability'
-		details: (Dictionary new
-			at: #model put: aModelName;
-			at: #availableModelCount put: availableModels size;
-			yourself)
 ]
 
 { #category : 'accessing' }
@@ -1278,25 +1188,11 @@ CopilotSettings class >> promptToInstallMissingModelNamed: aModelName availableM
 	| message confirmation |
 	message := self installModelPromptMessageForModelNamed: aModelName.
 
-	CoCopilotLogger
-		logBackEndEvent: 'Prompting user to install missing Ollama model'
-		details: (Dictionary new
-			at: #model put: aModelName;
-			at: #availableModels put: availableModels;
-			yourself).
-
 	confirmation := self confirmViaUIManager: message.
 	confirmation ifNil: [
 		self notifyViaTranscript: message.
 		^ false
 	].
-
-	CoCopilotLogger
-		logBackEndEvent: 'User responded to Ollama model install prompt'
-		details: (Dictionary new
-			at: #model put: aModelName;
-			at: #userAccepted put: confirmation;
-			yourself).
 
 	^ confirmation
 ]
@@ -1579,7 +1475,6 @@ CopilotSettings class >> saveSettingsToFile [
 	"Save current settings to the persistent STON file."
 
 	| fileRef snapshot stonString |
-	[
 		fileRef := self settingsFileReference.
 		snapshot := self serializableSettingsSnapshot.
 		stonString := STON toString: snapshot.
@@ -1590,19 +1485,7 @@ CopilotSettings class >> saveSettingsToFile [
 			stream nextPutAll: stonString
 		].
 
-		CoCopilotLogger
-			logBackEndEvent: 'Saved settings to file'
-			details: (Dictionary new
-				at: #file put: fileRef pathString;
-				at: #settingsCount put: snapshot size;
-				yourself)
-	] on: Error do: [ :ex |
-		CoCopilotLogger
-			logError: 'Failed to save settings to file'
-			origin: #CopilotSettings
-			exception: ex
-			payload: Dictionary new
-	]
+
 ]
 
 { #category : 'ollama' }
@@ -1999,14 +1882,6 @@ CopilotSettings class >> showInstallCompletionDialog [
 
 { #category : 'settings' }
 CopilotSettings class >> switchToNullModelDueToMissingOllamaFor: selectedModelName [
-	"Fall back to the null model when Ollama is unavailable and the user declines installation."
-
-	CoCopilotLogger
-		logBackEndEvent: 'Falling back to null model due to missing Ollama'
-		details: (Dictionary new
-			at: #model put: selectedModelName;
-			at: #nullModel put: self nullModelFullName;
-			yourself).
 
 	self modelName: self nullModelFullName.
 	self notifyUser: 'Ollama is not available. Pharo Copilot will use the null model until you configure an Ollama model.'
@@ -2127,16 +2002,6 @@ CopilotSettings class >> writeMetadata: metadata toDirectory: modelDirectory mod
 				stream truncate.
 				stream nextPutAll: contents
 			]
-		] on: Error do: [ :ex |
-			CoCopilotLogger
-				logBackEndEvent: 'Failed to write Ollama metadata file'
-				details: (Dictionary new
-					at: #model put: modelNameString;
-					at: #key put: keyLabel;
-					at: #file put: fileRef basename;
-					at: #errorClass put: ex class name;
-					at: #error put: ex description;
-					yourself)
-		]
+		] 
 	]
 ]
