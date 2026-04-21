@@ -99,10 +99,6 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 		initialExtent: 500 @ 400;
 		centered.
 
-	aWindowPresenter whenOpenedDo: [
-		aWindowPresenter withAdapterDo: [ :anAdapter |
-			(anAdapter widget respondsTo: #makeUnclosable)
-				ifTrue: [ anAdapter widget makeUnclosable ] ] ]
 ]
 
 { #category : 'initialization' }
