@@ -1,3 +1,7 @@
+"
+I represent one evaluation record for a Copilot suggestion.
+I keep the suggestion, its context, timestamp, action, rejection reason, and extra metadata.
+"
 Class {
 	#name : 'CoPCEvaluationEntry',
 	#superclass : 'Object',

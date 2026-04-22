@@ -1,3 +1,7 @@
+"
+I generate a textual summary of a Copilot evaluation session.
+I report overview metrics, context and model statistics, rejection reasons, and recommendations.
+"
 Class {
 	#name : 'CoPCEvaluationReport',
 	#superclass : 'Object',

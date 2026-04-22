@@ -1,3 +1,7 @@
+"
+I announce that a Copilot suggestion evaluation entry was produced or updated.
+I carry the evaluation entry through the Announcements framework.
+"
 Class {
 	#name : 'CoPCEvaluationAnnouncement',
 	#superclass : 'Announcement',
