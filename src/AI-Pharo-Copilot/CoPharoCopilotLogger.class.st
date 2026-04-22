@@ -174,28 +174,22 @@ CoPharoCopilotLogger class >> formatValue: anObject [
 	^ anObject printString
 ]
 
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> indent: level on: stream [
-
-	1 to: level do: [ stream nextPutAll: '  ' ]
-]
-
-{ #category : 'class initialization' }
+{ #category : 'as yet unclassified' }
 CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInfo prefix: prefixString suffix: suffixString classContext: classContext cacheStats: cacheStats [
 
 	^ Dictionary new
 		at: #timestamp put: (contextInfo at: #timestamp ifAbsent: [ DateAndTime now asString ]);
 		at: #cache put: cacheStats;
+		at: #context put: (Dictionary new
+			at: #fullSource put: (contextInfo at: #fullSource ifAbsent: [ '' ]);
+			at: #prefix put: prefixString;
+			at: #suffix put: suffixString;
+			at: #classContext put: classContext;
+			yourself);
 		at: #fim put: (Dictionary new
 			at: #prefix put: prefixString;
 			at: #suffix put: suffixString;
 			at: #context put: classContext;
-			yourself);
-		at: #context put: (Dictionary new
-			at: #prefix put: prefixString;
-			at: #suffix put: suffixString;
-			at: #classContext put: classContext;
-			at: #fullSource put: (contextInfo at: #fullSource ifAbsent: [ '' ]);
 			yourself);
 		at: #accepted put: nil;
 		at: #rejected put: ((contextInfo at: #rejected ifAbsent: [ #() ]) asArray);
@@ -322,16 +316,6 @@ CoPharoCopilotLogger class >> pharoCopilotDirectoryName [
 ]
 
 { #category : 'class initialization' }
-CoPharoCopilotLogger class >> prettyJSONStringFor: anObject [
-
-	^ String streamContents: [ :stream |
-		self
-			writeJSONObject: anObject
-			on: stream
-			indent: 0 ]
-]
-
-{ #category : 'class initialization' }
 CoPharoCopilotLogger class >> rawEvaluationLogFileReference [
 
 	^ evaluationLogFileReference
@@ -369,7 +353,6 @@ CoPharoCopilotLogger class >> rawLogsDirectoryReference: aDirectoryReference [
 
 { #category : 'class initialization' }
 CoPharoCopilotLogger class >> updateCompletionSession: aSessionId addRejected: rejectedString [
-
 	| file payload rejected |
 	self loggingEnabled ifFalse: [ ^ self ].
 	file := self completionFileReferenceFor: aSessionId.
@@ -379,12 +362,11 @@ CoPharoCopilotLogger class >> updateCompletionSession: aSessionId addRejected: r
 	rejected add: rejectedString.
 	payload at: #rejected put: rejected asArray.
 	file writeStreamDo: [ :stream |
-		stream nextPutAll: (self prettyJSONStringFor: payload) ]
+		stream nextPutAll: (STONJSON toString: payload) ]
 ]
 
 { #category : 'class initialization' }
 CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withAccepted: acceptedString [
-
 	| file payload |
 	self loggingEnabled ifFalse: [ ^ self ].
 	file := self completionFileReferenceFor: aSessionId.
@@ -392,70 +374,15 @@ CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withAccepted: 
 	payload := STONJSON fromString: file contents.
 	payload at: #accepted put: acceptedString.
 	file writeStreamDo: [ :stream |
-		stream nextPutAll: (self prettyJSONStringFor: payload) ]
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> writeCollection: aCollection on: stream indent: level [
-	stream nextPut: $[.
-	aCollection isEmpty ifTrue: [
-		stream nextPut: $].
-		^ self ].
-
-	stream cr.
-	aCollection withIndexDo: [ :each :index |
-		self indent: level + 1 on: stream.
-		self writeJSONObject: each on: stream indent: level + 1.
-		index < aCollection size ifTrue: [ stream nextPut: $, ].
-		stream cr ].
-
-	self indent: level on: stream.
-	stream nextPut: $]
+		stream nextPutAll: (STONJSON toString: payload) ]
 ]
 
 { #category : 'class initialization' }
 CoPharoCopilotLogger class >> writeCompletionSession: aDictionary sessionId: aSessionId [
-
 	| file |
 	self loggingEnabled ifFalse: [ ^ self ].
 	file := self completionFileReferenceFor: aSessionId.
 	self ensureFileExists: file.
 	file writeStreamDo: [ :stream |
-		stream nextPutAll: (self prettyJSONStringFor: aDictionary) ]
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> writeDictionary: aDictionary on: stream indent: level [
-	| associations |
-	associations := aDictionary associations asOrderedCollection.
-
-	stream nextPut: ${.
-	associations isEmpty ifTrue: [
-		stream nextPut: $}.
-		^ self ].
-
-	stream cr.
-	associations withIndexDo: [ :assoc :index |
-		self indent: level + 1 on: stream.
-		stream nextPutAll: (STONJSON toString: assoc key asString).
-		stream nextPutAll: ': '.
-		self writeJSONObject: assoc value on: stream indent: level + 1.
-		index < associations size ifTrue: [ stream nextPut: $, ].
-		stream cr ].
-
-	self indent: level on: stream.
-	stream nextPut: $}
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> writeJSONObject: anObject on: stream indent: level [
-
-	(anObject isKindOf: Dictionary) ifTrue: [
-		^ self writeDictionary: anObject on: stream indent: level ].
-
-	(anObject isKindOf: SequenceableCollection)
-		ifTrue: [ anObject isString ifFalse: [
-			^ self writeCollection: anObject on: stream indent: level ] ].
-
-	stream nextPutAll: (STONJSON toString: anObject)
+		stream nextPutAll: (STONJSON toString: aDictionary) ]
 ]
