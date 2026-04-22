@@ -1,12 +1,12 @@
 Class {
-	#name : 'CoBenchmarkCacheScenario',
+	#name : 'CoPCBenchmarkCacheScenario',
 	#superclass : 'Object',
 	#category : 'AI-Pharo-Copilot-Benchmarks',
 	#package : 'AI-Pharo-Copilot-Benchmarks'
 }
 
 { #category : 'scenarios' }
-CoBenchmarkCacheScenario class >> allScenarios [
+CoPCBenchmarkCacheScenario class >> allScenarios [
 	"Return all cache benchmark scenarios combined."
 
 	| all |
@@ -18,12 +18,12 @@ CoBenchmarkCacheScenario class >> allScenarios [
 ]
 
 { #category : 'scenarios' }
-CoBenchmarkCacheScenario class >> cacheHitScenarios [
+CoPCBenchmarkCacheScenario class >> cacheHitScenarios [
 	"Scenarios where the same request is made twice to measure cache hit speed.
 	 The first run populates the cache, subsequent runs should be cache hits."
 
 	^ Dictionary new
-		at: 'cache_hit_simple_accessor' put: (CoBenchmarkScenario
+		at: 'cache_hit_simple_accessor' put: (CoPCBenchmarkScenario
 			named: 'cache_hit_simple_accessor'
 			prefix: 'name
 	^ '
@@ -33,7 +33,7 @@ CoBenchmarkCacheScenario class >> cacheHitScenarios [
 Person >> age
 	^ age'
 			description: 'Cache hit test: simple accessor repeated');
-		at: 'cache_hit_method_body' put: (CoBenchmarkScenario
+		at: 'cache_hit_method_body' put: (CoPCBenchmarkScenario
 			named: 'cache_hit_method_body'
 			prefix: 'initialize
 	super initialize.
@@ -46,19 +46,19 @@ CacheTarget >> data
 CacheTarget >> cache
 	^ cache'
 			description: 'Cache hit test: method body repeated');
-		at: 'cache_hit_large_context' put: (CoBenchmarkScenario
+		at: 'cache_hit_large_context' put: (CoPCBenchmarkScenario
 			named: 'cache_hit_large_context'
 			prefix: 'visitNode: aNode
 	"Visit an AST node and collect metrics"
 	'
 			suffix: ''
-			context: (CoBenchmarkContextScenario realisticClassContext)
+			context: (CoPCBenchmarkContextScenario realisticClassContext)
 			description: 'Cache hit test: large context repeated');
 		yourself
 ]
 
 { #category : 'scenarios' }
-CoBenchmarkCacheScenario class >> cacheMissScenarios [
+CoPCBenchmarkCacheScenario class >> cacheMissScenarios [
 	"Scenarios with unique prefixes to force cache misses."
 
 	| scenarios |
@@ -69,7 +69,7 @@ CoBenchmarkCacheScenario class >> cacheMissScenarios [
 		prefix := 'uniqueMethod', i asString, '
 	"Method variant ', i asString, '"
 	'.
-		scenarios at: name put: (CoBenchmarkScenario
+		scenarios at: name put: (CoPCBenchmarkScenario
 			named: name
 			prefix: prefix
 			suffix: ''
@@ -82,7 +82,7 @@ CacheMissTarget >> x
 ]
 
 { #category : 'scenarios' }
-CoBenchmarkCacheScenario class >> cacheSizeScenarios [
+CoPCBenchmarkCacheScenario class >> cacheSizeScenarios [
 	"Scenarios for benchmarking different cache size configurations."
 
 	| sizes scenarios |
@@ -91,7 +91,7 @@ CoBenchmarkCacheScenario class >> cacheSizeScenarios [
 	sizes do: [ :size |
 		| name |
 		name := 'cache_size_', size asString.
-		scenarios at: name put: (CoBenchmarkScenario
+		scenarios at: name put: (CoPCBenchmarkScenario
 			named: name
 			prefix: 'processItem: anItem
 	"Process a single item from the queue"

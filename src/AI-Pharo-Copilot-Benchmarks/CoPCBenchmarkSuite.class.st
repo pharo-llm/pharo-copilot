@@ -27,7 +27,7 @@ The suite produces a 'benchmark_output/' directory containing:
 	- context_scaling.csv  (context size vs performance)
 "
 Class {
-	#name : 'CoBenchmarkSuite',
+	#name : 'CoPCBenchmarkSuite',
 	#superclass : 'Object',
 	#instVars : [
 		'models',
@@ -49,7 +49,7 @@ Class {
 }
 
 { #category : 'running' }
-CoBenchmarkSuite class >> run [
+CoPCBenchmarkSuite class >> run [
 	"One-liner: run the full benchmark suite with sensible defaults and print the summary."
 
 	| suite report |
@@ -62,7 +62,7 @@ CoBenchmarkSuite class >> run [
 ]
 
 { #category : 'running' }
-CoBenchmarkSuite class >> runContextCapacity [
+CoPCBenchmarkSuite class >> runContextCapacity [
 	"Benchmark focused on context size scaling."
 
 	| suite report |
@@ -80,7 +80,7 @@ CoBenchmarkSuite class >> runContextCapacity [
 ]
 
 { #category : 'running' }
-CoBenchmarkSuite class >> runModels: modelNames [
+CoPCBenchmarkSuite class >> runModels: modelNames [
 	"Run the full benchmark suite comparing the given models."
 
 	| suite report |
@@ -94,7 +94,7 @@ CoBenchmarkSuite class >> runModels: modelNames [
 ]
 
 { #category : 'running' }
-CoBenchmarkSuite class >> runQuick [
+CoPCBenchmarkSuite class >> runQuick [
 	"Fast benchmark: 1 run per scenario, code scenarios only."
 
 	| suite report |
@@ -110,10 +110,10 @@ CoBenchmarkSuite class >> runQuick [
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> buildPromptFor: aScenario [
+CoPCBenchmarkSuite >> buildPromptFor: aScenario [
 
 	| template |
-	template := CoBenchmarkPharoCopilotRunner defaultTemplate.
+	template := CoPCBenchmarkRunner defaultTemplate.
 	^ (((template
 		copyReplaceAll: '<|fim_prefix|>' with: aScenario prefix)
 		copyReplaceAll: '<|fim_suffix|>' with: aScenario suffix)
@@ -122,7 +122,7 @@ CoBenchmarkSuite >> buildPromptFor: aScenario [
 ]
 
 { #category : 'private' }
-CoBenchmarkSuite >> clearModelCacheFor: modelName [
+CoPCBenchmarkSuite >> clearModelCacheFor: modelName [
 
 	[ client transport
 		postJsonAt: 'api/generate'
@@ -134,31 +134,31 @@ CoBenchmarkSuite >> clearModelCacheFor: modelName [
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> coldStart [
+CoPCBenchmarkSuite >> coldStart [
 	^ coldStart
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> coldStart: aBoolean [
+CoPCBenchmarkSuite >> coldStart: aBoolean [
 
 	coldStart := aBoolean
 ]
 
 { #category : 'private' }
-CoBenchmarkSuite >> collectScenarios [
+CoPCBenchmarkSuite >> collectScenarios [
 
 	| scenarios |
 	scenarios := Dictionary new.
-	includeCodeScenarios ifTrue: [ scenarios addAll: CoBenchmarkScenarioCatalog defaultScenarios ].
-	scenarios addAll: CoBenchmarkCacheScenario allScenarios.
-	includeContextScaling ifTrue: [ scenarios addAll: CoBenchmarkContextScenario contextSizeScenarios ].
-	includeFimQuality ifTrue: [ scenarios addAll: CoBenchmarkContextScenario fimQualityScenarios ].
-	includeStrategyComparison ifTrue: [ scenarios addAll: CoBenchmarkContextScenario contextStrategyScenarios ].
+	includeCodeScenarios ifTrue: [ scenarios addAll: CoPCBenchmarkScenarioCatalog defaultScenarios ].
+	scenarios addAll: CoPCBenchmarkCacheScenario allScenarios.
+	includeContextScaling ifTrue: [ scenarios addAll: CoPCBenchmarkContextScenario contextSizeScenarios ].
+	includeFimQuality ifTrue: [ scenarios addAll: CoPCBenchmarkContextScenario fimQualityScenarios ].
+	includeStrategyComparison ifTrue: [ scenarios addAll: CoPCBenchmarkContextScenario contextStrategyScenarios ].
 	^ scenarios
 ]
 
 { #category : 'private' }
-CoBenchmarkSuite >> ensureModelAvailable: modelName [
+CoPCBenchmarkSuite >> ensureModelAvailable: modelName [
 
 	| modelsResponse modelNames |
 	[
@@ -182,7 +182,7 @@ CoBenchmarkSuite >> ensureModelAvailable: modelName [
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> executeScenario: aScenario model: modelName [
+CoPCBenchmarkSuite >> executeScenario: aScenario model: modelName [
 
 	| prompt payload options startMillis response endMillis result |
 	prompt := self buildPromptFor: aScenario.
@@ -205,7 +205,7 @@ CoBenchmarkSuite >> executeScenario: aScenario model: modelName [
 		response := client transport postJsonAt: 'api/generate' body: payload.
 		endMillis := Time millisecondClockValue.
 
-		result := CoBenchmarkResult
+		result := CoPCBenchmarkResult
 			fromOllamaResponse: response
 			scenario: aScenario
 			model: modelName
@@ -215,7 +215,7 @@ CoBenchmarkSuite >> executeScenario: aScenario model: modelName [
 		^ result
 	] on: Error do: [ :ex |
 		endMillis := Time millisecondClockValue.
-		^ CoBenchmarkResult
+		^ CoPCBenchmarkResult
 			errorFor: aScenario
 			model: modelName
 			error: ex
@@ -224,55 +224,55 @@ CoBenchmarkSuite >> executeScenario: aScenario model: modelName [
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> includeCodeScenarios [
+CoPCBenchmarkSuite >> includeCodeScenarios [
 
 	^ includeCodeScenarios
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> includeCodeScenarios: aBoolean [
+CoPCBenchmarkSuite >> includeCodeScenarios: aBoolean [
 
 	includeCodeScenarios := aBoolean
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> includeContextScaling [
+CoPCBenchmarkSuite >> includeContextScaling [
 
 	^ includeContextScaling
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> includeContextScaling: aBoolean [
+CoPCBenchmarkSuite >> includeContextScaling: aBoolean [
 
 	includeContextScaling := aBoolean
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> includeFimQuality [
+CoPCBenchmarkSuite >> includeFimQuality [
 
 	^ includeFimQuality
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> includeFimQuality: aBoolean [
+CoPCBenchmarkSuite >> includeFimQuality: aBoolean [
 
 	includeFimQuality := aBoolean
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> includeStrategyComparison [
+CoPCBenchmarkSuite >> includeStrategyComparison [
 
 	^ includeStrategyComparison
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> includeStrategyComparison: aBoolean [
+CoPCBenchmarkSuite >> includeStrategyComparison: aBoolean [
 
 	includeStrategyComparison := aBoolean
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> initialize [
+CoPCBenchmarkSuite >> initialize [
 
 	super initialize.
 	models := #( 'omarabedelkader/pharo-qwen-coder-plus-20296:3b' ).
@@ -289,71 +289,71 @@ CoBenchmarkSuite >> initialize [
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> models [
+CoPCBenchmarkSuite >> models [
 
 	^ models
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> models: anArray [
+CoPCBenchmarkSuite >> models: anArray [
 
 	models := anArray
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> numCtx [
+CoPCBenchmarkSuite >> numCtx [
 
 	^ numCtx
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> numCtx: anInteger [
+CoPCBenchmarkSuite >> numCtx: anInteger [
 
 	numCtx := anInteger
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> numPredict [
+CoPCBenchmarkSuite >> numPredict [
 
 	^ numPredict
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> numPredict: anInteger [
+CoPCBenchmarkSuite >> numPredict: anInteger [
 
 	numPredict := anInteger
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> outputDirectory [
+CoPCBenchmarkSuite >> outputDirectory [
 
 	^ outputDirectory
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> outputDirectory: aFileReference [
+CoPCBenchmarkSuite >> outputDirectory: aFileReference [
 
 	outputDirectory := aFileReference
 ]
 
 { #category : 'report' }
-CoBenchmarkSuite >> report [
+CoPCBenchmarkSuite >> report [
 	"Return a CoBenchmarkReport for the collected results."
 
 	| report |
-	report := CoBenchmarkReport on: results.
+	report := CoPCBenchmarkReport on: results.
 	outputDirectory ifNotNil: [ report outputDirectory: outputDirectory ].
 	^ report
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> results [
+CoPCBenchmarkSuite >> results [
 
 	^ results
 ]
 
 { #category : 'running' }
-CoBenchmarkSuite >> run [
+CoPCBenchmarkSuite >> run [
 	"Execute the full benchmark suite."
 
 	| scenarios |
@@ -377,7 +377,7 @@ CoBenchmarkSuite >> run [
 				scenarios keysAndValuesDo: [ :name :scenario |
 					1 to: runsPerScenario do: [ :i |
 						| r |
-						r := CoBenchmarkResult new.
+						r := CoPCBenchmarkResult new.
 						r model: modelName; scenario: name; runIndex: i; success: false;
 							errorMessage: 'Model not available'.
 						results add: r ] ] ] ].
@@ -387,7 +387,7 @@ CoBenchmarkSuite >> run [
 ]
 
 { #category : 'running' }
-CoBenchmarkSuite >> runModel: modelName scenarios: scenarios [
+CoPCBenchmarkSuite >> runModel: modelName scenarios: scenarios [
 
 	scenarios keysAndValuesDo: [ :name :scenario |
 		Transcript show: '  [*] Scenario: ', name; cr.
@@ -410,25 +410,25 @@ CoBenchmarkSuite >> runModel: modelName scenarios: scenarios [
 ]
 
 { #category : 'running' }
-CoBenchmarkSuite >> runsPerScenario [
+CoPCBenchmarkSuite >> runsPerScenario [
 
 	^ runsPerScenario
 ]
 
 { #category : 'running' }
-CoBenchmarkSuite >> runsPerScenario: anInteger [
+CoPCBenchmarkSuite >> runsPerScenario: anInteger [
 
 	runsPerScenario := anInteger
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> temperature [
+CoPCBenchmarkSuite >> temperature [
 
 	^ temperature
 ]
 
 { #category : 'initialization' }
-CoBenchmarkSuite >> temperature: aNumber [
+CoPCBenchmarkSuite >> temperature: aNumber [
 
 	temperature := aNumber
 ]

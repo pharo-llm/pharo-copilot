@@ -1,5 +1,5 @@
 Class {
-	#name : 'CoBenchmarkResult',
+	#name : 'CoPCBenchmarkResult',
 	#superclass : 'Object',
 	#instVars : [
 		'model',
@@ -31,7 +31,7 @@ Class {
 }
 
 { #category : 'as yet unclassified' }
-CoBenchmarkResult class >> csvHeader [
+CoPCBenchmarkResult class >> csvHeader [
 
 	^ #('model' 'scenario' 'run' 'success' 'cold_start' 'context_strategy'
 	     'num_ctx' 'num_predict' 'temperature'
@@ -43,7 +43,7 @@ CoBenchmarkResult class >> csvHeader [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkResult class >> errorFor: aScenario model: modelName error: anError startMillis: start endMillis: end [
+CoPCBenchmarkResult class >> errorFor: aScenario model: modelName error: anError startMillis: start endMillis: end [
 
 	| result |
 	result := self new.
@@ -61,7 +61,7 @@ CoBenchmarkResult class >> errorFor: aScenario model: modelName error: anError s
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkResult class >> fromOllamaResponse: response scenario: aScenario model: modelName startMillis: start endMillis: end [
+CoPCBenchmarkResult class >> fromOllamaResponse: response scenario: aScenario model: modelName startMillis: start endMillis: end [
 	"Build a successful benchmark result from a raw Ollama api/generate response dictionary."
  
 	| result completionText promptEval evalDuration promptTokens completionTokens tokPerSec |
@@ -102,7 +102,7 @@ CoBenchmarkResult class >> fromOllamaResponse: response scenario: aScenario mode
 ]
 
 { #category : 'export' }
-CoBenchmarkResult >> asCsvFields [
+CoPCBenchmarkResult >> asCsvFields [
 
 	^ OrderedCollection new
 		add: self model;
@@ -131,7 +131,7 @@ CoBenchmarkResult >> asCsvFields [
 ]
 
 { #category : 'export' }
-CoBenchmarkResult >> asDictionary [
+CoPCBenchmarkResult >> asDictionary [
 
 	^ Dictionary new
 		  at: #model put: self model;
@@ -162,79 +162,79 @@ CoBenchmarkResult >> asDictionary [
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> coldStart [
+CoPCBenchmarkResult >> coldStart [
 
 	^ coldStart ifNil: [ false ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> coldStart: aBoolean [
+CoPCBenchmarkResult >> coldStart: aBoolean [
 
 	coldStart := aBoolean
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> completionText [
+CoPCBenchmarkResult >> completionText [
 
 	^ completionText ifNil: [ '' ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> completionText: aString [
+CoPCBenchmarkResult >> completionText: aString [
 
 	completionText := aString
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> completionTokens [
+CoPCBenchmarkResult >> completionTokens [
 
 	^ completionTokens ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> completionTokens: anInteger [
+CoPCBenchmarkResult >> completionTokens: anInteger [
 
 	completionTokens := anInteger
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> contextSizeBytes [
+CoPCBenchmarkResult >> contextSizeBytes [
 
 	^ contextSizeBytes ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> contextSizeBytes: anInteger [
+CoPCBenchmarkResult >> contextSizeBytes: anInteger [
 
 	contextSizeBytes := anInteger
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> contextSizeChars [
+CoPCBenchmarkResult >> contextSizeChars [
 
 	^ contextSizeChars ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> contextSizeChars: anInteger [
+CoPCBenchmarkResult >> contextSizeChars: anInteger [
 
 	contextSizeChars := anInteger
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> contextStrategy [
+CoPCBenchmarkResult >> contextStrategy [
 
 	^ contextStrategy ifNil: [ 'default' ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> contextStrategy: aString [
+CoPCBenchmarkResult >> contextStrategy: aString [
 
 	contextStrategy := aString
 ]
 
 { #category : 'export' }
-CoBenchmarkResult >> csvHeader [
+CoPCBenchmarkResult >> csvHeader [
 
 	^ #('model' 'scenario' 'run' 'success' 'cold_start' 'context_strategy'
 	     'num_ctx' 'num_predict' 'temperature'
@@ -246,19 +246,19 @@ CoBenchmarkResult >> csvHeader [
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> errorMessage [
+CoPCBenchmarkResult >> errorMessage [
 
 	^ errorMessage ifNil: [ '' ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> errorMessage: aString [
+CoPCBenchmarkResult >> errorMessage: aString [
 
 	errorMessage := aString
 ]
 
 { #category : 'derived' }
-CoBenchmarkResult >> estimatedPromptTokens [
+CoPCBenchmarkResult >> estimatedPromptTokens [
 
 
 	"Rough estimate: 1 token ~ 4 chars for code"
@@ -266,115 +266,115 @@ CoBenchmarkResult >> estimatedPromptTokens [
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> evalTimeSeconds [
+CoPCBenchmarkResult >> evalTimeSeconds [
 
 	^ evalTimeSeconds ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> evalTimeSeconds: aNumber [
+CoPCBenchmarkResult >> evalTimeSeconds: aNumber [
 
 	evalTimeSeconds := aNumber
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> model [
+CoPCBenchmarkResult >> model [
 
 	^ model ifNil: [ '' ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> model: aString [
+CoPCBenchmarkResult >> model: aString [
 
 	model := aString
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> numCtx [ 
+CoPCBenchmarkResult >> numCtx [ 
 
 	^ numCtx ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> numCtx: anInteger [
+CoPCBenchmarkResult >> numCtx: anInteger [
 
 	numCtx := anInteger
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> numPredict [
+CoPCBenchmarkResult >> numPredict [
 
 	^ numPredict ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> numPredict: anInteger [
+CoPCBenchmarkResult >> numPredict: anInteger [
 
 	numPredict := anInteger
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> prefixSizeChars [
+CoPCBenchmarkResult >> prefixSizeChars [
 
 	^ prefixSizeChars ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> prefixSizeChars: anInteger [
+CoPCBenchmarkResult >> prefixSizeChars: anInteger [
 
 	prefixSizeChars := anInteger
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> promptEvalTimeSeconds [ 
+CoPCBenchmarkResult >> promptEvalTimeSeconds [ 
 
 	^ promptEvalTimeSeconds ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> promptEvalTimeSeconds: aNumber [
+CoPCBenchmarkResult >> promptEvalTimeSeconds: aNumber [
 
 	promptEvalTimeSeconds := aNumber
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> promptText [
+CoPCBenchmarkResult >> promptText [
 
 	^ promptText ifNil: [ '' ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> promptText: aString [
+CoPCBenchmarkResult >> promptText: aString [
 
 	promptText := aString
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> promptTokens [
+CoPCBenchmarkResult >> promptTokens [
 
 	^ promptTokens ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> promptTokens: anInteger [ 
+CoPCBenchmarkResult >> promptTokens: anInteger [ 
 
 	promptTokens := anInteger
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> runIndex [
+CoPCBenchmarkResult >> runIndex [
 
 	^ runIndex ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> runIndex: anInteger [
+CoPCBenchmarkResult >> runIndex: anInteger [
 
 	runIndex := anInteger
 ]
 
 { #category : 'private' }
-CoBenchmarkResult >> safeNumber: aDict key: aKey [
+CoPCBenchmarkResult >> safeNumber: aDict key: aKey [
 
 
 	| value |
@@ -383,92 +383,92 @@ CoBenchmarkResult >> safeNumber: aDict key: aKey [
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> scenario [
+CoPCBenchmarkResult >> scenario [
 
 	^ scenario ifNil: [ '' ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> scenario: aString [ 
+CoPCBenchmarkResult >> scenario: aString [ 
 
 	scenario := aString
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> success [
+CoPCBenchmarkResult >> success [
 
 	^ success ifNil: [ false ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> success: aBoolean [ 
+CoPCBenchmarkResult >> success: aBoolean [ 
 
 	success := aBoolean
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> suffixSizeChars [
+CoPCBenchmarkResult >> suffixSizeChars [
 
 	^ suffixSizeChars ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> suffixSizeChars: anInteger [
+CoPCBenchmarkResult >> suffixSizeChars: anInteger [
 
 	suffixSizeChars := anInteger
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> temperature [
+CoPCBenchmarkResult >> temperature [
 
 	^ temperature ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> temperature: aNumber [
+CoPCBenchmarkResult >> temperature: aNumber [
 
 	temperature := aNumber
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> timestamp [
+CoPCBenchmarkResult >> timestamp [
 
 	^ timestamp
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> timestamp: aDateAndTime [
+CoPCBenchmarkResult >> timestamp: aDateAndTime [
 
 	timestamp := aDateAndTime
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> tokensPerSecond [
+CoPCBenchmarkResult >> tokensPerSecond [
 
 	^ tokensPerSecond ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> tokensPerSecond: aNumber [ 
+CoPCBenchmarkResult >> tokensPerSecond: aNumber [ 
 
 	tokensPerSecond := aNumber
 ]
 
 { #category : 'derived' }
-CoBenchmarkResult >> totalPromptSizeChars [
+CoPCBenchmarkResult >> totalPromptSizeChars [
 
 
 	^ self contextSizeChars + self prefixSizeChars + self suffixSizeChars
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> totalTimeSeconds [
+CoPCBenchmarkResult >> totalTimeSeconds [
 
 	^ totalTimeSeconds ifNil: [ 0 ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkResult >> totalTimeSeconds: aNumber [
+CoPCBenchmarkResult >> totalTimeSeconds: aNumber [
 
 	totalTimeSeconds := aNumber
 ]

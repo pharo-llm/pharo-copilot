@@ -1,12 +1,12 @@
 Class {
-	#name : 'CoBenchmarkContextScenario',
+	#name : 'CoPCBenchmarkContextScenario',
 	#superclass : 'Object',
 	#category : 'AI-Pharo-Copilot-Benchmarks',
 	#package : 'AI-Pharo-Copilot-Benchmarks'
 }
 
 { #category : 'scenarios' }
-CoBenchmarkContextScenario class >> allScenarios [
+CoPCBenchmarkContextScenario class >> allScenarios [
 	"Return all context benchmark scenarios combined."
 	| all |
 	all := Dictionary new.
@@ -17,7 +17,7 @@ CoBenchmarkContextScenario class >> allScenarios [
 ]
 
 { #category : 'scenarios' }
-CoBenchmarkContextScenario class >> contextSizeScenarios [
+CoPCBenchmarkContextScenario class >> contextSizeScenarios [
 
 	"Scenarios that test increasing context window sizes.
 	 Each one has the same prefix/suffix but growing context."
@@ -34,7 +34,7 @@ CoBenchmarkContextScenario class >> contextSizeScenarios [
 		| context name |
 		context := self generateContextOfSize: size.
 		name := 'context_', size asString, '_chars'.
-		scenarios at: name put: (CoBenchmarkScenario
+		scenarios at: name put: (CoPCBenchmarkScenario
 			named: name
 			prefix: basePrefix
 			suffix: baseSuffix
@@ -44,11 +44,11 @@ CoBenchmarkContextScenario class >> contextSizeScenarios [
 ]
 
 { #category : 'scenarios' }
-CoBenchmarkContextScenario class >> contextStrategyScenarios [
+CoPCBenchmarkContextScenario class >> contextStrategyScenarios [
 	"Scenarios comparing full-source vs selectors-only context."
 
 	^ Dictionary new
-		at: 'strategy_full_source' put: (CoBenchmarkScenario
+		at: 'strategy_full_source' put: (CoPCBenchmarkScenario
 			named: 'strategy_full_source'
 			prefix: 'visitNode: aNode
 	"Visit an AST node and collect metrics"
@@ -56,7 +56,7 @@ CoBenchmarkContextScenario class >> contextStrategyScenarios [
 			suffix: ''
 			context: (self realisticClassContext)
 			description: 'Full source context');
-		at: 'strategy_selectors_only' put: (CoBenchmarkScenario
+		at: 'strategy_selectors_only' put: (CoPCBenchmarkScenario
 			named: 'strategy_selectors_only'
 			prefix: 'visitNode: aNode
 	"Visit an AST node and collect metrics"
@@ -68,11 +68,11 @@ CoBenchmarkContextScenario class >> contextStrategyScenarios [
 ]
 
 { #category : 'scenarios' }
-CoBenchmarkContextScenario class >> fimQualityScenarios [
+CoPCBenchmarkContextScenario class >> fimQualityScenarios [
 	"Scenarios with known expected completions for quality measurement."
 
 	^ Dictionary new
-		at: 'fim_accessor' put: (CoBenchmarkScenario
+		at: 'fim_accessor' put: (CoPCBenchmarkScenario
 			named: 'fim_accessor'
 			prefix: 'name
 	^ '
@@ -84,7 +84,7 @@ Person >> age
 Person >> email
 	^ email'
 			description: 'Simple accessor - expected: name');
-		at: 'fim_setter' put: (CoBenchmarkScenario
+		at: 'fim_setter' put: (CoPCBenchmarkScenario
 			named: 'fim_setter'
 			prefix: 'name: aString
 	'
@@ -96,7 +96,7 @@ Person >> age: anInteger
 Person >> email: aString
 	email := aString'
 			description: 'Simple setter - expected: name := aString');
-		at: 'fim_collection_iterate' put: (CoBenchmarkScenario
+		at: 'fim_collection_iterate' put: (CoPCBenchmarkScenario
 			named: 'fim_collection_iterate'
 			prefix: 'do: aBlock
 	"Iterate over all elements"
@@ -109,7 +109,7 @@ MyList >> size
 MyList >> at: anIndex
 	^ elements at: anIndex'
 			description: 'Collection iteration');
-		at: 'fim_with_suffix' put: (CoBenchmarkScenario
+		at: 'fim_with_suffix' put: (CoPCBenchmarkScenario
 			named: 'fim_with_suffix'
 			prefix: 'between: min and: max
 	"Clamp the receiver between min and max"
@@ -125,7 +125,7 @@ Number >> min: aNumber
 ]
 
 { #category : 'context-generation' }
-CoBenchmarkContextScenario class >> generateContextOfSize: targetSize [
+CoPCBenchmarkContextScenario class >> generateContextOfSize: targetSize [
 	"Generate realistic Pharo method context of approximately targetSize characters."
 
 	| methods stream currentSize counter |
@@ -157,7 +157,7 @@ CoBenchmarkContextScenario class >> generateContextOfSize: targetSize [
 ]
 
 { #category : 'context-generation' }
-CoBenchmarkContextScenario class >> realisticClassContext [
+CoPCBenchmarkContextScenario class >> realisticClassContext [
 	^ 'RBProgramNode subclass: #ASTMetricsVisitor
 	instanceVariableNames: ''methodCount messageCount assignmentCount blockDepth maxBlockDepth''
 
@@ -200,13 +200,13 @@ ASTMetricsVisitor >> complexity
 ]
 
 { #category : 'context-generation' }
-CoBenchmarkContextScenario class >> selectorsOnlyContext [
+CoPCBenchmarkContextScenario class >> selectorsOnlyContext [
 
 	^ 'ASTMetricsVisitor: initialize visitMethodNode: visitMessageNode: visitAssignmentNode: visitBlockNode: report complexity'
 ]
 
 { #category : 'context-generation' }
-CoBenchmarkContextScenario class >> syntheticMethods [
+CoPCBenchmarkContextScenario class >> syntheticMethods [
 
 	^ #(
 		'BenchmarkTarget >> initialize

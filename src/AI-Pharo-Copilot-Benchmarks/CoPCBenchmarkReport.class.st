@@ -1,5 +1,5 @@
 Class {
-	#name : 'CoBenchmarkReport',
+	#name : 'CoPCBenchmarkReport',
 	#superclass : 'Object',
 	#instVars : [
 		'results',
@@ -10,13 +10,13 @@ Class {
 }
 
 { #category : 'instance creation' }
-CoBenchmarkReport class >> on: aCollectionOfResults [
+CoPCBenchmarkReport class >> on: aCollectionOfResults [
 
 	^ self new results: aCollectionOfResults
 ]
 
 { #category : 'export' }
-CoBenchmarkReport >> exportAll [
+CoPCBenchmarkReport >> exportAll [
 	"Export everything: CSV, JSON, summary text, completions. Returns the output directory."
 
 	self outputDirectory ensureCreateDirectory.
@@ -30,7 +30,7 @@ CoBenchmarkReport >> exportAll [
 ]
 
 { #category : 'export' }
-CoBenchmarkReport >> exportCompletions [
+CoPCBenchmarkReport >> exportCompletions [
 
 	| stream |
 	stream := (self outputDirectory / 'completions.txt') writeStream.
@@ -50,7 +50,7 @@ CoBenchmarkReport >> exportCompletions [
 ]
 
 { #category : 'export' }
-CoBenchmarkReport >> exportContextScaling [
+CoPCBenchmarkReport >> exportContextScaling [
 	"Export context size scaling analysis."
 
 	| contextResults stream grouped |
@@ -79,13 +79,13 @@ CoBenchmarkReport >> exportContextScaling [
 ]
 
 { #category : 'export' }
-CoBenchmarkReport >> exportCsv [
+CoPCBenchmarkReport >> exportCsv [
 
 	| stream |
 	stream := (self outputDirectory / 'results.csv') writeStream.
 	[
 		"Header"
-		stream nextPutAll: ($, join: CoBenchmarkResult csvHeader); lf.
+		stream nextPutAll: ($, join: CoPCBenchmarkResult csvHeader); lf.
 		"Rows"
 		results do: [ :r |
 			stream nextPutAll: ($, join: (r asCsvFields collect: [ :f | f asString ])); lf ]
@@ -93,7 +93,7 @@ CoBenchmarkReport >> exportCsv [
 ]
 
 { #category : 'export' }
-CoBenchmarkReport >> exportJson [
+CoPCBenchmarkReport >> exportJson [
 
 	| data |
 	data := Dictionary new
@@ -107,7 +107,7 @@ CoBenchmarkReport >> exportJson [
 ]
 
 { #category : 'export' }
-CoBenchmarkReport >> exportModelComparison [
+CoPCBenchmarkReport >> exportModelComparison [
 	"Export a model-vs-model comparison table."
 
 	| models stream metrics |
@@ -157,7 +157,7 @@ CoBenchmarkReport >> exportModelComparison [
 ]
 
 { #category : 'export' }
-CoBenchmarkReport >> exportSummary [
+CoPCBenchmarkReport >> exportSummary [
 
 	(self outputDirectory / 'summary.txt') writeStream
 		nextPutAll: self generateSummary;
@@ -165,7 +165,7 @@ CoBenchmarkReport >> exportSummary [
 ]
 
 { #category : 'report' }
-CoBenchmarkReport >> generateSummary [
+CoPCBenchmarkReport >> generateSummary [
 
 	^ String streamContents: [ :s |
 		self writeBannerOn: s.
@@ -178,14 +178,14 @@ CoBenchmarkReport >> generateSummary [
 ]
 
 { #category : 'stat' }
-CoBenchmarkReport >> mean: aCollection [
+CoPCBenchmarkReport >> mean: aCollection [
 
 	aCollection isEmpty ifTrue: [ ^ 0 ].
 	^ (aCollection inject: 0 into: [ :sum :each | sum + each ]) / aCollection size asFloat
 ]
 
 { #category : 'stat' }
-CoBenchmarkReport >> median: aCollection [
+CoPCBenchmarkReport >> median: aCollection [
 
 	| sorted mid |
 	aCollection isEmpty ifTrue: [ ^ 0 ].
@@ -197,7 +197,7 @@ CoBenchmarkReport >> median: aCollection [
 ]
 
 { #category : 'report' }
-CoBenchmarkReport >> metadataDictionary [
+CoPCBenchmarkReport >> metadataDictionary [
 
 	^ Dictionary new
 		at: #generatedAt put: DateAndTime now asString;
@@ -208,19 +208,19 @@ CoBenchmarkReport >> metadataDictionary [
 ]
 
 { #category : 'accessing' }
-CoBenchmarkReport >> outputDirectory [
+CoPCBenchmarkReport >> outputDirectory [
 
 	^ outputDirectory ifNil: [ FileLocator workingDirectory / 'benchmark_output' ]
 ]
 
 { #category : 'accessing' }
-CoBenchmarkReport >> outputDirectory: aFileReference [
+CoPCBenchmarkReport >> outputDirectory: aFileReference [
 
 	outputDirectory := aFileReference
 ]
 
 { #category : 'private' }
-CoBenchmarkReport >> padRight: aString to: anInteger [
+CoPCBenchmarkReport >> padRight: aString to: anInteger [
 
 	| s |
 	s := aString asString.
@@ -229,19 +229,19 @@ CoBenchmarkReport >> padRight: aString to: anInteger [
 ]
 
 { #category : 'accessing' }
-CoBenchmarkReport >> results [
+CoPCBenchmarkReport >> results [
 
 	^ results
 ]
 
 { #category : 'accessing' }
-CoBenchmarkReport >> results: aCollection [
+CoPCBenchmarkReport >> results: aCollection [
 
 	results := aCollection
 ]
 
 { #category : 'stat' }
-CoBenchmarkReport >> statisticsDictionary [
+CoPCBenchmarkReport >> statisticsDictionary [
 
 	| models stats |
 	models := (results collect: [ :r | r model ]) asSet asSortedCollection.
@@ -268,7 +268,7 @@ CoBenchmarkReport >> statisticsDictionary [
 ]
 
 { #category : 'stat' }
-CoBenchmarkReport >> stddev: aCollection [
+CoPCBenchmarkReport >> stddev: aCollection [
 
 	| avg |
 	aCollection size < 2 ifTrue: [ ^ 0 ].
@@ -278,7 +278,7 @@ CoBenchmarkReport >> stddev: aCollection [
 ]
 
 { #category : 'report' }
-CoBenchmarkReport >> writeBannerOn: s [
+CoPCBenchmarkReport >> writeBannerOn: s [
 
 	s nextPutAll: (String new: 70 withAll: $#); lf.
 	s nextPutAll: '#  PHARO COPILOT BENCHMARK REPORT'; lf.
@@ -287,7 +287,7 @@ CoBenchmarkReport >> writeBannerOn: s [
 ]
 
 { #category : 'report' }
-CoBenchmarkReport >> writeBottomResultsOn: s [
+CoPCBenchmarkReport >> writeBottomResultsOn: s [
 
 	| successful sorted |
 	successful := results select: [ :r | r success ].
@@ -305,7 +305,7 @@ CoBenchmarkReport >> writeBottomResultsOn: s [
 ]
 
 { #category : 'report' }
-CoBenchmarkReport >> writeContextAnalysisOn: s [
+CoPCBenchmarkReport >> writeContextAnalysisOn: s [
 
 	| contextResults grouped sortedKeys |
 	contextResults := results select: [ :r |
@@ -338,7 +338,7 @@ CoBenchmarkReport >> writeContextAnalysisOn: s [
 ]
 
 { #category : 'report' }
-CoBenchmarkReport >> writeOverviewOn: s [
+CoPCBenchmarkReport >> writeOverviewOn: s [
 
 	| successful failed models scenarios |
 	successful := results select: [ :r | r success ].
@@ -357,7 +357,7 @@ CoBenchmarkReport >> writeOverviewOn: s [
 ]
 
 { #category : 'report' }
-CoBenchmarkReport >> writePerModelStatsOn: s [
+CoPCBenchmarkReport >> writePerModelStatsOn: s [
 
 	| models |
 	models := (results collect: [ :r | r model ]) asSet asSortedCollection.
@@ -395,7 +395,7 @@ CoBenchmarkReport >> writePerModelStatsOn: s [
 ]
 
 { #category : 'report' }
-CoBenchmarkReport >> writePerScenarioStatsOn: s [
+CoPCBenchmarkReport >> writePerScenarioStatsOn: s [
 
 	| scenarios |
 	scenarios := (results collect: [ :r | r scenario ]) asSet asSortedCollection.
@@ -422,7 +422,7 @@ CoBenchmarkReport >> writePerScenarioStatsOn: s [
 ]
 
 { #category : 'report' }
-CoBenchmarkReport >> writeTopResultsOn: s [
+CoPCBenchmarkReport >> writeTopResultsOn: s [
 
 	| successful sorted |
 	successful := results select: [ :r | r success ].

@@ -1,5 +1,5 @@
 Class {
-	#name : 'CoBenchmarkScenario',
+	#name : 'CoPCBenchmarkScenario',
 	#superclass : 'Object',
 	#instVars : [
 		'name',
@@ -13,12 +13,12 @@ Class {
 }
 
 { #category : 'scenarios' }
-CoBenchmarkScenario class >> defaultScenarios [
+CoPCBenchmarkScenario class >> defaultScenarios [
 	self shouldBeImplemented.
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkScenario class >> named: aName prefix: prefixString suffix: suffixString context: contextString description: descriptionString [
+CoPCBenchmarkScenario class >> named: aName prefix: prefixString suffix: suffixString context: contextString description: descriptionString [
 
 	^ self new
 		name: aName;
@@ -30,63 +30,63 @@ CoBenchmarkScenario class >> named: aName prefix: prefixString suffix: suffixStr
 ]
 
 { #category : 'accessing' }
-CoBenchmarkScenario >> context [
+CoPCBenchmarkScenario >> context [
 
 	^ context
 ]
 
 { #category : 'accessing' }
-CoBenchmarkScenario >> context: aString [
+CoPCBenchmarkScenario >> context: aString [
 
 	context := aString
 ]
 
 { #category : 'accessing' }
-CoBenchmarkScenario >> description [
+CoPCBenchmarkScenario >> description [
 
 	^ description
 ]
 
 { #category : 'accessing' }
-CoBenchmarkScenario >> description: aString [
+CoPCBenchmarkScenario >> description: aString [
 
 	description := aString
 ]
 
 { #category : 'accessing' }
-CoBenchmarkScenario >> name [
+CoPCBenchmarkScenario >> name [
 
 	^ name
 ]
 
 { #category : 'accessing' }
-CoBenchmarkScenario >> name: aString [
+CoPCBenchmarkScenario >> name: aString [
 
 	name := aString
 ]
 
 { #category : 'accessing' }
-CoBenchmarkScenario >> prefix [
+CoPCBenchmarkScenario >> prefix [
 
 	^ prefix
 
 ]
 
 { #category : 'accessing' }
-CoBenchmarkScenario >> prefix: aString [
+CoPCBenchmarkScenario >> prefix: aString [
 
 	prefix := aString
 
 ]
 
 { #category : 'accessing' }
-CoBenchmarkScenario >> suffix [
+CoPCBenchmarkScenario >> suffix [
 
 	^ suffix
 ]
 
 { #category : 'accessing' }
-CoBenchmarkScenario >> suffix: aString [
+CoPCBenchmarkScenario >> suffix: aString [
 
 	suffix := aString
 ]

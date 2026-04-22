@@ -1,5 +1,5 @@
 Class {
-	#name : 'CoBenchmarkPharoCopilotRunner',
+	#name : 'CoPCBenchmarkRunner',
 	#superclass : 'Object',
 	#instVars : [
 		'client',
@@ -15,7 +15,7 @@ Class {
 }
 
 { #category : 'accessing - defaults' }
-CoBenchmarkPharoCopilotRunner class >> defaultConfiguration [
+CoPCBenchmarkRunner class >> defaultConfiguration [
 
 	^ Dictionary new
 		at: #models put: #('qwen2.5-coder:3b');
@@ -30,13 +30,13 @@ CoBenchmarkPharoCopilotRunner class >> defaultConfiguration [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner class >> defaultTemplate [
+CoPCBenchmarkRunner class >> defaultTemplate [
 
 	^ 'You are a Pharo Smalltalk code completion assistant. Complete the code at the cursor position.\n\nContext:\n<|fim_context|>\n\nPrefix:\n<|fim_prefix|>\n\nSuffix:\n<|fim_suffix|>\n\nComplete the code at <|fim_middle|>:'
 ]
 
 { #category : 'accessing - defaults' }
-CoBenchmarkPharoCopilotRunner class >> runWithConfiguration: aDictionary [
+CoPCBenchmarkRunner class >> runWithConfiguration: aDictionary [
 
 	| runner results outputCsv outputCompletions |
 	runner := self new.
@@ -57,13 +57,13 @@ CoBenchmarkPharoCopilotRunner class >> runWithConfiguration: aDictionary [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> availableScenarioNames [
+CoPCBenchmarkRunner >> availableScenarioNames [
 
 	^ scenarios keys asSortedCollection
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> buildPromptFor: aScenario [
+CoPCBenchmarkRunner >> buildPromptFor: aScenario [
 
 	| prompt safeTemplate |
 	safeTemplate := template ifNil: [ self class defaultTemplate ].
@@ -76,7 +76,7 @@ CoBenchmarkPharoCopilotRunner >> buildPromptFor: aScenario [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> clearModelCacheFor: modelNameString [
+CoPCBenchmarkRunner >> clearModelCacheFor: modelNameString [
 
 	[ client
 		transport
@@ -89,7 +89,7 @@ CoBenchmarkPharoCopilotRunner >> clearModelCacheFor: modelNameString [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> defaultOptions [
+CoPCBenchmarkRunner >> defaultOptions [
 
 	^ Dictionary new
 		at: #num_predict put: (numPredict ifNil: [ 150 ]);
@@ -100,7 +100,7 @@ CoBenchmarkPharoCopilotRunner >> defaultOptions [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> ensureModelAvailable: modelNameString [
+CoPCBenchmarkRunner >> ensureModelAvailable: modelNameString [
 
 	| modelsResponse modelNames |
 	modelsResponse := self listAvailableModels.
@@ -111,7 +111,7 @@ CoBenchmarkPharoCopilotRunner >> ensureModelAvailable: modelNameString [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> generateCompletionFor: aScenario model: modelNameString [
+CoPCBenchmarkRunner >> generateCompletionFor: aScenario model: modelNameString [
 
 	| prompt payload startMillis response doneMillis promptEval evalDuration promptTokens completionTokens completionText |
 	prompt := self buildPromptFor: aScenario.
@@ -163,23 +163,23 @@ CoBenchmarkPharoCopilotRunner >> generateCompletionFor: aScenario model: modelNa
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> initialize [
+CoPCBenchmarkRunner >> initialize [
 
 	super initialize.
 	client := OllamaClient new.
 	options := Dictionary new.
-	scenarios :=CoBenchmarkScenarioCatalog defaultScenarios.
+	scenarios :=CoPCBenchmarkScenarioCatalog defaultScenarios.
 	results := OrderedCollection new
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> listAvailableModels [
+CoPCBenchmarkRunner >> listAvailableModels [
 
 	^ client listModels
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> modelNamesFrom: modelsResponse [
+CoPCBenchmarkRunner >> modelNamesFrom: modelsResponse [
 
 	| modelList |
 	modelsResponse ifNil: [ ^ #() ].
@@ -188,7 +188,7 @@ CoBenchmarkPharoCopilotRunner >> modelNamesFrom: modelsResponse [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> numberFromResponse: response key: keySymbol [
+CoPCBenchmarkRunner >> numberFromResponse: response key: keySymbol [
 
 	| value |
 	value := response at: keySymbol ifAbsent: [ response at: keySymbol asString ifAbsent: [ 0 ] ].
@@ -196,7 +196,7 @@ CoBenchmarkPharoCopilotRunner >> numberFromResponse: response key: keySymbol [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> pullModelNamed: modelNameString [
+CoPCBenchmarkRunner >> pullModelNamed: modelNameString [
 
 	| response |
 	[
@@ -212,14 +212,14 @@ CoBenchmarkPharoCopilotRunner >> pullModelNamed: modelNameString [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> responseTextFrom: response [
+CoPCBenchmarkRunner >> responseTextFrom: response [
 
 	response isNil ifTrue: [ ^ '' ].
 	^ response at: #response ifAbsent: [ response at: 'response' ifAbsent: [ '' ] ]
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> runForModels: modelNames scenarios: scenarioNames runs: runCount numPredict: maxTokens template: templateString coldStart: coldStartFlag [
+CoPCBenchmarkRunner >> runForModels: modelNames scenarios: scenarioNames runs: runCount numPredict: maxTokens template: templateString coldStart: coldStartFlag [
 
 	| scenarioKeys selectedScenarios |
 	results removeAll.
@@ -265,7 +265,7 @@ CoBenchmarkPharoCopilotRunner >> runForModels: modelNames scenarios: scenarioNam
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> saveCompletionsTo: aFileReference [
+CoPCBenchmarkRunner >> saveCompletionsTo: aFileReference [
 
 	| stream |
 	stream := aFileReference writeStream.
@@ -282,7 +282,7 @@ CoBenchmarkPharoCopilotRunner >> saveCompletionsTo: aFileReference [
 ]
 
 { #category : 'as yet unclassified' }
-CoBenchmarkPharoCopilotRunner >> saveCsvTo: aFileReference [
+CoPCBenchmarkRunner >> saveCsvTo: aFileReference [
 	| stream fields |
 	
 	fields := #(model scenario run cold_start success ttft total_time
