@@ -110,7 +110,7 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showMissingOllamaStep [
 
-	| messageLabel installButton closeButton buttonRow |
+	| messageLabel installButton centeredRow centeredColumn |
 	titleLabel label: 'Ollama Required'.
 	descriptionLabel label: 'Pharo-Copilot needs Ollama to continue.'.
 	statusLabel label: ''.
@@ -125,23 +125,24 @@ PharoCopilotSetupPresenter >> showMissingOllamaStep [
 		action: [ WebBrowser openOn: 'https://ollama.com/download/windows' ];
 		yourself.
 
-	closeButton := self newButton
-		label: 'Close';
-		action: [ self window close ];
+	centeredRow := SpBoxLayout newLeftToRight
+		add: SpNullPresenter new expand: true;
+		add: (SpBoxLayout newTopToBottom
+			spacing: 12;
+			add: messageLabel expand: false;
+			add: installButton expand: false;
+			yourself)
+		expand: false;
+		add: SpNullPresenter new expand: true;
 		yourself.
 
-	buttonRow := SpBoxLayout newHorizontal
-		spacing: 8;
-		add: installButton expand: false;
-		add: closeButton expand: false;
+	centeredColumn := SpBoxLayout newTopToBottom
+		add: SpNullPresenter new expand: true;
+		add: centeredRow expand: false;
+		add: SpNullPresenter new expand: true;
 		yourself.
 
-	contentContainer layout: (SpBoxLayout newTopToBottom
-		spacing: 12;
-		add: messageLabel expand: false;
-		add: buttonRow expand: false;
-		yourself).
-
+	contentContainer layout: centeredColumn.
 	self layout: self defaultLayout
 ]
 
