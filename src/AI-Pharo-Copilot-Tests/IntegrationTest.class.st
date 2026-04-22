@@ -21,7 +21,7 @@ IntegrationTest >> testCopilotEntryActivationFlow [
 { #category : 'tests' }
 IntegrationTest >> testEngineAndBuilderIntegration [
 	| engine builder context |
-	engine := CoCompletionEnginePharoCopilot new.
+	engine := CoPharoCopilotCompletionEngine new.
 	context := CoPharoCopilotContext new.
 	builder := engine completionBuilder.
 	

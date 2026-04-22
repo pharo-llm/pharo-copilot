@@ -3,20 +3,20 @@ I retrieve code completion suggestions from the Pharo Copilot service and apply 
 
 "
 Class {
-	#name : 'CoCompletionEnginePharoCopilot',
+	#name : 'CoPharoCopilotCompletionEngine',
 	#superclass : 'CoCompletionEngine',
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
 }
 
 { #category : 'accessing' }
-CoCompletionEnginePharoCopilot >> basicReplaceTokenInEditorWith: newString [
+CoPharoCopilotCompletionEngine >> basicReplaceTokenInEditorWith: newString [
 
 	super replaceTokenInEditorWith: newString
 ]
 
 { #category : 'accessing' }
-CoCompletionEnginePharoCopilot >> completionBuilder [
+CoPharoCopilotCompletionEngine >> completionBuilder [
 
 	| alreadyInitialized builderClassName |
 	alreadyInitialized := completionBuilder notNil.
@@ -29,7 +29,7 @@ CoCompletionEnginePharoCopilot >> completionBuilder [
 ]
 
 { #category : 'new' }
-CoCompletionEnginePharoCopilot >> replaceTokenInEditorWith: newString [
+CoPharoCopilotCompletionEngine >> replaceTokenInEditorWith: newString [
 
 	| caretPosition |
 	(self shouldIgnoreReplacement: newString) ifTrue: [ ^ self ].
@@ -40,13 +40,13 @@ CoCompletionEnginePharoCopilot >> replaceTokenInEditorWith: newString [
 ]
 
 { #category : 'new' }
-CoCompletionEnginePharoCopilot >> restoreCaretTo: caretPosition [
+CoPharoCopilotCompletionEngine >> restoreCaretTo: caretPosition [
 
 	self editor selectAt: caretPosition
 ]
 
 { #category : 'new' }
-CoCompletionEnginePharoCopilot >> shouldIgnoreReplacement: newString [
+CoPharoCopilotCompletionEngine >> shouldIgnoreReplacement: newString [
 
 	^ newString isNil or: [ newString isEmpty ]
 ]

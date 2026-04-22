@@ -73,9 +73,9 @@ CoSuggestionEvaluator >> announceEvaluation: anEvaluationEntry [
 { #category : 'initialization' }
 CoSuggestionEvaluator >> appendEvaluationEntry: anEvaluationEntry [
 	| evaluationFile data safeData |
-	CoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
+	CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
 
-	evaluationFile := CoCopilotLogger evaluationLogFileReference.
+	evaluationFile := CoPharoCopilotLogger evaluationLogFileReference.
 	data := Dictionary new
 		at: #timestamp put: anEvaluationEntry timestamp;
 		at: #action put: anEvaluationEntry action asString;
@@ -88,7 +88,7 @@ CoSuggestionEvaluator >> appendEvaluationEntry: anEvaluationEntry [
 	safeData := self jsonSafeObject: data.
 
 	[
-		CoCopilotLogger ensureEvaluationLogFileInitialized.
+		CoPharoCopilotLogger ensureEvaluationLogFileInitialized.
 		evaluationFile writeStreamDo: [ :stream |
 			stream setToEnd.
 			stream nextPutAll: (STONJSON toString: safeData).
@@ -282,10 +282,10 @@ CoSuggestionEvaluator >> jsonSafeObject: anObject [
 { #category : 'initialization' }
 CoSuggestionEvaluator >> loadPersistentStats [
 	"Load previous evaluation data if available"
-CoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
+CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
 	[
 		| evaluationFile |
-		evaluationFile := CoCopilotLogger evaluationLogFileReference.
+		evaluationFile := CoPharoCopilotLogger evaluationLogFileReference.
 
 		(evaluationFile exists and: [ evaluationFile isFile ]) ifTrue: [
 				persistentStats := OrderedCollection new.
@@ -371,9 +371,9 @@ CoSuggestionEvaluator >> rejectionRate [
 CoSuggestionEvaluator >> savePersistentStats [
 	"Save evaluation data to file for long-term analysis"
         | evaluationFile data |
-        CoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
+        CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
 
-        evaluationFile := CoCopilotLogger evaluationLogFileReference.
+        evaluationFile := CoPharoCopilotLogger evaluationLogFileReference.
         data := Dictionary new
                         at: #acceptedCount put: acceptedEntries size;
 		        at: #rejectedCount put: rejectedEntries size;
@@ -383,7 +383,7 @@ CoSuggestionEvaluator >> savePersistentStats [
 		        yourself.
 
 	[
-		CoCopilotLogger ensureEvaluationLogFileInitialized.
+		CoPharoCopilotLogger ensureEvaluationLogFileInitialized.
 		evaluationFile writeStreamDo: [ :stream |
 				| safeData |
 				safeData := self jsonSafeObject: data.

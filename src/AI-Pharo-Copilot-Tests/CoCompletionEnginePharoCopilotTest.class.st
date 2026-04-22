@@ -19,7 +19,7 @@ CoCompletionEnginePharoCopilotTest >> testCleanedContentFromRemovesExplanation [
 CoCompletionEnginePharoCopilotTest >> testCompletionBuilderHasNilContext [
 
     | engine builder |
-    engine := CoCompletionEnginePharoCopilot new.
+    engine := CoPharoCopilotCompletionEngine new.
     builder := engine completionBuilder.
     self assert: builder completionContext isNil.
 ]
@@ -28,7 +28,7 @@ CoCompletionEnginePharoCopilotTest >> testCompletionBuilderHasNilContext [
 CoCompletionEnginePharoCopilotTest >> testCompletionBuilderIsCoPharoCopilotResultSetBuilder [
 
     | engine builder |
-    engine := CoCompletionEnginePharoCopilot new.
+    engine := CoPharoCopilotCompletionEngine new.
     builder := engine completionBuilder.
     self assert: builder class equals: CoPharoCopilotResultSetBuilder.
 ]
@@ -37,7 +37,7 @@ CoCompletionEnginePharoCopilotTest >> testCompletionBuilderIsCoPharoCopilotResul
 CoCompletionEnginePharoCopilotTest >> testCompletionBuilderMemoization [
 
 	| engine firstBuilder secondBuilder |
-	engine := CoCompletionEnginePharoCopilot new.
+	engine := CoPharoCopilotCompletionEngine new.
 	firstBuilder := engine completionBuilder.
 	secondBuilder := engine completionBuilder.
 	self assert: firstBuilder identicalTo: secondBuilder
@@ -47,8 +47,8 @@ CoCompletionEnginePharoCopilotTest >> testCompletionBuilderMemoization [
 CoCompletionEnginePharoCopilotTest >> testDifferentEnginesHaveDifferentBuilders [
 
     | engine1 engine2 builder1 builder2 |
-    engine1 := CoCompletionEnginePharoCopilot new.
-    engine2 := CoCompletionEnginePharoCopilot new.
+    engine1 := CoPharoCopilotCompletionEngine new.
+    engine2 := CoPharoCopilotCompletionEngine new.
     builder1 := engine1 completionBuilder.
     builder2 := engine2 completionBuilder.
     self deny: builder1 identicalTo: builder2.

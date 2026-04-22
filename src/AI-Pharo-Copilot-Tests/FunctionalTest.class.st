@@ -17,7 +17,7 @@ FunctionalTest >> testCompleteWorkflowWithMockedClient [
 	context position: context source size.
 	
 	"2. Get engine and builder"
-	engine := CoCompletionEnginePharoCopilot new.
+	engine := CoPharoCopilotCompletionEngine new.
 	builder := engine completionBuilder.
 	
 	"3. Create a mock entry (simulating AI response)"

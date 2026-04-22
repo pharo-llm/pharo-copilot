@@ -162,17 +162,17 @@ CoSuggestionEvaluatorTest >> testSavePersistentStatsProducesJson [
     | tempFs tempDir tempFile originalReference originalLoggingEnabled jsonLine parsed |
     tempFs := FileSystem memory.
             tempDir := tempFs
-            / CoCopilotLogger pharoCopilotDirectoryName.
+            / CoPharoCopilotLogger pharoCopilotDirectoryName.
     tempDir parent ensureCreateDirectory.
     tempDir ensureCreateDirectory.
     tempFile := tempDir / 'copilot-evaluation-log.jsonl'.
 
-    originalReference := CoCopilotLogger evaluationLogFileReference.
+    originalReference := CoPharoCopilotLogger evaluationLogFileReference.
     originalLoggingEnabled := CopilotSettings loggingEnabled.
 
     [
             CopilotSettings loggingEnabled: true.
-            CoCopilotLogger evaluationLogFileReference: tempFile.
+            CoPharoCopilotLogger evaluationLogFileReference: tempFile.
             evaluator savePersistentStats.
             jsonLine := tempFile readStreamDo: [ :stream | stream nextLine ].
             parsed := STONJSON fromString: jsonLine.
@@ -182,7 +182,7 @@ CoSuggestionEvaluatorTest >> testSavePersistentStatsProducesJson [
 		self assert: ((parsed at: 'timestamp') isKindOf: String).
 		self assert: ((parsed at: 'modelName') isKindOf: String) ] ensure: [
 			tempFile ensureDelete.
-			CoCopilotLogger evaluationLogFileReference: originalReference ]
+			CoPharoCopilotLogger evaluationLogFileReference: originalReference ]
 ]
 
 { #category : 'running' }

@@ -299,13 +299,13 @@ CopilotSettings class >> ensureModelMetadataDirectoryFor: modelNameString [
 	"Ensure the per-model metadata directory exists; answer the directory or nil on failure."
 
 	| logsDirectory modelDirectory |
-	logsDirectory := CoCopilotLogger ensureLogsDirectory.
+	logsDirectory := CoPharoCopilotLogger ensureLogsDirectory.
 	modelDirectory := logsDirectory / (self sanitizedFileComponentFor: modelNameString default: 'unknown-model').
 
 	[
 		modelDirectory ensureCreateDirectory
 	] on: Error do: [ :ex |
-		CoCopilotLogger
+		CoPharoCopilotLogger
 			logBackEndEvent: 'Failed to prepare metadata directory'
 			details: (Dictionary new
 				at: #model put: modelNameString;
@@ -514,6 +514,14 @@ CopilotSettings class >> host: aString [
 	self autoSaveSettings
 ]
 
+{ #category : 'accessing' }
+CopilotSettings class >> initialize [
+
+	super initialize.
+	self initializeDefaults.
+	self loadSettingsFromFile
+]
+
 { #category : 'settings' }
 CopilotSettings class >> initializeDefaults [
 
@@ -535,7 +543,7 @@ CopilotSettings class >> installModelNamed: aModelName [
 		client := self newOllamaClient.
 
 		self notifyUser: ('Downloading {1}... This may take a few minutes.' format: { aModelName }).
-		CoCopilotLogger logBackEndEvent: 'Invoking Ollama model install script' details: (Dictionary new
+		CoPharoCopilotLogger logBackEndEvent: 'Invoking Ollama model install script' details: (Dictionary new
 				 at: #model put: aModelName;
 				 yourself).
 
@@ -543,7 +551,7 @@ CopilotSettings class >> installModelNamed: aModelName [
 			ifTrue: [ client pullModelNamed: aModelName timeoutSeconds: self modelInstallTimeoutSeconds ]
 			ifFalse: [ client pullModelNamed: aModelName ].
 
-		CoCopilotLogger logBackEndEvent: 'Ollama model install script completed' details: (Dictionary new
+		CoPharoCopilotLogger logBackEndEvent: 'Ollama model install script completed' details: (Dictionary new
 				 at: #model put: aModelName;
 				 yourself).
 		self notifyUser: ('Download completed for {1}.' format: { aModelName }).
@@ -706,7 +714,7 @@ CopilotSettings class >> logOllamaServiceUnavailable: ex [
 CopilotSettings class >> logUsingBundledFimTemplateFrom: fileRef [
 	"Log that we loaded a bundled template file."
 
-	CoCopilotLogger
+	CoPharoCopilotLogger
 		logBackEndEvent: 'Using bundled FIM template'
 		details: (Dictionary new
 			at: #model put: (self modelName ifNil: [ 'unknown-model' ]);
@@ -718,7 +726,7 @@ CopilotSettings class >> logUsingBundledFimTemplateFrom: fileRef [
 CopilotSettings class >> logUsingCachedFimTemplateFrom: cacheFile [
 	"Log that we loaded a cached template from logs."
 
-	CoCopilotLogger
+	CoPharoCopilotLogger
 		logBackEndEvent: 'Using cached FIM template from logs'
 		details: (Dictionary new
 			at: #model put: (self modelName ifNil: [ 'unknown-model' ]);
@@ -786,7 +794,7 @@ CopilotSettings class >> metadataFileContentsFor: value [
 	"Format a metadata value as text suitable for writing to a .txt file."
 
 	| formatted |
-	formatted := CoCopilotLogger formatValue: value.
+	formatted := CoPharoCopilotLogger formatValue: value.
 	formatted ifNil: [ ^ '' ].
 	^ formatted asString
 ]
@@ -1217,8 +1225,8 @@ CopilotSettings class >> recordInstallModelUserConsentForModelNamed: aModelName 
 	self autoSaveSettings.
 
 	[
-		CoCopilotLogger ensureEvaluationLogFileInitialized.
-		evalFile := CoCopilotLogger evaluationLogFileReference.
+		CoPharoCopilotLogger ensureEvaluationLogFileInitialized.
+		evalFile := CoPharoCopilotLogger evaluationLogFileReference.
 		evalFile writeStreamDo: [ :stream |
 			stream setToEnd.
 			stream
@@ -1240,8 +1248,8 @@ CopilotSettings class >> recordPrivacyPolicyUserConsentAccepted: aBoolean [
 		yourself.
 
 	[
-		CoCopilotLogger ensureEvaluationLogFileInitialized.
-		evalFile := CoCopilotLogger evaluationLogFileReference.
+		CoPharoCopilotLogger ensureEvaluationLogFileInitialized.
+		evalFile := CoPharoCopilotLogger evaluationLogFileReference.
 		evalFile writeStreamDo: [ :stream |
 			stream setToEnd.
 			stream
@@ -1271,7 +1279,7 @@ CopilotSettings class >> refreshModelsAfterInstallOf: aModelName usingInitialRes
 
 		self logInstallDidNotExposeModel: aModelName before: initialResponse after: refreshedModels
 	] on: Error do: [ :ex |
-		CoCopilotLogger
+		CoPharoCopilotLogger
 			logError: 'Failed to refresh Ollama models after install'
 			origin: #CopilotSettings
 			exception: ex
@@ -1563,7 +1571,7 @@ CopilotSettings class >> settingsFileReference [
 	"Answer the file reference for the persistent settings file."
 
 	| logsDirectory |
-	logsDirectory := CoCopilotLogger ensureLogsDirectory.
+	logsDirectory := CoPharoCopilotLogger ensureLogsDirectory.
 	^ logsDirectory / 'settings.ston'
 
 ]
@@ -1918,7 +1926,7 @@ CopilotSettings class >> templateFileForModelNamed: aModelName [
 		sanitizedFileComponentFor: modelNameValue
 		default: 'unknown-model'.
 
-	baseDirectory := CoCopilotLogger logsDirectoryReference.
+	baseDirectory := CoPharoCopilotLogger logsDirectoryReference.
 	^ (baseDirectory / sanitizedName / 'template.txt') asFileReference
 ]
 

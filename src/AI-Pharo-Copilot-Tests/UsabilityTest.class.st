@@ -35,7 +35,7 @@ UsabilityTest >> testContextBuilderIntuitiveAPI [
 { #category : 'tests' }
 UsabilityTest >> testEngineBuilderMemoizationIsTransparent [
 	| engine builder1 builder2 |
-	engine := CoCompletionEnginePharoCopilot new.
+	engine := CoPharoCopilotCompletionEngine new.
 	
 	builder1 := engine completionBuilder.
 	builder2 := engine completionBuilder.

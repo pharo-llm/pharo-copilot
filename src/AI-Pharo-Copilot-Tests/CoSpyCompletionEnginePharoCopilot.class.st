@@ -1,6 +1,6 @@
 Class {
 	#name : 'CoSpyCompletionEnginePharoCopilot',
-	#superclass : 'CoCompletionEnginePharoCopilot',
+	#superclass : 'CoPharoCopilotCompletionEngine',
 	#instVars : [
 		'editorMock',
 		'basicCalledWith'

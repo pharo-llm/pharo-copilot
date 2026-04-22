@@ -4,7 +4,7 @@ It writes human-readable sections to `copilot.log` and also maintains a JSONL fi
 inside the `pharo-copilot` directory under the image directory, when logging is enabled in CopilotSettings.
 "
 Class {
-	#name : 'CoCopilotLogger',
+	#name : 'CoPharoCopilotLogger',
 	#superclass : 'Object',
 	#classInstVars : [
 		'logFileReference',
@@ -16,7 +16,7 @@ Class {
 }
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> appendDetailAssociation: anAssociation to: lines [
+CoPharoCopilotLogger class >> appendDetailAssociation: anAssociation to: lines [
 
 	| keyString valueString valueLines |
 	keyString := self formatValue: anAssociation key.
@@ -31,7 +31,7 @@ CoCopilotLogger class >> appendDetailAssociation: anAssociation to: lines [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> appendLines: lines [
+CoPharoCopilotLogger class >> appendLines: lines [
 
 	self loggingEnabled ifFalse: [ ^ self ].
 
@@ -53,7 +53,7 @@ CoCopilotLogger class >> appendLines: lines [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> ensureEvaluationLogFileInitialized [
+CoPharoCopilotLogger class >> ensureEvaluationLogFileInitialized [
 
 	self loggingEnabled ifFalse: [ ^ self ].
 
@@ -69,14 +69,14 @@ CoCopilotLogger class >> ensureEvaluationLogFileInitialized [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> ensureFileExists: aFileReference [
+CoPharoCopilotLogger class >> ensureFileExists: aFileReference [
 
 	aFileReference parent ifNotNil: [ :parent | parent ensureCreateDirectory ].
 	aFileReference ensureCreateFile
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> ensureLogFileInitialized [
+CoPharoCopilotLogger class >> ensureLogFileInitialized [
 
 	self loggingEnabled ifFalse: [ ^ self ].
 
@@ -92,7 +92,7 @@ CoCopilotLogger class >> ensureLogFileInitialized [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> ensureLogsDirectory [
+CoPharoCopilotLogger class >> ensureLogsDirectory [
 
 	| directory |
 	directory := self logsDirectoryReference.
@@ -109,26 +109,26 @@ CoCopilotLogger class >> ensureLogsDirectory [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> evaluationLogFileName [
+CoPharoCopilotLogger class >> evaluationLogFileName [
 
 	^ 'copilot-evaluation-log.jsonl'
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> evaluationLogFileReference [
+CoPharoCopilotLogger class >> evaluationLogFileReference [
 
 	^ evaluationLogFileReference ifNil: [
 		evaluationLogFileReference := (self ensureLogsDirectory) / self evaluationLogFileName ]
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> evaluationLogFileReference: aFileReference [
+CoPharoCopilotLogger class >> evaluationLogFileReference: aFileReference [
 
 	evaluationLogFileReference := aFileReference
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> formatValue: anObject [
+CoPharoCopilotLogger class >> formatValue: anObject [
 
 	anObject isNil ifTrue: [ ^ 'nil' ].
 
@@ -151,7 +151,7 @@ CoCopilotLogger class >> formatValue: anObject [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> initialize [
+CoPharoCopilotLogger class >> initialize [
 
 	logFileReference := nil.
 	logsDirectoryReference := nil.
@@ -163,7 +163,7 @@ CoCopilotLogger class >> initialize [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> instVarNamed: aStringOrSymbol [
+CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol [
 
 	| name |
 	name := aStringOrSymbol asSymbol.
@@ -176,7 +176,7 @@ CoCopilotLogger class >> instVarNamed: aStringOrSymbol [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
+CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
 
 	| name |
 	name := aStringOrSymbol asSymbol.
@@ -189,32 +189,32 @@ CoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> logBackEndEvent: eventName details: aDictionary [
+CoPharoCopilotLogger class >> logBackEndEvent: eventName details: aDictionary [
 
 	self logSection: 'BACKEND' event: eventName details: aDictionary
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> logFileName [
+CoPharoCopilotLogger class >> logFileName [
 
 	^ 'copilot.log'
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> logFileReference [
+CoPharoCopilotLogger class >> logFileReference [
 
 	^ logFileReference ifNil: [
 		logFileReference := (self ensureLogsDirectory) / self logFileName ]
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> logFrontEndEvent: eventName details: aDictionary [
+CoPharoCopilotLogger class >> logFrontEndEvent: eventName details: aDictionary [
 
 	self logSection: 'FRONTEND' event: eventName details: aDictionary
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> logSection: sectionName event: eventName details: aDictionary [
+CoPharoCopilotLogger class >> logSection: sectionName event: eventName details: aDictionary [
 
 	| timestamp lines |
 	self loggingEnabled ifFalse: [ ^ self ].
@@ -244,62 +244,62 @@ CoCopilotLogger class >> logSection: sectionName event: eventName details: aDict
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> loggingEnabled [
+CoPharoCopilotLogger class >> loggingEnabled [
 
 	^ CopilotSettings loggingEnabled
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> logsDirectoryName [
+CoPharoCopilotLogger class >> logsDirectoryName [
 
 	^ self pharoCopilotDirectoryName
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> logsDirectoryReference [
+CoPharoCopilotLogger class >> logsDirectoryReference [
 
 	^ logsDirectoryReference ifNil: [
 		logsDirectoryReference := FileLocator imageDirectory / self pharoCopilotDirectoryName ]
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> pharoCopilotDirectoryName [
+CoPharoCopilotLogger class >> pharoCopilotDirectoryName [
 
 	^ 'pharo-copilot'
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> rawEvaluationLogFileReference [
+CoPharoCopilotLogger class >> rawEvaluationLogFileReference [
 
 	^ evaluationLogFileReference
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> rawEvaluationLogFileReference: aFileReference [
+CoPharoCopilotLogger class >> rawEvaluationLogFileReference: aFileReference [
 
 	evaluationLogFileReference := aFileReference
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> rawLogFileReference [
+CoPharoCopilotLogger class >> rawLogFileReference [
 
 	^ logFileReference
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> rawLogFileReference: aFileReference [
+CoPharoCopilotLogger class >> rawLogFileReference: aFileReference [
 
 	logFileReference := aFileReference
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> rawLogsDirectoryReference [
+CoPharoCopilotLogger class >> rawLogsDirectoryReference [
 
 	^ logsDirectoryReference
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> rawLogsDirectoryReference: aDirectoryReference [
+CoPharoCopilotLogger class >> rawLogsDirectoryReference: aDirectoryReference [
 
 	logsDirectoryReference := aDirectoryReference
 ]

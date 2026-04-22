@@ -71,7 +71,7 @@ CoCopilotEntry >> activateOn: aCoCompletionContext [
 					recordSuggestionAccepted: self
 					context: aCoCompletionContext
 			] on: Error do: [ :ex |
-				CoCopilotLogger
+				CoPharoCopilotLogger
 					logError: 'Failed to record accepted suggestion'
 					origin: #CoCopilotEntry
 					exception: ex

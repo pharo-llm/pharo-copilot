@@ -147,21 +147,21 @@ CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
 	CopilotSettings withDefaultSettingsDo: [
 			| tempDir tempLogFile tempEvalFile originalLogRef originalDirRef originalEvalRef evaluator |
 			tempDir := FileLocator temp / ('copilot-logger-test-' , UUID new asString).
-			tempLogFile := tempDir / CoCopilotLogger logFileName.
-			tempEvalFile := tempDir / CoCopilotLogger evaluationLogFileName.
-			originalLogRef := CoCopilotLogger rawLogFileReference.
-			originalDirRef := CoCopilotLogger rawLogsDirectoryReference.
-			originalEvalRef := CoCopilotLogger rawEvaluationLogFileReference.
+			tempLogFile := tempDir / CoPharoCopilotLogger logFileName.
+			tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
+			originalLogRef := CoPharoCopilotLogger rawLogFileReference.
+			originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
+			originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
 			[
 				CopilotSettings loggingEnabled: false.
-				CoCopilotLogger rawLogsDirectoryReference: tempDir.
-				CoCopilotLogger rawLogFileReference: tempLogFile.
-				CoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
+				CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
+				CoPharoCopilotLogger rawLogFileReference: tempLogFile.
+				CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
 				tempLogFile exists ifTrue: [ tempLogFile ensureDelete ].
 				tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-				CoCopilotLogger ensureLogFileInitialized.
-				CoCopilotLogger ensureEvaluationLogFileInitialized.
-				CoCopilotLogger logFrontEndEvent: 'Logging disabled test' details: Dictionary new.
+				CoPharoCopilotLogger ensureLogFileInitialized.
+				CoPharoCopilotLogger ensureEvaluationLogFileInitialized.
+				CoPharoCopilotLogger logFrontEndEvent: 'Logging disabled test' details: Dictionary new.
 				evaluator := CoSuggestionEvaluator new.
 				evaluator savePersistentStats.
 				self deny: tempLogFile exists.
@@ -169,9 +169,9 @@ CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
 					tempLogFile exists ifTrue: [ tempLogFile ensureDelete ].
 					tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 					tempDir exists ifTrue: [ tempDir ensureDelete ].
-					CoCopilotLogger rawLogFileReference: originalLogRef.
-					CoCopilotLogger rawLogsDirectoryReference: originalDirRef.
-					CoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+					CoPharoCopilotLogger rawLogFileReference: originalLogRef.
+					CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+					CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
 ]
 
 { #category : 'tests' }
@@ -246,15 +246,15 @@ CopilotSettingsTest >> testMetadataStringForKeyDefaultWhenMissing [
 CopilotSettingsTest >> testMissingDefaultFimTemplateSignalsError [
 
     | originalLogsDir tempFs logsDir |
-    originalLogsDir := CoCopilotLogger rawLogsDirectoryReference.
+    originalLogsDir := CoPharoCopilotLogger rawLogsDirectoryReference.
     self withTemporaryTemplatesDirectoryDo: [ :ignoredDirectory |
         tempFs := FileSystem memory.
         logsDir := tempFs / 'pharo-copilot' / 'logs'.
         logsDir ensureCreateDirectory.
         [
-            CoCopilotLogger rawLogsDirectoryReference: logsDir.
+            CoPharoCopilotLogger rawLogsDirectoryReference: logsDir.
             self should: [ CopilotSettings defaultFimTemplate ] raise: Error
-        ] ensure: [ CoCopilotLogger rawLogsDirectoryReference: originalLogsDir ]
+        ] ensure: [ CoPharoCopilotLogger rawLogsDirectoryReference: originalLogsDir ]
     ]
 ]
 
@@ -445,11 +445,11 @@ CopilotSettingsTest >> testNullModelGeneratesMetadataFiles [
     CopilotSettings withDefaultSettingsDo: [
         | tempDir originalDirRef originalFactory metadata modelDir detailsFile systemFile templateFile modelfileFile modelFile parsedDetails |
         tempDir := FileLocator temp / ('copilot-null-metadata-' , UUID new asString).
-        originalDirRef := CoCopilotLogger rawLogsDirectoryReference.
+        originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
         originalFactory := CopilotSettings ollamaClientFactory.
         [
             tempDir exists ifTrue: [ tempDir ensureDelete ].
-            CoCopilotLogger rawLogsDirectoryReference: tempDir.
+            CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
             CopilotSettings loggingEnabled: true.
             CopilotSettings clearCachedModelMetadata.
             CopilotSettings modelName: CopilotSettings nullModelFullName.
@@ -472,7 +472,7 @@ CopilotSettingsTest >> testNullModelGeneratesMetadataFiles [
             self assert: modelFile contents equals: (metadata at: #model).
         ] ensure: [
             CopilotSettings ollamaClientFactory: originalFactory.
-            CoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+            CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
             CopilotSettings clearCachedModelMetadata.
             modelDir notNil ifTrue: [
                 [ modelDir children do: [ :child | child ensureDelete ] ] on: Error do: [ :ignored | ].
@@ -529,12 +529,12 @@ CopilotSettingsTest >> testRecordPrivacyPolicyConsentWritesEvaluationJsonEntr [
 	CopilotSettings withDefaultSettingsDo: [
 		| tempDir tempEvalFile originalDirRef originalEvalRef jsonLine parsed |
 		tempDir := FileLocator temp / ('copilot-privacy-consent-test-' , UUID new asString).
-		tempEvalFile := tempDir / CoCopilotLogger evaluationLogFileName.
-		originalDirRef := CoCopilotLogger rawLogsDirectoryReference.
-		originalEvalRef := CoCopilotLogger rawEvaluationLogFileReference.
+		tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
+		originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
+		originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
 		[
-			CoCopilotLogger rawLogsDirectoryReference: tempDir.
-			CoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
+			CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
+			CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
 			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 
 			CopilotSettings recordPrivacyPolicyUserConsentAccepted: true.
@@ -547,8 +547,8 @@ CopilotSettingsTest >> testRecordPrivacyPolicyConsentWritesEvaluationJsonEntr [
 		] ensure: [
 			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 			tempDir exists ifTrue: [ tempDir ensureDelete ].
-			CoCopilotLogger rawLogsDirectoryReference: originalDirRef.
-			CoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+			CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
 ]
 
 { #category : 'tests' }

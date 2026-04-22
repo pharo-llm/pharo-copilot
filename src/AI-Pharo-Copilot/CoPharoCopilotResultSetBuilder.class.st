@@ -830,7 +830,7 @@ CoPharoCopilotResultSetBuilder >> logAsynchronousCompletionError: ex contextInfo
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollection [
 
-	CoCopilotLogger logFrontEndEvent: 'Skipping completion menu: no entries after cleaning' details: (
+	CoPharoCopilotLogger logFrontEndEvent: 'Skipping completion menu: no entries after cleaning' details: (
 		Dictionary new
 			at: #rawSuggestionCount put: contentCollection size;
 			yourself
@@ -840,7 +840,7 @@ CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollectio
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logRejectedSuggestionFrom: rawResponse attempt: attempt prefix: prefixString [
 
-	CoCopilotLogger logBackEndEvent: 'Suggestion rejected after normalization' details: (
+	CoPharoCopilotLogger logBackEndEvent: 'Suggestion rejected after normalization' details: (
 		Dictionary new
 			at: #attempt put: attempt;
 			at: #rawResponse put: rawResponse asString;
@@ -894,7 +894,7 @@ CoPharoCopilotResultSetBuilder >> menuPositionForContextOrDefault: aContext [
 	position := self menuPositionFor: aContext.
 
 	position ifNil: [
-		CoCopilotLogger logFrontEndEvent: 'Completion menu position unavailable' details: (
+		CoPharoCopilotLogger logFrontEndEvent: 'Completion menu position unavailable' details: (
 			Dictionary new
 				at: #contextClass put: aContext class name;
 				at: #hasEditorAccessor put: (aContext respondsTo: #editor);
@@ -1050,7 +1050,7 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 		]
 			on: Error
 			do: [ :ex |
-				CoCopilotLogger
+				CoPharoCopilotLogger
 					logError: 'Failed to open completion menu'
 					origin: #CoPharoCopilotResultSetBuilder
 					exception: ex
