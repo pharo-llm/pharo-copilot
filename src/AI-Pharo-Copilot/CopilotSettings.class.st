@@ -318,6 +318,27 @@ CopilotSettings class >> ensureModelMetadataDirectoryFor: modelNameString [
 	^ modelDirectory
 ]
 
+{ #category : 'accessing' }
+CopilotSettings class >> ensureOllamaInstalledBeforeUse [
+
+	| response |
+	[
+		response := self newOllamaClient listModels
+	] on: Error do: [ :ex |
+		self logOllamaServiceUnavailable: ex.
+		self notifyUser: self missingOllamaSetupMessage.
+		^ false
+	].
+
+	response ifNil: [
+		self logOllamaMissingResponse.
+		self notifyUser: self missingOllamaSetupMessage.
+		^ false
+	].
+
+	^ true
+]
+
 { #category : 'settings' }
 CopilotSettings class >> ensureOllamaServiceAvailable [
 	"Verify the Ollama service responds; answer the listModels response or nil if unavailable."
@@ -488,12 +509,7 @@ CopilotSettings class >> getCustomParameter: aKey [
 { #category : 'settings' }
 CopilotSettings class >> handleMissingOllamaForModelNamed: selectedModelName [
 
-	"Handle cases where the Ollama service is missing; attempt install or fall back to the null model."
-
-	(self promptToInstallMissingModelNamed: selectedModelName availableModels: #())
-		ifTrue: [
-			(self installModelNamed: selectedModelName) ifTrue: [ ^ true ] ].
-
+	self notifyUser: self missingOllamaSetupMessage.
 	self switchToNullModelDueToMissingOllamaFor: selectedModelName.
 	^ self isNullModelName: self modelName
 ]
@@ -846,6 +862,18 @@ CopilotSettings class >> minimumPrefixLength: anObject [
 
 	minimumPrefixLength := self normalizedDuration: anObject default: 2 minimum: 1 maximum: 20.
 	self autoSaveSettings
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> missingOllamaSetupMessage [
+
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: 'Pharo-Copilot requires Ollama before you can use this plugin.';
+			nextPut: Character lf;
+			nextPutAll: 'Ollama does not seem to be installed or running.';
+			nextPut: Character lf;
+			nextPutAll: 'Please install Ollama, start it, then reopen the setup.' ]
 ]
 
 { #category : 'accessing' }

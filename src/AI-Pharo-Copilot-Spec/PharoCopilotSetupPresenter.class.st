@@ -61,12 +61,17 @@ PharoCopilotSetupPresenter >> descriptionLabel: anObject [
 
 { #category : 'accessing' }
 PharoCopilotSetupPresenter >> handleOk [
-	
-	CopilotSettings recordPrivacyPolicyUserConsentAccepted:
-		privacyConsentCheckbox state.
-	privacyConsentCheckbox state
-		ifTrue: [ self window close ]
-		ifFalse: [ self inform: 'You must accept the privacy policy before continuing.' ]
+
+	privacyConsentCheckbox state ifFalse: [
+		^ self inform: 'You must accept the privacy policy before continuing.' ].
+
+	(CopilotSettings ensureOllamaInstalledBeforeUse) ifFalse: [
+		statusLabel label: 'Ollama is required before Pharo-Copilot can be used.'.
+		^ self
+	].
+
+	CopilotSettings recordPrivacyPolicyUserConsentAccepted: true.
+	self window close
 ]
 
 { #category : 'initialization' }
