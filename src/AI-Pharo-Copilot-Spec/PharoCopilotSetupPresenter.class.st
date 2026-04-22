@@ -66,7 +66,7 @@ PharoCopilotSetupPresenter >> handleOk [
 		^ self inform: 'You must accept the privacy policy before continuing.' ].
 
 	(CopilotSettings ensureOllamaInstalledBeforeUse) ifFalse: [
-		statusLabel label: 'Ollama is required before Pharo-Copilot can be used.'.
+		statusLabel label: CopilotSettings missingOllamaSetupMessage.
 		^ self
 	].
 
@@ -111,53 +111,65 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showWelcomeStep [
 
-	| welcomeContainer privacyLabel privacyDetailLabel termsButton okButton buttonRow |
+		| welcomeContainer privacyLabel privacyDetailLabel ollamaLabel termsButton installOllamaButton okButton buttonRow |
 	titleLabel label: 'Welcome to Pharo-Copilot'.
-	descriptionLabel label: 'Your AI code Completion'.
+	descriptionLabel label: 'Your AI code completion'.
 	statusLabel label: ''.
 
 	privacyLabel := self newLabel
-		                label: 'Pharo-Copilot is fully private.';
-		                yourself.
+		label: 'Pharo-Copilot is fully private.';
+		yourself.
 
 	privacyDetailLabel := self newLabel
-		                      label: 'Your code and interactions stay private.';
-		                      yourself.
+		label: 'Your code and interactions stay private.';
+		yourself.
+
+	ollamaLabel := self newLabel
+		label: CopilotSettings missingOllamaSetupMessage;
+		yourself.
 
 	privacyConsentCheckbox := self newCheckBox
-		                          label: 'I agree with the privacy policy';
-		                          state: false;
-		                          yourself.
+		label: 'I agree with the privacy policy';
+		state: false;
+		yourself.
 
 	termsButton := self newButton
-		               label: 'Privacy Policy & Terms';
-		               icon: (self iconNamed: #glamorousBrowse);
-		               action: [ WebBrowser openOn: 'https://pharo-llm.github.io/privacy.html' ];
-		               yourself.
+		label: 'Privacy Policy & Terms';
+		icon: (self iconNamed: #glamorousBrowse);
+		action: [ WebBrowser openOn: 'https://pharo-llm.github.io/privacy.html' ];
+		yourself.
+
+	installOllamaButton := self newButton
+		label: 'Install Ollama';
+		icon: (self iconNamed: #glamorousBrowse);
+		action: [ WebBrowser openOn: 'https://ollama.com/download/windows' ];
+		yourself.
 
 	welcomeContainer := SpBoxLayout newTopToBottom
-		                    spacing: 16;
-		                    add: privacyLabel expand: false;
-		                    add: privacyDetailLabel expand: false;
-		                    add: termsButton expand: false;
-		                    yourself.
+		spacing: 16;
+		add: privacyLabel expand: false;
+		add: privacyDetailLabel expand: false;
+		add: ollamaLabel expand: false;
+		add: installOllamaButton expand: false;
+		add: termsButton expand: false;
+		yourself.
 
 	okButton := self newButton
-		            label: 'OK';
-		            action: [ self handleOk ];
-		            yourself.
+		label: 'OK';
+		action: [ self handleOk ];
+		yourself.
 
 	buttonRow := SpBoxLayout newHorizontal
-		             spacing: 8;
-		             add: okButton expand: false;
-		             yourself.
+		spacing: 8;
+		add: okButton expand: false;
+		yourself.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
-			 spacing: 12;
-			 add: welcomeContainer expand: true;
-			 add: privacyConsentCheckbox expand: false;
-			 add: buttonRow expand: false;
-			 yourself).
+		spacing: 12;
+		add: welcomeContainer expand: true;
+		add: privacyConsentCheckbox expand: false;
+		add: buttonRow expand: false;
+		yourself).
 
 	self layout: self defaultLayout
 ]
