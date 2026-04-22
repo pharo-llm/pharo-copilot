@@ -65,13 +65,12 @@ PharoCopilotSetupPresenter >> handleOk [
 	privacyConsentCheckbox state ifFalse: [
 		^ self inform: 'You must accept the privacy policy before continuing.' ].
 
-	(CopilotSettings ensureOllamaInstalledBeforeUse) ifFalse: [
-		statusLabel label: CopilotSettings missingOllamaSetupMessage.
-		^ self
-	].
-
 	CopilotSettings recordPrivacyPolicyUserConsentAccepted: true.
-	self window close
+
+	(CopilotSettings ensureOllamaInstalledBeforeUse)
+		ifTrue: [ ^ self window close ].
+
+	self showMissingOllamaStep
 ]
 
 { #category : 'initialization' }
@@ -109,11 +108,49 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 ]
 
 { #category : 'initialization' }
+PharoCopilotSetupPresenter >> showMissingOllamaStep [
+
+	| messageLabel installButton closeButton buttonRow |
+	titleLabel label: 'Ollama Required'.
+	descriptionLabel label: 'Pharo-Copilot needs Ollama to continue.'.
+	statusLabel label: ''.
+
+	messageLabel := self newLabel
+		label: CopilotSettings missingOllamaSetupMessage;
+		yourself.
+
+	installButton := self newButton
+		label: 'Install Ollama';
+		icon: (self iconNamed: #glamorousBrowse);
+		action: [ WebBrowser openOn: 'https://ollama.com/download/windows' ];
+		yourself.
+
+	closeButton := self newButton
+		label: 'Close';
+		action: [ self window close ];
+		yourself.
+
+	buttonRow := SpBoxLayout newHorizontal
+		spacing: 8;
+		add: installButton expand: false;
+		add: closeButton expand: false;
+		yourself.
+
+	contentContainer layout: (SpBoxLayout newTopToBottom
+		spacing: 12;
+		add: messageLabel expand: false;
+		add: buttonRow expand: false;
+		yourself).
+
+	self layout: self defaultLayout
+]
+
+{ #category : 'initialization' }
 PharoCopilotSetupPresenter >> showWelcomeStep [
 
-		| welcomeContainer privacyLabel privacyDetailLabel ollamaLabel termsButton installOllamaButton okButton buttonRow |
+	| welcomeContainer privacyLabel privacyDetailLabel termsButton okButton buttonRow |
 	titleLabel label: 'Welcome to Pharo-Copilot'.
-	descriptionLabel label: 'Your AI code completion'.
+	descriptionLabel label: 'Your AI code Completion'.
 	statusLabel label: ''.
 
 	privacyLabel := self newLabel
@@ -122,10 +159,6 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 
 	privacyDetailLabel := self newLabel
 		label: 'Your code and interactions stay private.';
-		yourself.
-
-	ollamaLabel := self newLabel
-		label: CopilotSettings missingOllamaSetupMessage;
 		yourself.
 
 	privacyConsentCheckbox := self newCheckBox
@@ -139,18 +172,10 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 		action: [ WebBrowser openOn: 'https://pharo-llm.github.io/privacy.html' ];
 		yourself.
 
-	installOllamaButton := self newButton
-		label: 'Install Ollama';
-		icon: (self iconNamed: #glamorousBrowse);
-		action: [ WebBrowser openOn: 'https://ollama.com/download/windows' ];
-		yourself.
-
 	welcomeContainer := SpBoxLayout newTopToBottom
 		spacing: 16;
 		add: privacyLabel expand: false;
 		add: privacyDetailLabel expand: false;
-		add: ollamaLabel expand: false;
-		add: installOllamaButton expand: false;
 		add: termsButton expand: false;
 		yourself.
 
