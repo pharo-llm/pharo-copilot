@@ -358,7 +358,7 @@ CoPCBenchmarkSuite >> run [
 
 	| scenarios |
 	results := OrderedCollection new.
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	scenarios := self collectScenarios.
 
 	Transcript show: '=== Pharo Copilot Benchmark Suite ==='; cr.

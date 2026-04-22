@@ -1,36 +1,36 @@
 Class {
-	#name : 'CopilotContextFactory',
+	#name : 'CoPCContextFactory',
 	#superclass : 'Object',
 	#category : 'AI-Pharo-Copilot-Context',
 	#package : 'AI-Pharo-Copilot-Context'
 }
 
 { #category : 'factory' }
-CopilotContextFactory class >> classFromSelector: aSelector [
+CoPCContextFactory class >> classFromSelector: aSelector [
 
 	^ SystemNavigation default allClasses detect: [ :each | each includesSelector: aSelector ] ifNone: [ nil ]
 ]
 
 { #category : 'factory' }
-CopilotContextFactory class >> forSelector: aSelector [
+CoPCContextFactory class >> forSelector: aSelector [
 
 	| contextClass strategy |
 	contextClass := self classFromSelector: aSelector.
 	contextClass ifNil: [ ^ nil ].
 
 	strategy := self strategyFromSettings.
-	^ CopilotContextBuilder
+	^ CoPCContextBuilder
 		forClass: contextClass
 		strategy: strategy
 ]
 
 { #category : 'factory' }
-CopilotContextFactory class >> strategyFromSettings [
+CoPCContextFactory class >> strategyFromSettings [
 
-	^ CopilotContextSettings mode
+	^ CoPCContextSettings mode
 		caseOf: {
-			[ #fullSource ] -> [ CopilotContextFullSource new ].
-			[ #selectors ] -> [ CopilotContextSelectorsOnly new ].
+			[ #fullSource ] -> [ CoPCContextFullSource new ].
+			[ #selectors ] -> [ CoPCContextSelectorsOnly new ].
 		}
-		otherwise: [ CopilotContextFullSource new ]
+		otherwise: [ CoPCContextFullSource new ]
 ]

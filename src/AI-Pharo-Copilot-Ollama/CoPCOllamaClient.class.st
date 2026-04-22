@@ -2,7 +2,7 @@
 Simple client for invoking the Ollama REST API.
 "
 Class {
-	#name : 'OllamaClient',
+	#name : 'CoPCOllamaClient',
 	#superclass : 'Object',
 	#instVars : [
 		'transport',
@@ -19,25 +19,25 @@ Class {
 }
 
 { #category : 'accessing' }
-OllamaClient class >> defaultModelFullName [
+CoPCOllamaClient class >> defaultModelFullName [
 
 	^ defaultModelFullName ifNil: [ defaultModelFullName := self nullModelFullName  ]
 ]
 
 { #category : 'accessing' }
-OllamaClient class >> nullModelFullName [
+CoPCOllamaClient class >> nullModelFullName [
 
   ^ 'pharo-copilot-null'
 ]
 
 { #category : 'accessing' }
-OllamaClient class >> nullModelResponseString [
+CoPCOllamaClient class >> nullModelResponseString [
 
 	^ 'nothing'
 ]
 
 { #category : 'response-normalization' }
-OllamaClient >> coerceResponseValueToString: value default: fallbackString [
+CoPCOllamaClient >> coerceResponseValueToString: value default: fallbackString [
 
 	value isNil ifTrue: [ ^ fallbackString ].
 	value isString ifTrue: [ ^ value ].
@@ -51,7 +51,7 @@ OllamaClient >> coerceResponseValueToString: value default: fallbackString [
 ]
 
 { #category : 'response-normalization' }
-OllamaClient >> ensureStringFromResponse: container fallback: fallbackString [
+CoPCOllamaClient >> ensureStringFromResponse: container fallback: fallbackString [
 
 	| value |
 	container ifNil: [ ^ fallbackString ].
@@ -70,7 +70,7 @@ OllamaClient >> ensureStringFromResponse: container fallback: fallbackString [
 ]
 
 { #category : 'generation-operations' }
-OllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: suffixString context: contextString [
+CoPCOllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: suffixString context: contextString [
 
 	| prompt safePrefix safeSuffix safeContext includesContext |
 	safePrefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
@@ -103,7 +103,7 @@ OllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: s
 ]
 
 { #category : 'generation-operations' }
-OllamaClient >> generate: aPromptString [
+CoPCOllamaClient >> generate: aPromptString [
 	| payload response normalized |
 	self isNullModel ifTrue: [ ^ self class nullModelResponseString ].
 
@@ -121,7 +121,7 @@ OllamaClient >> generate: aPromptString [
 ]
 
 { #category : 'generation-operations' }
-OllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
+CoPCOllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
 	"Generate a fill-in-the-middle completion using Ollama's native prompt/suffix API."
 
 	| safePrefix safeSuffix safeSystem payload response normalized |
@@ -154,10 +154,10 @@ OllamaClient >> generateForPrefix: prefixString suffix: suffixString context: co
 ]
 
 { #category : 'initialization' }
-OllamaClient >> initialize [
+CoPCOllamaClient >> initialize [
 
 	super initialize.
-	transport := OAHttpTransport new.
+	transport := CoPCOAHttpTransport new.
 	stream := false.
 	options := Dictionary new.
 	self loadOptionsFromSettings.
@@ -165,14 +165,14 @@ OllamaClient >> initialize [
 ]
 
 { #category : 'model-operations' }
-OllamaClient >> isNullModel [
+CoPCOllamaClient >> isNullModel [
 
 	modelSpec ifNil: [ ^ false ].
 	^ modelSpec fullName = self class nullModelFullName
 ]
 
 { #category : 'ollama' }
-OllamaClient >> listModels [
+CoPCOllamaClient >> listModels [
 
 	| response |
 	response := transport getJsonAt: 'api/tags'.
@@ -180,7 +180,7 @@ OllamaClient >> listModels [
 ]
 
 { #category : 'initialization' }
-OllamaClient >> loadOptionsFromSettings [
+CoPCOllamaClient >> loadOptionsFromSettings [
 
 	| settingsOptions |
 	settingsOptions := CopilotSettings allOllamaOptions.
@@ -188,7 +188,7 @@ OllamaClient >> loadOptionsFromSettings [
 ]
 
 { #category : 'response-normalization' }
-OllamaClient >> normalizeResponse: response [
+CoPCOllamaClient >> normalizeResponse: response [
 
 	| parsed |
 	response isNil ifTrue: [ ^ '' ].
@@ -204,31 +204,31 @@ OllamaClient >> normalizeResponse: response [
 ]
 
 { #category : 'api' }
-OllamaClient >> optionAt: aKey [
+CoPCOllamaClient >> optionAt: aKey [
 ^ options ifNil: [ nil ] ifNotNil: [ options at: aKey ifAbsent: [ nil ] ]
 ]
 
 { #category : 'api' }
-OllamaClient >> optionAt: aKey put: aValue [
+CoPCOllamaClient >> optionAt: aKey put: aValue [
 
 	options ifNil: [ options := Dictionary new ].
 	^ options at: aKey put: aValue
 ]
 
 { #category : 'api' }
-OllamaClient >> options [
+CoPCOllamaClient >> options [
 
 	^ options
 ]
 
 { #category : 'api' }
-OllamaClient >> options: aDictionary [
+CoPCOllamaClient >> options: aDictionary [
 
 	options := aDictionary ifNil: [ Dictionary new ]
 ]
 
 { #category : 'response-normalization' }
-OllamaClient >> parseJsonSafely: aString [
+CoPCOllamaClient >> parseJsonSafely: aString [
 
 	^ [ STONJSON fromString: aString ]
 		  on: Error
@@ -236,7 +236,7 @@ OllamaClient >> parseJsonSafely: aString [
 ]
 
 { #category : 'generation-operations' }
-OllamaClient >> prependContext: contextString toPrompt: promptString [
+CoPCOllamaClient >> prependContext: contextString toPrompt: promptString [
 
 	| delimiter |
 	delimiter := String lf , String lf.
@@ -250,13 +250,13 @@ OllamaClient >> prependContext: contextString toPrompt: promptString [
 ]
 
 { #category : 'ollama' }
-OllamaClient >> pullModelNamed: aString [
+CoPCOllamaClient >> pullModelNamed: aString [
 
 	^ self pullModelNamed: aString timeoutSeconds: CopilotSettings modelInstallTimeoutSeconds
 ]
 
 { #category : 'ollama' }
-OllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds [
+CoPCOllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds [
 
 	| payload response |
 	payload := Dictionary new
@@ -270,7 +270,7 @@ OllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds [
 ]
 
 { #category : 'ollama' }
-OllamaClient >> showModelNamed: aModelFullName [
+CoPCOllamaClient >> showModelNamed: aModelFullName [
 
 	| payload response |
 	payload := Dictionary new
@@ -284,7 +284,7 @@ OllamaClient >> showModelNamed: aModelFullName [
 ]
 
 { #category : 'generation-operations' }
-OllamaClient >> systemPromptPrefixedContextFor: contextString [
+CoPCOllamaClient >> systemPromptPrefixedContextFor: contextString [
 
 	| systemPrompt safeContext |
 	systemPrompt := CopilotSettings modelSystemPromptIfAvailable.
@@ -304,24 +304,24 @@ OllamaClient >> systemPromptPrefixedContextFor: contextString [
 ]
 
 { #category : 'accessing' }
-OllamaClient >> transport [
+CoPCOllamaClient >> transport [
 
 	^ transport
 ]
 
 { #category : 'model-operations' }
-OllamaClient >> useDefaultModel [
+CoPCOllamaClient >> useDefaultModel [
 
 	self useModelNamed: self class defaultModelFullName
 ]
 
 { #category : 'model-operations' }
-OllamaClient >> useModelNamed: aString [
+CoPCOllamaClient >> useModelNamed: aString [
 	"Resolve and set the model spec for the given full name (family[:tag])."
 
 	| tokens family tag |
 
-	modelSpec := OModelRegistry current specByFullName: aString.
+	modelSpec := CoPCModelRegistry current specByFullName: aString.
 	modelSpec ifNil: [
 			tokens := aString findTokens: ':'.
 			family := tokens isEmpty
@@ -332,5 +332,5 @@ OllamaClient >> useModelNamed: aString [
 						       String streamContents: [ :s |
 							       (tokens copyFrom: 2 to: tokens size) do: [ :each | s nextPutAll: each ] separatedBy: [ s nextPut: $: ] ] ]
 				       ifFalse: [ nil ].
-			modelSpec := OModelSpec family: family tag: tag label: aString ].
+			modelSpec := CoPCModelSpec family: family tag: tag label: aString ].
 ]

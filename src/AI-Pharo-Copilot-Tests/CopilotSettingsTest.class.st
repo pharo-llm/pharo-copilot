@@ -162,7 +162,7 @@ CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
 				CoPharoCopilotLogger ensureLogFileInitialized.
 				CoPharoCopilotLogger ensureEvaluationLogFileInitialized.
 				CoPharoCopilotLogger logFrontEndEvent: 'Logging disabled test' details: Dictionary new.
-				evaluator := CoSuggestionEvaluator new.
+				evaluator := CoPCSuggestionEvaluator new.
 				evaluator savePersistentStats.
 				self deny: tempLogFile exists.
 				self deny: tempEvalFile exists ] ensure: [
@@ -263,7 +263,7 @@ CopilotSettingsTest >> testModelNameAccessor [
     CopilotSettings withDefaultSettingsDo: [
         | old |
         old := CopilotSettings modelName.
-        self assert: old equals: OllamaClient defaultModelFullName.
+        self assert: old equals: CoPCOllamaClient defaultModelFullName.
         CopilotSettings modelName: 'foo'.
         self assert: CopilotSettings modelName equals: 'foo'.
         CopilotSettings modelName: old

@@ -105,7 +105,7 @@ CopilotSettings class >> autoSaveSettings [
 CopilotSettings class >> availableModelNames [
 	"Answer the list of available model names for the settings UI."
 
-	^ OModelRegistry refresh domainValuesForSettings
+	^ CoPCModelRegistry refresh domainValuesForSettings
 ]
 
 { #category : 'settings' }
@@ -879,7 +879,7 @@ CopilotSettings class >> modelMetadata [
 CopilotSettings class >> modelName [
 	"Answer the configured model name; default to Ollama's default model."
 
-	^ modelName ifNil: [ modelName := OllamaClient defaultModelFullName ]
+	^ modelName ifNil: [ modelName := CoPCOllamaClient defaultModelFullName ]
 ]
 
 { #category : 'accessing' }
@@ -1052,7 +1052,7 @@ CopilotSettings class >> notifyViaUIManager: aString [
 CopilotSettings class >> nullModelFullName [
 	"Answer the full name of the placeholder/null model."
 
-	^ OllamaClient nullModelFullName
+	^ CoPCOllamaClient nullModelFullName
 ]
 
 { #category : 'accessing' }
@@ -1116,7 +1116,7 @@ CopilotSettings class >> numPredict: anInteger [
 CopilotSettings class >> ollamaClientFactory [
 	"Answer the factory closure used to create Ollama clients; default constructs a new client."
 
-	ollamaClientFactory ifNil: [ ollamaClientFactory := [ OllamaClient new ] ].
+	ollamaClientFactory ifNil: [ ollamaClientFactory := [ CoPCOllamaClient new ] ].
 	^ ollamaClientFactory
 ]
 
@@ -1273,7 +1273,7 @@ CopilotSettings class >> refreshModelsAfterInstallOf: aModelName usingInitialRes
 		(refreshedModels includes: aModelName)
 			ifTrue: [
 				self logDetectedInstalledModel: aModelName before: initialResponse after: refreshedModels.
-				[ OModelRegistry refresh ] on: Error do: [ :ignored | ].
+				[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
 				^ true
 			].
 
@@ -1400,7 +1400,7 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 		completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ nil ].
 		backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ nil ].
 		installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ nil ].
-	(aDictionary at: #contextMode ifAbsent: [ nil ]) ifNotNil: [ :savedMode | CopilotContextSettings mode: savedMode ]. "Convert templatesDirectory path string back to FileReference"
+	(aDictionary at: #contextMode ifAbsent: [ nil ]) ifNotNil: [ :savedMode | CoPCContextSettings mode: savedMode ]. "Convert templatesDirectory path string back to FileReference"
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
 	templatesPath ifNotNil: [
 			templatesDirectory := [ templatesPath asFileReference ]
@@ -1544,7 +1544,7 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #maxInstanceMethods put: maxInstanceMethods;
 		            at: #maxClassMethods put: maxClassMethods;
 		            at: #minimumPrefixLength put: minimumPrefixLength;
-		            at: #contextMode put: CopilotContextSettings mode;
+		            at: #contextMode put: CoPCContextSettings mode;
 		            at: #completionSuggestionsCount put: completionSuggestionsCount;
 		            at: #backgroundColor put: backgroundColor;
 		at: #installModelUserConsent put: installModelUserConsent;
@@ -1654,11 +1654,11 @@ CopilotSettings class >> settingsOn: aBuilder [
 				(aBuilder pickOne: #contextMode)
 					order: 0.65;
 					label: 'Context mode';
-					target: CopilotContextSettings;
+					target: CoPCContextSettings;
 					getSelector: #mode;
 					setSelector: #mode:;
-					default: CopilotContextSettings mode;
-					domainValues: CopilotContextSettings availableModes;
+					default: CoPCContextSettings mode;
+					domainValues: CoPCContextSettings availableModes;
 					description: 'Controls whether completions use full source or selectors-only class context.'.
 
 

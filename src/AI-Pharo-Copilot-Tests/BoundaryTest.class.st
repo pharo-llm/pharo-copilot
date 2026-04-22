@@ -9,8 +9,8 @@ Class {
 { #category : 'tests' }
 BoundaryTest >> testLengthStatsBoundaryValues [
 	| evaluator context testCases lengthStats bucket |
-	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new.
+	evaluator := CoPCSuggestionEvaluator new.
+	context := CoPCContext new.
 	
 	"Test exactly at boundaries: 10, 50"
 	testCases := {
@@ -32,7 +32,7 @@ BoundaryTest >> testLengthStatsBoundaryValues [
 { #category : 'tests' }
 BoundaryTest >> testNormalizeResponseBoundaryInputs [
 	| client |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	
 	"Test empty responses"
 	self assert: (client normalizeResponse: '') equals: ''.
@@ -46,7 +46,7 @@ BoundaryTest >> testNormalizeResponseBoundaryInputs [
 { #category : 'tests' }
 BoundaryTest >> testPositionBoundaryInContext [
 	| context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	
 	"Test position at boundaries"
 	context source: 'hello world'.

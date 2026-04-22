@@ -9,7 +9,7 @@ Class {
 { #category : 'tests' }
 OllamaClientTest >> testGenerateBuildsCorrectPayload [
     | client mock payload |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     mock := OAHttpTransportMockExtended new.
     client instVarNamed: 'transport' put: mock.
 
@@ -34,7 +34,7 @@ OllamaClientTest >> testGenerateBuildsCorrectPayload [
 { #category : 'tests' }
 OllamaClientTest >> testGenerateIncludesFormatWhenSet [
 	| client mock payload |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	client instVarNamed: 'format' put: 'json'.
 	mock := OAHttpTransportMockExtended new.
 	client instVarNamed: 'transport' put: mock.
@@ -48,7 +48,7 @@ OllamaClientTest >> testGenerateIncludesFormatWhenSet [
 { #category : 'tests' }
 OllamaClientTest >> testGenerateIncludesOptionsWhenNotEmpty [
         | client mock payload |
-        client := OllamaClient new.
+        client := CoPCOllamaClient new.
         client optionAt: #temperature put: 0.7.
         mock := OAHttpTransportMockExtended new.
         client instVarNamed: 'transport' put: mock.
@@ -66,11 +66,11 @@ OllamaClientTest >> testGenerateReturnsNullModelMessageWhenNullSelected [
         oldModel := CopilotSettings modelName.
         [
                 CopilotSettings modelName: CopilotSettings nullModelFullName.
-                client := OllamaClient new.
+                client := CoPCOllamaClient new.
                 mock := OAHttpTransportMockExtended new.
                 client instVarNamed: 'transport' put: mock.
                 response := client generate: 'anything'.
-                self assert: response equals: OllamaClient nullModelResponseString.
+                self assert: response equals: CoPCOllamaClient nullModelResponseString.
                 self assert: mock callCount equals: 0
         ] ensure: [ CopilotSettings modelName: oldModel ]
 ]
@@ -78,7 +78,7 @@ OllamaClientTest >> testGenerateReturnsNullModelMessageWhenNullSelected [
 { #category : 'tests' }
 OllamaClientTest >> testGenerateUsesCorrectEndpoint [
 	| client mock |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	mock := OAHttpTransportMockExtended new.
 	client instVarNamed: 'transport' put: mock.
 	
@@ -94,7 +94,7 @@ OllamaClientTest >> testInitializeUsesCopilotSettingsModel [
 	old := CopilotSettings modelName.
 	[
 		CopilotSettings modelName: OTestModelSupport mockModelName.
-		client := OllamaClient new.
+		client := CoPCOllamaClient new.
 		self assert: (client instVarNamed: 'modelSpec') fullName equals: OTestModelSupport mockModelName ] ensure: [ CopilotSettings modelName: old ]
 ]
 
@@ -102,7 +102,7 @@ OllamaClientTest >> testInitializeUsesCopilotSettingsModel [
 OllamaClientTest >> testListModelsUsesApiTags [
 
     | client mock |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     mock := OAHttpTransportMock new.
     client instVarNamed: 'transport' put: mock.
     client listModels.
@@ -113,7 +113,7 @@ OllamaClientTest >> testListModelsUsesApiTags [
 OllamaClientTest >> testNormalizeResponseHandlesComplexDictionary [
 
 	| client response result |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	response := Dictionary new
 		            at: #model put:  OTestModelSupport mockModelName;
 		            at: #response put: 'actual content';
@@ -127,7 +127,7 @@ OllamaClientTest >> testNormalizeResponseHandlesComplexDictionary [
 { #category : 'tests' }
 OllamaClientTest >> testNormalizeResponseHandlesJsonString [
 	| client jsonString result |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	jsonString := '{"response": "parsed content", "done": true}'.
 	
 	result := client normalizeResponse: jsonString.
@@ -137,7 +137,7 @@ OllamaClientTest >> testNormalizeResponseHandlesJsonString [
 { #category : 'tests' }
 OllamaClientTest >> testNormalizeResponseHandlesMalformedJson [
 	| client malformedJson result |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	malformedJson := '{"response": unclosed'.
 	
 	result := client normalizeResponse: malformedJson.
@@ -147,7 +147,7 @@ OllamaClientTest >> testNormalizeResponseHandlesMalformedJson [
 { #category : 'tests' }
 OllamaClientTest >> testNormalizeResponseHandlesNonDictionary [
 	| client result |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	
 	result := client normalizeResponse: 123.
 	self assert: result equals: '123'
@@ -157,7 +157,7 @@ OllamaClientTest >> testNormalizeResponseHandlesNonDictionary [
 OllamaClientTest >> testNormalizeResponseHandlesStringContentKey [
 
     | client dict result |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     dict := Dictionary new
         at: 'content' put: 'bar';
         yourself.
@@ -169,7 +169,7 @@ OllamaClientTest >> testNormalizeResponseHandlesStringContentKey [
 OllamaClientTest >> testNormalizeResponseHandlesStringResponseKey [
 
     | client dict result |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     dict := Dictionary new
         at: 'response' put: 'foo';
         yourself.
@@ -181,7 +181,7 @@ OllamaClientTest >> testNormalizeResponseHandlesStringResponseKey [
 OllamaClientTest >> testNormalizeResponsePrefersResponse [
 
     | client dict result |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     dict := Dictionary new
         at: #response put: 'foo';
         at: #content put: 'bar';
@@ -194,7 +194,7 @@ OllamaClientTest >> testNormalizeResponsePrefersResponse [
 OllamaClientTest >> testNormalizeResponseUsesContent [
 
     | client dict result |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     dict := Dictionary new
         at: #content put: 'bar';
         yourself.
@@ -206,7 +206,7 @@ OllamaClientTest >> testNormalizeResponseUsesContent [
 OllamaClientTest >> testNormalizeResponseUsesString [
 
     | client result |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     result := client normalizeResponse: 'baz'.
     self assert: result equals: 'baz'.
 ]
@@ -215,7 +215,7 @@ OllamaClientTest >> testNormalizeResponseUsesString [
 OllamaClientTest >> testOptionAtPutAndGet [
 
     | client |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     client optionAt: #temperature put: 0.5.
     self assert: (client optionAt: #temperature) equals: 0.5.
 ]
@@ -224,7 +224,7 @@ OllamaClientTest >> testOptionAtPutAndGet [
 OllamaClientTest >> testOptionAtReturnsNil [
 
     | client |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     self assert: (client optionAt: #missing) isNil.
 ]
 
@@ -233,7 +233,7 @@ OllamaClientTest >> testOptionsDefaultEmpty [
 
     | client |
     CopilotSettings withDefaultSettingsDo: [
-        client := OllamaClient new.
+        client := CoPCOllamaClient new.
         self assert: client options isEmpty
     ].
 ]
@@ -242,7 +242,7 @@ OllamaClientTest >> testOptionsDefaultEmpty [
 OllamaClientTest >> testOptionsSetterNilCreatesEmptyDictionary [
 
     | client |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     client options: nil.
     self assert: client options isEmpty.
 ]
@@ -251,7 +251,7 @@ OllamaClientTest >> testOptionsSetterNilCreatesEmptyDictionary [
 OllamaClientTest >> testOptionsSetterStoresDictionary [
 
     | client dict |
-    client := OllamaClient new.
+    client := CoPCOllamaClient new.
     dict := Dictionary new
         at: #temperature put: 0.8;
         yourself.
@@ -263,7 +263,7 @@ OllamaClientTest >> testOptionsSetterStoresDictionary [
 OllamaClientTest >> testShowModelUsesApiShow [
 
 	| client mock response |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	mock := OAHttpTransportMockExtended new.
 	response := Dictionary new
 		            at: #template put: 'value';
@@ -279,7 +279,7 @@ OllamaClientTest >> testShowModelUsesApiShow [
 { #category : 'tests' }
 OllamaClientTest >> testUseModelNamedWithComplexName [
 	| client spec |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	client useModelNamed: 'llama2:13b-chat'.
 	
 	spec := client instVarNamed: 'modelSpec'.
@@ -291,7 +291,7 @@ OllamaClientTest >> testUseModelNamedWithComplexName [
 { #category : 'tests' }
 OllamaClientTest >> testUseModelNamedWithSimpleName [
 	| client spec |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	client useModelNamed: 'llama2'.
 	
 	spec := client instVarNamed: 'modelSpec'.

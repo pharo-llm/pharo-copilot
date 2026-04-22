@@ -166,7 +166,7 @@ CoPCBenchmarkRunner >> generateCompletionFor: aScenario model: modelNameString [
 CoPCBenchmarkRunner >> initialize [
 
 	super initialize.
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	options := Dictionary new.
 	scenarios :=CoPCBenchmarkScenarioCatalog defaultScenarios.
 	results := OrderedCollection new

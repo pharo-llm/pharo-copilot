@@ -35,7 +35,7 @@ ErrorHandlingTest >> testEntryActivationWithNilContext [
 { #category : 'tests' }
 ErrorHandlingTest >> testEvaluatorWithCorruptedStats [
 	| evaluator |
-	evaluator := CoSuggestionEvaluator new.
+	evaluator := CoPCSuggestionEvaluator new.
 	
 	"Corrupt the stats dictionary"
 	evaluator sessionStats removeKey: #totalSuggestions ifAbsent: [].
@@ -47,7 +47,7 @@ ErrorHandlingTest >> testEvaluatorWithCorruptedStats [
 { #category : 'tests' }
 ErrorHandlingTest >> testHttpTransportWithInvalidData [
 	| transport |
-	transport := OAHttpTransport new.
+	transport := CoPCOAHttpTransport new.
 	
 	"Test with invalid host/port"
 	transport host: nil.
@@ -63,7 +63,7 @@ ErrorHandlingTest >> testModelSpecWithNilValues [
 	| spec |
 	
 	"Should handle nil values gracefully"
-	self shouldnt: [ spec := OModelSpec family: nil tag: nil label: nil ] raise: Error.
+	self shouldnt: [ spec := CoPCModelSpec family: nil tag: nil label: nil ] raise: Error.
 	
 	spec ifNotNil: [
 		self shouldnt: [ spec fullName ] raise: Error.
@@ -73,7 +73,7 @@ ErrorHandlingTest >> testModelSpecWithNilValues [
 { #category : 'tests' }
 ErrorHandlingTest >> testOllamaClientWithBrokenTransport [
 	| client brokenTransport |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	brokenTransport := OAHttpTransportMockExtended new.
 	brokenTransport configureToThrowError.
 	client instVarNamed: 'transport' put: brokenTransport.
@@ -86,7 +86,7 @@ ErrorHandlingTest >> testOllamaClientWithBrokenTransport [
 { #category : 'tests' }
 ErrorHandlingTest >> testRegistryRebuildWithMissingClasses [
 	| registry |
-	registry := OModelRegistry new.
+	registry := CoPCModelRegistry new.
 	
 	"Should handle rebuild even if some classes are missing"
 	self shouldnt: [ registry rebuild ] raise: Error.

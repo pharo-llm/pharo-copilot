@@ -1,5 +1,5 @@
 Class {
-	#name : 'CoEvaluationReport',
+	#name : 'CoPCEvaluationReport',
 	#superclass : 'Object',
 	#instVars : [
 		'evaluator'
@@ -9,7 +9,7 @@ Class {
 }
 
 { #category : 'accessing' }
-CoEvaluationReport >> addContextStatsTo: stream [
+CoPCEvaluationReport >> addContextStatsTo: stream [
 	stream nextPutAll: 'CONTEXT ANALYSIS'; lf.
 	stream nextPutAll: '----------------'; lf.
 	
@@ -25,7 +25,7 @@ CoEvaluationReport >> addContextStatsTo: stream [
 ]
 
 { #category : 'accessing' }
-CoEvaluationReport >> addLengthStatsTo: stream [
+CoPCEvaluationReport >> addLengthStatsTo: stream [
 	stream nextPutAll: 'SUGGESTION LENGTH ANALYSIS'; lf.
 	stream nextPutAll: '--------------------------'; lf.
 	
@@ -43,7 +43,7 @@ CoEvaluationReport >> addLengthStatsTo: stream [
 ]
 
 { #category : 'accessing' }
-CoEvaluationReport >> addModelStatsTo: stream [ 
+CoPCEvaluationReport >> addModelStatsTo: stream [ 
 	stream nextPutAll: 'MODEL PERFORMANCE'; lf.
 	stream nextPutAll: '----------------'; lf.
 	
@@ -59,7 +59,7 @@ CoEvaluationReport >> addModelStatsTo: stream [
 ]
 
 { #category : 'accessing' }
-CoEvaluationReport >> addOverviewTo: stream [
+CoPCEvaluationReport >> addOverviewTo: stream [
 	| stats total |
 	stats := evaluator sessionStats.
 	total := stats at: #totalSuggestions.
@@ -77,7 +77,7 @@ CoEvaluationReport >> addOverviewTo: stream [
 ]
 
 { #category : 'accessing' }
-CoEvaluationReport >> addRecommendationsTo: stream [
+CoPCEvaluationReport >> addRecommendationsTo: stream [
 	stream nextPutAll: 'RECOMMENDATIONS'; lf.
 	stream nextPutAll: '---------------'; lf.
 	
@@ -92,7 +92,7 @@ CoEvaluationReport >> addRecommendationsTo: stream [
 ]
 
 { #category : 'accessing' }
-CoEvaluationReport >> addTopRejectionReasonsTo: stream [
+CoPCEvaluationReport >> addTopRejectionReasonsTo: stream [
 
 	| reasons |
 	reasons := Bag new.
@@ -112,12 +112,12 @@ CoEvaluationReport >> addTopRejectionReasonsTo: stream [
 ]
 
 { #category : 'accessing' }
-CoEvaluationReport >> evaluator: anEvaluator [ 
+CoPCEvaluationReport >> evaluator: anEvaluator [ 
 	evaluator := anEvaluator
 ]
 
 { #category : 'accessing' }
-CoEvaluationReport >> generate [
+CoPCEvaluationReport >> generate [
 	| report stats |
 	stats := evaluator sessionStats.
 	

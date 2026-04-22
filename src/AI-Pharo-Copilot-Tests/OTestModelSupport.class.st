@@ -11,13 +11,13 @@ OTestModelSupport class >> beginMockModels [
 
 	| context |
 	context := Dictionary new
-		           at: #modelsFetcher put: OModelRegistry modelsFetcher;
+		           at: #modelsFetcher put: CoPCModelRegistry modelsFetcher;
 		           at: #modelName put: CopilotSettings modelName;
 		           yourself.
 	CopilotSettings clearCachedModelMetadata.
 	CopilotSettings modelName: self mockModelName.
-	OModelRegistry modelsFetcher: [ self mockModelsResponse ].
-	OModelRegistry refresh.
+	CoPCModelRegistry modelsFetcher: [ self mockModelsResponse ].
+	CoPCModelRegistry refresh.
 	^ context
 ]
 
@@ -27,8 +27,8 @@ OTestModelSupport class >> endMockModels: context [
 	| previousFetcher |
 	context ifNil: [ ^ self ].
 	previousFetcher := context at: #modelsFetcher ifAbsent: [ nil ].
-	OModelRegistry modelsFetcher: previousFetcher.
-	OModelRegistry reset.
+	CoPCModelRegistry modelsFetcher: previousFetcher.
+	CoPCModelRegistry reset.
 	    CopilotSettings modelName: ((context at: #modelName ifAbsent: [ nil ])
             ifNil: [ CopilotSettings nullModelFullName ]).
 	CopilotSettings clearCachedModelMetadata

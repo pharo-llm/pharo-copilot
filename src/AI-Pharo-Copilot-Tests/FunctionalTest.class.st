@@ -12,7 +12,7 @@ FunctionalTest >> testCompleteWorkflowWithMockedClient [
 	| context engine builder entry testContext |
 	
 	"1. Create context"
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	context source: 'myMethod: arg | result | result := arg * 2. '.
 	context position: context source size.
 	
@@ -35,8 +35,8 @@ FunctionalTest >> testCompleteWorkflowWithMockedClient [
 FunctionalTest >> testEvaluationWorkflowWithReports [
 
 	| evaluator context entry report |
-	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new.
+	evaluator := CoPCSuggestionEvaluator new.
+	context := CoPCContext new.
 	context source: 'Class { #name : ''TestClass'' }'.
 	entry := CoCopilotEntry contents: 'good suggestion'.
 	evaluator recordSuggestionAccepted: entry context: context.
@@ -57,14 +57,14 @@ FunctionalTest >> testModelManagementWorkflow [
 	
 	[
 		"1. Get available models"
-		registry := OModelRegistry current.
+		registry := CoPCModelRegistry current.
 		
 		"2. Select a model"
 		spec := registry allSpecs first.
 		CopilotSettings modelName: spec fullName.
 		
 		"3. Create client with selected model"
-		client := OllamaClient new.
+		client := CoPCOllamaClient new.
 		
 		"4. Verify model is used"
 		self assert: (client instVarNamed: 'modelSpec') fullName equals: spec fullName

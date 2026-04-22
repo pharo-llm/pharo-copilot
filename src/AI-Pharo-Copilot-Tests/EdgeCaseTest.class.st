@@ -18,7 +18,7 @@ EdgeCaseTest >> testCoCopilotEntryWithEmptyContent [
 { #category : 'tests' }
 EdgeCaseTest >> testCoPharoCopilotContextWithEmptySource [
 	| context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	context source: ''.
 	context position: 0.
 	
@@ -29,7 +29,7 @@ EdgeCaseTest >> testCoPharoCopilotContextWithEmptySource [
 { #category : 'tests' }
 EdgeCaseTest >> testOllamaClientWithNilOptions [
 	| client |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	client options: nil.
 	
 	self assert: client options isEmpty.
@@ -39,7 +39,7 @@ EdgeCaseTest >> testOllamaClientWithNilOptions [
 { #category : 'tests' }
 EdgeCaseTest >> testSuggestionEvaluatorWithZeroTotal [
 	| evaluator |
-	evaluator := CoSuggestionEvaluator new.
+	evaluator := CoPCSuggestionEvaluator new.
 	
 	"Should handle division by zero gracefully"
 	self assert: evaluator acceptanceRate equals: 0.

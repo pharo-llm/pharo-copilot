@@ -1,5 +1,5 @@
 Class {
-	#name : 'CoEvaluationAnnouncement',
+	#name : 'CoPCEvaluationAnnouncement',
 	#superclass : 'Announcement',
 	#instVars : [
 		'entry'
@@ -9,11 +9,11 @@ Class {
 }
 
 { #category : 'accessing' }
-CoEvaluationAnnouncement >> entry [
+CoPCEvaluationAnnouncement >> entry [
 	^ entry
 ]
 
 { #category : 'accessing' }
-CoEvaluationAnnouncement >> entry: anEvaluationEntry [
+CoPCEvaluationAnnouncement >> entry: anEvaluationEntry [
 	entry := anEvaluationEntry
 ]

@@ -26,7 +26,7 @@ PerformanceTest >> testContextCreationPerformance [
 	
 	time := Time millisecondsToRun: [
 		1000 timesRepeat: [
-			contexts add: CoPharoCopilotContext new ] ].
+			contexts add: CoPCContext new ] ].
 	
 	"Should create contexts quickly (less than 100ms for 1000)"
 	self assert: time < 100.
@@ -52,7 +52,7 @@ PerformanceTest >> testEntryCreationPerformance [
 { #category : 'tests' }
 PerformanceTest >> testNormalizeResponsePerformanceWithManyResponses [
 	| client responses time |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	responses := (1 to: 1000) collect: [ :i |
 		'{"response":"content', i asString, '","done":true}' ].
 	

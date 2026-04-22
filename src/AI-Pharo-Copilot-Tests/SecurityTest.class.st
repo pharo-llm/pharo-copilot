@@ -28,7 +28,7 @@ SecurityTest >> testModelNameValidation [
 		"Test potentially malicious model names"
 		#('../../../etc/passwd' '$(rm -rf /)' '; DROP TABLE models; --') do: [ :maliciousName |
 			CopilotSettings modelName: maliciousName.
-			client := OllamaClient new.
+			client := CoPCOllamaClient new.
 			
 			"Should create spec without executing commands"
 			spec := client instVarNamed: 'modelSpec'.

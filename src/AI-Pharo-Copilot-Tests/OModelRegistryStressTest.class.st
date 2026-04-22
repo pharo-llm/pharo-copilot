@@ -9,11 +9,11 @@ Class {
 { #category : 'tests' }
 OModelRegistryStressTest >> testMassiveModelRegistry [
 	| registry |
-	registry := OModelRegistry new.
+	registry := CoPCModelRegistry new.
 
 	1 to: 100 do: [:i |
 		| spec |
-		spec := OModelSpec
+		spec := CoPCModelSpec
 			family: ('model', i asString)
 			tag:    ('v', i asString)
 			label:  ('Model ', i asString).
@@ -27,26 +27,26 @@ OModelRegistryStressTest >> testMassiveModelRegistry [
 { #category : 'tests' }
 OModelRegistryStressTest >> testRegistryConsistencyAfterMultipleRefreshes [
 	| initialSpecs |
-	initialSpecs := OModelRegistry current allSpecs.
+	initialSpecs := CoPCModelRegistry current allSpecs.
 	
 	"Refresh multiple times rapidly"
 	5 timesRepeat: [
 		| refreshedRegistry |
-		refreshedRegistry := OModelRegistry refresh.
-		self assert: refreshedRegistry identicalTo: OModelRegistry current ].
+		refreshedRegistry := CoPCModelRegistry refresh.
+		self assert: refreshedRegistry identicalTo: CoPCModelRegistry current ].
 		
 	"Verify specs are still consistent"
-	self assert: OModelRegistry current allSpecs size equals: initialSpecs size
+	self assert: CoPCModelRegistry current allSpecs size equals: initialSpecs size
 ]
 
 { #category : 'tests' }
 OModelRegistryStressTest >> testRegistryWithDuplicateSpecs [
 	| registry spec1 spec2 |
-	registry := OModelRegistry new.
+	registry := CoPCModelRegistry new.
 	
 	"Add same model with different objects"
-	spec1 := OModelSpec family: 'test' tag: '1' label: 'Test 1'.
-	spec2 := OModelSpec family: 'test' tag: '1' label: 'Test 1 Duplicate'.
+	spec1 := CoPCModelSpec family: 'test' tag: '1' label: 'Test 1'.
+	spec2 := CoPCModelSpec family: 'test' tag: '1' label: 'Test 1 Duplicate'.
 	
 	registry byFullName at: spec1 fullName put: spec1.
 	registry byFullName at: spec2 fullName put: spec2.  "Should overwrite"
@@ -59,7 +59,7 @@ OModelRegistryStressTest >> testRegistryWithDuplicateSpecs [
 OModelRegistryStressTest >> testSpecLookupPerformance [
 
 	| registry lookupTime |
-	registry := OModelRegistry current. "Measure lookup performance"
+	registry := CoPCModelRegistry current. "Measure lookup performance"
 	lookupTime := Time millisecondsToRun: [
 			              1000 timesRepeat: [
 					              registry specByFullName: OTestModelSupport mockModelName.

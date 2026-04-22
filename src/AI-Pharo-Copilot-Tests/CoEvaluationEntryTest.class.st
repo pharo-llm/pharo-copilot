@@ -9,7 +9,7 @@ Class {
 { #category : 'tests' }
 CoEvaluationEntryTest >> testActionAccessor [
 	| entry |
-	entry := CoEvaluationEntry new.
+	entry := CoPCEvaluationEntry new.
 	
 	entry action: #accepted.
 	self assert: entry action equals: #accepted.
@@ -24,8 +24,8 @@ CoEvaluationEntryTest >> testActionAccessor [
 { #category : 'tests' }
 CoEvaluationEntryTest >> testContextAccessor [
 	| entry context |
-	entry := CoEvaluationEntry new.
-	context := CoPharoCopilotContext new.
+	entry := CoPCEvaluationEntry new.
+	context := CoPCContext new.
 	
 	entry context: context.
 	self assert: entry context identicalTo: context
@@ -35,7 +35,7 @@ CoEvaluationEntryTest >> testContextAccessor [
 CoEvaluationEntryTest >> testMetadataAccessor [
 
 	| entry metadata |
-	entry := CoEvaluationEntry new. "Should start with empty dictionary"
+	entry := CoPCEvaluationEntry new. "Should start with empty dictionary"
 	self assert: ((entry metadata) isKindOf: Dictionary).
 	self assert: entry metadata isEmpty.
 
@@ -49,7 +49,7 @@ CoEvaluationEntryTest >> testMetadataAccessor [
 { #category : 'tests' }
 CoEvaluationEntryTest >> testRejectionReasonAccessor [ 
 	| entry |
-	entry := CoEvaluationEntry new.
+	entry := CoPCEvaluationEntry new.
 	
 	entry rejectionReason: 'Syntax error'.
 	self assert: entry rejectionReason equals: 'Syntax error'
@@ -58,7 +58,7 @@ CoEvaluationEntryTest >> testRejectionReasonAccessor [
 { #category : 'tests' }
 CoEvaluationEntryTest >> testSuggestionAccessor [
 	| entry suggestion |
-	entry := CoEvaluationEntry new.
+	entry := CoPCEvaluationEntry new.
 	suggestion := CoCopilotEntry contents: 'test'.
 	
 	entry suggestion: suggestion.
@@ -68,7 +68,7 @@ CoEvaluationEntryTest >> testSuggestionAccessor [
 { #category : 'tests' }
 CoEvaluationEntryTest >> testTimestampAccessor [
 	| entry timestamp |
-	entry := CoEvaluationEntry new.
+	entry := CoPCEvaluationEntry new.
 	timestamp := DateAndTime now.
 	
 	entry timestamp: timestamp.

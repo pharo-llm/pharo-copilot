@@ -62,7 +62,7 @@ CoCopilotEntry >> activateOn: aCoCompletionContext [
 
 	applied ifTrue: [
 		evaluatorClass := Smalltalk globals
-			at: #CoSuggestionEvaluator
+			at: #CoPCSuggestionEvaluator
 			ifAbsent: [ nil ].
 
 		evaluatorClass ifNotNil: [

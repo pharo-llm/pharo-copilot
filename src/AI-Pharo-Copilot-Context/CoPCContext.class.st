@@ -4,27 +4,27 @@ It initializes the completion builder responsible for producing Copilot completi
 based on this context.
 "
 Class {
-	#name : 'CoPharoCopilotContext',
+	#name : 'CoPCContext',
 	#superclass : 'CoCompletionContext',
 	#category : 'AI-Pharo-Copilot-Context',
 	#package : 'AI-Pharo-Copilot-Context'
 }
 
 { #category : 'initialization' }
-CoPharoCopilotContext >> editor [
+CoPCContext >> editor [
 
 	^ self engine editor
 ]
 
 { #category : 'initialization' }
-CoPharoCopilotContext >> initialize [
+CoPCContext >> initialize [
 
 	super initialize.
 	self initializeCompletionBuilder
 ]
 
 { #category : 'initialization' }
-CoPharoCopilotContext >> initializeCompletionBuilder [
+CoPCContext >> initializeCompletionBuilder [
 
 	completionBuilder := CoPharoCopilotResultSetBuilder initializeOnContext: self
 ]

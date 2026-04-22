@@ -4,14 +4,14 @@ Each class-side method declares one model via an <ollamaModel:...> pragma and re
 
 "
 Class {
-	#name : 'OModelCatalog',
+	#name : 'CoPCModelCatalog',
 	#superclass : 'Object',
 	#category : 'AI-Pharo-Copilot-Ollama',
 	#package : 'AI-Pharo-Copilot-Ollama'
 }
 
 { #category : 'private - definitions' }
-OModelCatalog class >> pharoCopilotNull [
+CoPCModelCatalog class >> pharoCopilotNull [
 	"Declare the 'Pharo Null Copilot' model and answer its Ollama model id."
 
 	<ollamaModel: 'pharo-copilot-null' tag: nil label: 'Pharo Null Copilot'>

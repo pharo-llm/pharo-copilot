@@ -25,7 +25,7 @@ UsabilityTest >> testAvailableModelNamesAreUserFriendly [
 { #category : 'tests' }
 UsabilityTest >> testContextBuilderIntuitiveAPI [
 	| context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	
 	"Should have sensible defaults"
 	self assert: context completionBuilder notNil.
@@ -63,8 +63,8 @@ UsabilityTest >> testEntryDisplayStringIsInformative [
 { #category : 'tests' }
 UsabilityTest >> testEvaluatorReportIsReadable [
 	| evaluator context report |
-	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new.
+	evaluator := CoPCSuggestionEvaluator new.
+	context := CoPCContext new.
 	
 	"Add sample data"
 	evaluator recordSuggestionAccepted: (CoCopilotEntry contents: 'accepted') context: context.
@@ -80,7 +80,7 @@ UsabilityTest >> testEvaluatorReportIsReadable [
 UsabilityTest >> testModelSpecDisplayIsIntuitive [
 
 	| spec |
-	spec := OModelSpec family: 'mock' tag: 'model' label: 'Mock Model Friendly'. "Full name should be technical identifier"
+	spec := CoPCModelSpec family: 'mock' tag: 'model' label: 'Mock Model Friendly'. "Full name should be technical identifier"
 	self assert: spec fullName equals: 'mock:model'. "Label should be human-readable"
 	self assert: spec label equals: 'Mock Model Friendly'. "Label should be more descriptive than full name"
 	self assert: spec label size > spec fullName size

@@ -9,8 +9,8 @@ Class {
 { #category : 'tests' }
 CoEvaluationReportTest >> testGenerateCreatesNonEmptyReport [
 	| evaluator report content |
-	evaluator := CoSuggestionEvaluator new.
-	report := CoEvaluationReport new evaluator: evaluator; yourself.
+	evaluator := CoPCSuggestionEvaluator new.
+	report := CoPCEvaluationReport new evaluator: evaluator; yourself.
 	
 	content := report generate.
 	
@@ -24,13 +24,13 @@ CoEvaluationReportTest >> testGenerateCreatesNonEmptyReport [
 { #category : 'tests' }
 CoEvaluationReportTest >> testGenerateWithSampleData [
     | evaluator report content context entry |
-    evaluator := CoSuggestionEvaluator new.
-    context := CoPharoCopilotContext new.  "source may be nil; that's fine now"
+    evaluator := CoPCSuggestionEvaluator new.
+    context := CoPCContext new.  "source may be nil; that's fine now"
     entry := CoCopilotEntry contents: 'test code'.
 
     evaluator recordSuggestionAccepted: entry context: context.
 
-    report := CoEvaluationReport new
+    report := CoPCEvaluationReport new
         evaluator: evaluator;
         yourself.
     content := report generate.
