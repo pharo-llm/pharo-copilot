@@ -1,336 +1,168 @@
 "
-Simple client for invoking the Ollama REST API.
+Minimal Ollama client.
+
+Two generation paths are kept:
+
+  #generateForPrefix:suffix:context:
+    - If CopilotSettings fimTemplate is set, the prompt is built by expanding the
+      FIM template (placeholders {{ .Prompt }} / {{ .Suffix }} / {{ .Context }}
+      and %1 / %2 / %3) and sent as a single `prompt` field.
+    - Otherwise, Ollama's native FIM API is used (separate `prompt` and
+      `suffix` fields) and the class context is passed via `system`.
+
+No response cleaning, no prefix echo removal, no template-leak filtering.
+The raw `response` field from Ollama is returned as a string.
 "
 Class {
 	#name : 'CoPCOllamaClient',
 	#superclass : 'Object',
 	#instVars : [
 		'transport',
-		'modelSpec',
-		'stream',
-		'format',
+		'modelFullName',
 		'options'
-	],
-	#classInstVars : [
-		'defaultModelFullName'
 	],
 	#category : 'AI-Pharo-Copilot-Ollama',
 	#package : 'AI-Pharo-Copilot-Ollama'
 }
-
-{ #category : 'accessing' }
-CoPCOllamaClient class >> defaultModelFullName [
-
-	^ defaultModelFullName ifNil: [ defaultModelFullName := self nullModelFullName  ]
-]
-
-{ #category : 'accessing' }
-CoPCOllamaClient class >> nullModelFullName [
-
-  ^ 'pharo-copilot-null'
-]
-
-{ #category : 'accessing' }
-CoPCOllamaClient class >> nullModelResponseString [
-
-	^ 'nothing'
-]
-
-{ #category : 'response-normalization' }
-CoPCOllamaClient >> coerceResponseValueToString: value default: fallbackString [
-
-	value isNil ifTrue: [ ^ fallbackString ].
-	value isString ifTrue: [ ^ value ].
-
-	[ ^ STONJSON toString: value ]
-		on: Error
-		do: [ "Fall through" ].
-	(value respondsTo: #asString) ifTrue: [ ^ value asString ].
-
-	^ fallbackString
-]
-
-{ #category : 'response-normalization' }
-CoPCOllamaClient >> ensureStringFromResponse: container fallback: fallbackString [
-
-	| value |
-	container ifNil: [ ^ fallbackString ].
-
-	value := (container respondsTo: #at:ifAbsent:)
-		         ifTrue: [
-				         container
-					         at: #response
-					         ifAbsent: [
-					         container
-						         at: 'response'
-						         ifAbsent: [ container at: #content ifAbsent: [ container at: 'content' ifAbsent: [ container ] ] ] ] ]
-		         ifFalse: [ container ].
-
-	^ self coerceResponseValueToString: value default: fallbackString
-]
-
-{ #category : 'generation-operations' }
-CoPCOllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: suffixString context: contextString [
-
-	| prompt safePrefix safeSuffix safeContext includesContext |
-	safePrefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
-	safeSuffix := suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ].
-	safeContext := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
-	prompt := templateString ifNil: [ '' ].
-
-	includesContext := (prompt includesSubstring: '{{ .Context }}') or: [
-		                   (prompt includesSubstring: '{{.Context}}') or: [
-			                   (prompt includesSubstring: '{3}') or: [ prompt includesSubstring: '%3' ] ] ].
-
-	prompt := prompt copyReplaceAll: '{{ .Prompt }}' with: safePrefix.
-	prompt := prompt copyReplaceAll: '{{.Prompt}}' with: safePrefix.
-	prompt := prompt copyReplaceAll: '{{ .Suffix }}' with: safeSuffix.
-	prompt := prompt copyReplaceAll: '{{.Suffix}}' with: safeSuffix.
-	prompt := prompt copyReplaceAll: '{{ .Context }}' with: safeContext.
-	prompt := prompt copyReplaceAll: '{{.Context}}' with: safeContext.
-
-	prompt := prompt copyReplaceAll: '%1' with: safePrefix.
-	prompt := prompt copyReplaceAll: '%2' with: safeSuffix.
-	prompt := prompt copyReplaceAll: '%3' with: safeContext.
-	prompt := prompt format: {
-			          safePrefix.
-			          safeSuffix.
-			          safeContext }.
-
-	(includesContext not and: [ safeContext isEmpty not ]) ifTrue: [ prompt := self prependContext: safeContext toPrompt: prompt ].
-
-	^ prompt
-]
-
-{ #category : 'generation-operations' }
-CoPCOllamaClient >> generate: aPromptString [
-	| payload response normalized |
-	self isNullModel ifTrue: [ ^ self class nullModelResponseString ].
-
-	payload := Dictionary new
-		           at: #model put: modelSpec fullName;
-		           at: #prompt put: aPromptString;
-		           at: #stream put: stream;
-		           yourself.
-	format ifNotNil: [ payload at: #format put: format ].
-	(options notNil and: [ options isEmpty not ]) ifTrue: [ payload at: #options put: options ].
-	response := transport postJsonAt: 'api/generate' body: payload.
-	normalized := self normalizeResponse: response.
-
-	^ normalized
-]
-
-{ #category : 'generation-operations' }
-CoPCOllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
-	"Generate a fill-in-the-middle completion using Ollama's native prompt/suffix API."
-
-	| safePrefix safeSuffix safeSystem payload response normalized |
-	self isNullModel ifTrue: [ ^ self class nullModelResponseString ].
-
-	safePrefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
-	safeSuffix := suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ].
-	safeSystem := self systemPromptPrefixedContextFor: contextString.
-
-	payload := Dictionary new
-		at: #model put: modelSpec fullName;
-		at: #prompt put: safePrefix;
-		at: #suffix put: safeSuffix;
-		at: #stream put: stream;
-		yourself.
-
-	safeSystem isEmpty ifFalse: [
-		payload at: #system put: safeSystem ].
-
-	format ifNotNil: [
-		payload at: #format put: format ].
-
-	(options notNil and: [ options isEmpty not ]) ifTrue: [
-		payload at: #options put: options copy ].
-
-	response := transport postJsonAt: 'api/generate' body: payload.
-	normalized := self normalizeResponse: response.
-
-	^ normalized
-]
 
 { #category : 'initialization' }
 CoPCOllamaClient >> initialize [
 
 	super initialize.
 	transport := CoPCOAHttpTransport new.
-	stream := false.
-	options := Dictionary new.
-	self loadOptionsFromSettings.
-	self useModelNamed: CopilotSettings modelName.
+	modelFullName := CopilotSettings modelName.
+	options := CopilotSettings allOllamaOptions copy
 ]
 
-{ #category : 'model-operations' }
-CoPCOllamaClient >> isNullModel [
+{ #category : 'accessing' }
+CoPCOllamaClient >> transport [ ^ transport ]
 
-	modelSpec ifNil: [ ^ false ].
-	^ modelSpec fullName = self class nullModelFullName
+{ #category : 'accessing' }
+CoPCOllamaClient >> modelFullName [ ^ modelFullName ]
+
+{ #category : 'accessing' }
+CoPCOllamaClient >> useModelNamed: aString [
+
+	modelFullName := aString
 ]
 
-{ #category : 'ollama' }
-CoPCOllamaClient >> listModels [
+{ #category : 'accessing' }
+CoPCOllamaClient >> options [ ^ options ]
 
-	| response |
-	response := transport getJsonAt: 'api/tags'.
-	^ response
-]
-
-{ #category : 'initialization' }
-CoPCOllamaClient >> loadOptionsFromSettings [
-
-	| settingsOptions |
-	settingsOptions := CopilotSettings allOllamaOptions.
-	settingsOptions keysAndValuesDo: [ :key :value | options at: key put: value ].
-]
-
-{ #category : 'response-normalization' }
-CoPCOllamaClient >> normalizeResponse: response [
-
-	| parsed |
-	response isNil ifTrue: [ ^ '' ].
-
-	response isString ifTrue: [
-			parsed := self parseJsonSafely: response.
-			parsed ifNil: [ ^ response ].
-			^ (parsed isKindOf: Dictionary)
-				  ifTrue: [ self ensureStringFromResponse: parsed fallback: response ]
-				  ifFalse: [ self coerceResponseValueToString: parsed default: response ] ].
-
-	^ self ensureStringFromResponse: response fallback: response asString
-]
-
-{ #category : 'api' }
-CoPCOllamaClient >> optionAt: aKey [
-^ options ifNil: [ nil ] ifNotNil: [ options at: aKey ifAbsent: [ nil ] ]
-]
-
-{ #category : 'api' }
-CoPCOllamaClient >> optionAt: aKey put: aValue [
-
-	options ifNil: [ options := Dictionary new ].
-	^ options at: aKey put: aValue
-]
-
-{ #category : 'api' }
-CoPCOllamaClient >> options [
-
-	^ options
-]
-
-{ #category : 'api' }
+{ #category : 'accessing' }
 CoPCOllamaClient >> options: aDictionary [
 
 	options := aDictionary ifNil: [ Dictionary new ]
 ]
 
-{ #category : 'response-normalization' }
-CoPCOllamaClient >> parseJsonSafely: aString [
-
-	^ [ STONJSON fromString: aString ]
-		  on: Error
-		  do: [ nil ]
-]
-
-{ #category : 'generation-operations' }
-CoPCOllamaClient >> prependContext: contextString toPrompt: promptString [
-
-	| delimiter |
-	delimiter := String lf , String lf.
-	^ String streamContents: [ :s |
-			  s
-				  nextPutAll: 'Class context provided by Pharo Copilot:';
-				  nextPutAll: delimiter;
-				  nextPutAll: contextString;
-				  nextPutAll: delimiter;
-				  nextPutAll: promptString ]
-]
-
-{ #category : 'ollama' }
-CoPCOllamaClient >> pullModelNamed: aString [
-
-	^ self pullModelNamed: aString timeoutSeconds: CopilotSettings modelInstallTimeoutSeconds
-]
-
-{ #category : 'ollama' }
-CoPCOllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds [
+{ #category : 'generation' }
+CoPCOllamaClient >> generate: aPromptString [
+	"POST /api/generate with a single prompt."
 
 	| payload response |
 	payload := Dictionary new
-		           at: #name put: aString;
-		           at: #stream put: false;
-		           yourself.
+		at: #model   put: modelFullName;
+		at: #prompt  put: aPromptString;
+		at: #stream  put: false;
+		yourself.
+	(options notNil and: [ options isEmpty not ])
+		ifTrue: [ payload at: #options put: options copy ].
 
-	response := transport postJsonAt: 'api/pull' body: payload timeoutSeconds: timeoutSeconds.
-
-	^ response
+	response := transport postJsonAt: 'api/generate' body: payload.
+	^ self responseTextOf: response
 ]
 
-{ #category : 'ollama' }
-CoPCOllamaClient >> showModelNamed: aModelFullName [
+{ #category : 'generation' }
+CoPCOllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
+	"Main entry point used by the completion builder.
+
+	If a FIM template is configured, expand it and send a single prompt.
+	Otherwise use Ollama's native FIM API (prompt + suffix) and pass the
+	class context as a `system` message."
+
+	| template safePrefix safeSuffix safeContext |
+	safePrefix  := prefixString  ifNil: [ '' ].
+	safeSuffix  := suffixString  ifNil: [ '' ].
+	safeContext := contextString ifNil: [ '' ].
+
+	template := CopilotSettings fimTemplate.
+
+	template ifNotNil: [
+		| prompt |
+		prompt := self
+			expandFimTemplate: template
+			prefix: safePrefix asString
+			suffix: safeSuffix asString
+			context: safeContext asString.
+		^ self generate: prompt ].
+
+	^ self
+		nativeFimForPrefix: safePrefix asString
+		suffix: safeSuffix asString
+		context: safeContext asString
+]
+
+{ #category : 'generation' }
+CoPCOllamaClient >> nativeFimForPrefix: prefixString suffix: suffixString context: contextString [
 
 	| payload response |
 	payload := Dictionary new
-		           at: #model put: aModelFullName;
-		           yourself.
+		at: #model   put: modelFullName;
+		at: #prompt  put: prefixString;
+		at: #suffix  put: suffixString;
+		at: #stream  put: false;
+		yourself.
 
-	response := transport postJsonAt: 'api/show' body: payload.
+	contextString isEmpty ifFalse: [
+		payload at: #system put: contextString ].
 
+	(options notNil and: [ options isEmpty not ])
+		ifTrue: [ payload at: #options put: options copy ].
 
-	^ response
+	response := transport postJsonAt: 'api/generate' body: payload.
+	^ self responseTextOf: response
 ]
 
-{ #category : 'generation-operations' }
-CoPCOllamaClient >> systemPromptPrefixedContextFor: contextString [
+{ #category : 'generation' }
+CoPCOllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: suffixString context: contextString [
+	"Substitute FIM placeholders. Supported:
+	   {{ .Prompt }}  {{.Prompt}}  %1    -> prefix
+	   {{ .Suffix }}  {{.Suffix}}  %2    -> suffix
+	   {{ .Context }} {{.Context}} %3    -> class context"
 
-	| systemPrompt safeContext |
-	systemPrompt := CopilotSettings modelSystemPromptIfAvailable.
-	safeContext := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
-
-	(systemPrompt isEmpty and: [ safeContext isEmpty ]) ifTrue: [ ^ safeContext ].
-
-	^ String streamContents: [ :stream |
-			  systemPrompt isEmpty ifFalse: [
-					  stream
-						  nextPutAll: 'System Prompt:';
-						  cr;
-						  nextPutAll: systemPrompt;
-						  cr;
-						  cr ].
-			  safeContext isEmpty ifFalse: [ stream nextPutAll: safeContext ] ]
+	| prompt |
+	prompt := templateString ifNil: [ '' ].
+	prompt := prompt copyReplaceAll: '{{ .Prompt }}'  with: prefixString.
+	prompt := prompt copyReplaceAll: '{{.Prompt}}'    with: prefixString.
+	prompt := prompt copyReplaceAll: '{{ .Suffix }}'  with: suffixString.
+	prompt := prompt copyReplaceAll: '{{.Suffix}}'    with: suffixString.
+	prompt := prompt copyReplaceAll: '{{ .Context }}' with: contextString.
+	prompt := prompt copyReplaceAll: '{{.Context}}'   with: contextString.
+	prompt := prompt copyReplaceAll: '%1' with: prefixString.
+	prompt := prompt copyReplaceAll: '%2' with: suffixString.
+	prompt := prompt copyReplaceAll: '%3' with: contextString.
+	^ prompt
 ]
 
-{ #category : 'accessing' }
-CoPCOllamaClient >> transport [
+{ #category : 'response' }
+CoPCOllamaClient >> responseTextOf: aResponse [
+	"Extract the text of Ollama's `response` field as-is. No cleaning."
 
-	^ transport
-]
+	| container value |
+	aResponse ifNil: [ ^ '' ].
 
-{ #category : 'model-operations' }
-CoPCOllamaClient >> useDefaultModel [
+	container := aResponse isString
+		ifTrue: [ [ STONJSON fromString: aResponse ] on: Error do: [ ^ aResponse ] ]
+		ifFalse: [ aResponse ].
 
-	self useModelNamed: self class defaultModelFullName
-]
+	(container isKindOf: Dictionary) ifFalse: [ ^ container asString ].
 
-{ #category : 'model-operations' }
-CoPCOllamaClient >> useModelNamed: aString [
-	"Resolve and set the model spec for the given full name (family[:tag])."
+	value := container at: #response ifAbsent: [
+		container at: 'response' ifAbsent: [
+			container at: #content ifAbsent: [
+				container at: 'content' ifAbsent: [ '' ] ] ] ].
 
-	| tokens family tag |
-
-	modelSpec := CoPCModelRegistry current specByFullName: aString.
-	modelSpec ifNil: [
-			tokens := aString findTokens: ':'.
-			family := tokens isEmpty
-				          ifTrue: [ aString ]
-				          ifFalse: [ tokens first ].
-			tag := tokens size > 1
-				       ifTrue: [
-						       String streamContents: [ :s |
-							       (tokens copyFrom: 2 to: tokens size) do: [ :each | s nextPutAll: each ] separatedBy: [ s nextPut: $: ] ] ]
-				       ifFalse: [ nil ].
-			modelSpec := CoPCModelSpec family: family tag: tag label: aString ].
+	value isNil    ifTrue: [ ^ '' ].
+	value isString ifTrue: [ ^ value ].
+	^ value asString
 ]

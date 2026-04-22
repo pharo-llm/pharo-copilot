@@ -1,7 +1,5 @@
 "
-OAHttpTransport is a small HTTP helper that talks to a local Ollama server and
-returns Smalltalk objects by sending/receiving JSON over HTTP (GET and POST).
-It centralizes host/port, JSON encoding/decoding, and default headers.
+HTTP helper that talks to a local Ollama server with JSON bodies.
 "
 Class {
 	#name : 'CoPCOAHttpTransport',
@@ -9,7 +7,6 @@ Class {
 	#instVars : [
 		'host',
 		'port',
-		'defaultHeaders',
 		'jsonReader',
 		'jsonWriter'
 	],
@@ -17,107 +14,30 @@ Class {
 	#package : 'AI-Pharo-Copilot-Ollama'
 }
 
-{ #category : 'private' }
-CoPCOAHttpTransport >> applyDefaultHeadersTo: aClient [
-	"Apply the transport default headers to the given client."
-
-	defaultHeaders keysAndValuesDo: [ :key :value |
-		aClient headerAt: key put: value ]
-]
-
-{ #category : 'private' }
-CoPCOAHttpTransport >> configureJsonOn: aClient [
-	"Configure JSON accept/content reader/writer on the given client using the transport JSON reader/writer."
-
-	aClient accept: ZnMimeType applicationJson.
-
-	aClient contentWriter: [ :data |
-		ZnEntity json: (jsonWriter toString: data) ].
-
-	aClient contentReader: [ :entity |
-		jsonReader fromString: entity contents ]
-]
-
-{ #category : 'accessing' }
-CoPCOAHttpTransport >> defaultHeaders [
-	"Answer the dictionary of headers applied to every request."
-
-	^ defaultHeaders
-]
-
-{ #category : 'accessing' }
-CoPCOAHttpTransport >> defaultHeaders: aDictionary [
-	"Set the dictionary of headers applied to every request."
-
-	defaultHeaders := aDictionary
-]
-
-{ #category : 'requests' }
-CoPCOAHttpTransport >> getJsonAt: aPath [
-	"Perform a GET request on the given path and answer the decoded JSON response."
-
-	| client |
-	client := self newJsonClientForPath: aPath.
-	^ client get
-]
-
-{ #category : 'accessing' }
-CoPCOAHttpTransport >> host [
-	"Answer the configured host used for requests."
-
-	^ host
-]
-
-{ #category : 'accessing' }
-CoPCOAHttpTransport >> host: anObject [
-	"Set the host used for requests."
-
-	host := anObject
-]
-
 { #category : 'initialization' }
 CoPCOAHttpTransport >> initialize [
-	"Initialize the transport with settings (host/port), JSON reader/writer, and an empty default header set."
 
 	super initialize.
 	host := CopilotSettings host.
 	port := CopilotSettings port.
-	defaultHeaders := Dictionary new.
 	jsonReader := ZnUtils defaultJSONReader.
 	jsonWriter := ZnUtils defaultJSONWriter
 ]
 
 { #category : 'accessing' }
-CoPCOAHttpTransport >> jsonReader [
-	"Answer the JSON reader used to decode responses."
-
-	^ jsonReader
-]
+CoPCOAHttpTransport >> host [ ^ host ]
 
 { #category : 'accessing' }
-CoPCOAHttpTransport >> jsonReader: anObject [
-	"Set the JSON reader used to decode responses."
-
-	jsonReader := anObject
-]
+CoPCOAHttpTransport >> host: anObject [ host := anObject ]
 
 { #category : 'accessing' }
-CoPCOAHttpTransport >> jsonWriter [
-	"Answer the JSON writer used to encode request bodies."
-
-	^ jsonWriter
-]
+CoPCOAHttpTransport >> port [ ^ port ]
 
 { #category : 'accessing' }
-CoPCOAHttpTransport >> jsonWriter: anObject [
-	"Set the JSON writer used to encode request bodies."
-
-	jsonWriter := anObject
-]
+CoPCOAHttpTransport >> port: anObject [ port := anObject ]
 
 { #category : 'private' }
 CoPCOAHttpTransport >> newJsonClientForPath: aPath [
-	"Create and configure a Zinc client for JSON REST calls using ZnEasy (so tests can replace it)."
 
 	| client |
 	client := ZnEasy client.
@@ -125,44 +45,21 @@ CoPCOAHttpTransport >> newJsonClientForPath: aPath [
 	client
 		host: host;
 		port: port;
-		path: aPath. "Hard stop so UI never waits forever if Ollama is slow/down."
-	(client respondsTo: #timeout:) ifTrue: [ client timeout: CopilotSettings requestTimeoutSeconds ].
+		path: aPath.
+	(client respondsTo: #timeout:) ifTrue: [
+		client timeout: CopilotSettings requestTimeoutSeconds ].
 
-	self applyDefaultHeadersTo: client.
-	self configureJsonOn: client.
-
+	client accept: ZnMimeType applicationJson.
+	client contentWriter: [ :data | ZnEntity json: (jsonWriter toString: data) ].
+	client contentReader: [ :entity | jsonReader fromString: entity contents ].
 	^ client
-]
-
-{ #category : 'accessing' }
-CoPCOAHttpTransport >> port [
-	"Answer the configured port used for requests."
-
-	^ port
-]
-
-{ #category : 'accessing' }
-CoPCOAHttpTransport >> port: anObject [
-	"Set the port used for requests."
-
-	port := anObject
 ]
 
 { #category : 'requests' }
 CoPCOAHttpTransport >> postJsonAt: aPath body: aDictionary [
-	"Perform a POST request on the given path with the given object as JSON body, answering the decoded JSON response."
-
-	^ self postJsonAt: aPath body: aDictionary timeoutSeconds: nil
-]
-
-{ #category : 'requests' }
-CoPCOAHttpTransport >> postJsonAt: aPath body: aDictionary timeoutSeconds: timeoutSeconds [
-	"Perform a POST request with an optional timeout override."
 
 	| client |
 	client := self newJsonClientForPath: aPath.
-	(timeoutSeconds notNil and: [ client respondsTo: #timeout: ])
-		ifTrue: [ client timeout: timeoutSeconds ].
 	client contents: aDictionary.
 	^ client post
 ]
