@@ -1,18 +1,18 @@
 Class {
-	#name : 'CopilotContextFullSource',
+	#name : 'CoPCContextFullSource',
 	#superclass : 'Object',
 	#category : 'AI-Pharo-Copilot-Context',
 	#package : 'AI-Pharo-Copilot-Context'
 }
 
 { #category : 'hooks' }
-CopilotContextFullSource >> methodsFor: aClass [
+CoPCContextFullSource >> methodsFor: aClass [
 
 	^ aClass methodDictionary values
 ]
 
 { #category : 'hooks' }
-CopilotContextFullSource >> renderMethod: aCompiledMethod [ 
+CoPCContextFullSource >> renderMethod: aCompiledMethod [ 
 
 	^ aCompiledMethod sourceCode
 ]

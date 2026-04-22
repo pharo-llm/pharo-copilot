@@ -1,5 +1,5 @@
 Class {
-	#name : 'CopilotContextBuilder',
+	#name : 'CoPCContextBuilder',
 	#superclass : 'Object',
 	#instVars : [
 		'targetClass',
@@ -10,7 +10,7 @@ Class {
 }
 
 { #category : 'instance creation' }
-CopilotContextBuilder class >> forClass: aClass strategy: aStrategy [
+CoPCContextBuilder class >> forClass: aClass strategy: aStrategy [
 
 	^ self new
 		targetClass: aClass;
@@ -19,7 +19,7 @@ CopilotContextBuilder class >> forClass: aClass strategy: aStrategy [
 ]
 
 { #category : 'building' }
-CopilotContextBuilder >> buildForFIMWithPrefix: prefixString [
+CoPCContextBuilder >> buildForFIMWithPrefix: prefixString [
 
 	| stream |
 	stream := String streamContents: [ :s |
@@ -31,7 +31,7 @@ CopilotContextBuilder >> buildForFIMWithPrefix: prefixString [
 ]
 
 { #category : 'accessing' }
-CopilotContextBuilder >> methodLabelFor: each [
+CoPCContextBuilder >> methodLabelFor: each [
 
 	(each isKindOf: CompiledMethod)
 		ifTrue: [ ^ each selector asString ].
@@ -39,31 +39,31 @@ CopilotContextBuilder >> methodLabelFor: each [
 ]
 
 { #category : 'accessing' }
-CopilotContextBuilder >> strategy [
+CoPCContextBuilder >> strategy [
 
 	^ strategy
 ]
 
 { #category : 'accessing' }
-CopilotContextBuilder >> strategy: aStrategy [
+CoPCContextBuilder >> strategy: aStrategy [
 
 	strategy := aStrategy
 ]
 
 { #category : 'accessing' }
-CopilotContextBuilder >> targetClass [
+CoPCContextBuilder >> targetClass [
 
 	^ targetClass
 ]
 
 { #category : 'accessing' }
-CopilotContextBuilder >> targetClass: aClass [
+CoPCContextBuilder >> targetClass: aClass [
 
 	targetClass := aClass
 ]
 
 { #category : 'accessing' }
-CopilotContextBuilder >> writeFIMOn: aStream prefix: prefixString [
+CoPCContextBuilder >> writeFIMOn: aStream prefix: prefixString [
 
 	aStream
 		nextPutAll: '<|fim_prefix|>';
@@ -76,7 +76,7 @@ CopilotContextBuilder >> writeFIMOn: aStream prefix: prefixString [
 ]
 
 { #category : 'accessing' }
-CopilotContextBuilder >> writeMethodsOn: aStream [
+CoPCContextBuilder >> writeMethodsOn: aStream [
 	| methods |
 	methods := strategy methodsFor: targetClass.
 
@@ -92,7 +92,7 @@ CopilotContextBuilder >> writeMethodsOn: aStream [
 ]
 
 { #category : 'accessing' }
-CopilotContextBuilder >> writeRepoHeaderOn: aStream [
+CoPCContextBuilder >> writeRepoHeaderOn: aStream [
 
 	aStream
 		nextPutAll: '<|repo_name|>';

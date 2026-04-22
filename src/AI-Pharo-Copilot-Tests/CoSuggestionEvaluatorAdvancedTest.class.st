@@ -10,8 +10,8 @@ Class {
 CoSuggestionEvaluatorAdvancedTest >> testComplexEvaluationScenario [
 
 	| evaluator context suggestions lengthStats |
-	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new. 
+	evaluator := CoPCSuggestionEvaluator new.
+	context := CoPCContext new. 
 	suggestions := {
 		               (CoCopilotEntry contents: 'short').
 		               (CoCopilotEntry contents: (String new: 30 withAll: $m)).
@@ -31,12 +31,12 @@ CoSuggestionEvaluatorAdvancedTest >> testComplexEvaluationScenario [
 { #category : 'tests' }
 CoSuggestionEvaluatorAdvancedTest >> testConcurrentEvaluationOperations [
 	| evaluator contexts |
-	evaluator := CoSuggestionEvaluator new.
+	evaluator := CoPCSuggestionEvaluator new.
 	
 	"Create multiple contexts simulating different editing contexts"
 	contexts := (1 to: 5) collect: [ :i |
 		| ctx |
-		ctx := CoPharoCopilotContext new.
+		ctx := CoPCContext new.
 		ctx source: 'context', i asString, 'source code here'.
 		ctx ].
 	
@@ -51,7 +51,7 @@ CoSuggestionEvaluatorAdvancedTest >> testConcurrentEvaluationOperations [
 { #category : 'tests' }
 CoSuggestionEvaluatorAdvancedTest >> testDetermineContextTypeWithComplexCode [
 	| evaluator testCases |
-	evaluator := CoSuggestionEvaluator new.
+	evaluator := CoPCSuggestionEvaluator new.
 	
 	testCases := {
 		'Class { #name : ''MyClass'', #superclass : ''Object'' }' -> #classDef.
@@ -64,7 +64,7 @@ CoSuggestionEvaluatorAdvancedTest >> testDetermineContextTypeWithComplexCode [
 	
 	testCases do: [ :case |
 		| context result |
-		context := CoPharoCopilotContext new.
+		context := CoPCContext new.
 		context source: case key.
 		result := evaluator determineContextType: context.
 		self assert: result equals: case value ]
@@ -73,14 +73,14 @@ CoSuggestionEvaluatorAdvancedTest >> testDetermineContextTypeWithComplexCode [
 { #category : 'tests' }
 CoSuggestionEvaluatorAdvancedTest >> testEvaluatorMemoryUsage [
 	| evaluator initialSize |
-	evaluator := CoSuggestionEvaluator new.
+	evaluator := CoPCSuggestionEvaluator new.
 	initialSize := evaluator acceptedEntries size + evaluator rejectedEntries size.
 	
 	"Add many entries"
 	1 to: 1000 do: [ :i |
 		| entry context |
 		entry := CoCopilotEntry contents: 'suggestion ', i asString.
-		context := CoPharoCopilotContext new.
+		context := CoPCContext new.
 		evaluator recordSuggestionAccepted: entry context: context ].
 	
 	self assert: evaluator acceptedEntries size equals: 1000.
@@ -91,8 +91,8 @@ CoSuggestionEvaluatorAdvancedTest >> testEvaluatorMemoryUsage [
 CoSuggestionEvaluatorAdvancedTest >> testGenerateReportWithVariedData [
 
 	| evaluator context report |
-	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new. "Create varied evaluation data"
+	evaluator := CoPCSuggestionEvaluator new.
+	context := CoPCContext new. "Create varied evaluation data"
 	evaluator recordSuggestionAccepted: (CoCopilotEntry contents: 'good suggestion') context: context.
 	evaluator recordSuggestionRejected: (CoCopilotEntry contents: 'bad suggestion') context: context reason: 'Wrong code'.
 

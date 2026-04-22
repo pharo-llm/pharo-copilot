@@ -1,5 +1,5 @@
 Class {
-	#name : 'CopilotContextSettings',
+	#name : 'CoPCContextSettings',
 	#superclass : 'Object',
 	#classInstVars : [
 		'mode'
@@ -9,20 +9,20 @@ Class {
 }
 
 { #category : 'capabilities' }
-CopilotContextSettings class >> availableModes [
+CoPCContextSettings class >> availableModes [
 
 	^ #( #fullSource #selectors )
 ]
 
 { #category : 'capabilities' }
-CopilotContextSettings class >> mode [
+CoPCContextSettings class >> mode [
 	"Possible values: #fullSource #selectors"
 
 	^ mode ifNil: [ mode := #fullSource ]
 ]
 
 { #category : 'capabilities' }
-CopilotContextSettings class >> mode: aSymbol [
+CoPCContextSettings class >> mode: aSymbol [
 
 	mode := (self availableModes includes: aSymbol)
 		ifTrue: [ aSymbol ]

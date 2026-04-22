@@ -10,7 +10,7 @@ Class {
 OModelCatalogTest >> testBuiltInModelPragmas [
 
         | pragmas uniqueFamiliesAndTags uniqueLabels |
-        pragmas := Pragma allNamed: #ollamaModel:tag:label: in: OModelCatalog class.
+        pragmas := Pragma allNamed: #ollamaModel:tag:label: in: CoPCModelCatalog class.
 
         self deny: pragmas isEmpty.
 

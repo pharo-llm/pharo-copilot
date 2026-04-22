@@ -78,7 +78,7 @@ CoPharoCopilotResultSetBuilderTest >> testClassContextIsCached [
 { #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromEmptyResponse [
 	| builder context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	context
 		source: 'foo bar';
 		position: 3.
@@ -212,7 +212,7 @@ CoPharoCopilotResultSetBuilderTest >> testDelayIsIdleWhenNoBoundaryTyped [
 CoPharoCopilotResultSetBuilderTest >> testInitializeOnContextSetsCompletionContext [
 
 	| builder context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	builder := CoPharoCopilotResultSetBuilder initializeOnContext: context.
 	self assert: builder completionContext identicalTo: context
 ]

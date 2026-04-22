@@ -12,14 +12,14 @@ Class {
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> setUp [
 	super setUp.
-	evaluator := CoSuggestionEvaluator new
+	evaluator := CoPCSuggestionEvaluator new
 ]
 
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testAcceptanceRateCalculation [
 
 	| context entry |
-	context := CoPharoCopilotContext new. 
+	context := CoPCContext new. 
 	entry := CoCopilotEntry contents: 'test1'.
 	evaluator recordSuggestionAccepted: entry context: context.
 
@@ -39,7 +39,7 @@ CoSuggestionEvaluatorTest >> testAcceptanceRateWithNoSuggestions [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testDetermineContextTypeAssignment [
 	| context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	context source: 'variable := value'.
 	
 	self assert: (evaluator determineContextType: context) equals: #assignment
@@ -48,7 +48,7 @@ CoSuggestionEvaluatorTest >> testDetermineContextTypeAssignment [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testDetermineContextTypeClassDefinition [
 	| context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	context source: 'Class { #name : ''MyClass'' }'.
 	
 	self assert: (evaluator determineContextType: context) equals: #classDef
@@ -58,7 +58,7 @@ CoSuggestionEvaluatorTest >> testDetermineContextTypeClassDefinition [
 CoSuggestionEvaluatorTest >> testDetermineContextTypeConditional [
 
 	| context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	context source: 'condition ifTrue: [ action ]'.
 
 	self assert: (evaluator determineContextType: context) equals: #condition
@@ -67,7 +67,7 @@ CoSuggestionEvaluatorTest >> testDetermineContextTypeConditional [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testDetermineContextTypeIteration [
 	| context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	context source: 'collection do: [ :each | process ]'.
 	
 	self assert: (evaluator determineContextType: context) equals: #iteration
@@ -76,7 +76,7 @@ CoSuggestionEvaluatorTest >> testDetermineContextTypeIteration [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testDetermineContextTypeMethod [
 	| context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	context source: 'methodName { #category : ''accessing'' }'.
 	
 	self assert: (evaluator determineContextType: context) equals: #method
@@ -85,7 +85,7 @@ CoSuggestionEvaluatorTest >> testDetermineContextTypeMethod [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testDetermineContextTypeOther [
 	| context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	context source: 'some random code'.
 	
 	self assert: (evaluator determineContextType: context) equals: #other
@@ -94,7 +94,7 @@ CoSuggestionEvaluatorTest >> testDetermineContextTypeOther [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testDetermineContextTypeReturn [
 	| context |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	context source: '^ result'.
 	
 	self assert: (evaluator determineContextType: context) equals: #return
@@ -118,7 +118,7 @@ CoSuggestionEvaluatorTest >> testInitialStatsStructure [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testRecordSuggestionAccepted [
 	| context entry |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	entry := CoCopilotEntry contents: 'test suggestion'.
 	
 	evaluator recordSuggestionAccepted: entry context: context.
@@ -132,7 +132,7 @@ CoSuggestionEvaluatorTest >> testRecordSuggestionAccepted [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testRecordSuggestionIgnored [
 	| context entry |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	entry := CoCopilotEntry contents: 'ignored suggestion'.
 	
 	evaluator recordSuggestionIgnored: entry context: context.
@@ -149,7 +149,7 @@ CoSuggestionEvaluatorTest >> testRecordSuggestionIgnored [
 CoSuggestionEvaluatorTest >> testRejectionRateCalculation [
 
 	| context |
-	context := CoPharoCopilotContext new. 
+	context := CoPCContext new. 
 	self assert: evaluator rejectionRate equals: 0. 
 	evaluator recordSuggestionAccepted: (CoCopilotEntry contents: 'accepted') context: context.
 evaluator recordSuggestionRejected: (CoCopilotEntry contents: 'rejected') context: context reason: 'Bad suggestion'.
@@ -188,7 +188,7 @@ CoSuggestionEvaluatorTest >> testSavePersistentStatsProducesJson [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testUpdateLengthStatsLongSuggestion [
 	| entry |
-	entry := CoEvaluationEntry new.
+	entry := CoPCEvaluationEntry new.
 	entry suggestion: (CoCopilotEntry contents: (String new: 100 withAll: $a)).
 	entry action: #accepted.
 	
@@ -200,7 +200,7 @@ CoSuggestionEvaluatorTest >> testUpdateLengthStatsLongSuggestion [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testUpdateLengthStatsMediumSuggestion [
 	| entry |
-	entry := CoEvaluationEntry new.
+	entry := CoPCEvaluationEntry new.
 	entry suggestion: (CoCopilotEntry contents: (String new: 30 withAll: $a)).
 	entry action: #accepted.
 	
@@ -212,7 +212,7 @@ CoSuggestionEvaluatorTest >> testUpdateLengthStatsMediumSuggestion [
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testUpdateLengthStatsShortSuggestion [
 	| entry |
-	entry := CoEvaluationEntry new.
+	entry := CoPCEvaluationEntry new.
 	entry suggestion: (CoCopilotEntry contents: 'short').
 	entry action: #accepted.
 	

@@ -15,21 +15,21 @@ OModelRegistryTest >> defaultModelsResponse [
 { #category : 'tests' }
 OModelRegistryTest >> setUp [
     super setUp.
-    OModelRegistry modelsFetcher: [ self defaultModelsResponse ].
-    OModelRegistry refresh
+    CoPCModelRegistry modelsFetcher: [ self defaultModelsResponse ].
+    CoPCModelRegistry refresh
 ]
 
 { #category : 'running' }
 OModelRegistryTest >> tearDown [
-    OModelRegistry modelsFetcher: nil.
-    OModelRegistry reset.
+    CoPCModelRegistry modelsFetcher: nil.
+    CoPCModelRegistry reset.
     super tearDown
 ]
 
 { #category : 'tests' }
 OModelRegistryTest >> testAllSpecsReturnsSortedArray [ 
 	| registry specs |
-	registry := OModelRegistry build.
+	registry := CoPCModelRegistry build.
 	specs := registry allSpecs.
 	
 	self assert: specs isArray.
@@ -43,7 +43,7 @@ OModelRegistryTest >> testAllSpecsReturnsSortedArray [
 { #category : 'tests' }
 OModelRegistryTest >> testBuildCreatesFilledRegistry [
 	| registry |
-	registry := OModelRegistry build.
+	registry := CoPCModelRegistry build.
 	
 	self assert: ((registry byFullName) isKindOf: Dictionary).
 	self assert: ((registry byLabel) isKindOf: Dictionary).
@@ -54,9 +54,9 @@ OModelRegistryTest >> testBuildCreatesFilledRegistry [
 { #category : 'tests' }
 OModelRegistryTest >> testCurrentReturnsValidRegistry [
 	| registry |
-	registry := OModelRegistry current.
+	registry := CoPCModelRegistry current.
 	
-	self assert: (registry isKindOf: OModelRegistry).
+	self assert: (registry isKindOf: CoPCModelRegistry).
 	self assert: registry byFullName notEmpty.
 	self assert: registry byLabel notEmpty
 ]
@@ -65,7 +65,7 @@ OModelRegistryTest >> testCurrentReturnsValidRegistry [
 OModelRegistryTest >> testDomainValuesForSettings [
 
 	| registry domain |
-	registry := OModelRegistry build.
+	registry := CoPCModelRegistry build.
 	domain := registry domainValuesForSettings.
 	self assert: domain size > 0.
 	self assert: (domain anySatisfy: [:assoc | assoc key = OTestModelSupport mockModelLabel and: [assoc value = OTestModelSupport mockModelName]]).
@@ -75,7 +75,7 @@ OModelRegistryTest >> testDomainValuesForSettings [
 OModelRegistryTest >> testDomainValuesForSettingsReturnAssociations [
 
     | registry domain |
-    registry := OModelRegistry build.
+    registry := CoPCModelRegistry build.
     domain := registry domainValuesForSettings.
     self assert: (domain allSatisfy: [ :assoc | assoc isKindOf: Association ]).
 ]
@@ -83,7 +83,7 @@ OModelRegistryTest >> testDomainValuesForSettingsReturnAssociations [
 { #category : 'tests' }
 OModelRegistryTest >> testDomainValuesForSettingsReturnsAssociations [ 
 	| registry domain |
-	registry := OModelRegistry build.
+	registry := CoPCModelRegistry build.
 	domain := registry domainValuesForSettings.
 	
 	self assert: domain isCollection.
@@ -97,7 +97,7 @@ OModelRegistryTest >> testDomainValuesForSettingsReturnsAssociations [
 OModelRegistryTest >> testRebuildHandlesEmptyPragmas [
 	"Test rebuilding works even when no pragmas are found"
 	| registry oldMethod |
-	registry := OModelRegistry new.
+	registry := CoPCModelRegistry new.
 	
 	"This should not fail even if pragma lookup fails"
 	registry rebuild.
@@ -110,34 +110,34 @@ OModelRegistryTest >> testRebuildHandlesEmptyPragmas [
 OModelRegistryTest >> testRebuildWithoutRemoteModelsDoesNotIncludeCatalogEntries [
 
         | registry |
-        OModelRegistry modelsFetcher: [
+        CoPCModelRegistry modelsFetcher: [
                         Dictionary new
                                 at: #models put: #(  );
                                 yourself ].
-        OModelRegistry refresh.
-        registry := OModelRegistry current.
+        CoPCModelRegistry refresh.
+        registry := CoPCModelRegistry current.
         self assert: registry byFullName size equals: 1.
     self assert: registry byLabel size equals: 1.
     self assert: (registry specByFullName: CopilotSettings nullModelFullName) notNil.
-        OModelRegistry modelsFetcher: [ self defaultModelsResponse ].
-        OModelRegistry refresh
+        CoPCModelRegistry modelsFetcher: [ self defaultModelsResponse ].
+        CoPCModelRegistry refresh
 ]
 
 { #category : 'tests' }
 OModelRegistryTest >> testRefreshRebuildsCurrent [
 
 	| old new |
-	old := OModelRegistry current.
-	new := OModelRegistry refresh.
+	old := CoPCModelRegistry current.
+	new := CoPCModelRegistry refresh.
 	self deny: old identicalTo: new.
-	self assert: OModelRegistry current identicalTo: new
+	self assert: CoPCModelRegistry current identicalTo: new
 ]
 
 { #category : 'tests' }
 OModelRegistryTest >> testRegistryAlwaysIncludesNullModel [
 
     | registry spec |
-    registry := OModelRegistry build.
+    registry := CoPCModelRegistry build.
     self assert: (registry specByFullName: CopilotSettings nullModelFullName) notNil.
     spec := registry specByLabel: 'Pharo Copilot (not configured)'.
     "self assert: spec notNil."
@@ -148,7 +148,7 @@ OModelRegistryTest >> testRegistryAlwaysIncludesNullModel [
 OModelRegistryTest >> testSpecLookupByFullNameAndLabel [
 
 	| registry spec |
-	registry := OModelRegistry build.
+	registry := CoPCModelRegistry build.
 	spec := registry specByFullName: OTestModelSupport mockModelName.
 	self assert: spec notNil.
 	self assert: spec label equals: OTestModelSupport mockModelLabel.
@@ -159,14 +159,14 @@ OModelRegistryTest >> testSpecLookupByFullNameAndLabel [
 OModelRegistryTest >> testSpecLookupByFullNameMissing [
 
     | registry |
-    registry := OModelRegistry build.
+    registry := CoPCModelRegistry build.
     self assert: (registry specByFullName: 'unknown') isNil.
 ]
 
 { #category : 'tests' }
 OModelRegistryTest >> testSpecLookupHandlesMissingKeys [
 	| registry |
-	registry := OModelRegistry build.
+	registry := CoPCModelRegistry build.
 	
 	self assert: (registry specByFullName: 'nonexistent:model') isNil.
 	self assert: (registry specByLabel: 'Nonexistent Model') isNil

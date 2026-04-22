@@ -73,7 +73,7 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 
 	| builder context classDefinition instanceSide classSide |
 
-	builder := selector ifNotNil: [ CopilotContextFactory forSelector: selector ].
+	builder := selector ifNotNil: [ CoPCContextFactory forSelector: selector ].
 	builder ifNotNil: [
 		^ builder buildForFIMWithPrefix: prefixString
 	].
@@ -1029,7 +1029,7 @@ CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefi
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> ollamaClient [ 
 
-	^ cachedClient ifNil: [ cachedClient := OllamaClient new ]
+	^ cachedClient ifNil: [ cachedClient := CoPCOllamaClient new ]
 ]
 
 { #category : 'new' }

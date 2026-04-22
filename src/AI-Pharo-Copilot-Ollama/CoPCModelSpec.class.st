@@ -5,7 +5,7 @@ It also knows how to produce the model's full name as expected by Ollama: 'famil
 
 "
 Class {
-	#name : 'OModelSpec',
+	#name : 'CoPCModelSpec',
 	#superclass : 'Object',
 	#instVars : [
 		'family',
@@ -17,7 +17,7 @@ Class {
 }
 
 { #category : 'instance creation' }
-OModelSpec class >> family: aFamilyString tag: aTagStringOrNil label: aLabelString [
+CoPCModelSpec class >> family: aFamilyString tag: aTagStringOrNil label: aLabelString [
 	"Create a model spec with a family name, optional tag, and a display label."
 
 	^ self new
@@ -28,21 +28,21 @@ OModelSpec class >> family: aFamilyString tag: aTagStringOrNil label: aLabelStri
 ]
 
 { #category : 'accessing' }
-OModelSpec >> family [
+CoPCModelSpec >> family [
 	"Answer the model family (base name)."
 
 	^ family
 ]
 
 { #category : 'accessing' }
-OModelSpec >> family: aFamilyString [
+CoPCModelSpec >> family: aFamilyString [
 	"Set the model family (base name)."
 
 	family := aFamilyString
 ]
 
 { #category : 'accessing' }
-OModelSpec >> fullName [
+CoPCModelSpec >> fullName [
 	"Answer the Ollama model identifier: 'family' when tag is nil, otherwise 'family:tag'."
 
 	^ tag
@@ -51,28 +51,28 @@ OModelSpec >> fullName [
 ]
 
 { #category : 'accessing' }
-OModelSpec >> label [
+CoPCModelSpec >> label [
 	"Answer the human-friendly label for this model."
 
 	^ label
 ]
 
 { #category : 'accessing' }
-OModelSpec >> label: aLabelString [
+CoPCModelSpec >> label: aLabelString [
 	"Set the human-friendly label for this model."
 
 	label := aLabelString
 ]
 
 { #category : 'accessing' }
-OModelSpec >> tag [
+CoPCModelSpec >> tag [
 	"Answer the model tag (version/variant) or nil if not set."
 
 	^ tag
 ]
 
 { #category : 'accessing' }
-OModelSpec >> tag: aTagStringOrNil [
+CoPCModelSpec >> tag: aTagStringOrNil [
 	"Set the model tag (version/variant). Use nil when there is no tag."
 
 	tag := aTagStringOrNil

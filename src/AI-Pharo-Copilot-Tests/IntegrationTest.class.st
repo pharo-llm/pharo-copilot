@@ -22,7 +22,7 @@ IntegrationTest >> testCopilotEntryActivationFlow [
 IntegrationTest >> testEngineAndBuilderIntegration [
 	| engine builder context |
 	engine := CoPharoCopilotCompletionEngine new.
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	builder := engine completionBuilder.
 	
 	"Test that engine and context work together"
@@ -33,15 +33,15 @@ IntegrationTest >> testEngineAndBuilderIntegration [
 { #category : 'tests' }
 IntegrationTest >> testModelRegistryAndClientIntegration [
 	| client registry spec |
-	client := OllamaClient new.
-	registry := OModelRegistry current.
+	client := CoPCOllamaClient new.
+	registry := CoPCModelRegistry current.
 	
 	"Test that client uses registry correctly"
 	spec := registry specByFullName: client class defaultModelFullName.
 	
 	"Should either find the spec or handle gracefully"
 	spec ifNotNil: [
-		self assert: (spec isKindOf: OModelSpec).
+		self assert: (spec isKindOf: CoPCModelSpec).
 		self assert: spec fullName isString ]
 ]
 
@@ -53,7 +53,7 @@ IntegrationTest >> testSettingsAndClientIntegration [
 	[
 		"Test settings integration with client"
 		CopilotSettings modelName: 'test:model'.
-		client := OllamaClient new.
+		client := CoPCOllamaClient new.
 		
 		self assert: (client instVarNamed: 'modelSpec') fullName equals: 'test:model'
 	] ensure: [
@@ -64,7 +64,7 @@ IntegrationTest >> testSettingsAndClientIntegration [
 { #category : 'tests' }
 IntegrationTest >> testSettingsAndRegistryIntegration [
 	| modelNames registry |
-	registry := OModelRegistry current.
+	registry := CoPCModelRegistry current.
 	modelNames := CopilotSettings availableModelNames.
 	
 	"Settings should return what registry provides"

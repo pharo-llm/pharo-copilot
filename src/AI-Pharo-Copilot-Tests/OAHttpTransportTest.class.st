@@ -23,7 +23,7 @@ OAHttpTransportTest >> replaceGlobal: aSymbol with: aReplacementClass during: aB
 OAHttpTransportTest >> testDefaultHeadersInitialization [
 
 	| transport |
-	transport := OAHttpTransport new.
+	transport := CoPCOAHttpTransport new.
 
 	self assert: ((transport defaultHeaders) isKindOf: Dictionary).
 	self assert: transport defaultHeaders isEmpty
@@ -32,7 +32,7 @@ OAHttpTransportTest >> testDefaultHeadersInitialization [
 { #category : 'tests' }
 OAHttpTransportTest >> testDefaultHostAndPort [
 	| transport |
-	transport := OAHttpTransport new.
+	transport := CoPCOAHttpTransport new.
 	
 	self assert: transport host equals: '127.0.0.1'.
 	self assert: transport port equals: 11434
@@ -46,7 +46,7 @@ OAHttpTransportTest >> testGetJsonUsesConfiguredHostAndPort [
         OAHttpTransportEasyDouble reset.
         OAHttpTransportClientDouble nextGetResult: (Dictionary newFromPairs: { 'ok'. true }).
 
-        transport := OAHttpTransport new.
+        transport := CoPCOAHttpTransport new.
         transport host: 'api.internal'.
         transport port: 5151.
 
@@ -64,7 +64,7 @@ OAHttpTransportTest >> testGetJsonUsesConfiguredHostAndPort [
 { #category : 'tests' }
 OAHttpTransportTest >> testHostPortSetters [
 	| transport |
-	transport := OAHttpTransport new.
+	transport := CoPCOAHttpTransport new.
 	
 	transport host: '192.168.1.1'.
 	transport port: 8080.
@@ -82,7 +82,7 @@ OAHttpTransportTest >> testInitializationUsesCopilotSettingsHostAndPort [
         CopilotSettings host: '10.0.0.42'.
         CopilotSettings port: 4242.
 
-        transport := OAHttpTransport new.
+        transport := CoPCOAHttpTransport new.
 
         self assert: transport host equals: '10.0.0.42'.
         self assert: transport port equals: 4242
@@ -101,7 +101,7 @@ OAHttpTransportTest >> testInitializationUsesCopilotSettingsTimeout [
         CopilotSettings requestTimeoutSeconds: 12.
         self replaceGlobal: #ZnEasy with: OAHttpTransportEasyDouble during: [
             OAHttpTransportEasyDouble reset.
-            transport := OAHttpTransport new.
+            transport := CoPCOAHttpTransport new.
             transport getJsonAt: '/models'.
             client := OAHttpTransportClientDouble lastCreated.
             self assert: client timeoutSeconds equals: 12
@@ -112,7 +112,7 @@ OAHttpTransportTest >> testInitializationUsesCopilotSettingsTimeout [
 { #category : 'tests' }
 OAHttpTransportTest >> testJsonReaderWriterInitialization [
 	| transport |
-	transport := OAHttpTransport new.
+	transport := CoPCOAHttpTransport new.
 	
 	self assert: transport jsonReader notNil.
 	self assert: transport jsonWriter notNil
@@ -131,7 +131,7 @@ OAHttpTransportTest >> testPostJsonUsesCustomReaderAndWriter [
 				reader := OAHttpTransportJsonReaderDouble new.
 				payload := Dictionary newFromPairs: { 'prompt'. 'generate' }.
 
-				transport := OAHttpTransport new.
+				transport := CoPCOAHttpTransport new.
 				transport host: 'post.host'.
 				transport port: 4040.
 				transport jsonWriter: writer.
@@ -152,8 +152,8 @@ OAHttpTransportTest >> testPostJsonUsesCustomReaderAndWriter [
 OAHttpTransportTest >> testSeparateDefaultHeadersPerInstance [
 
     | first second |
-    first := OAHttpTransport new.
-    second := OAHttpTransport new.
+    first := CoPCOAHttpTransport new.
+    second := CoPCOAHttpTransport new.
 
     first defaultHeaders at: 'X-Test' put: 'one'.
 

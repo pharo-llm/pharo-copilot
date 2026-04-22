@@ -4,7 +4,7 @@ returns Smalltalk objects by sending/receiving JSON over HTTP (GET and POST).
 It centralizes host/port, JSON encoding/decoding, and default headers.
 "
 Class {
-	#name : 'OAHttpTransport',
+	#name : 'CoPCOAHttpTransport',
 	#superclass : 'Object',
 	#instVars : [
 		'host',
@@ -18,7 +18,7 @@ Class {
 }
 
 { #category : 'private' }
-OAHttpTransport >> applyDefaultHeadersTo: aClient [
+CoPCOAHttpTransport >> applyDefaultHeadersTo: aClient [
 	"Apply the transport default headers to the given client."
 
 	defaultHeaders keysAndValuesDo: [ :key :value |
@@ -26,7 +26,7 @@ OAHttpTransport >> applyDefaultHeadersTo: aClient [
 ]
 
 { #category : 'private' }
-OAHttpTransport >> configureJsonOn: aClient [
+CoPCOAHttpTransport >> configureJsonOn: aClient [
 	"Configure JSON accept/content reader/writer on the given client using the transport JSON reader/writer."
 
 	aClient accept: ZnMimeType applicationJson.
@@ -39,21 +39,21 @@ OAHttpTransport >> configureJsonOn: aClient [
 ]
 
 { #category : 'accessing' }
-OAHttpTransport >> defaultHeaders [
+CoPCOAHttpTransport >> defaultHeaders [
 	"Answer the dictionary of headers applied to every request."
 
 	^ defaultHeaders
 ]
 
 { #category : 'accessing' }
-OAHttpTransport >> defaultHeaders: aDictionary [
+CoPCOAHttpTransport >> defaultHeaders: aDictionary [
 	"Set the dictionary of headers applied to every request."
 
 	defaultHeaders := aDictionary
 ]
 
 { #category : 'requests' }
-OAHttpTransport >> getJsonAt: aPath [
+CoPCOAHttpTransport >> getJsonAt: aPath [
 	"Perform a GET request on the given path and answer the decoded JSON response."
 
 	| client |
@@ -62,21 +62,21 @@ OAHttpTransport >> getJsonAt: aPath [
 ]
 
 { #category : 'accessing' }
-OAHttpTransport >> host [
+CoPCOAHttpTransport >> host [
 	"Answer the configured host used for requests."
 
 	^ host
 ]
 
 { #category : 'accessing' }
-OAHttpTransport >> host: anObject [
+CoPCOAHttpTransport >> host: anObject [
 	"Set the host used for requests."
 
 	host := anObject
 ]
 
 { #category : 'initialization' }
-OAHttpTransport >> initialize [
+CoPCOAHttpTransport >> initialize [
 	"Initialize the transport with settings (host/port), JSON reader/writer, and an empty default header set."
 
 	super initialize.
@@ -88,35 +88,35 @@ OAHttpTransport >> initialize [
 ]
 
 { #category : 'accessing' }
-OAHttpTransport >> jsonReader [
+CoPCOAHttpTransport >> jsonReader [
 	"Answer the JSON reader used to decode responses."
 
 	^ jsonReader
 ]
 
 { #category : 'accessing' }
-OAHttpTransport >> jsonReader: anObject [
+CoPCOAHttpTransport >> jsonReader: anObject [
 	"Set the JSON reader used to decode responses."
 
 	jsonReader := anObject
 ]
 
 { #category : 'accessing' }
-OAHttpTransport >> jsonWriter [
+CoPCOAHttpTransport >> jsonWriter [
 	"Answer the JSON writer used to encode request bodies."
 
 	^ jsonWriter
 ]
 
 { #category : 'accessing' }
-OAHttpTransport >> jsonWriter: anObject [
+CoPCOAHttpTransport >> jsonWriter: anObject [
 	"Set the JSON writer used to encode request bodies."
 
 	jsonWriter := anObject
 ]
 
 { #category : 'private' }
-OAHttpTransport >> newJsonClientForPath: aPath [
+CoPCOAHttpTransport >> newJsonClientForPath: aPath [
 	"Create and configure a Zinc client for JSON REST calls using ZnEasy (so tests can replace it)."
 
 	| client |
@@ -135,28 +135,28 @@ OAHttpTransport >> newJsonClientForPath: aPath [
 ]
 
 { #category : 'accessing' }
-OAHttpTransport >> port [
+CoPCOAHttpTransport >> port [
 	"Answer the configured port used for requests."
 
 	^ port
 ]
 
 { #category : 'accessing' }
-OAHttpTransport >> port: anObject [
+CoPCOAHttpTransport >> port: anObject [
 	"Set the port used for requests."
 
 	port := anObject
 ]
 
 { #category : 'requests' }
-OAHttpTransport >> postJsonAt: aPath body: aDictionary [
+CoPCOAHttpTransport >> postJsonAt: aPath body: aDictionary [
 	"Perform a POST request on the given path with the given object as JSON body, answering the decoded JSON response."
 
 	^ self postJsonAt: aPath body: aDictionary timeoutSeconds: nil
 ]
 
 { #category : 'requests' }
-OAHttpTransport >> postJsonAt: aPath body: aDictionary timeoutSeconds: timeoutSeconds [
+CoPCOAHttpTransport >> postJsonAt: aPath body: aDictionary timeoutSeconds: timeoutSeconds [
 	"Perform a POST request with an optional timeout override."
 
 	| client |

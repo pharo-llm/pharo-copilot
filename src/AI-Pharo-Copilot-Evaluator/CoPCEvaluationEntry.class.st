@@ -1,5 +1,5 @@
 Class {
-	#name : 'CoEvaluationEntry',
+	#name : 'CoPCEvaluationEntry',
 	#superclass : 'Object',
 	#instVars : [
 		'suggestion',
@@ -14,62 +14,62 @@ Class {
 }
 
 { #category : 'accessing' }
-CoEvaluationEntry >> action [
+CoPCEvaluationEntry >> action [
 	^ action
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> action: aSymbol [ 
+CoPCEvaluationEntry >> action: aSymbol [ 
 	"#accepted, #rejected, or #ignored"
 	action := aSymbol
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> context [
+CoPCEvaluationEntry >> context [
 	^ context
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> context: aCompletionContext [
+CoPCEvaluationEntry >> context: aCompletionContext [
 	context := aCompletionContext
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> metadata [
+CoPCEvaluationEntry >> metadata [
 	^ metadata ifNil: [ metadata := Dictionary new ]
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> metadata: aDictionary [
+CoPCEvaluationEntry >> metadata: aDictionary [
 	metadata := aDictionary
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> rejectionReason [
+CoPCEvaluationEntry >> rejectionReason [
 	^ rejectionReason
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> rejectionReason: aString [
+CoPCEvaluationEntry >> rejectionReason: aString [
 	rejectionReason := aString
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> suggestion [ 
+CoPCEvaluationEntry >> suggestion [ 
 	^ suggestion
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> suggestion: aCopilotEntry [
+CoPCEvaluationEntry >> suggestion: aCopilotEntry [
 	suggestion := aCopilotEntry
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> timestamp [
+CoPCEvaluationEntry >> timestamp [
 	^ timestamp
 ]
 
 { #category : 'accessing' }
-CoEvaluationEntry >> timestamp: aDateAndTime [
+CoPCEvaluationEntry >> timestamp: aDateAndTime [
 	timestamp := aDateAndTime
 ]

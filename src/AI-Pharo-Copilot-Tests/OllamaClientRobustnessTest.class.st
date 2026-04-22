@@ -9,7 +9,7 @@ Class {
 { #category : 'tests' }
 OllamaClientRobustnessTest >> testNormalizeResponseWithCorruptedJsonStructures [
 	| client testCases |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	
 	testCases := {
 		'{"response":}' -> '{"response":}'.
@@ -30,7 +30,7 @@ OllamaClientRobustnessTest >> testNormalizeResponseWithCorruptedJsonStructures [
 { #category : 'tests' }
 OllamaClientRobustnessTest >> testNormalizeResponseWithDeeplyNestedJson [
 	| client deepJson result |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	deepJson := '{"level1":{"level2":{"level3":{"response":"deep value"}}}}'.
 	
 	result := client normalizeResponse: deepJson.
@@ -40,7 +40,7 @@ OllamaClientRobustnessTest >> testNormalizeResponseWithDeeplyNestedJson [
 { #category : 'tests' }
 OllamaClientRobustnessTest >> testNormalizeResponseWithLargeJsonResponse [
 	| client largeContent jsonString result |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	largeContent := String new: 10000 withAll: $x.
 	jsonString := '{"response":"', largeContent, '","done":true}'.
 	
@@ -51,7 +51,7 @@ OllamaClientRobustnessTest >> testNormalizeResponseWithLargeJsonResponse [
 { #category : 'tests' }
 OllamaClientRobustnessTest >> testUseModelNamedWithInvalidCharacters [
 	| client spec |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	client useModelNamed: 'invalid/model:name'.
 	
 	spec := client instVarNamed: 'modelSpec'.
@@ -62,7 +62,7 @@ OllamaClientRobustnessTest >> testUseModelNamedWithInvalidCharacters [
 { #category : 'tests' }
 OllamaClientRobustnessTest >> testUseModelNamedWithMultipleColons [
 	| client spec |
-	client := OllamaClient new.
+	client := CoPCOllamaClient new.
 	client useModelNamed: 'family:tag:extra:parts'.
 	
 	spec := client instVarNamed: 'modelSpec'.

@@ -5,7 +5,7 @@ models reported by the Ollama server, and lets clients look them up by full name
 
 "
 Class {
-	#name : 'OModelRegistry',
+	#name : 'CoPCModelRegistry',
 	#superclass : 'Object',
 	#instVars : [
 		'byFullName',
@@ -20,7 +20,7 @@ Class {
 }
 
 { #category : 'building' }
-OModelRegistry class >> build [
+CoPCModelRegistry class >> build [
 
 	| registry |
 	registry := self new.
@@ -29,14 +29,14 @@ OModelRegistry class >> build [
 ]
 
 { #category : 'building' }
-OModelRegistry class >> current [
+CoPCModelRegistry class >> current [
 	"Answer the cached registry; create and rebuild it if it does not exist yet."
 
 	^ current ifNil: [ self refresh ]
 ]
 
 { #category : 'class initialization' }
-OModelRegistry class >> fetchModelsResponse [
+CoPCModelRegistry class >> fetchModelsResponse [
 	"Fetch the server response for the models list, or an empty dictionary if unavailable."
 
 	| client |
@@ -49,21 +49,21 @@ OModelRegistry class >> fetchModelsResponse [
 ]
 
 { #category : 'class initialization' }
-OModelRegistry class >> modelsFetcher [
+CoPCModelRegistry class >> modelsFetcher [
 	"Optional override hook to fetch models (useful for tests)."
 
 	^ modelsFetcher
 ]
 
 { #category : 'class initialization' }
-OModelRegistry class >> modelsFetcher: aBlock [
+CoPCModelRegistry class >> modelsFetcher: aBlock [
 	"Set an optional override hook to fetch models (useful for tests)."
 
 	modelsFetcher := aBlock
 ]
 
 { #category : 'building' }
-OModelRegistry class >> refresh [
+CoPCModelRegistry class >> refresh [
 	"Rebuild and replace the cached registry.
 	Important: set #current BEFORE rebuilding to avoid recursion if modelsFetcher calls #current."
 
@@ -73,7 +73,7 @@ OModelRegistry class >> refresh [
 ]
 
 { #category : 'class initialization' }
-OModelRegistry class >> reset [
+CoPCModelRegistry class >> reset [
 	"Clear the cached registry (useful for development / scripting)."
 	<script>
 
@@ -81,32 +81,32 @@ OModelRegistry class >> reset [
 ]
 
 { #category : 'private' }
-OModelRegistry >> addKnownSpecsExceptNullFrom: knownSpecs [
+CoPCModelRegistry >> addKnownSpecsExceptNullFrom: knownSpecs [
 	"Add all pragma-defined specs except the null model (already added first)."
 
 	| nullFullName |
-	nullFullName := OllamaClient nullModelFullName.
+	nullFullName := CoPCOllamaClient nullModelFullName.
 
 	knownSpecs valuesDo: [ :spec |
 		spec fullName = nullFullName ifFalse: [ self addSpec: spec ] ]
 ]
 
 { #category : 'private' }
-OModelRegistry >> addNullSpecFromKnownSpecs: knownSpecs [
+CoPCModelRegistry >> addNullSpecFromKnownSpecs: knownSpecs [
 	"Ensure the null model spec is present and added first."
 
 	| nullFullName nullSpec |
-	nullFullName := OllamaClient nullModelFullName.
+	nullFullName := CoPCOllamaClient nullModelFullName.
 
 	nullSpec := knownSpecs
 		at: nullFullName
-		ifAbsent: [ OModelSpec family: nullFullName tag: nil label: 'Pharo Null Copilot' ].
+		ifAbsent: [ CoPCModelSpec family: nullFullName tag: nil label: 'Pharo Null Copilot' ].
 
 	self addSpec: nullSpec
 ]
 
 { #category : 'private' }
-OModelRegistry >> addRemoteModelsUsingKnownSpecs: knownSpecs [
+CoPCModelRegistry >> addRemoteModelsUsingKnownSpecs: knownSpecs [
 	"Fetch server models and add them, reusing known specs when possible."
 
 	| response models |
@@ -128,7 +128,7 @@ OModelRegistry >> addRemoteModelsUsingKnownSpecs: knownSpecs [
 ]
 
 { #category : 'accessing' }
-OModelRegistry >> addSpec: aSpec [
+CoPCModelRegistry >> addSpec: aSpec [
 	"Add a spec to both indexes (full name and label)."
 
 	aSpec ifNil: [ ^ self ].
@@ -137,7 +137,7 @@ OModelRegistry >> addSpec: aSpec [
 ]
 
 { #category : 'accessing' }
-OModelRegistry >> allSpecs [
+CoPCModelRegistry >> allSpecs [
 	"Answer all specs sorted by their label."
 
 	^ (self byFullName values
@@ -145,33 +145,33 @@ OModelRegistry >> allSpecs [
 ]
 
 { #category : 'accessing' }
-OModelRegistry >> byFullName [
+CoPCModelRegistry >> byFullName [
 	"Answer the dictionary indexed by full model name."
 
 	^ byFullName ifNil: [ byFullName := Dictionary new ]
 ]
 
 { #category : 'accessing' }
-OModelRegistry >> byFullName: anObject [
+CoPCModelRegistry >> byFullName: anObject [
 
 	byFullName := anObject
 ]
 
 { #category : 'accessing' }
-OModelRegistry >> byLabel [
+CoPCModelRegistry >> byLabel [
 	"Answer the dictionary indexed by user-visible label."
 
 	^ byLabel ifNil: [ byLabel := Dictionary new ]
 ]
 
 { #category : 'accessing' }
-OModelRegistry >> byLabel: anObject [
+CoPCModelRegistry >> byLabel: anObject [
 
 	byLabel := anObject
 ]
 
 { #category : 'private' }
-OModelRegistry >> collectKnownSpecsFromPragmas [
+CoPCModelRegistry >> collectKnownSpecsFromPragmas [
 	"Collect friendly model specs declared in the image via pragmas."
 
 	| knownSpecs |
@@ -183,7 +183,7 @@ OModelRegistry >> collectKnownSpecsFromPragmas [
 		tag := pragma arguments second.
 		label := pragma arguments third.
 
-		spec := OModelSpec family: family tag: tag label: label.
+		spec := CoPCModelSpec family: family tag: tag label: label.
 		knownSpecs at: spec fullName put: spec
 	].
 
@@ -191,14 +191,14 @@ OModelRegistry >> collectKnownSpecsFromPragmas [
 ]
 
 { #category : 'building' }
-OModelRegistry >> domainValuesForSettings [
+CoPCModelRegistry >> domainValuesForSettings [
 	"Answer { label -> fullName } pairs, sorted by label (for settings UI)."
 
 	^ (self allSpecs collect: [ :spec | spec label -> spec fullName ]) asArray
 ]
 
 { #category : 'private' }
-OModelRegistry >> familyFromFullName: fullName [
+CoPCModelRegistry >> familyFromFullName: fullName [
 	"Extract the family part from a full name."
 
 	| tokens |
@@ -208,7 +208,7 @@ OModelRegistry >> familyFromFullName: fullName [
 ]
 
 { #category : 'initialization' }
-OModelRegistry >> initialize [
+CoPCModelRegistry >> initialize [
 	"Initialize indexes."
 
 	super initialize.
@@ -216,7 +216,7 @@ OModelRegistry >> initialize [
 ]
 
 { #category : 'private' }
-OModelRegistry >> modelNameFromEntry: modelEntry [
+CoPCModelRegistry >> modelNameFromEntry: modelEntry [
 	"Extract a model name from a model entry supporting symbol or string keys."
 
 	modelEntry ifNil: [ ^ nil ].
@@ -224,7 +224,7 @@ OModelRegistry >> modelNameFromEntry: modelEntry [
 ]
 
 { #category : 'private' }
-OModelRegistry >> modelsFromResponse: response [
+CoPCModelRegistry >> modelsFromResponse: response [
 	"Extract the models collection from a server response supporting symbol or string keys."
 
 	| models |
@@ -235,7 +235,7 @@ OModelRegistry >> modelsFromResponse: response [
 ]
 
 { #category : 'building' }
-OModelRegistry >> prettifiedTokenForLabel: aString [
+CoPCModelRegistry >> prettifiedTokenForLabel: aString [
 	"Prettify a token: keep digit-leading tokens uppercase, otherwise capitalize."
 
 	aString ifEmpty: [ ^ aString ].
@@ -246,7 +246,7 @@ OModelRegistry >> prettifiedTokenForLabel: aString [
 ]
 
 { #category : 'building' }
-OModelRegistry >> rebuild [
+CoPCModelRegistry >> rebuild [
 	"Rebuild the registry from pragmas (known specs) and the server model list."
 
 	| knownSpecs |
@@ -259,7 +259,7 @@ OModelRegistry >> rebuild [
 ]
 
 { #category : 'initialization' }
-OModelRegistry >> resetIndexes [
+CoPCModelRegistry >> resetIndexes [
 	"Reset internal indexes to empty dictionaries."
 
 	byFullName := Dictionary new.
@@ -267,21 +267,21 @@ OModelRegistry >> resetIndexes [
 ]
 
 { #category : 'building' }
-OModelRegistry >> specByFullName: aString [
+CoPCModelRegistry >> specByFullName: aString [
 	"Lookup a spec by its full name. Answer nil if missing."
 
 	^ self byFullName at: aString ifAbsent: [ nil ]
 ]
 
 { #category : 'building' }
-OModelRegistry >> specByLabel: aString [
+CoPCModelRegistry >> specByLabel: aString [
 	"Lookup a spec by its label. Answer nil if missing."
 
 	^ self byLabel at: aString ifAbsent: [ nil ]
 ]
 
 { #category : 'private' }
-OModelRegistry >> specForModelNamed: fullName knownSpecs: knownSpecs [
+CoPCModelRegistry >> specForModelNamed: fullName knownSpecs: knownSpecs [
 	"Return an OModelSpec for a server model name, using a known spec if available."
 
 	^ knownSpecs
@@ -290,21 +290,21 @@ OModelRegistry >> specForModelNamed: fullName knownSpecs: knownSpecs [
 ]
 
 { #category : 'private' }
-OModelRegistry >> specFromFullName: fullName [
+CoPCModelRegistry >> specFromFullName: fullName [
 	"Build a spec from a full model name (e.g. 'family:tag'), generating a friendly label."
 
 	| family tag |
 	family := self familyFromFullName: fullName.
 	tag := self tagFromFullName: fullName.
 
-	^ OModelSpec
+	^ CoPCModelSpec
 		family: family
 		tag: tag
 		label: (self userFriendlyLabelForModelNamed: fullName)
 ]
 
 { #category : 'private' }
-OModelRegistry >> tagFromFullName: fullName [
+CoPCModelRegistry >> tagFromFullName: fullName [
 	"Extract the tag part from a full name, preserving ':' inside multi-part tags."
 
 	| tokens |
@@ -318,7 +318,7 @@ OModelRegistry >> tagFromFullName: fullName [
 ]
 
 { #category : 'building' }
-OModelRegistry >> userFriendlyLabelForModelNamed: aString [
+CoPCModelRegistry >> userFriendlyLabelForModelNamed: aString [
 	"Convert a model full name into a readable label (tokenized on :-_)."
 
 	| tokens |

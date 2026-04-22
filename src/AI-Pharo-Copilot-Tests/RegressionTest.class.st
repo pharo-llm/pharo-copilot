@@ -22,12 +22,12 @@ RegressionTest >> testCleanedContentFromDoesNotAlterOriginalString [
 { #category : 'tests' }
 RegressionTest >> testDefaultModelConsistency [
         | defaultModel oldModel client1 client2 |
-        defaultModel := OllamaClient defaultModelFullName.
+        defaultModel := CoPCOllamaClient defaultModelFullName.
         oldModel := CopilotSettings modelName.
         [
                 CopilotSettings modelName: defaultModel.
-                client1 := OllamaClient new.
-                client2 := OllamaClient new.
+                client1 := CoPCOllamaClient new.
+                client2 := CoPCOllamaClient new.
                 self assert: (client1 instVarNamed: 'modelSpec') fullName equals: defaultModel.
                 self assert: (client2 instVarNamed: 'modelSpec') fullName equals: defaultModel.
                 self
@@ -41,10 +41,10 @@ RegressionTest >> testEvaluatorDefaultInstanceConsistency [
 	| evaluator1 evaluator2 |
 	
 	"Reset to ensure clean state"
-	CoSuggestionEvaluator reset.
+	CoPCSuggestionEvaluator reset.
 	
-	evaluator1 := CoSuggestionEvaluator default.
-	evaluator2 := CoSuggestionEvaluator default.
+	evaluator1 := CoPCSuggestionEvaluator default.
+	evaluator2 := CoPCSuggestionEvaluator default.
 	
 	"Should return same instance"
 	self assert: evaluator1 identicalTo: evaluator2
@@ -53,8 +53,8 @@ RegressionTest >> testEvaluatorDefaultInstanceConsistency [
 { #category : 'tests' }
 RegressionTest >> testRegistryCurrentInstanceConsistency [
 	| registry1 registry2 |
-	registry1 := OModelRegistry current.
-	registry2 := OModelRegistry current.
+	registry1 := CoPCModelRegistry current.
+	registry2 := CoPCModelRegistry current.
 	
 	"Should return same instance"
 	self assert: registry1 identicalTo: registry2

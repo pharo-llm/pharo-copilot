@@ -9,8 +9,8 @@ Class {
 { #category : 'tests' }
 ConcurrencyTest >> testConcurrentEvaluatorAccess [
 	| evaluator results context |
-	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new.
+	evaluator := CoPCSuggestionEvaluator new.
+	context := CoPCContext new.
 	results := OrderedCollection new.
 	
 	"Simulate concurrent access"
@@ -47,7 +47,7 @@ ConcurrencyTest >> testConcurrentSettingsModification [
 { #category : 'tests' }
 ConcurrencyTest >> testSequentialRefreshCreatesNewInstances [
 	| registries |
-	registries := (Array new: 5) collect: [:i | OModelRegistry refresh ].
+	registries := (Array new: 5) collect: [:i | CoPCModelRegistry refresh ].
 	self deny: ((IdentitySet newFrom: registries) size = 1).
-	self assert: (registries last) identicalTo: OModelRegistry current.
+	self assert: (registries last) identicalTo: CoPCModelRegistry current.
 ]

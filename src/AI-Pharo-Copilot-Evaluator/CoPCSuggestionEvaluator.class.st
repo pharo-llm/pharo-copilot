@@ -21,7 +21,7 @@ View current statistics:
    CoSuggestionEvaluator default rejectedEntries inspect
 "
 Class {
-	#name : 'CoSuggestionEvaluator',
+	#name : 'CoPCSuggestionEvaluator',
 	#superclass : 'Object',
 	#instVars : [
 		'acceptedEntries',
@@ -37,18 +37,18 @@ Class {
 }
 
 { #category : 'accessing' }
-CoSuggestionEvaluator class >> default [
+CoPCSuggestionEvaluator class >> default [
 	^ default ifNil: [ default := self new ]
 ]
 
 { #category : 'accessing' }
-CoSuggestionEvaluator class >> reset [
+CoPCSuggestionEvaluator class >> reset [
 	<script>
 	default := nil
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> acceptanceRate [
+CoPCSuggestionEvaluator >> acceptanceRate [
 
 	| total accepted |
 	total := sessionStats at: #totalSuggestions ifAbsent: [ 0 ].
@@ -58,20 +58,20 @@ CoSuggestionEvaluator >> acceptanceRate [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> acceptedEntries [
+CoPCSuggestionEvaluator >> acceptedEntries [
 	^ acceptedEntries
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> announceEvaluation: anEvaluationEntry [
+CoPCSuggestionEvaluator >> announceEvaluation: anEvaluationEntry [
 	"Send announcement for potential model training/improvement"
-	SystemAnnouncer uniqueInstance announce: (CoEvaluationAnnouncement new
+	SystemAnnouncer uniqueInstance announce: (CoPCEvaluationAnnouncement new
 		entry: anEvaluationEntry;
 		yourself)
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> appendEvaluationEntry: anEvaluationEntry [
+CoPCSuggestionEvaluator >> appendEvaluationEntry: anEvaluationEntry [
 	| evaluationFile data safeData |
 	CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
 
@@ -101,13 +101,13 @@ CoSuggestionEvaluator >> appendEvaluationEntry: anEvaluationEntry [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> conditionSelectors [
+CoPCSuggestionEvaluator >> conditionSelectors [
 	^ #(' ifTrue:' ' ifFalse:' ' ifNil:' ' ifNotNil:' ' ifEmpty:' ' ifNotEmpty:' ' ifPresent:' ' ifAbsent:').
 
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> determineContextType: aContext [
+CoPCSuggestionEvaluator >> determineContextType: aContext [
 
         | src |
         aContext isNil ifTrue: [ ^ #other ].
@@ -131,7 +131,7 @@ CoSuggestionEvaluator >> determineContextType: aContext [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> exportToCSV: filename [
+CoPCSuggestionEvaluator >> exportToCSV: filename [
 	"Export evaluation data to CSV for external analysis"
 	| entries |
 	entries := OrderedCollection new.
@@ -155,21 +155,21 @@ CoSuggestionEvaluator >> exportToCSV: filename [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> generateReport [
+CoPCSuggestionEvaluator >> generateReport [
 	"Generate a comprehensive evaluation report"
-	^ CoEvaluationReport new
+	^ CoPCEvaluationReport new
 		evaluator: self;
 		generate
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> hasAnyTopLevel: tokens in: src [
+CoPCSuggestionEvaluator >> hasAnyTopLevel: tokens in: src [
 	^ tokens anySatisfy: [ :tok | self hasTopLevel: tok in: src ].
 
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> hasTopLevel: token in: src [
+CoPCSuggestionEvaluator >> hasTopLevel: token in: src [
 "Find TOKEN only when not inside (), [], {}, strings (''...''), or comments (""..."" )."
         | stream depthPar depthBracket depthBrace inStr inCmt quote lookAhead |
         src ifNil: [ ^ false ].
@@ -206,7 +206,7 @@ CoSuggestionEvaluator >> hasTopLevel: token in: src [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> initialize [
+CoPCSuggestionEvaluator >> initialize [
 
 	super initialize.
 	acceptedEntries := OrderedCollection new.
@@ -217,7 +217,7 @@ CoSuggestionEvaluator >> initialize [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> initializeStats [ 
+CoPCSuggestionEvaluator >> initializeStats [ 
 	sessionStats
 		at: #totalSuggestions put: 0;
 		at: #totalAccepted put: 0;
@@ -229,7 +229,7 @@ CoSuggestionEvaluator >> initializeStats [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> isClassDef: src [
+CoPCSuggestionEvaluator >> isClassDef: src [
 
 	        | normalized |
         normalized := src asString.
@@ -238,20 +238,20 @@ CoSuggestionEvaluator >> isClassDef: src [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> isMethodDef: src [
+CoPCSuggestionEvaluator >> isMethodDef: src [
 	"e.g., 'method: arg { #category : ''accessing'' } ...'"
 	^ (src findString: '{' startingAt: 1) > 0
 	  and: [ (src findString: '#category' startingAt: 1) > 0 ].
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> iterationSelectors [
+CoPCSuggestionEvaluator >> iterationSelectors [
 	^ #(' do:' ' collect:' ' select:' ' reject:' ' detect:' ' inject:into:'
 	    ' anySatisfy:' ' allSatisfy:' ' noneSatisfy:' ' withIndexDo:' ' keysAndValuesDo:' ' timesRepeat:').
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> jsonSafeObject: anObject [
+CoPCSuggestionEvaluator >> jsonSafeObject: anObject [
         anObject isNil ifTrue: [ ^ nil ].
 
         (anObject isString or: [ anObject isKindOf: Text ]) ifTrue: [ ^ anObject asString ].
@@ -280,7 +280,7 @@ CoSuggestionEvaluator >> jsonSafeObject: anObject [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> loadPersistentStats [
+CoPCSuggestionEvaluator >> loadPersistentStats [
 	"Load previous evaluation data if available"
 CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
 	[
@@ -302,10 +302,10 @@ CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> recordSuggestionAccepted: aCopilotEntry context: aCompletionContext [
+CoPCSuggestionEvaluator >> recordSuggestionAccepted: aCopilotEntry context: aCompletionContext [
 	| evaluationEntry |
 	
-	evaluationEntry := CoEvaluationEntry new
+	evaluationEntry := CoPCEvaluationEntry new
 		suggestion: aCopilotEntry;
 		context: aCompletionContext;
 		timestamp: DateAndTime now;
@@ -321,10 +321,10 @@ CoSuggestionEvaluator >> recordSuggestionAccepted: aCopilotEntry context: aCompl
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> recordSuggestionIgnored: aCopilotEntry context: aCompletionContext [
+CoPCSuggestionEvaluator >> recordSuggestionIgnored: aCopilotEntry context: aCompletionContext [
 	| evaluationEntry |
 	
-	evaluationEntry := CoEvaluationEntry new
+	evaluationEntry := CoPCEvaluationEntry new
 		suggestion: aCopilotEntry;
 		context: aCompletionContext;
 		timestamp: DateAndTime now;
@@ -336,10 +336,10 @@ CoSuggestionEvaluator >> recordSuggestionIgnored: aCopilotEntry context: aComple
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> recordSuggestionRejected: aCopilotEntry context: aCompletionContext reason: aString [
+CoPCSuggestionEvaluator >> recordSuggestionRejected: aCopilotEntry context: aCompletionContext reason: aString [
 
 	| evaluationEntry |
-	evaluationEntry := CoEvaluationEntry new
+	evaluationEntry := CoPCEvaluationEntry new
 		suggestion: aCopilotEntry;
 		context: aCompletionContext;
 		timestamp: DateAndTime now;
@@ -353,12 +353,12 @@ CoSuggestionEvaluator >> recordSuggestionRejected: aCopilotEntry context: aCompl
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> rejectedEntries [
+CoPCSuggestionEvaluator >> rejectedEntries [
 	^ rejectedEntries
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> rejectionRate [
+CoPCSuggestionEvaluator >> rejectionRate [
 
 	| total rejected |
 	total := sessionStats at: #totalSuggestions ifAbsent: [ 0 ].
@@ -368,7 +368,7 @@ CoSuggestionEvaluator >> rejectionRate [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> savePersistentStats [
+CoPCSuggestionEvaluator >> savePersistentStats [
 	"Save evaluation data to file for long-term analysis"
         | evaluationFile data |
         CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
@@ -398,12 +398,12 @@ CoSuggestionEvaluator >> savePersistentStats [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> sessionStats [
+CoPCSuggestionEvaluator >> sessionStats [
 	^ sessionStats
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> updateLengthStats: length action: action [
+CoPCSuggestionEvaluator >> updateLengthStats: length action: action [
         | bucket lengthStats bucketStats |
         bucket := length <= 10
                 ifTrue: [ #short ]
@@ -421,7 +421,7 @@ CoSuggestionEvaluator >> updateLengthStats: length action: action [
 ]
 
 { #category : 'initialization' }
-CoSuggestionEvaluator >> updateStats: anEvaluationEntry [
+CoPCSuggestionEvaluator >> updateStats: anEvaluationEntry [
         | modelName contextType suggestion suggestionLength |
 
         sessionStats

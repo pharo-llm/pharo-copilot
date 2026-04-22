@@ -9,7 +9,7 @@ Class {
 { #category : 'tests' }
 OModelSpecTest >> testCreationWithNilTag [
 	| spec |
-	spec := OModelSpec family: 'test' tag: nil label: 'Test Model'.
+	spec := CoPCModelSpec family: 'test' tag: nil label: 'Test Model'.
 	
 	self assert: spec family equals: 'test'.
 	self assert: spec tag isNil.
@@ -20,7 +20,7 @@ OModelSpecTest >> testCreationWithNilTag [
 { #category : 'tests' }
 OModelSpecTest >> testCreationWithTag [
 	| spec |
-	spec := OModelSpec family: 'test' tag: '7b' label: 'Test Model 7B'.
+	spec := CoPCModelSpec family: 'test' tag: '7b' label: 'Test Model 7B'.
 	
 	self assert: spec family equals: 'test'.
 	self assert: spec tag equals: '7b'.
@@ -32,7 +32,7 @@ OModelSpecTest >> testCreationWithTag [
 OModelSpecTest >> testFamilyAccessor [
 
     | spec |
-    spec := OModelSpec family: 'abc' tag: nil label: 'ABC'.
+    spec := CoPCModelSpec family: 'abc' tag: nil label: 'ABC'.
     self assert: spec family equals: 'abc'.
 ]
 
@@ -40,7 +40,7 @@ OModelSpecTest >> testFamilyAccessor [
 OModelSpecTest >> testFamilySetter [
 
     | spec |
-    spec := OModelSpec family: 'abc' tag: nil label: 'ABC'.
+    spec := CoPCModelSpec family: 'abc' tag: nil label: 'ABC'.
     spec family: 'xyz'.
     self assert: spec family equals: 'xyz'.
 ]
@@ -48,7 +48,7 @@ OModelSpecTest >> testFamilySetter [
 { #category : 'tests' }
 OModelSpecTest >> testFullNameWithEmptyTag [ 
 	| spec |
-	spec := OModelSpec family: 'test' tag: '' label: 'Test'.
+	spec := CoPCModelSpec family: 'test' tag: '' label: 'Test'.
 	
 	"Empty string should behave like nil for tag"
 	self assert: spec fullName equals: 'test:'
@@ -58,7 +58,7 @@ OModelSpecTest >> testFullNameWithEmptyTag [
 OModelSpecTest >> testFullNameWithTag [ 
 
     | spec |
-    spec := OModelSpec family: 'foo' tag: 'bar' label: 'Foo Bar'.
+    spec := CoPCModelSpec family: 'foo' tag: 'bar' label: 'Foo Bar'.
     self assert: spec fullName equals: 'foo:bar'.
 ]
 
@@ -66,7 +66,7 @@ OModelSpecTest >> testFullNameWithTag [
 OModelSpecTest >> testFullNameWithoutTag [
 
     | spec |
-    spec := OModelSpec family: 'foo' tag: nil label: 'Foo'.
+    spec := CoPCModelSpec family: 'foo' tag: nil label: 'Foo'.
     self assert: spec fullName equals: 'foo'.
 ]
 
@@ -74,7 +74,7 @@ OModelSpecTest >> testFullNameWithoutTag [
 OModelSpecTest >> testLabelAccessor [
 
     | spec |
-    spec := OModelSpec family: 'abc' tag: nil label: 'ABC'.
+    spec := CoPCModelSpec family: 'abc' tag: nil label: 'ABC'.
     self assert: spec label equals: 'ABC'.
 ]
 
@@ -82,7 +82,7 @@ OModelSpecTest >> testLabelAccessor [
 OModelSpecTest >> testLabelSetter [
 
     | spec |
-    spec := OModelSpec family: 'abc' tag: nil label: 'ABC'.
+    spec := CoPCModelSpec family: 'abc' tag: nil label: 'ABC'.
     spec label: 'XYZ'.
     self assert: spec label equals: 'XYZ'.
 ]
@@ -91,14 +91,14 @@ OModelSpecTest >> testLabelSetter [
 OModelSpecTest >> testTagAccessor [
 
     | spec |
-    spec := OModelSpec family: 'abc' tag: 'def' label: 'ABC'.
+    spec := CoPCModelSpec family: 'abc' tag: 'def' label: 'ABC'.
     self assert: spec tag equals: 'def'.
 ]
 
 { #category : 'tests' }
 OModelSpecTest >> testTagSetter [
 	| spec |
-	spec := OModelSpec family: 'test' tag: 'old' label: 'Test'.
+	spec := CoPCModelSpec family: 'test' tag: 'old' label: 'Test'.
 	spec tag: 'new'.
 	
 	self assert: spec tag equals: 'new'.

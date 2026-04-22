@@ -10,7 +10,7 @@ Class {
 CoPharoCopilotContextTest >> testInitializeSetsCompletionBuilder [
 
 	| context builder |
-	context := CoPharoCopilotContext new.
+	context := CoPCContext new.
 	builder := context completionBuilder.
 	self assert: builder class equals: CoPharoCopilotResultSetBuilder.
 	self assert: builder completionContext identicalTo: context

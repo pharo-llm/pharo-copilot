@@ -1,18 +1,18 @@
 Class {
-	#name : 'CopilotContextSelectorsOnly',
-	#superclass : 'CopilotContextStrategy',
+	#name : 'CoPCContextSelectorsOnly',
+	#superclass : 'CoPCContextStrategy',
 	#category : 'AI-Pharo-Copilot-Context',
 	#package : 'AI-Pharo-Copilot-Context'
 }
 
 { #category : 'hooks' }
-CopilotContextSelectorsOnly >> methodsFor: aClass [
+CoPCContextSelectorsOnly >> methodsFor: aClass [
 
 	^ aClass selectors asSortedCollection
 ]
 
 { #category : 'hooks' }
-CopilotContextSelectorsOnly >> renderMethod: aSelector [
+CoPCContextSelectorsOnly >> renderMethod: aSelector [
 
 	^ aSelector asString
 ]

@@ -9,8 +9,8 @@ Class {
 { #category : 'tests' }
 DataIntegrityTest >> testEvaluationEntryConsistency [
 	| entry context suggestion timestamp |
-	entry := CoEvaluationEntry new.
-	context := CoPharoCopilotContext new.
+	entry := CoPCEvaluationEntry new.
+	context := CoPCContext new.
 	suggestion := CoCopilotEntry contents: 'test'.
 	timestamp := DateAndTime now.
 	
@@ -32,8 +32,8 @@ DataIntegrityTest >> testEvaluationEntryConsistency [
 { #category : 'tests' }
 DataIntegrityTest >> testModelSpecImmutability [
 	| spec1 spec2 |
-	spec1 := OModelSpec family: 'test' tag: 'v1' label: 'Test V1'.
-	spec2 := OModelSpec family: 'test' tag: 'v1' label: 'Test V1'.
+	spec1 := CoPCModelSpec family: 'test' tag: 'v1' label: 'Test V1'.
+	spec2 := CoPCModelSpec family: 'test' tag: 'v1' label: 'Test V1'.
 	
 	"Different instances with same data should be equal in content"
 	self assert: spec1 fullName equals: spec2 fullName.
@@ -45,7 +45,7 @@ DataIntegrityTest >> testModelSpecImmutability [
 { #category : 'tests' }
 DataIntegrityTest >> testRegistryConsistency [
 	| registry spec |
-	registry := OModelRegistry build.
+	registry := CoPCModelRegistry build.
 	
 	"Test bi-directional lookup consistency"
 	registry byFullName keysAndValuesDo: [ :fullName :spec |
@@ -61,8 +61,8 @@ DataIntegrityTest >> testRegistryConsistency [
 DataIntegrityTest >> testSessionStatsConsistency [
 
 	| evaluator context stats calculatedRate |
-	evaluator := CoSuggestionEvaluator new.
-	context := CoPharoCopilotContext new.
+	evaluator := CoPCSuggestionEvaluator new.
+	context := CoPCContext new.
 	5 timesRepeat: [ evaluator recordSuggestionAccepted: (CoCopilotEntry contents: 'accepted') context: context ].
 	3 timesRepeat: [evaluator recordSuggestionRejected: (CoCopilotEntry contents: 'rejected') context: context reason: 'Not useful' ].
 	
