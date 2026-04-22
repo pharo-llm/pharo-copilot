@@ -195,34 +195,6 @@ CoCopilotLogger class >> logBackEndEvent: eventName details: aDictionary [
 ]
 
 { #category : 'class initialization' }
-CoCopilotLogger class >> logError: eventName origin: originSymbol exception: anException payload: aDictionary [
-
-	| details |
-	details := (aDictionary ifNil: [ Dictionary new ]) copy.
-	details
-		at: #origin put: (self formatValue: originSymbol);
-		at: #error put: (anException
-			ifNil: [ 'Unknown error' ]
-			ifNotNil: [ anException messageText ]).
-
-	anException ifNotNil: [
-		(anException respondsTo: #stack)
-			ifTrue: [ details at: #stack put: (self formatValue: anException stack) ].
-
-		(anException respondsTo: #signalerContext)
-			ifTrue: [
-				[
-					details at: #stackTrace put: (
-						String streamContents: [ :s |
-							anException signalerContext printDebugOn: s ])
-				]
-					on: Error
-					do: [ :ignored | "best-effort only" ] ] ].
-
-	self logSection: 'ERROR' event: eventName details: details
-]
-
-{ #category : 'class initialization' }
 CoCopilotLogger class >> logFileName [
 
 	^ 'copilot.log'

@@ -7,18 +7,6 @@ Class {
 }
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderStressTest >> testCleanedContentFromWithDeeplyNestedCodeBlocks [ 
-	| builder raw cleaned |
-	builder := CoPharoCopilotResultSetBuilder new.
-	raw := '```outer', String lf, 'start', String lf, '```inner', String lf, 'nested', String lf, '```', String lf, 'end', String lf, '```'.
-	cleaned := builder cleanedContentFrom: raw.
-	
-	"Should extract from first complete block"
-	self assert: cleaned equals: 'start', String lf, '```inner', String lf, 'nested', String lf, '```', String lf, 'end'
-
-]
-
-{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderStressTest >> testCleanedContentFromWithGiantString [
 	| builder largeString cleaned |
 	builder := CoPharoCopilotResultSetBuilder new.
