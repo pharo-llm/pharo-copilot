@@ -1,3 +1,7 @@
+"
+I am a context strategy that exposes only method selectors.
+Use me when completions should rely on a lightweight class overview instead of full source.
+"
 Class {
 	#name : 'CoPCContextSelectorsOnly',
 	#superclass : 'CoPCContextStrategy',

@@ -1,3 +1,7 @@
+"
+I am a context strategy that exposes the full source code of methods.
+Use me when completions should be generated from complete method bodies.
+"
 Class {
 	#name : 'CoPCContextFullSource',
 	#superclass : 'Object',

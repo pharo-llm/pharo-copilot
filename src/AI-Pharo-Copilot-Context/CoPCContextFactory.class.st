@@ -1,3 +1,7 @@
+"
+I create context builders for completions based on the current settings.
+I resolve the class from a selector and choose the configured context strategy.
+"
 Class {
 	#name : 'CoPCContextFactory',
 	#superclass : 'Object',

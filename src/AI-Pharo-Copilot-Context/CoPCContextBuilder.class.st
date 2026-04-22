@@ -1,3 +1,7 @@
+"
+I build the class context string sent to the completion model.
+I use a context strategy to render class methods and wrap the current prefix with FIM markers.
+"
 Class {
 	#name : 'CoPCContextBuilder',
 	#superclass : 'Object',

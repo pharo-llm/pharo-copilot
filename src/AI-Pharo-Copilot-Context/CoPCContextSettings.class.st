@@ -1,3 +1,7 @@
+"
+I store the configuration for class-context generation used by Pharo Copilot.
+I validate and expose the available context modes.
+"
 Class {
 	#name : 'CoPCContextSettings',
 	#superclass : 'Object',

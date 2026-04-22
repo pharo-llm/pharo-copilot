@@ -1,3 +1,7 @@
+"
+I define the protocol for building class context representations for completions.
+Subclasses decide which methods to expose and how each method is rendered.
+"
 Class {
 	#name : 'CoPCContextStrategy',
 	#superclass : 'Object',

@@ -44,12 +44,10 @@ Class {
 
 { #category : 'ollama' }
 CopilotSettings class >> allOllamaOptions [
-	"Answer a dictionary of all Ollama options (standard + custom) ready to send to the API."
 
 	| options |
 	options := Dictionary new.
 
-	"Add standard parameters if they have non-nil values"
 	temperature ifNotNil: [ options at: #temperature put: temperature ].
 	topP ifNotNil: [ options at: #top_p put: topP ].
 	topK ifNotNil: [ options at: #top_k put: topK ].
@@ -58,7 +56,6 @@ CopilotSettings class >> allOllamaOptions [
 	numCtx ifNotNil: [ options at: #num_ctx put: numCtx ].
 	seed ifNotNil: [ options at: #seed put: seed ].
 
-	"Add custom parameters"
 	customParameters ifNotNil: [
 		customParameters keysAndValuesDo: [ :key :value |
 			options at: key put: value
@@ -71,7 +68,6 @@ CopilotSettings class >> allOllamaOptions [
 
 { #category : 'accessing' }
 CopilotSettings class >> attemptAutoInstallForModelNamed: aModelName usingInitialResponse: response [
-	"Try to auto-install the given model when enabled; answer whether the install succeeded."
 
 	(self shouldAutoInstallModelNamed: aModelName) ifFalse: [ ^ false ].
 	^ self performInstallOfModelNamed: aModelName usingInitialResponse: response
@@ -79,7 +75,6 @@ CopilotSettings class >> attemptAutoInstallForModelNamed: aModelName usingInitia
 
 { #category : 'accessing' }
 CopilotSettings class >> autoInstallModelScriptEnabled [
-	"Answer whether auto-install is enabled; default to true."
 
 	^ autoInstallModelScriptEnabled ifNil: [ autoInstallModelScriptEnabled := true ]
 ]
@@ -1021,7 +1016,6 @@ CopilotSettings class >> normalizedDuration: anObject default: defaultValue mini
 
 { #category : 'ollama' }
 CopilotSettings class >> normalizedFloat: anObject default: defaultValue minimum: minValue maximum: maxValue [
-	"Normalize a float value, enforcing a range."
 
 	| candidate |
 	anObject ifNil: [ ^ defaultValue ].
@@ -1326,24 +1320,20 @@ CopilotSettings class >> removeMetadataTextFilesFrom: aDirectory [
 
 { #category : 'ollama' }
 CopilotSettings class >> repeatPenalty [
-	"Answer the repeat_penalty parameter for Ollama (penalizes repetition). Default: 1.1"
 
-	^ repeatPenalty ifNil: [ repeatPenalty := 1.1 ]
+	^ repeatPenalty
 ]
 
 { #category : 'ollama' }
 CopilotSettings class >> repeatPenalty: aNumber [
-	"Set the repeat_penalty parameter (0.0 to 2.0, default: 1.1)."
 
-	repeatPenalty := self normalizedFloat: aNumber default: 1.1 minimum: 0.0 maximum: 2.0.
-	self autoSaveSettings
+	repeatPenalty := aNumber
 ]
 
 { #category : 'settings' }
 CopilotSettings class >> requestTimeoutSeconds [
-	"Answer the HTTP request timeout (seconds) for Ollama calls."
 
-	^ requestTimeoutSeconds ifNil: [ requestTimeoutSeconds := 500 ]
+	^ requestTimeoutSeconds
 ]
 
 { #category : 'settings' }
@@ -1928,7 +1918,6 @@ CopilotSettings class >> temperature [
 
 { #category : 'ollama' }
 CopilotSettings class >> temperature: aNumber [
-	"Set the temperature parameter (0.0 to 2.0, default: 0.8)."
 
 	temperature := self normalizedFloat: aNumber default: 0.8 minimum: 0.0 maximum: 2.0.
 	self autoSaveSettings
@@ -1968,9 +1957,8 @@ CopilotSettings class >> templatesDirectory: aFileReference [
 
 { #category : 'ollama' }
 CopilotSettings class >> topK [
-	"Answer the top_k parameter for Ollama (limits token selection). Default: 40"
 
-	^ topK ifNil: [ topK := 40 ]
+	^ topK
 ]
 
 { #category : 'ollama' }
@@ -1983,9 +1971,8 @@ CopilotSettings class >> topK: anInteger [
 
 { #category : 'ollama' }
 CopilotSettings class >> topP [
-	"Answer the top_p parameter for Ollama (nucleus sampling). Default: 0.9"
 
-	^ topP ifNil: [ topP := 0.9 ]
+	^ topP
 ]
 
 { #category : 'ollama' }
