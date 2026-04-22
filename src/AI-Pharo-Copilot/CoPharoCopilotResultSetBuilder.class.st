@@ -400,7 +400,7 @@ CoPharoCopilotResultSetBuilder >> contextSnapshotFor: aContext [
 CoPharoCopilotResultSetBuilder >> debounceMilliseconds [
 	"Return the current debounce delay used before firing a completion request."
 
-	^ debounceMilliseconds ifNil: [ 250 ]
+	^ debounceMilliseconds ifNil: [ CopilotSettings completionDebounceMilliseconds ]
 ]
 
 { #category : 'initialization' }

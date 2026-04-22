@@ -146,7 +146,7 @@ CopilotSettings class >> clearCachedModelMetadata [
 { #category : 'settings' }
 CopilotSettings class >> completionDebounceMilliseconds [
 
-	^ completionDebounceMilliseconds ifNil: [ completionDebounceMilliseconds := 50 ]
+	^ completionDebounceMilliseconds
 ]
 
 { #category : 'settings' }
@@ -514,6 +514,18 @@ CopilotSettings class >> host: aString [
 	self autoSaveSettings
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> initializeDefaults [
+
+	enabled := true.
+	provider := #ollama.
+	completionDebounceMilliseconds := 50.
+	completionIdleMilliseconds := 300.
+	completionSuggestionsCount := 3.
+	minimumPrefixLength := 3.
+	backgroundColor := self defaultBackgroundColor.
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> installModelNamed: aModelName [
 	"Invoke Ollama to pull/install the given model; answer whether it succeeded."
@@ -538,13 +550,6 @@ CopilotSettings class >> installModelNamed: aModelName [
 		^ true ]
 		on: Error
 		do: [ :ex |
-				CoCopilotLogger
-					logError: 'Failed to invoke Ollama model install script'
-					origin: #CopilotSettings
-					exception: ex
-					payload: (Dictionary new
-							 at: #model put: aModelName;
-							 yourself).
 				self notifyUser: ('Failed to download {1}. Please check Ollama logs.' format: { aModelName }).
 				^ false ]
 ]
