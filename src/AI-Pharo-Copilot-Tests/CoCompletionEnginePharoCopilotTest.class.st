@@ -52,4 +52,5 @@ CoCompletionEnginePharoCopilotTest >> testDifferentEnginesHaveDifferentBuilders 
     builder1 := engine1 completionBuilder.
     builder2 := engine2 completionBuilder.
     self deny: builder1 identicalTo: builder2.
+
 ]

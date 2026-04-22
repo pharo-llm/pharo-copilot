@@ -28,10 +28,8 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
 		yourself
 ]
 
-{ #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
-	
-	"Backward compatible single-content entry point."
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [ 
 
 	self
 		applyContents: { contentString }
@@ -49,7 +47,10 @@ CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aC
 	(self hasStaleContextFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix)
 		ifTrue: [ ^ self logStaleContextForExpectedPrefix: expectedPrefix suffix: expectedSuffix context: aContext ].
 
-	entries := self completionEntriesFrom: contentCollection inContext: aContext.
+	entries := self
+		completionEntriesFrom: contentCollection
+		inContext: aContext
+		contextInfo: contextInfo.
 	entries isEmpty ifTrue: [ ^ self logNoEntriesAfterCleaningFor: contentCollection ].
 
 	position := self menuPositionForContextOrDefault: aContext.
@@ -98,7 +99,7 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
-	| context snapshot prefix suffix contextInfo delay |
+	| context snapshot prefix suffix contextInfo delay sessionId |
 
 	context := completionContext.
 
@@ -110,6 +111,13 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	prefix := snapshot at: #prefix.
 	suffix := snapshot at: #suffix.
 	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
+
+	sessionId := CoPharoCopilotLogger completionSessionId.
+	contextInfo
+		at: #sessionId put: sessionId;
+		at: #timestamp put: DateAndTime now asString;
+		at: #rejected put: OrderedCollection new.
+
 	delay := self requestDelayForSnapshot: snapshot.
 
 	self
@@ -324,7 +332,8 @@ CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix
 			prefix: prefixString
 			suffix: suffixString
 			context: classContext
-			attempt: attempt.
+			attempt: attempt
+			contextInfo: contextInfo.
 
 		(content isEmpty not and: [ (seen includes: content) not ]) ifTrue: [
 			seen add: content.
@@ -359,6 +368,25 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 		CoCopilotEntry
 			contents: each
 			description: (self descriptionForSuggestion: each inContext: aContext) ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext contextInfo: contextInfo [
+
+	| cleaned sessionId |
+	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
+		select: [ :each | each isEmpty not ].
+
+	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
+
+	^ cleaned collect: [ :each |
+		| entry |
+		entry := CoCopilotEntry
+			contents: each
+			description: (self descriptionForSuggestion: each inContext: aContext).
+		(entry respondsTo: #sessionId:) ifTrue: [
+			entry sessionId: sessionId ].
+		entry ]
 ]
 
 { #category : 'private' }
@@ -824,10 +852,6 @@ CoPharoCopilotResultSetBuilder >> isWordChar: ch [
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> logAsynchronousCompletionError: ex contextInfo: contextInfo prefix: prefixString suffix: suffixString [ 
-]
-
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollection [
 
 	CoPharoCopilotLogger logFrontEndEvent: 'Skipping completion menu: no entries after cleaning' details: (
@@ -852,12 +876,27 @@ CoPharoCopilotResultSetBuilder >> logRejectedSuggestionFrom: rawResponse attempt
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> logStaleContextForExpectedPrefix: expectedPrefix suffix: expectedSuffix context: aContext [
+CoPharoCopilotResultSetBuilder >> logRejectedSuggestionFrom: rawResponse attempt: attempt prefix: prefixString contextInfo: contextInfo [
 
-	| snapshot currentPrefix currentSuffix |
-	snapshot := self contextSnapshotFor: aContext.
-	currentPrefix := snapshot at: #prefix.
-	currentSuffix := snapshot at: #suffix.
+	| rejected sessionId |
+	CoPharoCopilotLogger logBackEndEvent: 'Suggestion rejected after normalization' details: (
+		Dictionary new
+			at: #attempt put: attempt;
+			at: #rawResponse put: rawResponse asString;
+			at: #prefixTail put: ((prefixString size > 80)
+				ifTrue: [ prefixString last: 80 ]
+				ifFalse: [ prefixString ]);
+			yourself
+	).
+
+	rejected := contextInfo at: #rejected ifAbsentPut: [ OrderedCollection new ].
+	rejected add: rawResponse asString.
+
+	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
+	sessionId ifNotNil: [
+		CoPharoCopilotLogger
+			updateCompletionSession: sessionId
+			addRejected: rawResponse asString ]
 ]
 
 { #category : 'initialization' }
@@ -1026,6 +1065,24 @@ CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefi
 	^ content
 ]
 
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefixString suffix: suffixString context: classContext attempt: attempt contextInfo: contextInfo [
+
+	| rawResponse content |
+	rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
+	content := self normalizeSuggestion: rawResponse forPrefix: prefixString.
+
+	(content isEmpty and: [ rawResponse asString trimBoth isEmpty not ]) ifTrue: [
+		self
+			logRejectedSuggestionFrom: rawResponse
+			attempt: attempt
+			prefix: prefixString
+			contextInfo: contextInfo
+	].
+
+	^ content
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> ollamaClient [ 
 
@@ -1073,16 +1130,29 @@ CoPharoCopilotResultSetBuilder >> positionFromSnapshot: snapshot [
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
 	[
-		| classContext suggestions |
+		| classContext suggestions sessionId sessionPayload |
 
 		classContext := self classContextFor: aContext prefix: prefixString.
 		self updateContextInfo: contextInfo withClassContext: classContext.
+		contextInfo at: #classContext put: classContext.
 
 		suggestions := self cachedSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
 		suggestions ifNil: [
 			suggestions := self fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
 			self cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext
 		].
+
+		sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
+		sessionId ifNotNil: [
+			sessionPayload := CoPharoCopilotLogger
+				initialCompletionPayloadForContextInfo: contextInfo
+				prefix: prefixString
+				suffix: suffixString
+				classContext: classContext
+				cacheStats: self completionCache statisticsDictionary.
+			CoPharoCopilotLogger
+				writeCompletionSession: sessionPayload
+				sessionId: sessionId ].
 
 		self
 			applyContents: suggestions
@@ -1093,6 +1163,7 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 	]
 		on: Error
 		do: [ :ex | self logAsynchronousCompletionError: ex contextInfo: contextInfo prefix: prefixString suffix: suffixString ]
+
 ]
 
 { #category : 'initialization' }

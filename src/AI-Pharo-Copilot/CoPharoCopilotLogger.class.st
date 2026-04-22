@@ -53,6 +53,30 @@ CoPharoCopilotLogger class >> appendLines: lines [
 ]
 
 { #category : 'class initialization' }
+CoPharoCopilotLogger class >> completionFileReferenceFor: aSessionId [
+	^ self ensureCompletionsDirectory / ('completion-', aSessionId, '.json')
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> completionSessionId [
+	^ DateAndTime now asUnixTime asString , '-' , UUID new asString36
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> completionsDirectoryReference [
+	^ (self ensureLogsDirectory) / 'completions'
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> ensureCompletionsDirectory [
+	| directory |
+	directory := self completionsDirectoryReference.
+	directory ensureCreateDirectory.
+	^ directory
+
+]
+
+{ #category : 'class initialization' }
 CoPharoCopilotLogger class >> ensureEvaluationLogFileInitialized [
 
 	self loggingEnabled ifFalse: [ ^ self ].
@@ -150,6 +174,28 @@ CoPharoCopilotLogger class >> formatValue: anObject [
 	^ anObject printString
 ]
 
+{ #category : 'as yet unclassified' }
+CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInfo prefix: prefixString suffix: suffixString classContext: classContext cacheStats: cacheStats [
+
+	^ Dictionary new
+		at: #timestamp put: (contextInfo at: #timestamp ifAbsent: [ DateAndTime now asString ]);
+		at: #cache put: cacheStats;
+		at: #context put: (Dictionary new
+			at: #fullSource put: (contextInfo at: #fullSource ifAbsent: [ '' ]);
+			at: #prefix put: prefixString;
+			at: #suffix put: suffixString;
+			at: #classContext put: classContext;
+			yourself);
+		at: #fim put: (Dictionary new
+			at: #prefix put: prefixString;
+			at: #suffix put: suffixString;
+			at: #context put: classContext;
+			yourself);
+		at: #accepted put: nil;
+		at: #rejected put: ((contextInfo at: #rejected ifAbsent: [ #() ]) asArray);
+		yourself
+]
+
 { #category : 'class initialization' }
 CoPharoCopilotLogger class >> initialize [
 
@@ -158,6 +204,7 @@ CoPharoCopilotLogger class >> initialize [
 	evaluationLogFileReference := nil.
 
 	self ensureLogsDirectory.
+	self ensureCompletionsDirectory.
 	self ensureLogFileInitialized.
 	self ensureEvaluationLogFileInitialized
 ]
@@ -302,4 +349,40 @@ CoPharoCopilotLogger class >> rawLogsDirectoryReference [
 CoPharoCopilotLogger class >> rawLogsDirectoryReference: aDirectoryReference [
 
 	logsDirectoryReference := aDirectoryReference
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> updateCompletionSession: aSessionId addRejected: rejectedString [
+	| file payload rejected |
+	self loggingEnabled ifFalse: [ ^ self ].
+	file := self completionFileReferenceFor: aSessionId.
+	file exists ifFalse: [ ^ self ].
+	payload := STONJSON fromString: file contents.
+	rejected := payload at: #rejected ifAbsent: [ OrderedCollection new ].
+	rejected add: rejectedString.
+	payload at: #rejected put: rejected asArray.
+	file writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: payload) ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withAccepted: acceptedString [
+	| file payload |
+	self loggingEnabled ifFalse: [ ^ self ].
+	file := self completionFileReferenceFor: aSessionId.
+	file exists ifFalse: [ ^ self ].
+	payload := STONJSON fromString: file contents.
+	payload at: #accepted put: acceptedString.
+	file writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: payload) ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> writeCompletionSession: aDictionary sessionId: aSessionId [
+	| file |
+	self loggingEnabled ifFalse: [ ^ self ].
+	file := self completionFileReferenceFor: aSessionId.
+	self ensureFileExists: file.
+	file writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: aDictionary) ]
 ]
