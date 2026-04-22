@@ -89,8 +89,7 @@ CopilotSettings class >> autoInstallModelScriptEnabled: aBoolean [
 
 { #category : 'persistence' }
 CopilotSettings class >> autoSaveSettings [
-
-	^ self
+	"Automatically save settings to file when they change. Runs in background to avoid blocking UI."
 "
 	[
 		self saveSettingsToFile
