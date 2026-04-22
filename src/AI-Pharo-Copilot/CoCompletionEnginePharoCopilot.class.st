@@ -28,13 +28,25 @@ CoCompletionEnginePharoCopilot >> completionBuilder [
 
 ]
 
-{ #category : 'replacement' }
+{ #category : 'new' }
 CoCompletionEnginePharoCopilot >> replaceTokenInEditorWith: newString [
 
-	| originalCaretPosition |
-	(newString isNil or: [ newString isEmpty ]) ifTrue: [ ^ self ].
+	| caretPosition |
+	(self shouldIgnoreReplacement: newString) ifTrue: [ ^ self ].
 
-	originalCaretPosition := self editor caret.
+	caretPosition := self editor caret.
 	self basicReplaceTokenInEditorWith: newString.
-	self editor selectAt: originalCaretPosition
+	self restoreCaretTo: caretPosition
+]
+
+{ #category : 'new' }
+CoCompletionEnginePharoCopilot >> restoreCaretTo: caretPosition [
+
+	self editor selectAt: caretPosition
+]
+
+{ #category : 'new' }
+CoCompletionEnginePharoCopilot >> shouldIgnoreReplacement: newString [
+
+	^ newString isNil or: [ newString isEmpty ]
 ]

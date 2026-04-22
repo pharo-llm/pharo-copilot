@@ -70,28 +70,26 @@ CoPharoCopilotCompletionCache >> clear [
 	oldestTime := nil.
 ]
 
-{ #category : 'accessing' }
+{ #category : 'new' }
 CoPharoCopilotCompletionCache >> ensureCapacity [
 
-	[ entries size >= maxSize and: [ timestamps notEmpty ] ] whileTrue: [
-			(oldestKey notNil and: [ entries includesKey: oldestKey ])
-				ifTrue: [
-						entries removeKey: oldestKey ifAbsent: [ ].
-						timestamps removeKey: oldestKey ifAbsent: [ ] ]
-				ifFalse: [
-						| scanOldestKey scanOldestTime |
-						scanOldestKey := nil.
-						scanOldestTime := SmallInteger maxVal.
-						timestamps keysAndValuesDo: [ :k :t |
-								t < scanOldestTime ifTrue: [
-										scanOldestKey := k.
-										scanOldestTime := t ] ].
-						scanOldestKey ifNil: [ ^ self ].
-						entries removeKey: scanOldestKey ifAbsent: [ ].
-						timestamps removeKey: scanOldestKey ifAbsent: [ ] ].
-			evictions := evictions + 1.
-			oldestKey := nil.
-			oldestTime := nil ]
+	[ self isAtCapacity ] whileTrue: [
+		self evictOldestEntry
+	]
+]
+
+{ #category : 'new' }
+CoPharoCopilotCompletionCache >> evictOldestEntry [
+
+	| keyToEvict |
+	keyToEvict := self oldestExistingKey.
+	keyToEvict ifNil: [ ^ self ].
+
+	entries removeKey: keyToEvict ifAbsent: [ ].
+	timestamps removeKey: keyToEvict ifAbsent: [ ].
+	evictions := evictions + 1.
+
+	self resetOldestTracking
 ]
 
 { #category : 'accessing' }
@@ -126,6 +124,12 @@ CoPharoCopilotCompletionCache >> initialize [
 		oldestKey := nil.
 	oldestTime := nil.
 	self resetStats
+]
+
+{ #category : 'new' }
+CoPharoCopilotCompletionCache >> isAtCapacity [
+
+	^ entries size >= maxSize and: [ timestamps notEmpty ]
 ]
 
 { #category : 'accessing' }
@@ -169,12 +173,51 @@ CoPharoCopilotCompletionCache >> nearMatchAt: prefixString suffix: suffixString 
 		  ifPresent: aBlock
 ]
 
+{ #category : 'new' }
+CoPharoCopilotCompletionCache >> oldestExistingKey [
+
+	(oldestKey notNil and: [ entries includesKey: oldestKey ]) ifTrue: [
+		^ oldestKey
+	].
+
+	^ self scanOldestKey
+]
+
+{ #category : 'new' }
+CoPharoCopilotCompletionCache >> resetOldestTracking [ 
+
+	oldestKey := nil.
+	oldestTime := nil
+]
+
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> resetStats [
 
 	hits := 0.
 	misses := 0.
 	evictions := 0
+]
+
+{ #category : 'new' }
+CoPharoCopilotCompletionCache >> scanOldestKey [
+
+	| scanOldestKey scanOldestTime |
+	scanOldestKey := nil.
+	scanOldestTime := SmallInteger maxVal.
+
+	timestamps keysAndValuesDo: [ :key :time |
+		time < scanOldestTime ifTrue: [
+			scanOldestKey := key.
+			scanOldestTime := time
+		]
+	].
+
+	oldestKey := scanOldestKey.
+	oldestTime := scanOldestTime = SmallInteger maxVal
+		ifTrue: [ nil ]
+		ifFalse: [ scanOldestTime ].
+
+	^ scanOldestKey
 ]
 
 { #category : 'accessing' }
@@ -196,12 +239,13 @@ CoPharoCopilotCompletionCache >> statisticsDictionary [
 		  yourself
 ]
 
-{ #category : 'accessing' }
+{ #category : 'new' }
 CoPharoCopilotCompletionCache >> touchKey: aKey [
 
 	clock := clock + 1.
 	timestamps at: aKey put: clock.
-	(oldestTime isNil or: [ clock = 1 ]) ifFalse: [ ^ self ].
+
+	(oldestKey isNil or: [ oldestTime isNil ]) ifFalse: [ ^ self ].
 	oldestKey := aKey.
 	oldestTime := clock
 ]
