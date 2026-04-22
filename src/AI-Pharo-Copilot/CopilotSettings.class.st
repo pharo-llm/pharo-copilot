@@ -289,6 +289,16 @@ CopilotSettings class >> defaultFimTemplate [
 	^ self error: 'No fill-in-the-middle template is available for the current Copilot model.'
 ]
 
+{ #category : 'persistence' }
+CopilotSettings class >> dictionaryValueAt: aKey from: aDictionary default: aDefaultValue [
+
+	| value |
+	value := self valueAt: aKey from: aDictionary default: aDefaultValue.
+	^ (value isKindOf: Dictionary)
+		ifTrue: [ value ]
+		ifFalse: [ Dictionary new ]
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> ensureModelMetadataDirectoryFor: modelNameString [
 	"Ensure the per-model metadata directory exists; answer the directory or nil on failure."
@@ -535,11 +545,32 @@ CopilotSettings class >> initializeDefaults [
 
 	enabled := true.
 	provider := #ollama.
+	modelName := CoPCOllamaClient defaultModelFullName.
+	host := '127.0.0.1'.
+	port := 11434.
+	autoInstallModelScriptEnabled := true.
+	loggingEnabled := true.
+	templatesDirectory := (FileLocator imageDirectory / 'pharo-copilot' / 'templates') asFileReference.
 	completionDebounceMilliseconds := 50.
 	completionIdleMilliseconds := 300.
-	completionSuggestionsCount := 3.
+	requestTimeoutSeconds := 500.
+	modelInstallTimeoutSeconds := 600.
+	temperature := 0.8.
+	topP := 0.9.
+	topK := 40.
+	numPredict := 128.
+	repeatPenalty := 1.1.
+	numCtx := 2048.
+	seed := 0.
+	customParameters := Dictionary new.
+	maxInstanceMethods := 10.
+	maxClassMethods := 5.
 	minimumPrefixLength := 3.
+	completionSuggestionsCount := 3.
 	backgroundColor := self defaultBackgroundColor.
+	installModelUserConsent := false.
+	ollamaClientFactory := [ CoPCOllamaClient new ].
+	modelMetadata := nil
 ]
 
 { #category : 'accessing' }
@@ -1103,10 +1134,11 @@ CopilotSettings class >> numCtx [
 
 { #category : 'ollama' }
 CopilotSettings class >> numCtx: anIntegerOrNil [
-	"Set the num_ctx parameter (512 to 32768, or nil for model default)."
-
-	anIntegerOrNil ifNil: [ numCtx := nil. self autoSaveSettings. ^ nil ].
-	numCtx := self normalizedDuration: anIntegerOrNil default: 2048 minimum: 512 maximum: 32768.
+	numCtx := self
+		normalizedDuration: anIntegerOrNil
+		default: 2048
+		minimum: 512
+		maximum: 32768.
 	self autoSaveSettings
 ]
 
@@ -1338,85 +1370,59 @@ CopilotSettings class >> requestTimeoutSeconds [
 
 { #category : 'settings' }
 CopilotSettings class >> requestTimeoutSeconds: anObject [
-	"Set the HTTP request timeout (seconds) for Ollama calls."
-
-	requestTimeoutSeconds := anObject.
+	requestTimeoutSeconds := self
+		normalizedDuration: anObject
+		default: 500
+		minimum: 1
+		maximum: 3600.
 	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
 CopilotSettings class >> resetToDefaultSettings [
 	"Reset all settings to defaults (by clearing class-side state)."
-
-	<script>
-	enabled := nil.
-	provider := nil.
-	modelName := nil.
-	host := nil.
-	port := nil.
-	modelMetadata := nil.
-	ollamaClientFactory := nil.
-	autoInstallModelScriptEnabled := nil.
-	loggingEnabled := nil.
-	templatesDirectory := nil.
-	completionDebounceMilliseconds := nil.
-	completionIdleMilliseconds := nil.
-	requestTimeoutSeconds := nil.
-	modelInstallTimeoutSeconds := nil.
-	temperature := nil.
-	topP := nil.
-	topK := nil.
-	numPredict := nil.
-	repeatPenalty := nil.
-	numCtx := nil.
-	seed := nil.
-	customParameters := nil.
-	maxInstanceMethods := nil.
-	maxClassMethods := nil.
-	minimumPrefixLength := nil.
-	completionSuggestionsCount := nil.
-	backgroundColor := nil.
-	installModelUserConsent := nil
+<script>
+	self initializeDefaults.
+	CoPCContextSettings initializeDefaults
 ]
 
 { #category : 'persistence' }
 CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
-	"Restore settings from a serializable snapshot (handles path strings, etc.)."
 
 	| templatesPath |
-	enabled := aDictionary at: #enabled ifAbsent: [ nil ].
-	provider := aDictionary at: #provider ifAbsent: [ nil ].
-	modelName := aDictionary at: #modelName ifAbsent: [ nil ].
-	host := aDictionary at: #host ifAbsent: [ nil ].
-	port := aDictionary at: #port ifAbsent: [ nil ].
-	autoInstallModelScriptEnabled := aDictionary at: #autoInstallModelScriptEnabled ifAbsent: [ nil ].
-	loggingEnabled := aDictionary at: #loggingEnabled ifAbsent: [ nil ].
-	completionDebounceMilliseconds := aDictionary at: #completionDebounceMilliseconds ifAbsent: [ nil ].
-	completionIdleMilliseconds := aDictionary at: #completionIdleMilliseconds ifAbsent: [ nil ].
-	requestTimeoutSeconds := aDictionary at: #requestTimeoutSeconds ifAbsent: [ nil ].
-	modelInstallTimeoutSeconds := aDictionary at: #modelInstallTimeoutSeconds ifAbsent: [ nil ].
-	temperature := aDictionary at: #temperature ifAbsent: [ nil ].
-	topP := aDictionary at: #topP ifAbsent: [ nil ].
-	topK := aDictionary at: #topK ifAbsent: [ nil ].
-	numPredict := aDictionary at: #numPredict ifAbsent: [ nil ].
-	repeatPenalty := aDictionary at: #repeatPenalty ifAbsent: [ nil ].
-	numCtx := aDictionary at: #numCtx ifAbsent: [ nil ].
-	seed := aDictionary at: #seed ifAbsent: [ nil ].
-	customParameters := aDictionary at: #customParameters ifAbsent: [ Dictionary new ].
-	maxInstanceMethods := aDictionary at: #maxInstanceMethods ifAbsent: [ nil ].
-	maxClassMethods := aDictionary at: #maxClassMethods ifAbsent: [ nil ].
-	minimumPrefixLength := aDictionary at: #minimumPrefixLength ifAbsent: [ nil ].
-		completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ nil ].
-		backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ nil ].
-		installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ nil ].
-	(aDictionary at: #contextMode ifAbsent: [ nil ]) ifNotNil: [ :savedMode | CoPCContextSettings mode: savedMode ]. "Convert templatesDirectory path string back to FileReference"
+
+	self initializeDefaults.
+
+	enabled := self valueAt: #enabled from: aDictionary default: enabled.
+	provider := self valueAt: #provider from: aDictionary default: provider.
+	modelName := self valueAt: #modelName from: aDictionary default: modelName.
+	host := self valueAt: #host from: aDictionary default: host.
+	port := self valueAt: #port from: aDictionary default: port.
+	autoInstallModelScriptEnabled := self valueAt: #autoInstallModelScriptEnabled from: aDictionary default: autoInstallModelScriptEnabled.
+	loggingEnabled := self valueAt: #loggingEnabled from: aDictionary default: loggingEnabled.
+	completionDebounceMilliseconds := self valueAt: #completionDebounceMilliseconds from: aDictionary default: completionDebounceMilliseconds.
+	completionIdleMilliseconds := self valueAt: #completionIdleMilliseconds from: aDictionary default: completionIdleMilliseconds.
+	requestTimeoutSeconds := self valueAt: #requestTimeoutSeconds from: aDictionary default: requestTimeoutSeconds.
+	modelInstallTimeoutSeconds := self valueAt: #modelInstallTimeoutSeconds from: aDictionary default: modelInstallTimeoutSeconds.
+	temperature := self valueAt: #temperature from: aDictionary default: temperature.
+	topP := self valueAt: #topP from: aDictionary default: topP.
+	topK := self valueAt: #topK from: aDictionary default: topK.
+	numPredict := self valueAt: #numPredict from: aDictionary default: numPredict.
+	repeatPenalty := self valueAt: #repeatPenalty from: aDictionary default: repeatPenalty.
+	numCtx := self valueAt: #numCtx from: aDictionary default: numCtx.
+	seed := self valueAt: #seed from: aDictionary default: seed.
+	customParameters := self dictionaryValueAt: #customParameters from: aDictionary default: customParameters.
+	maxInstanceMethods := self valueAt: #maxInstanceMethods from: aDictionary default: maxInstanceMethods.
+	maxClassMethods := self valueAt: #maxClassMethods from: aDictionary default: maxClassMethods.
+	minimumPrefixLength := self valueAt: #minimumPrefixLength from: aDictionary default: minimumPrefixLength.
+	completionSuggestionsCount := self valueAt: #completionSuggestionsCount from: aDictionary default: completionSuggestionsCount.
+	backgroundColor := self valueAt: #backgroundColor from: aDictionary default: backgroundColor.
+	installModelUserConsent := self valueAt: #installModelUserConsent from: aDictionary default: installModelUserConsent.
+
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
-	templatesPath ifNotNil: [
-			templatesDirectory := [ templatesPath asFileReference ]
-				                      on: Error
-				                      do: [ nil ] ].
-	modelMetadata := nil.
-	ollamaClientFactory := nil
+	templatesPath = nil ifFalse: [
+		templatesDirectory := templatesPath asFileReference
+	]
 ]
 
 { #category : 'accessing' }
@@ -1519,9 +1525,10 @@ CopilotSettings class >> seed [
 
 { #category : 'ollama' }
 CopilotSettings class >> seed: anIntegerOrNil [
-	"Set the seed parameter for reproducible generation (any integer, or nil for random)."
 
-	seed := anIntegerOrNil.
+	seed := anIntegerOrNil = nil
+		ifTrue: [ 0 ]
+		ifFalse: [ anIntegerOrNil asInteger ].
 	self autoSaveSettings
 ]
 
@@ -1981,6 +1988,16 @@ CopilotSettings class >> topP: aNumber [
 
 	topP := self normalizedFloat: aNumber default: 0.9 minimum: 0.0 maximum: 1.0.
 	self autoSaveSettings
+]
+
+{ #category : 'persistence' }
+CopilotSettings class >> valueAt: aKey from: aDictionary default: aDefaultValue [
+
+	| value |
+	value := aDictionary at: aKey ifAbsent: [ aDefaultValue ].
+	^ value = nil
+		ifTrue: [ aDefaultValue ]
+		ifFalse: [ value ]
 ]
 
 { #category : 'accessing' }

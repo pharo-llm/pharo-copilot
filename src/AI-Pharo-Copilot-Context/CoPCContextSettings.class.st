@@ -18,11 +18,23 @@ CoPCContextSettings class >> availableModes [
 	^ #( #fullSource #selectors )
 ]
 
+{ #category : 'class initialization' }
+CoPCContextSettings class >> initialize [
+
+	super initialize.
+	self initializeDefaults
+]
+
+{ #category : 'class initialization' }
+CoPCContextSettings class >> initializeDefaults [
+
+	mode := #fullSource
+]
+
 { #category : 'capabilities' }
 CoPCContextSettings class >> mode [
-	"Possible values: #fullSource #selectors"
 
-	^ mode ifNil: [ mode := #fullSource ]
+	^ mode
 ]
 
 { #category : 'capabilities' }
