@@ -373,20 +373,19 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext contextInfo: contextInfo [
 
-	| cleaned sessionId |
-	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
-		select: [ :each | each isEmpty not ].
+	| sessionId |
+    "Change the 'collect' block to NOT call cleanedContentFrom:"
+    
+    sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
 
-	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
-
-	^ cleaned collect: [ :each |
-		| entry |
-		entry := CoCopilotEntry
-			contents: each
-			description: (self descriptionForSuggestion: each inContext: aContext).
-		(entry respondsTo: #sessionId:) ifTrue: [
-			entry sessionId: sessionId ].
-		entry ]
+    ^ contentCollection collect: [ :each | 
+        | entry |
+        entry := CoCopilotEntry
+            contents: each "Used to be: self cleanedContentFrom: each"
+            description: (self descriptionForSuggestion: each inContext: aContext).
+        (entry respondsTo: #sessionId:) ifTrue: [
+            entry sessionId: sessionId ].
+        entry ]
 ]
 
 { #category : 'private' }
@@ -851,6 +850,22 @@ CoPharoCopilotResultSetBuilder >> isWordChar: ch [
 		or: [ ch = $_ ] ]
 ]
 
+{ #category : 'as yet unclassified' }
+CoPharoCopilotResultSetBuilder >> logAsynchronousCompletionError: anError contextInfo: contextInfo prefix: prefix suffix: suffix [
+    "Log the error details for debugging asynchronous completion failures."
+    
+    | sessionId |
+    sessionId := contextInfo at: #sessionId ifAbsent: [ 'unknown' ].
+    
+    Transcript 
+        show: '[Copilot] Async Error (Session: ', sessionId asString, '): ';
+        show: anError description; 
+        cr.
+        
+    "Optionally log the prefix/suffix state if needed for deeper debugging"
+    "Non-interactive logging to avoid breaking the UI flow"
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollection [
 
@@ -1161,8 +1176,7 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			suffix: suffixString
 			contextInfo: contextInfo
 	]
-		on: Error
-		do: [ :ex | self logAsynchronousCompletionError: ex contextInfo: contextInfo prefix: prefixString suffix: suffixString ]
+
 
 ]
 
