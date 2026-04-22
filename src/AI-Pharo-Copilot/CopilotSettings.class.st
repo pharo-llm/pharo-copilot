@@ -90,11 +90,10 @@ CopilotSettings class >> autoInstallModelScriptEnabled: aBoolean [
 { #category : 'persistence' }
 CopilotSettings class >> autoSaveSettings [
 	"Automatically save settings to file when they change. Runs in background to avoid blocking UI."
-"
+
 	[
 		self saveSettingsToFile
 	] forkAt: Processor userBackgroundPriority named: 'CopilotSettings auto-save'
-"
 ]
 
 { #category : 'settings' }
@@ -147,8 +146,14 @@ CopilotSettings class >> completionDebounceMilliseconds [
 
 { #category : 'settings' }
 CopilotSettings class >> completionDebounceMilliseconds: anObject [
+	"Set the debounce delay (milliseconds) before firing completion requests."
 
-	completionDebounceMilliseconds := anObject.
+	completionDebounceMilliseconds := self
+		                                  normalizedDuration: anObject
+		                                  default: 50
+		                                  minimum: 1
+		                                  maximum: 60000.
+	self autoSaveSettings
 ]
 
 { #category : 'settings' }
@@ -161,7 +166,12 @@ CopilotSettings class >> completionIdleMilliseconds [
 CopilotSettings class >> completionIdleMilliseconds: anObject [
 	"Set the idle delay (milliseconds) before firing completion requests."
 
-	completionIdleMilliseconds := anObject.
+	completionIdleMilliseconds := self
+		                              normalizedDuration: anObject
+		                              default: 300
+		                              minimum: 1
+		                              maximum: 60000.
+	self autoSaveSettings
 ]
 
 { #category : 'settings' }
@@ -175,7 +185,12 @@ CopilotSettings class >> completionSuggestionsCount [
 CopilotSettings class >> completionSuggestionsCount: anObject [
 	"Set how many completion alternatives should be requested per completion trigger."
 
-	completionSuggestionsCount := anObject
+	completionSuggestionsCount := self
+		                              normalizedDuration: anObject
+		                              default: 3
+		                              minimum: 1
+		                              maximum: 10.
+	self autoSaveSettings
 ]
 
 { #category : 'private' }
@@ -517,11 +532,12 @@ CopilotSettings class >> host: aString [
 	self autoSaveSettings
 ]
 
-{ #category : 'class initialization' }
+{ #category : 'accessing' }
 CopilotSettings class >> initialize [
 
 	super initialize.
 	self initializeDefaults.
+	self loadSettingsFromFile
 ]
 
 { #category : 'settings' }
@@ -535,9 +551,9 @@ CopilotSettings class >> initializeDefaults [
 	autoInstallModelScriptEnabled := true.
 	loggingEnabled := true.
 	templatesDirectory := (FileLocator imageDirectory / 'pharo-copilot' / 'templates') asFileReference.
-	completionDebounceMilliseconds := 10.
-	completionIdleMilliseconds := 200.
-	requestTimeoutSeconds := 300.
+	completionDebounceMilliseconds := 50.
+	completionIdleMilliseconds := 300.
+	requestTimeoutSeconds := 500.
 	modelInstallTimeoutSeconds := 600.
 	temperature := 0.8.
 	topP := 0.9.
@@ -1354,7 +1370,11 @@ CopilotSettings class >> requestTimeoutSeconds [
 
 { #category : 'settings' }
 CopilotSettings class >> requestTimeoutSeconds: anObject [
-	requestTimeoutSeconds := anObject.
+	requestTimeoutSeconds := self
+		normalizedDuration: anObject
+		default: 500
+		minimum: 1
+		maximum: 3600.
 	self autoSaveSettings
 ]
 
@@ -1362,8 +1382,8 @@ CopilotSettings class >> requestTimeoutSeconds: anObject [
 CopilotSettings class >> resetToDefaultSettings [
 	"Reset all settings to defaults (by clearing class-side state)."
 <script>
-	"self initializeDefaults.
-	CoPCContextSettings initializeDefaults"
+	self initializeDefaults.
+	CoPCContextSettings initializeDefaults
 ]
 
 { #category : 'persistence' }
