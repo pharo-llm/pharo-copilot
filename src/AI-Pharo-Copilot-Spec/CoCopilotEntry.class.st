@@ -35,46 +35,93 @@ CoCopilotEntry class >> contents: aString description: aDescriptionString [
 
 { #category : 'accessing' }
 CoCopilotEntry >> activateOn: aCoCompletionContext [
+	"Apply this suggestion and record it as accepted when the apply succeeds."
 
 	| editor applied evaluatorClass |
 	aCoCompletionContext ifNil: [ Error signal: 'Completion context is nil' ].
 
 	applied := false.
 
-	"First use the completion context so token replacement + UI state stay consistent"
-	(applied not and: [ aCoCompletionContext respondsTo: #replaceTokenInEditorWith: ]) ifTrue: [
-		aCoCompletionContext replaceTokenInEditorWith: self contents.
-		applied := true
-	].
-
-	"Fallback only if the context cannot apply it"
 	editor := (aCoCompletionContext respondsTo: #editor)
-		ifTrue: [ [ aCoCompletionContext editor ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ].
+		          ifTrue: [
+				          [ aCoCompletionContext editor ]
+					          on: Error
+					          do: [ nil ] ]
+		          ifFalse: [ nil ].
 
 	editor ifNotNil: [
-		(applied not and: [ editor respondsTo: #replaceSelectionWith: ]) ifTrue: [
-			editor replaceSelectionWith: self contents.
-			applied := true
-		].
+			(editor respondsTo: #addString:) ifTrue: [
+					editor addString: self contents.
+					applied := true ].
 
-		(applied not and: [ editor respondsTo: #addString: ]) ifTrue: [
-			editor addString: self contents.
-			applied := true
-		].
+			(applied not and: [ editor respondsTo: #selectionInterval and: [ editor selectionInterval isEmpty ] ]) ifTrue: [
+					editor replaceSelectionWith: self contents.
+					applied := true ] ].
 
-		(applied and: [ editor respondsTo: #changed ]) ifTrue: [
-			editor changed
-		].
-	].
+	(applied not and: [ aCoCompletionContext respondsTo: #replaceTokenInEditorWith: ]) ifTrue: [
+			aCoCompletionContext replaceTokenInEditorWith: self contents.
+			applied := true ].
 
 	applied ifTrue: [
-		evaluatorClass := Smalltalk globals at: #CoPCSuggestionEvaluator ifAbsent: [ nil ].
-		evaluatorClass ifNotNil: [
-			[ evaluatorClass default recordSuggestionAccepted: self context: aCoCompletionContext ]
-				on: Error
-				do: [ :ex |
-					 ] ] ].
+			evaluatorClass := Smalltalk globals at: #CoPCSuggestionEvaluator ifAbsent: [ nil ].
+
+			evaluatorClass ifNotNil: [
+					[ evaluatorClass default recordSuggestionAccepted: self context: aCoCompletionContext ]
+				activateOn: aCoCompletionContext
+	"Apply this suggestion and record it as accepted when the apply succeeds."
+
+	| editor applied evaluatorClass |
+	aCoCompletionContext ifNil: [ Error signal: 'Completion context is nil' ].
+
+	applied := false.
+
+	editor := (aCoCompletionContext respondsTo: #editor)
+		          ifTrue: [
+				          [ aCoCompletionContext editor ]
+					          on: Error
+					          do: [ nil ] ]
+		          ifFalse: [ nil ].
+
+	editor ifNotNil: [
+			(editor respondsTo: #addString:) ifTrue: [
+					editor addString: self contents.
+					applied := true ].
+
+			(applied not and: [ editor respondsTo: #selectionInterval and: [ editor selectionInterval isEmpty ] ]) ifTrue: [
+					editor replaceSelectionWith: self contents.
+					applied := true ] ].
+
+	(applied not and: [ aCoCompletionContext respondsTo: #replaceTokenInEditorWith: ]) ifTrue: [
+			aCoCompletionContext replaceTokenInEditorWith: self contents.
+			applied := true ].
+
+	applied ifTrue: [
+			evaluatorClass := Smalltalk globals at: #CoPCSuggestionEvaluator ifAbsent: [ nil ].
+
+			evaluatorClass ifNotNil: [
+					[ evaluatorClass default recordSuggestionAccepted: self context: aCoCompletionContext ]
+						on: Error
+						do: [ :ex |
+								CoPharoCopilotLogger
+									logError: 'Failed to record accepted suggestion'
+									origin: #CoCopilotEntry
+									exception: ex
+									payload: (Dictionary new
+											 at: #contextClass put: aCoCompletionContext class name;
+											 at: #suggestion put: self contents;
+											 yourself) ] ] ].
+
+	^ applied
+						on: Error
+						do: [ :ex |
+								CoPharoCopilotLogger
+									logError: 'Failed to record accepted suggestion'
+									origin: #CoCopilotEntry
+									exception: ex
+									payload: (Dictionary new
+											 at: #contextClass put: aCoCompletionContext class name;
+											 at: #suggestion put: self contents;
+											 yourself) ] ] ].
 
 	^ applied
 ]
