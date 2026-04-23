@@ -566,7 +566,7 @@ CopilotSettings class >> initializeDefaults [
 	maxInstanceMethods := 10.
 	maxClassMethods := 5.
 	minimumPrefixLength := 3.
-	completionSuggestionsCount := 3.
+	completionSuggestionsCount := 1.
 	backgroundColor := self defaultBackgroundColor.
 	installModelUserConsent := false.
 	ollamaClientFactory := [ CoPCOllamaClient new ].
