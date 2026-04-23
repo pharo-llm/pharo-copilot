@@ -42,6 +42,7 @@ CoCopilotEntry >> activateOn: aCoCompletionContext [
 
 	applied := false.
 
+
 	editor := (aCoCompletionContext respondsTo: #editor)
 		          ifTrue: [
 				          [ aCoCompletionContext editor ]
@@ -54,12 +55,9 @@ CoCopilotEntry >> activateOn: aCoCompletionContext [
 					editor addString: self contents.
 					applied := true ].
 
-			(applied not
-				and: [
-					(editor respondsTo: #selectionInterval)
-						and: [
-							(editor respondsTo: #replaceSelectionWith:)
-								and: [ editor selectionInterval isEmpty ] ] ]) ifTrue: [
+			(applied not and: [
+					 (editor respondsTo: #selectionInterval) and: [
+						 (editor respondsTo: #replaceSelectionWith:) and: [ editor selectionInterval isEmpty ] ] ]) ifTrue: [
 					editor replaceSelectionWith: self contents.
 					applied := true ] ].
 
@@ -73,7 +71,7 @@ CoCopilotEntry >> activateOn: aCoCompletionContext [
 			evaluatorClass ifNotNil: [
 					[ evaluatorClass default recordSuggestionAccepted: self context: aCoCompletionContext ]
 						on: Error
-						do: [ :ex | ] ] ].
+						do: [ :ex |  ] ] ].
 
 	^ applied
 ]
