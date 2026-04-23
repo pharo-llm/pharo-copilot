@@ -1,3 +1,13 @@
+"
+Executes benchmark scenarios against one or more configured models.
+
+This class is responsible for building prompts from benchmark scenarios,
+sending requests to the completion backend, collecting timing and token metrics,
+and storing the resulting benchmark data.
+
+Use the runner when you want low-level control over benchmark execution
+and raw result collection.
+"
 Class {
 	#name : 'CoPCBenchmarkResult',
 	#superclass : 'Object',

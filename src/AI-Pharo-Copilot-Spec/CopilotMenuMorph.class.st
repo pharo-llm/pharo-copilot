@@ -136,6 +136,7 @@ CopilotMenuMorph >> delete [
 
 { #category : 'private' }
 CopilotMenuMorph >> detailDescriptionFor: anEntry [
+
 	| scopeLabel behavior |
 	behavior := (context respondsTo: #completionClass)
 		ifTrue: [ context completionClass ]
@@ -147,7 +148,7 @@ CopilotMenuMorph >> detailDescriptionFor: anEntry [
 
 	^ CoCopilotEntryDescription
 		label: scopeLabel
-		title: anEntry label
+		title: anEntry label , '  [' , CopilotSettings modelName , ']'
 		description: anEntry description
 ]
 

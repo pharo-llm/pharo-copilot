@@ -1,3 +1,12 @@
+"
+Provides benchmark scenarios focused on prompt context construction.
+
+This class defines scenarios for measuring the impact of context size,
+context-building strategy, and fill-in-the-middle quality on completion results.
+
+Use these scenarios when comparing how different context representations
+affect performance, throughput, and completion quality.
+"
 Class {
 	#name : 'CoPCBenchmarkCacheScenario',
 	#superclass : 'Object',

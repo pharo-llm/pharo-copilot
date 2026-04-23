@@ -1,3 +1,13 @@
+"
+Represents the output of a benchmark run as exportable reports.
+
+Instances of this class aggregate benchmark results and generate the files
+produced by the benchmark package, including CSV, JSON, summaries,
+completion dumps, model comparisons, and context-scaling reports.
+
+Use a report to analyze benchmark runs and export their results
+in machine-readable and human-readable formats.
+"
 Class {
 	#name : 'CoPCBenchmarkContextScenario',
 	#superclass : 'Object',

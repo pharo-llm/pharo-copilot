@@ -357,23 +357,31 @@ CoPharoCopilotResultSetBuilder >> completionCache: aCache [
 	completionCache := aCache
 ]
 
-{ #category : 'new' }
+{ #category : 'private' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext [
+	| cleaned fakeContextInfo |
 
-	| cleaned |
 	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
 		select: [ :each | each isEmpty not ].
 
+	fakeContextInfo := Dictionary new
+		at: #prefix put: '';
+		yourself.
+
 	^ cleaned collect: [ :each |
-		CoCopilotEntry
+		| entry |
+		entry := CoCopilotEntry
 			contents: each
-			description: (self descriptionForSuggestion: each inContext: aContext) ]
+			description: (self descriptionForSuggestion: each inContext: aContext).
+		entry label: (self menuLabelForSuggestion: each contextInfo: fakeContextInfo).
+		entry
+	]
 ]
 
-{ #category : 'new' }
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext contextInfo: contextInfo [
-
 	| cleaned sessionId |
+
 	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
 		select: [ :each | each isEmpty not ].
 
@@ -384,9 +392,14 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 		entry := CoCopilotEntry
 			contents: each
 			description: (self descriptionForSuggestion: each inContext: aContext).
+
+		entry label: (self menuLabelForSuggestion: each contextInfo: contextInfo).
+
 		(entry respondsTo: #sessionId:) ifTrue: [
 			entry sessionId: sessionId ].
-		entry ]
+
+		entry
+	]
 ]
 
 { #category : 'private' }
@@ -904,6 +917,26 @@ CoPharoCopilotResultSetBuilder >> menuClosed [
 	"Called when the menu is closed externally."
 
 	menuMorph := nil
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> menuLabelForSuggestion: suggestionString contextInfo: contextInfo [
+	| prefix visiblePrefix modelName |
+
+	prefix := (contextInfo at: #prefix ifAbsent: [ '' ]) asString.
+	modelName := (CopilotSettings modelName ifNil: [ 'model' ]) asString.
+
+	"Only show the current line before the caret"
+	visiblePrefix := prefix lines
+		ifEmpty: [ '' ]
+		ifNotEmpty: [ :lines | lines last ].
+
+	"Keep the menu stable and short"
+	visiblePrefix size > 50 ifTrue: [
+		visiblePrefix := '…', (visiblePrefix last: 50)
+	].
+
+	^ visiblePrefix , suggestionString , '  [' , modelName , ']'
 ]
 
 { #category : 'initialization' }

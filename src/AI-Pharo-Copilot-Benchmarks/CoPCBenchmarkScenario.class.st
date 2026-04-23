@@ -1,3 +1,13 @@
+"
+Provides a catalog of general-purpose benchmark scenarios.
+
+This class defines a default collection of code-completion scenarios covering
+common programming patterns such as accessors, iteration, conditionals,
+error handling, block usage, and initialization.
+
+Use this catalog as the baseline benchmark set for broad comparisons
+across models and configurations.
+"
 Class {
 	#name : 'CoPCBenchmarkScenario',
 	#superclass : 'Object',

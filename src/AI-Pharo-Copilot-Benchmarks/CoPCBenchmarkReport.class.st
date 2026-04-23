@@ -1,3 +1,14 @@
+"
+Represents a single benchmark measurement for one model, one scenario,
+and one run.
+
+A benchmark result stores execution metadata, prompt and completion sizes,
+timing information, throughput metrics, configuration values, and any error
+captured during execution.
+
+Use instances of this class as the canonical record for benchmark data
+before aggregation and export.
+"
 Class {
 	#name : 'CoPCBenchmarkReport',
 	#superclass : 'Object',

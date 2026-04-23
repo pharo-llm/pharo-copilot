@@ -1,3 +1,12 @@
+"
+Represents a single benchmark scenario used to evaluate code completion.
+
+A scenario defines the benchmark input through a name, prefix, suffix,
+context, and human-readable description.
+
+Use instances of this class as immutable benchmark fixtures that can be
+executed by the runner and grouped by catalogs or scenario providers.
+"
 Class {
 	#name : 'CoPCBenchmarkRunner',
 	#superclass : 'Object',
