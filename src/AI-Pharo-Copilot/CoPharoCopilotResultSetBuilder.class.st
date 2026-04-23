@@ -13,7 +13,9 @@ Class {
 		'classContextCache',
 		'menuMorph',
 		'completionCache',
-		'cachedClient'
+		'cachedClient',
+		'lastSnapshotKey',
+		'lastSnapshotValue'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -99,35 +101,49 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
-	| context snapshot prefix suffix contextInfo delay sessionId |
+    | context snapshot prefix suffix contextInfo delay sessionId classContext cached |
 
-	context := completionContext.
+    context := completionContext.
 
-	(self shouldRequestCompletionForContext: context) ifFalse: [
-		^ self emptyResultSet
-	].
+    (self shouldRequestCompletionForContext: context) ifFalse: [
+        ^ self emptyResultSet ].
 
-	snapshot := self contextSnapshotFor: context.
-	prefix := snapshot at: #prefix.
-	suffix := snapshot at: #suffix.
-	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
+    snapshot := self contextSnapshotFor: context.
+    prefix := snapshot at: #prefix.
+    suffix := snapshot at: #suffix.
+    contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
 
-	sessionId := CoPharoCopilotLogger completionSessionId.
-	contextInfo
-		at: #sessionId put: sessionId;
-		at: #timestamp put: DateAndTime now asString;
-		at: #rejected put: OrderedCollection new.
+    sessionId := CoPharoCopilotLogger completionSessionId.
+    contextInfo
+        at: #sessionId put: sessionId;
+        at: #timestamp put: DateAndTime now asString;
+        at: #rejected put: OrderedCollection new.
 
-	delay := self requestDelayForSnapshot: snapshot.
+    "Synchronous cache lookup — zero model call on hit."
+    classContext := self classContextFor: context prefix: prefix.
+    cached := self
+        cachedSuggestionsForPrefix: prefix
+        suffix: suffix
+        classContext: classContext
+        contextInfo: contextInfo.
+    cached ifNotNil: [
+        | entries position |
+        entries := self completionEntriesFrom: cached inContext: context contextInfo: contextInfo.
+        entries isEmpty ifFalse: [
+            position := self menuPositionForContextOrDefault: context.
+            self openCompletionMenuFor: context entries: entries position: position.
+            ^ self emptyResultSet ] ].
 
-	self
-		scheduleCompletionFor: context
-		prefix: prefix
-		suffix: suffix
-		contextInfo: contextInfo
-		delayMilliseconds: delay.
+    delay := self requestDelayForSnapshot: snapshot.
 
-	^ self emptyResultSet
+    self
+        scheduleCompletionFor: context
+        prefix: prefix
+        suffix: suffix
+        contextInfo: contextInfo
+        delayMilliseconds: delay.
+
+    ^ self emptyResultSet
 ]
 
 { #category : 'new' }
@@ -418,23 +434,32 @@ CoPharoCopilotResultSetBuilder >> contextInfoFor: aContext prefix: prefixString 
 
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> contextSnapshotFor: aContext [
-	"Take a safe snapshot (prefix/suffix/position) of the completion context so we can detect changes."
+    | source position prefix suffix |
+    source := [ aContext source ifNil: [ '' ] ] on: Error do: [ '' ].
+    position := [ aContext position ifNil: [ 0 ] ] on: Error do: [ 0 ].
+    position := (position max: 0) min: source size.
 
-	| source position |
-	source := [ aContext source ifNil: [ '' ] ] on: Error do: [ '' ].
-	position := [ aContext position ifNil: [ 0 ] ] on: Error do: [ 0 ].
-	position := (position max: 0) min: source size.
+    prefix := position > 0
+        ifTrue: [ source copyFrom: 1 to: position ]
+        ifFalse: [ '' ].
+    suffix := position < source size
+        ifTrue: [ source copyFrom: position + 1 to: source size ]
+        ifFalse: [ '' ].
 
-	^ Dictionary new
-		at: #prefix put: (position > 0
-			ifTrue: [ source copyFrom: 1 to: position ]
-			ifFalse: [ '' ]);
-		at: #suffix put: (position < source size
-			ifTrue: [ source copyFrom: position + 1 to: source size ]
-			ifFalse: [ '' ]);
-		at: #position put: position;
-		at: #sourceLength put: source size;
-		yourself
+    (lastSnapshotKey notNil
+        and: [ lastSnapshotKey first = source identityHash
+        and: [ lastSnapshotKey second = position ] ])
+            ifTrue: [ ^ lastSnapshotValue ].
+
+    lastSnapshotKey := { source identityHash. position }.
+    lastSnapshotValue := Dictionary new
+        at: #prefix put: prefix;
+        at: #suffix put: suffix;
+        at: #position put: position;
+        at: #sourceLength put: source size;
+        yourself.
+
+    ^ lastSnapshotValue
 ]
 
 { #category : 'initialization' }

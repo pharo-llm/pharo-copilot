@@ -33,23 +33,25 @@ CoPharoCopilotLogger class >> appendDetailAssociation: anAssociation to: lines [
 { #category : 'class initialization' }
 CoPharoCopilotLogger class >> appendLines: lines [
 
-	self loggingEnabled ifFalse: [ ^ self ].
+    self loggingEnabled ifFalse: [ ^ self ].
 
-	[
-		| file |
-		file := self logFileReference.
-		self ensureFileExists: file.
+    [
+        [
+            | file |
+            file := self logFileReference.
+            self ensureFileExists: file.
 
-		file writeStreamDo: [ :stream |
-			stream setToEnd.
-			lines do: [ :line |
-				stream nextPutAll: line.
-				stream nextPut: Character lf ] ] ]
-		on: Error
-		do: [ :ex |
-			Transcript
-				show: 'Copilot logging failed: ', ex messageText;
-				cr ]
+            file writeStreamDo: [ :stream |
+                stream setToEnd.
+                lines do: [ :line |
+                    stream nextPutAll: line.
+                    stream nextPut: Character lf ] ] ]
+        on: Error
+        do: [ :ex |
+            Transcript
+                show: 'Copilot logging failed: ', ex messageText;
+                cr ]
+    ] forkAt: Processor userBackgroundPriority named: 'Copilot log write'
 ]
 
 { #category : 'class initialization' }

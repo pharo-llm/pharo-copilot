@@ -116,14 +116,14 @@ CoPharoCopilotCompletionCache >> hits [
 { #category : 'initialization' }
 CoPharoCopilotCompletionCache >> initialize [
 
-	super initialize.
-	entries := Dictionary new.
-	timestamps := Dictionary new.
-	clock := 0.
-	maxSize := 64.
-		oldestKey := nil.
-	oldestTime := nil.
-	self resetStats
+    super initialize.
+    entries := Dictionary new.
+    timestamps := Dictionary new.
+    clock := 0.
+    maxSize := 512.
+    oldestKey := nil.
+    oldestTime := nil.
+    self resetStats
 ]
 
 { #category : 'new' }
