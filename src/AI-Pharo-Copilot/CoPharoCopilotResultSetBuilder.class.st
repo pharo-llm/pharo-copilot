@@ -912,6 +912,36 @@ CoPharoCopilotResultSetBuilder >> logRejectedSuggestionFrom: rawResponse attempt
 			addRejected: rawResponse asString ]
 ]
 
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> logStaleContextForExpectedPrefix: expectedPrefix suffix: expectedSuffix context: aContext [
+
+	| snapshot currentPrefix currentSuffix |
+	snapshot := self contextSnapshotFor: aContext.
+	currentPrefix := snapshot at: #prefix ifAbsent: [ '' ].
+	currentSuffix := snapshot at: #suffix ifAbsent: [ '' ].
+
+	CoPharoCopilotLogger logFrontEndEvent: 'Skipping completion menu: stale context' details: (
+		Dictionary new
+			at: #expectedPrefixTail put: ((expectedPrefix ifNil: [ '' ]) size > 80
+				ifTrue: [ (expectedPrefix ifNil: [ '' ]) last: 80 ]
+				ifFalse: [ expectedPrefix ifNil: [ '' ] ]);
+			at: #currentPrefixTail put: (currentPrefix size > 80
+				ifTrue: [ currentPrefix last: 80 ]
+				ifFalse: [ currentPrefix ]);
+			at: #expectedSuffixHead put: ((expectedSuffix ifNil: [ '' ]) size > 80
+				ifTrue: [ (expectedSuffix ifNil: [ '' ]) first: 80 ]
+				ifFalse: [ expectedSuffix ifNil: [ '' ] ]);
+			at: #currentSuffixHead put: (currentSuffix size > 80
+				ifTrue: [ currentSuffix first: 80 ]
+				ifFalse: [ currentSuffix ]);
+			at: #position put: (snapshot at: #position ifAbsent: [ nil ]);
+			at: #sourceLength put: (snapshot at: #sourceLength ifAbsent: [ nil ]);
+			yourself
+	).
+
+	^ self
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> menuClosed [
 	"Called when the menu is closed externally."

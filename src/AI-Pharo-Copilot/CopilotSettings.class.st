@@ -42,28 +42,27 @@ Class {
 	#package : 'AI-Pharo-Copilot'
 }
 
-{ #category : 'ollama' }
+{ #category : 'accessing' }
 CopilotSettings class >> allOllamaOptions [
 
 	| options |
 	options := Dictionary new.
 
-	temperature ifNotNil: [ options at: #temperature put: temperature ].
-	topP ifNotNil: [ options at: #top_p put: topP ].
-	topK ifNotNil: [ options at: #top_k put: topK ].
-	numPredict ifNotNil: [ options at: #num_predict put: numPredict ].
-	repeatPenalty ifNotNil: [ options at: #repeat_penalty put: repeatPenalty ].
-	numCtx ifNotNil: [ options at: #num_ctx put: numCtx ].
-	seed ifNotNil: [ options at: #seed put: seed ].
+	(temperature notNil and: [ temperature ~= 0.8 ]) ifTrue: [ options at: #temperature put: temperature ].
+	(topP notNil and: [ topP ~= 0.9 ]) ifTrue: [ options at: #top_p put: topP ].
+	(topK notNil and: [ topK ~= 40 ]) ifTrue: [ options at: #top_k put: topK ].
+	(numPredict notNil and: [ numPredict ~= 128 ]) ifTrue: [ options at: #num_predict put: numPredict ].
+	(repeatPenalty notNil and: [ repeatPenalty ~= 1.1 ]) ifTrue: [ options at: #repeat_penalty put: repeatPenalty ].
+	(numCtx notNil and: [ numCtx ~= 2048 ]) ifTrue: [ options at: #num_ctx put: numCtx ].
+	(seed notNil and: [ seed ~= 0 ]) ifTrue: [ options at: #seed put: seed ].
 
-	customParameters ifNotNil: [
+	(customParameters notNil and: [ customParameters isEmpty not ]) ifTrue: [
 		customParameters keysAndValuesDo: [ :key :value |
 			options at: key put: value
 		]
 	].
 
 	^ options
-
 ]
 
 { #category : 'accessing' }
@@ -2038,6 +2037,16 @@ CopilotSettings class >> writeMetadata: metadata toDirectory: modelDirectory mod
 				stream truncate.
 				stream nextPutAll: contents
 			]
-		] 
+		] on: Error do: [ :ex |
+			CoPharoCopilotLogger
+				logBackEndEvent: 'Failed to write model metadata file'
+				details: (Dictionary new
+					at: #model put: modelNameString;
+					at: #key put: keyLabel;
+					at: #file put: fileRef fullName;
+					at: #errorClass put: ex class name;
+					at: #error put: ex description;
+					yourself)
+		]
 	]
 ]
