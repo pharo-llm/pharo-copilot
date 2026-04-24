@@ -435,7 +435,7 @@ CoPharoCopilotCompletionEngineReplaceTokenTest >> testNonEmptyThirteenCharsAtCar
 	engine editor: editor.
 	engine replaceTokenInEditorWith: 'hello world! '.
 	self assert: engine basicCalledWith equals: 'hello world! '.
-	self assert: editor caret equals: 1 + 14
+	self assert: editor caret equals: 1 + 13
 ]
 
 { #category : 'tests' }
@@ -447,7 +447,7 @@ CoPharoCopilotCompletionEngineReplaceTokenTest >> testNonEmptyThirteenCharsAtCar
 	engine editor: editor.
 	engine replaceTokenInEditorWith: 'hello world! '.
 	self assert: engine basicCalledWith equals: 'hello world! '.
-	self assert: editor caret equals: 10 + 14
+	self assert: editor caret equals: 10 + 13
 ]
 
 { #category : 'tests' }

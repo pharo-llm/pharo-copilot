@@ -52,7 +52,7 @@ CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmp
 CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmptyStreamContents [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self assert: (engine shouldIgnoreReplacement: String streamContents: [ :s | ])
+	self assert: (engine shouldIgnoreReplacement: (String streamContents: [ :s | ]))
 ]
 
 { #category : 'tests' }
@@ -178,7 +178,7 @@ CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnore
 CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreUnicodeEmoji [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: String with: (Character value: 128512))
+	self deny: (engine shouldIgnoreReplacement: (String with: (Character value: 128512)))
 ]
 
 { #category : 'tests' }
