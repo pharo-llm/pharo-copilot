@@ -117,7 +117,8 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
     contextInfo
         at: #sessionId put: sessionId;
         at: #timestamp put: DateAndTime now asString;
-        at: #rejected put: OrderedCollection new.
+        at: #rejected put: OrderedCollection new;
+        at: #returned put: OrderedCollection new.
 
     "Synchronous cache lookup — zero model call on hit."
     classContext := self classContextFor: context prefix: prefix.
@@ -131,6 +132,7 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
         entries := self completionEntriesFrom: cached inContext: context contextInfo: contextInfo.
         entries isEmpty ifFalse: [
             position := self menuPositionForContextOrDefault: context.
+            self logCompletionSessionSummaryFor: cached cacheHit: true contextInfo: contextInfo.
             self openCompletionMenuFor: context entries: entries position: position.
             ^ self emptyResultSet ] ].
 
@@ -890,6 +892,114 @@ CoPharoCopilotResultSetBuilder >> isWordChar: ch [
 ]
 
 { #category : 'new' }
+CoPharoCopilotResultSetBuilder >> logCompletionResponseFor: rawResponse normalized: normalizedString attempt: attempt prefix: prefixString durationMs: durationMs contextInfo: contextInfo [
+	"Log a single completion response returned by the model. Captures the raw and
+	normalized text, its line/character counts, the first line, and the duration of
+	the model call. Also appends the response to the per-session JSON file so each
+	completion can be inspected after the fact."
+
+	| rawString normString lines firstLine status sessionId modelName safePrefix previewLimit details returnedEntry |
+	rawString := (rawResponse ifNil: [ '' ]) asString.
+	normString := (normalizedString ifNil: [ '' ]) asString.
+	lines := normString isEmpty
+		ifTrue: [ rawString lines ]
+		ifFalse: [ normString lines ].
+	firstLine := lines isEmpty
+		ifTrue: [ '' ]
+		ifFalse: [ lines first ].
+	status := normString isEmpty ifTrue: [ 'rejected' ] ifFalse: [ 'accepted' ].
+	safePrefix := (prefixString ifNil: [ '' ]) asString.
+	previewLimit := 2000.
+
+	sessionId := contextInfo ifNotNil: [
+		contextInfo at: #sessionId ifAbsent: [ nil ] ].
+	modelName := [ CopilotSettings modelName ] on: Error do: [ :ex | nil ].
+
+	details := Dictionary new
+		at: #sessionId put: (sessionId ifNil: [ '' ]) asString;
+		at: #model put: (modelName ifNil: [ '' ]) asString;
+		at: #attempt put: attempt;
+		at: #status put: status;
+		at: #durationMs put: durationMs;
+		at: #lineCount put: lines size;
+		at: #charCount put: normString size;
+		at: #rawCharCount put: rawString size;
+		at: #firstLine put: ((firstLine size > 160)
+			ifTrue: [ (firstLine first: 160), '...' ]
+			ifFalse: [ firstLine ]);
+		at: #rawResponse put: ((rawString size > previewLimit)
+			ifTrue: [ (rawString first: previewLimit), '...' ]
+			ifFalse: [ rawString ]);
+		at: #normalized put: ((normString size > previewLimit)
+			ifTrue: [ (normString first: previewLimit), '...' ]
+			ifFalse: [ normString ]);
+		at: #prefixTail put: ((safePrefix size > 80)
+			ifTrue: [ safePrefix last: 80 ]
+			ifFalse: [ safePrefix ]);
+		yourself.
+
+	CoPharoCopilotLogger
+		logBackEndEvent: 'Completion returned'
+		details: details.
+
+	returnedEntry := Dictionary new
+		at: #attempt put: attempt;
+		at: #status put: status;
+		at: #durationMs put: durationMs;
+		at: #lineCount put: lines size;
+		at: #charCount put: normString size;
+		at: #rawCharCount put: rawString size;
+		at: #firstLine put: firstLine;
+		at: #rawResponse put: rawString;
+		at: #normalized put: normString;
+		at: #timestamp put: DateAndTime now asString;
+		yourself.
+
+	contextInfo ifNotNil: [
+		(contextInfo at: #returned ifAbsentPut: [ OrderedCollection new ])
+			add: returnedEntry ].
+
+	sessionId ifNotNil: [
+		CoPharoCopilotLogger
+			updateCompletionSession: sessionId
+			addReturned: returnedEntry ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> logCompletionSessionSummaryFor: suggestions cacheHit: cacheHit contextInfo: contextInfo [
+	"Log a single summary entry per completion session capturing how many suggestions
+	were emitted, whether they came from cache, and the line count of each suggestion."
+
+	| sessionId details perSuggestion |
+	sessionId := contextInfo ifNotNil: [
+		contextInfo at: #sessionId ifAbsent: [ nil ] ].
+
+	perSuggestion := (suggestions ifNil: [ #() ]) asArray withIndexCollect: [ :each :index |
+		| content contentLines |
+		content := each asString.
+		contentLines := content lines.
+		Dictionary new
+			at: #index put: index;
+			at: #lineCount put: contentLines size;
+			at: #charCount put: content size;
+			at: #firstLine put: (contentLines isEmpty
+				ifTrue: [ '' ]
+				ifFalse: [ contentLines first ]);
+			yourself ].
+
+	details := Dictionary new
+		at: #sessionId put: (sessionId ifNil: [ '' ]) asString;
+		at: #cacheHit put: cacheHit;
+		at: #suggestionCount put: (suggestions ifNil: [ #() ]) size;
+		at: #suggestions put: perSuggestion asArray;
+		yourself.
+
+	CoPharoCopilotLogger
+		logBackEndEvent: 'Completion session summary'
+		details: details
+]
+
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollection [
 
 	CoPharoCopilotLogger logFrontEndEvent: 'Skipping completion menu: no entries after cleaning' details: (
@@ -1155,9 +1265,21 @@ CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefi
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefixString suffix: suffixString context: classContext attempt: attempt contextInfo: contextInfo [
 
-	| rawResponse content |
+	| rawResponse content startMs durationMs |
+	startMs := Time millisecondClockValue.
 	rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
+	durationMs := [ Time millisecondClockValue - startMs ]
+		on: Error
+		do: [ :ex | 0 ].
 	content := self normalizeSuggestion: rawResponse forPrefix: prefixString.
+
+	self
+		logCompletionResponseFor: rawResponse
+		normalized: content
+		attempt: attempt
+		prefix: prefixString
+		durationMs: durationMs
+		contextInfo: contextInfo.
 
 	(content isEmpty and: [ rawResponse asString trimBoth isEmpty not ]) ifTrue: [
 		self
@@ -1217,13 +1339,14 @@ CoPharoCopilotResultSetBuilder >> positionFromSnapshot: snapshot [
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
 	[
-		| classContext suggestions sessionId sessionPayload |
+		| classContext suggestions sessionId sessionPayload cacheHit |
 
 		classContext := self classContextFor: aContext prefix: prefixString.
 		self updateContextInfo: contextInfo withClassContext: classContext.
 		contextInfo at: #classContext put: classContext.
 
 		suggestions := self cachedSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
+		cacheHit := suggestions notNil.
 		suggestions ifNil: [
 			suggestions := self fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
 			self cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext
@@ -1240,6 +1363,8 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			CoPharoCopilotLogger
 				writeCompletionSession: sessionPayload
 				sessionId: sessionId ].
+
+		self logCompletionSessionSummaryFor: suggestions cacheHit: cacheHit contextInfo: contextInfo.
 
 		self
 			applyContents: suggestions

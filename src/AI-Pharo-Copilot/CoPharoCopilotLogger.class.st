@@ -195,6 +195,7 @@ CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInf
 			yourself);
 		at: #accepted put: nil;
 		at: #rejected put: ((contextInfo at: #rejected ifAbsent: [ #() ]) asArray);
+		at: #returned put: ((contextInfo at: #returned ifAbsent: [ #() ]) asArray);
 		yourself
 ]
 
@@ -363,6 +364,20 @@ CoPharoCopilotLogger class >> updateCompletionSession: aSessionId addRejected: r
 	rejected := payload at: #rejected ifAbsent: [ OrderedCollection new ].
 	rejected add: rejectedString.
 	payload at: #rejected put: rejected asArray.
+	file writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: payload) ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> updateCompletionSession: aSessionId addReturned: aReturnedDictionary [
+	| file payload returned |
+	self loggingEnabled ifFalse: [ ^ self ].
+	file := self completionFileReferenceFor: aSessionId.
+	file exists ifFalse: [ ^ self ].
+	payload := STONJSON fromString: file contents.
+	returned := payload at: #returned ifAbsent: [ OrderedCollection new ].
+	returned add: aReturnedDictionary.
+	payload at: #returned put: returned asArray.
 	file writeStreamDo: [ :stream |
 		stream nextPutAll: (STONJSON toString: payload) ]
 ]
