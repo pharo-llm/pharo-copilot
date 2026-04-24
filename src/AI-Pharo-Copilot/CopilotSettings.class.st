@@ -913,9 +913,9 @@ CopilotSettings class >> minimumPrefixLength [
 
 { #category : 'context' }
 CopilotSettings class >> minimumPrefixLength: anObject [
-	"Set the minimum prefix length (1 to 20, default: 2)."
+	"Set the minimum prefix length (0 to 20, default: 2). A value of 0 lets the copilot request completions on an empty prefix."
 
-	minimumPrefixLength := self normalizedDuration: anObject default: 2 minimum: 1 maximum: 20.
+	minimumPrefixLength := self normalizedInteger: anObject default: 2 minimum: 0 maximum: 20.
 	self autoSaveSettings
 ]
 
@@ -1083,6 +1083,17 @@ CopilotSettings class >> normalizedFloat: anObject default: defaultValue minimum
 	| candidate |
 	anObject ifNil: [ ^ defaultValue ].
 	candidate := [ anObject asFloat ] on: Error do: [ defaultValue ].
+	candidate := candidate max: minValue.
+	^ candidate min: maxValue
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> normalizedInteger: anObject default: defaultValue minimum: minValue maximum: maxValue [
+	"Normalize an integer, clamping to [minValue, maxValue]. Unlike normalizedDuration:, this preserves legitimate values equal to minValue (including 0)."
+
+	| candidate |
+	anObject ifNil: [ ^ defaultValue ].
+	candidate := [ anObject asInteger ] on: Error do: [ ^ defaultValue ].
 	candidate := candidate max: minValue.
 	^ candidate min: maxValue
 ]
@@ -1740,7 +1751,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #minimumPrefixLength;
 					setSelector: #minimumPrefixLength:;
 					default: self minimumPrefixLength;
-					description: 'Minimum number of characters typed before requesting a completion (1-20). Default: 2'.
+					description: 'Minimum number of characters typed before requesting a completion (0-20). Use 0 to trigger completions on an empty prefix. Default: 2'.
 
 				(aBuilder setting: #requestTimeoutSeconds)
 					order: 0.7;

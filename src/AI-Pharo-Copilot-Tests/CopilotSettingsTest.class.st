@@ -243,6 +243,30 @@ CopilotSettingsTest >> testMetadataStringForKeyDefaultWhenMissing [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testMinimumPrefixLengthAllowsZero [
+
+	CopilotSettings withDefaultSettingsDo: [
+		CopilotSettings minimumPrefixLength: 0.
+		self assert: CopilotSettings minimumPrefixLength equals: 0.
+	]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testMinimumPrefixLengthNormalization [
+
+	CopilotSettings withDefaultSettingsDo: [
+		CopilotSettings minimumPrefixLength: -5.
+		self assert: CopilotSettings minimumPrefixLength equals: 0.
+		CopilotSettings minimumPrefixLength: 42.
+		self assert: CopilotSettings minimumPrefixLength equals: 20.
+		CopilotSettings minimumPrefixLength: 7.
+		self assert: CopilotSettings minimumPrefixLength equals: 7.
+		CopilotSettings minimumPrefixLength: nil.
+		self assert: CopilotSettings minimumPrefixLength equals: 2.
+	]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testMissingDefaultFimTemplateSignalsError [
 
     | originalLogsDir tempFs logsDir |
