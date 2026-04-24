@@ -15,7 +15,10 @@ Class {
 		'completionCache',
 		'cachedClient',
 		'lastSnapshotKey',
-		'lastSnapshotValue'
+		'lastSnapshotValue',
+		'classContextClock',
+		'classContextOldestKey',
+		'classContextOldestTime'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -101,64 +104,64 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
-    | context snapshot prefix suffix contextInfo delay sessionId classContext cached |
 
-    context := completionContext.
+	| context snapshot prefix suffix contextInfo delay classContext cached |
+	context := completionContext.
 
-    (self shouldRequestCompletionForContext: context) ifFalse: [
-        ^ self emptyResultSet ].
+	(self shouldRequestCompletionForContext: context) ifFalse: [ ^ self emptyResultSet ].
 
-    snapshot := self contextSnapshotFor: context.
-    prefix := snapshot at: #prefix.
-    suffix := snapshot at: #suffix.
-    contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
+	snapshot := self contextSnapshotFor: context.
+	prefix := snapshot at: #prefix.
+	suffix := snapshot at: #suffix.
+	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
 
-    sessionId := CoPharoCopilotLogger completionSessionId.
-    contextInfo
-        at: #sessionId put: sessionId;
-        at: #timestamp put: DateAndTime now asString;
-        at: #rejected put: OrderedCollection new.
+	self isLoggingEnabled ifTrue: [
+	contextInfo
+		at: #sessionId put: CoPharoCopilotLogger completionSessionId;
+		at: #timestamp put: DateAndTime now asString;
+		at: #rejected put: OrderedCollection new].
+	
+	classContext := self classContextFor: context prefix: prefix.
+	cached := self
+		          cachedSuggestionsForPrefix: prefix
+		          suffix: suffix
+		          classContext: classContext
+		          contextInfo: contextInfo.
+	cached ifNotNil: [
+			| entries position |
+			entries := self completionEntriesFrom: cached inContext: context contextInfo: contextInfo.
+			entries isEmpty ifFalse: [
+					position := self menuPositionForContextOrDefault: context.
+					self openCompletionMenuFor: context entries: entries position: position.
+					^ self emptyResultSet ] ].
 
-    "Synchronous cache lookup — zero model call on hit."
-    classContext := self classContextFor: context prefix: prefix.
-    cached := self
-        cachedSuggestionsForPrefix: prefix
-        suffix: suffix
-        classContext: classContext
-        contextInfo: contextInfo.
-    cached ifNotNil: [
-        | entries position |
-        entries := self completionEntriesFrom: cached inContext: context contextInfo: contextInfo.
-        entries isEmpty ifFalse: [
-            position := self menuPositionForContextOrDefault: context.
-            self openCompletionMenuFor: context entries: entries position: position.
-            ^ self emptyResultSet ] ].
+	delay := self requestDelayForSnapshot: snapshot.
 
-    delay := self requestDelayForSnapshot: snapshot.
+	self
+		scheduleCompletionFor: context
+		prefix: prefix
+		suffix: suffix
+		contextInfo: contextInfo
+		delayMilliseconds: delay.
 
-    self
-        scheduleCompletionFor: context
-        prefix: prefix
-        suffix: suffix
-        contextInfo: contextInfo
-        delayMilliseconds: delay.
-
-    ^ self emptyResultSet
+	^ self emptyResultSet
 ]
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> cacheClassContext: contextString for: methodClass [
 
+	| tick |
 	methodClass ifNil: [ ^ self ].
 	self ensureClassContextCacheCapacity.
-
-	classContextCache at: methodClass put: (
-		Dictionary new
-			at: #stamp put: (self classStampFor: methodClass);
-			at: #context put: contextString;
-			at: #accessTime put: DateAndTime now;
-			yourself
-	)
+	tick := self classContextTick.
+	classContextCache at: methodClass put: (Dictionary new
+			 at: #stamp put: (self classStampFor: methodClass);
+			 at: #context put: contextString;
+			 at: #accessTime put: tick;
+			 yourself).
+	(classContextOldestKey isNil or: [ classContextOldestTime isNil ]) ifFalse: [ ^ self ].
+	classContextOldestKey := methodClass.
+	classContextOldestTime := tick
 ]
 
 { #category : 'new' }
@@ -186,7 +189,7 @@ CoPharoCopilotResultSetBuilder >> cachedClassContextFor: methodClass [
 		^ nil
 	].
 
-	cached at: #accessTime put: DateAndTime now.
+	cached at: #accessTime put: self classContextTick.
 	^ cached at: #context ifAbsent: [ '' ]
 ]
 
@@ -231,6 +234,14 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 	self cacheClassContext: builtContext for: methodClass.
 
 	^ builtContext
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> classContextTick [
+
+	classContextClock ifNil: [ classContextClock := 0 ].
+	classContextClock := classContextClock + 1.
+	^ classContextClock
 ]
 
 { #category : 'initialization' }
@@ -309,7 +320,7 @@ CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
 		ifFalse: [
 			(self isLanguageSpec: body) ifTrue: [ body := '' ] ].
 
-		^ body trimBoth
+		^ body trimRight
 	].
 
 	"Fallback: keep only the first paragraph if multiple paragraphs exist."
@@ -318,7 +329,7 @@ CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
 		ifTrue: [ text ]
 		ifFalse: [ text copyFrom: 1 to: delimiterIndex - 1 ].
 
-	^ body trimBoth
+	^ body trimRight
 ]
 
 { #category : 'initialization' }
@@ -420,46 +431,54 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> contextInfoFor: aContext prefix: prefixString suffix: suffixString [
-	"Build a diagnostic payload used for logging and debugging completion requests."
 
-	^ Dictionary new
-		at: #contextClass put: aContext class name;
-		at: #cursorPosition put: aContext position;
-		at: #sourceSize put: aContext source size;
-		at: #fullSource put: aContext source;
+	| info |
+	info := Dictionary new
 		at: #prefix put: prefixString;
 		at: #suffix put: suffixString;
-		yourself
+		yourself.
+	self isLoggingEnabled ifTrue: [
+		info
+			at: #contextClass put: aContext class name;
+			at: #cursorPosition put: aContext position;
+			at: #sourceSize put: aContext source size;
+			at: #fullSource put: aContext source ].
+	^ info
 ]
 
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> contextSnapshotFor: aContext [
-    | source position prefix suffix |
-    source := [ aContext source ifNil: [ '' ] ] on: Error do: [ '' ].
-    position := [ aContext position ifNil: [ 0 ] ] on: Error do: [ 0 ].
-    position := (position max: 0) min: source size.
 
-    prefix := position > 0
-        ifTrue: [ source copyFrom: 1 to: position ]
-        ifFalse: [ '' ].
-    suffix := position < source size
-        ifTrue: [ source copyFrom: position + 1 to: source size ]
-        ifFalse: [ '' ].
+	| source position prefix suffix |
+	source := [ aContext source ifNil: [ '' ] ]
+		          on: Error
+		          do: [ '' ].
+	position := [ aContext position ifNil: [ 0 ] ]
+		            on: Error
+		            do: [ 0 ].
+	position := (position max: 0) min: source size.
 
-    (lastSnapshotKey notNil
-        and: [ lastSnapshotKey first = source identityHash
+	  (lastSnapshotKey notNil
+        and: [ lastSnapshotKey first == source
         and: [ lastSnapshotKey second = position ] ])
             ifTrue: [ ^ lastSnapshotValue ].
 
-    lastSnapshotKey := { source identityHash. position }.
-    lastSnapshotValue := Dictionary new
-        at: #prefix put: prefix;
-        at: #suffix put: suffix;
-        at: #position put: position;
-        at: #sourceLength put: source size;
-        yourself.
+	prefix := position > 0
+		          ifTrue: [ source copyFrom: 1 to: position ]
+		          ifFalse: [ '' ].
+	suffix := position < source size
+		          ifTrue: [ source copyFrom: position + 1 to: source size ]
+		          ifFalse: [ '' ].
 
-    ^ lastSnapshotValue
+lastSnapshotKey := { source. position }.
+	lastSnapshotValue := Dictionary new
+		                     at: #prefix put: prefix;
+		                     at: #suffix put: suffix;
+		                     at: #position put: position;
+		                     at: #sourceLength put: source size;
+		                     yourself.
+
+	^ lastSnapshotValue
 ]
 
 { #category : 'initialization' }
@@ -498,56 +517,15 @@ CoPharoCopilotResultSetBuilder >> deferUI: aBlock [
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> descriptionForSuggestion: suggestionString inContext: aContext [
 
-	| firstLine selector behavior classComment |
-	firstLine := suggestionString lines
-		ifEmpty: [ '' ]
-		ifNotEmpty: [ :lines | lines first ].
+	"Cheap, UI-only preview. Avoid AST parsing and class comment lookups on the hot path."
 
-	selector := [ (OCParser parseFaultyMethod: suggestionString) selector ]
-		on: Error
-		do: [ nil ].
-
-	behavior := (aContext respondsTo: #completionClass)
-		ifTrue: [ aContext completionClass ]
-		ifFalse: [
-			(aContext respondsTo: #behavior)
-				ifTrue: [ aContext behavior ]
-				ifFalse: [ nil ] ].
-
-	classComment := behavior
-		ifNotNil: [
-			[ behavior comment asString ]
-				on: Error
-				do: [ '' ] ]
-		ifNil: [ '' ].
-
-	selector ifNotNil: [
-		^ String streamContents: [ :stream |
-			stream
-				nextPutAll: 'Suggested selector: ';
-				nextPutAll: selector asString;
-				cr; cr.
-			firstLine isEmpty ifFalse: [
-				stream
-					nextPutAll: 'Preview: ';
-					nextPutAll: firstLine;
-					cr; cr ].
-			classComment isEmpty ifFalse: [
-				stream
-					nextPutAll: 'Class comment:';
-					cr;
-					nextPutAll: classComment ] ] ].
-
-	^ String streamContents: [ :stream |
-		stream
-			nextPutAll: 'Preview: ';
-			nextPutAll: firstLine.
-		classComment isEmpty ifFalse: [
-			stream
-				cr; cr;
-				nextPutAll: 'Class comment:';
-				cr;
-				nextPutAll: classComment ] ]
+	| text newlineIndex firstLine |
+	text := suggestionString ifNil: [ ^ '' ].
+	newlineIndex := text indexOf: Character lf ifAbsent: [ 0 ].
+	firstLine := newlineIndex = 0
+		ifTrue: [ text ]
+		ifFalse: [ text copyFrom: 1 to: newlineIndex - 1 ].
+	^ 'Preview: ' , firstLine
 ]
 
 { #category : 'new' }
@@ -557,24 +535,22 @@ CoPharoCopilotResultSetBuilder >> emptyResultSet [
 ]
 
 { #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> ensureClassContextCacheCapacity [
+CoPharoCopilotResultSetBuilder >> ensureClassContextCacheCapacity [ 
+	"Counter-based LRU: cache oldest key between evictions; scan only when unknown."
 
 	| maxClassContextCacheSize |
 	maxClassContextCacheSize := 256.
 	classContextCache ifNil: [ ^ self ].
 	classContextCache size < maxClassContextCacheSize ifTrue: [ ^ self ].
 	[ classContextCache size >= maxClassContextCacheSize ] whileTrue: [
-			| oldestKey oldestTime |
-			oldestKey := nil.
-			oldestTime := nil.
-			classContextCache keysAndValuesDo: [ :k :v |
-					| accessTime |
-					accessTime := v at: #accessTime ifAbsent: [ DateAndTime epoch ].
-					(oldestTime isNil or: [ accessTime < oldestTime ]) ifTrue: [
-							oldestKey := k.
-							oldestTime := accessTime ] ].
-			oldestKey ifNil: [ ^ self ].
-			classContextCache removeKey: oldestKey ifAbsent: [ ] ]
+		| keyToEvict |
+		keyToEvict := (classContextOldestKey notNil and: [ classContextCache includesKey: classContextOldestKey ])
+			ifTrue: [ classContextOldestKey ]
+			ifFalse: [ self scanClassContextOldestKey ].
+		keyToEvict ifNil: [ ^ self ].
+		classContextCache removeKey: keyToEvict ifAbsent: [ ].
+		classContextOldestKey := nil.
+		classContextOldestTime := nil ]
 ]
 
 { #category : 'new' }
@@ -838,6 +814,12 @@ CoPharoCopilotResultSetBuilder >> isLikelyContextEcho: suggestionString forPrefi
 		and: [ (':_' includes: first) not ]
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> isLoggingEnabled [
+
+	^ [ CopilotSettings loggingEnabled ] on: Error do: [ false ]
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> isTemplateLeakOrPromptEcho: cleanedString rawResponse: rawString prefix: prefixString [
 
@@ -892,6 +874,7 @@ CoPharoCopilotResultSetBuilder >> isWordChar: ch [
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollection [
 
+	self isLoggingEnabled ifFalse: [ ^ self ].
 	CoPharoCopilotLogger logFrontEndEvent: 'Skipping completion menu: no entries after cleaning' details: (
 		Dictionary new
 			at: #rawSuggestionCount put: contentCollection size;
@@ -902,6 +885,7 @@ CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollectio
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logRejectedSuggestionFrom: rawResponse attempt: attempt prefix: prefixString [
 
+	self isLoggingEnabled ifFalse: [ ^ self ].
 	CoPharoCopilotLogger logBackEndEvent: 'Suggestion rejected after normalization' details: (
 		Dictionary new
 			at: #attempt put: attempt;
@@ -917,30 +901,27 @@ CoPharoCopilotResultSetBuilder >> logRejectedSuggestionFrom: rawResponse attempt
 CoPharoCopilotResultSetBuilder >> logRejectedSuggestionFrom: rawResponse attempt: attempt prefix: prefixString contextInfo: contextInfo [
 
 	| rejected sessionId |
-	CoPharoCopilotLogger logBackEndEvent: 'Suggestion rejected after normalization' details: (
-		Dictionary new
-			at: #attempt put: attempt;
-			at: #rawResponse put: rawResponse asString;
-			at: #prefixTail put: ((prefixString size > 80)
-				ifTrue: [ prefixString last: 80 ]
-				ifFalse: [ prefixString ]);
-			yourself
-	).
+	self isLoggingEnabled ifFalse: [ ^ self ].
+	CoPharoCopilotLogger logBackEndEvent: 'Suggestion rejected after normalization' details: (Dictionary new
+			 at: #attempt put: attempt;
+			 at: #rawResponse put: rawResponse asString;
+			 at: #prefixTail put: (prefixString size > 80
+					  ifTrue: [ prefixString last: 80 ]
+					  ifFalse: [ prefixString ]);
+			 yourself).
 
 	rejected := contextInfo at: #rejected ifAbsentPut: [ OrderedCollection new ].
 	rejected add: rawResponse asString.
 
 	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
-	sessionId ifNotNil: [
-		CoPharoCopilotLogger
-			updateCompletionSession: sessionId
-			addRejected: rawResponse asString ]
+	sessionId ifNotNil: [ CoPharoCopilotLogger updateCompletionSession: sessionId addRejected: rawResponse asString ]
 ]
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logStaleContextForExpectedPrefix: expectedPrefix suffix: expectedSuffix context: aContext [
 
 	| snapshot currentPrefix currentSuffix |
+	self isLoggingEnabled ifFalse: [ ^ self ].
 	snapshot := self contextSnapshotFor: aContext.
 	currentPrefix := snapshot at: #prefix ifAbsent: [ '' ].
 	currentSuffix := snapshot at: #suffix ifAbsent: [ '' ].
@@ -1020,14 +1001,14 @@ CoPharoCopilotResultSetBuilder >> menuPositionForContextOrDefault: aContext [
 	position := self menuPositionFor: aContext.
 
 	position ifNil: [
-		CoPharoCopilotLogger logFrontEndEvent: 'Completion menu position unavailable' details: (
-			Dictionary new
-				at: #contextClass put: aContext class name;
-				at: #hasEditorAccessor put: (aContext respondsTo: #editor);
-				yourself
-		).
-		^ 200 @ 200
-	].
+		self isLoggingEnabled ifTrue: [
+			CoPharoCopilotLogger logFrontEndEvent: 'Completion menu position unavailable' details: (
+				Dictionary new
+					at: #contextClass put: aContext class name;
+					at: #hasEditorAccessor put: (aContext respondsTo: #editor);
+					yourself
+			) ].
+			^ 200 @ 200 ].
 
 	^ position
 ]
@@ -1217,11 +1198,13 @@ CoPharoCopilotResultSetBuilder >> positionFromSnapshot: snapshot [
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
 	[
-		| classContext suggestions sessionId sessionPayload |
+		| classContext suggestions sessionId sessionPayload loggingOn |
 
 		classContext := self classContextFor: aContext prefix: prefixString.
-		self updateContextInfo: contextInfo withClassContext: classContext.
-		contextInfo at: #classContext put: classContext.
+		loggingOn := self isLoggingEnabled.
+		loggingOn ifTrue: [
+			self updateContextInfo: contextInfo withClassContext: classContext.
+			contextInfo at: #classContext put: classContext ].
 
 		suggestions := self cachedSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
 		suggestions ifNil: [
@@ -1229,17 +1212,18 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			self cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext
 		].
 
-		sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
-		sessionId ifNotNil: [
-			sessionPayload := CoPharoCopilotLogger
-				initialCompletionPayloadForContextInfo: contextInfo
-				prefix: prefixString
-				suffix: suffixString
-				classContext: classContext
-				cacheStats: self completionCache statisticsDictionary.
-			CoPharoCopilotLogger
-				writeCompletionSession: sessionPayload
-				sessionId: sessionId ].
+		loggingOn ifTrue: [
+			sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
+			sessionId ifNotNil: [
+				sessionPayload := CoPharoCopilotLogger
+					initialCompletionPayloadForContextInfo: contextInfo
+					prefix: prefixString
+					suffix: suffixString
+					classContext: classContext
+					cacheStats: self completionCache statisticsDictionary.
+				CoPharoCopilotLogger
+					writeCompletionSession: sessionPayload
+					sessionId: sessionId ] ].
 
 		self
 			applyContents: suggestions
@@ -1249,7 +1233,7 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			contextInfo: contextInfo
 	]
 		on: Error
-		do: [ :ex | self logAsynchronousCompletionError: ex contextInfo: contextInfo prefix: prefixString suffix: suffixString ]
+		do: [ :ex |  ]
 
 ]
 
@@ -1320,6 +1304,23 @@ CoPharoCopilotResultSetBuilder >> safeSourceAndPositionFor: aContext [
 	pos := [ aContext position ifNil: [ 0 ] ] on: Error do: [ 0 ].
 	pos := (pos max: 0) min: source size.
 	^ { source. pos }
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> scanClassContextOldestKey [
+
+	| bestKey bestTime |
+	bestKey := nil.
+	bestTime := nil.
+	classContextCache keysAndValuesDo: [ :k :v |
+		| t |
+		t := v at: #accessTime ifAbsent: [ 0 ].
+		(bestTime isNil or: [ t < bestTime ]) ifTrue: [
+			bestKey := k.
+			bestTime := t ] ].
+	classContextOldestKey := bestKey.
+	classContextOldestTime := bestTime.
+	^ bestKey
 ]
 
 { #category : 'initialization' }

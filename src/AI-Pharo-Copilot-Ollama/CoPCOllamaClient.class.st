@@ -72,34 +72,53 @@ CoPCOllamaClient >> ensureStringFromResponse: container fallback: fallbackString
 { #category : 'generation-operations' }
 CoPCOllamaClient >> expandFimTemplate: templateString prefix: prefixString suffix: suffixString context: contextString [
 
-	| prompt safePrefix safeSuffix safeContext includesContext |
+| safePrefix safeSuffix safeContext template size i ch includesContext result |
 	safePrefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
 	safeSuffix := suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ].
 	safeContext := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
-	prompt := templateString ifNil: [ '' ].
+	template := templateString ifNil: [ '' ].
+	size := template size.
+	includesContext := false.
 
-	includesContext := (prompt includesSubstring: '{{ .Context }}') or: [
-		                   (prompt includesSubstring: '{{.Context}}') or: [
-			                   (prompt includesSubstring: '{3}') or: [ prompt includesSubstring: '%3' ] ] ].
+	result := size = 0
+		ifTrue: [ '' ]
+		ifFalse: [ String streamContents: [ :s |
+			i := 1.
+			[ i <= size ] whileTrue: [
+				| consumed |
+				ch := template at: i.
+				consumed := 0.
 
-	prompt := prompt copyReplaceAll: '{{ .Prompt }}' with: safePrefix.
-	prompt := prompt copyReplaceAll: '{{.Prompt}}' with: safePrefix.
-	prompt := prompt copyReplaceAll: '{{ .Suffix }}' with: safeSuffix.
-	prompt := prompt copyReplaceAll: '{{.Suffix}}' with: safeSuffix.
-	prompt := prompt copyReplaceAll: '{{ .Context }}' with: safeContext.
-	prompt := prompt copyReplaceAll: '{{.Context}}' with: safeContext.
+				(ch = ${ and: [ i + 1 <= size and: [ (template at: i + 1) = ${ ] ]) ifTrue: [
+					| closeIdx |
+					closeIdx := self indexOfDoubleBraceCloseIn: template from: i + 2 upTo: size.
+					closeIdx > 0 ifTrue: [
+						| token |
+						token := (template copyFrom: i + 2 to: closeIdx - 1) trimBoth.
+						token = '.Prompt' ifTrue: [ s nextPutAll: safePrefix. consumed := closeIdx + 2 - i ]
+						ifFalse: [ token = '.Suffix' ifTrue: [ s nextPutAll: safeSuffix. consumed := closeIdx + 2 - i ]
+						ifFalse: [ token = '.Context' ifTrue: [ s nextPutAll: safeContext. includesContext := true. consumed := closeIdx + 2 - i ] ] ] ] ].
 
-	prompt := prompt copyReplaceAll: '%1' with: safePrefix.
-	prompt := prompt copyReplaceAll: '%2' with: safeSuffix.
-	prompt := prompt copyReplaceAll: '%3' with: safeContext.
-	prompt := prompt format: {
-			          safePrefix.
-			          safeSuffix.
-			          safeContext }.
+				(consumed = 0 and: [ ch = $% and: [ i + 1 <= size ] ]) ifTrue: [
+					| next |
+					next := template at: i + 1.
+					next = $1 ifTrue: [ s nextPutAll: safePrefix. consumed := 2 ]
+					ifFalse: [ next = $2 ifTrue: [ s nextPutAll: safeSuffix. consumed := 2 ]
+					ifFalse: [ next = $3 ifTrue: [ s nextPutAll: safeContext. includesContext := true. consumed := 2 ] ] ] ].
 
-	(includesContext not and: [ safeContext isEmpty not ]) ifTrue: [ prompt := self prependContext: safeContext toPrompt: prompt ].
+				(consumed = 0 and: [ ch = ${ and: [ i + 2 <= size and: [ (template at: i + 2) = $} ] ] ]) ifTrue: [
+					| digit |
+					digit := template at: i + 1.
+					digit = $1 ifTrue: [ s nextPutAll: safePrefix. consumed := 3 ]
+					ifFalse: [ digit = $2 ifTrue: [ s nextPutAll: safeSuffix. consumed := 3 ]
+					ifFalse: [ digit = $3 ifTrue: [ s nextPutAll: safeContext. includesContext := true. consumed := 3 ] ] ] ].
 
-	^ prompt
+				consumed = 0 ifTrue: [ s nextPut: ch. consumed := 1 ].
+				i := i + consumed ] ] ].
+
+	(includesContext not and: [ safeContext isEmpty not ]) ifTrue: [ result := self prependContext: safeContext toPrompt: result ].
+
+	^ result
 ]
 
 { #category : 'generation-operations' }
@@ -151,6 +170,17 @@ CoPCOllamaClient >> generateForPrefix: prefixString suffix: suffixString context
 	normalized := self normalizeResponse: response.
 
 	^ normalized
+]
+
+{ #category : 'generation-operations' }
+CoPCOllamaClient >> indexOfDoubleBraceCloseIn: aString from: startIndex upTo: size [ 
+
+	| i |
+	i := startIndex.
+	[ i < size ] whileTrue: [
+		((aString at: i) = $} and: [ (aString at: i + 1) = $} ]) ifTrue: [ ^ i ].
+		i := i + 1 ].
+	^ 0
 ]
 
 { #category : 'initialization' }
