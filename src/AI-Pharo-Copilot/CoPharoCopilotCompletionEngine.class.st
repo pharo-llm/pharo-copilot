@@ -29,7 +29,7 @@ CoPharoCopilotCompletionEngine >> completionBuilder [
 ]
 
 { #category : 'replacement' }
-CoPharoCopilotCompletionEngine >> okenStartPosition [
+CoPharoCopilotCompletionEngine >> tokenStartPosition [
 	"Answer the position at which the token being completed starts in the editor.
 	The token ends at the current caret, so its start is the caret minus the token size."
 

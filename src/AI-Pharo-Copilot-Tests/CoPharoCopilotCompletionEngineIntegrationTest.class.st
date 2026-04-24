@@ -162,30 +162,30 @@ CoPharoCopilotCompletionEngineIntegrationTest >> testBuilderIdentityAcrossReplac
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineIntegrationTest >> testOkenStartPositionAfterIgnoredReplacementUnchanged [
+CoPharoCopilotCompletionEngineIntegrationTest >> testTtokenStartPositionAfterIgnoredReplacementUnchanged [
 	| engine editor p |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
 	editor caret: 12.
 	engine editor: editor.
-	p := engine okenStartPosition.
+	p := engine tokenStartPosition.
 	engine replaceTokenInEditorWith: ''.
-	self assert: engine okenStartPosition equals: p
+	self assert: engine tokenStartPosition equals: p
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineIntegrationTest >> testOkenStartPositionAfterNonEmptyReplacementFollowsCaret [
+CoPharoCopilotCompletionEngineIntegrationTest >> testTtokenStartPositionAfterNonEmptyReplacementFollowsCaret [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
 	editor caret: 5.
 	engine editor: editor.
 	engine replaceTokenInEditorWith: 'abc'.
-	self assert: engine okenStartPosition equals: 8
+	self assert: engine tokenStartPosition equals: 8
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineIntegrationTest >> testRestoreCaretAfterReplaceResetsOkenStartPosition [
+CoPharoCopilotCompletionEngineIntegrationTest >> testRestoreCaretAfterReplaceResetsTtokenStartPosition [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -193,7 +193,7 @@ CoPharoCopilotCompletionEngineIntegrationTest >> testRestoreCaretAfterReplaceRes
 	engine editor: editor.
 	engine replaceTokenInEditorWith: 'abcd'.
 	engine restoreCaretTo: 3.
-	self assert: engine okenStartPosition equals: 3
+	self assert: engine tokenStartPosition equals: 3
 ]
 
 { #category : 'tests' }
@@ -246,10 +246,10 @@ CoPharoCopilotCompletionEngineIntegrationTest >> testRealEngineRespondsToRestore
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineIntegrationTest >> testRealEngineRespondsToOkenStartPosition [
+CoPharoCopilotCompletionEngineIntegrationTest >> testRealEngineRespondsToTtokenStartPosition [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self assert: (engine respondsTo: #okenStartPosition)
+	self assert: (engine respondsTo: #tokenStartPosition)
 ]
 
 { #category : 'tests' }
