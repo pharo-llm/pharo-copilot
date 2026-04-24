@@ -1,5 +1,5 @@
 Class {
-	#name : 'CoPharoCopilotCompletionEngineTtokenStartPositionTest',
+	#name : 'CoPharoCopilotCompletionEngineTokenStartPositionTest',
 	#superclass : 'TestCase',
 	#category : 'AI-Pharo-Copilot-Tests-Tests',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -7,7 +7,7 @@ Class {
 }
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt0 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt0 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -17,7 +17,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt1 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt1 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -27,7 +27,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt2 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt2 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -37,7 +37,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt3 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt3 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -47,7 +47,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt4 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt4 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -57,7 +57,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt5 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt5 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -67,7 +67,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt7 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt7 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -77,7 +77,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt10 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt10 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -87,7 +87,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt13 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt13 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -97,7 +97,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt20 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt20 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -107,7 +107,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt25 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt25 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -117,7 +117,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt50 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt50 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -127,7 +127,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt99 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt99 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -137,7 +137,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt100 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt100 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -147,7 +147,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt200 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt200 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -157,7 +157,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt500 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt500 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -167,7 +167,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt1000 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt1000 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -177,7 +177,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt1024 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt1024 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -187,7 +187,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt4096 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt4096 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -197,7 +197,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionEqualsCaretAt10000 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionEqualsCaretAt10000 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -207,7 +207,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionDefaultEditorCaretIsOne [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionDefaultEditorCaretIsOne [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -216,7 +216,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionReturnsInteger [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionReturnsInteger [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -226,7 +226,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionIsIdempotent [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionIsIdempotent [
 	| engine editor a b |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -238,7 +238,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionChangesWithCaret [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionChangesWithCaret [
 	| engine editor p1 p2 |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -251,7 +251,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionMatchesCaretAfterMutation [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionMatchesCaretAfterMutation [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -261,7 +261,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime11 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime11 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -271,7 +271,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime23 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime23 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -281,7 +281,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime37 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime37 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -291,7 +291,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime47 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime47 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -301,7 +301,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime59 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime59 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -311,7 +311,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime71 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime71 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -321,7 +321,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime83 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime83 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -331,7 +331,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime97 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime97 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -341,7 +341,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime109 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime109 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -351,7 +351,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime127 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime127 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -361,7 +361,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime149 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime149 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -371,7 +371,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime167 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime167 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -381,7 +381,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime181 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime181 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -391,7 +391,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime199 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime199 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -401,7 +401,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime211 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime211 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -411,7 +411,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime227 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime227 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -421,7 +421,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime241 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime241 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -431,7 +431,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionAtPrime257 [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionAtPrime257 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -441,7 +441,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionLargeCaret [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionLargeCaret [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -451,7 +451,7 @@ CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPosition
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineTtokenStartPositionTest >> testTtokenStartPositionSmallIntMax [
+CoPharoCopilotCompletionEngineTokenStartPositionTest >> testTokenStartPositionSmallIntMax [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.

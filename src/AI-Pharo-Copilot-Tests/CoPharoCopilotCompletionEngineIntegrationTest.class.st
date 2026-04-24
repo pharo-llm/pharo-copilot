@@ -162,7 +162,7 @@ CoPharoCopilotCompletionEngineIntegrationTest >> testBuilderIdentityAcrossReplac
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineIntegrationTest >> testTtokenStartPositionAfterIgnoredReplacementUnchanged [
+CoPharoCopilotCompletionEngineIntegrationTest >> testTokenStartPositionAfterIgnoredReplacementUnchanged [
 	| engine editor p |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -174,7 +174,7 @@ CoPharoCopilotCompletionEngineIntegrationTest >> testTtokenStartPositionAfterIgn
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineIntegrationTest >> testTtokenStartPositionAfterNonEmptyReplacementFollowsCaret [
+CoPharoCopilotCompletionEngineIntegrationTest >> testTokenStartPositionAfterNonEmptyReplacementFollowsCaret [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -185,7 +185,7 @@ CoPharoCopilotCompletionEngineIntegrationTest >> testTtokenStartPositionAfterNon
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineIntegrationTest >> testRestoreCaretAfterReplaceResetsTtokenStartPosition [
+CoPharoCopilotCompletionEngineIntegrationTest >> testRestoreCaretAfterReplaceResetsTokenStartPosition [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
@@ -246,7 +246,7 @@ CoPharoCopilotCompletionEngineIntegrationTest >> testRealEngineRespondsToRestore
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineIntegrationTest >> testRealEngineRespondsToTtokenStartPosition [
+CoPharoCopilotCompletionEngineIntegrationTest >> testRealEngineRespondsToTokenStartPosition [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
 	self assert: (engine respondsTo: #tokenStartPosition)
