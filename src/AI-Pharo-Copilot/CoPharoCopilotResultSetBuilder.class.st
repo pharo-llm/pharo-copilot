@@ -976,10 +976,9 @@ CoPharoCopilotResultSetBuilder >> menuClosed [
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> menuLabelForSuggestion: suggestionString contextInfo: contextInfo [
-	| prefix visiblePrefix modelName |
+	| prefix visiblePrefix |
 
 	prefix := (contextInfo at: #prefix ifAbsent: [ '' ]) asString.
-	modelName := (CopilotSettings modelName ifNil: [ 'model' ]) asString.
 
 	"Only show the current line before the caret"
 	visiblePrefix := prefix lines
@@ -991,7 +990,7 @@ CoPharoCopilotResultSetBuilder >> menuLabelForSuggestion: suggestionString conte
 		visiblePrefix := '…', (visiblePrefix last: 50)
 	].
 
-	^ visiblePrefix , suggestionString , '  [' , modelName , ']'
+	^ visiblePrefix , suggestionString 
 ]
 
 { #category : 'initialization' }
