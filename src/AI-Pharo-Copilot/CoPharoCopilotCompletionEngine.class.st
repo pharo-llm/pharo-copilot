@@ -29,24 +29,41 @@ CoPharoCopilotCompletionEngine >> completionBuilder [
 ]
 
 { #category : 'new' }
-CoPharoCopilotCompletionEngine >> replaceTokenInEditorWith: newString [
+CoPharoCopilotCompletionEngine >> placeCaretAtEndOfSuggestion: newString from: tokenStartPosition [
+	"Position the editor caret right after the accepted suggestion."
 
-	| caretPosition |
-	(self shouldIgnoreReplacement: newString) ifTrue: [ ^ self ].
-
-	caretPosition := self editor caret.
-	self basicReplaceTokenInEditorWith: newString.
-	self restoreCaretTo: caretPosition
+	self editor selectAt: tokenStartPosition + newString size
 ]
 
 { #category : 'new' }
-CoPharoCopilotCompletionEngine >> restoreCaretTo: caretPosition [
+CoPharoCopilotCompletionEngine >> replaceTokenInEditorWith: newString [
 
-	self editor selectAt: caretPosition
+	| tokenStartPosition |
+	(self shouldIgnoreReplacement: newString) ifTrue: [ ^ self ].
+
+	tokenStartPosition := self tokenStartPosition.
+	self basicReplaceTokenInEditorWith: newString.
+	self placeCaretAtEndOfSuggestion: newString from: tokenStartPosition
 ]
 
 { #category : 'new' }
 CoPharoCopilotCompletionEngine >> shouldIgnoreReplacement: newString [
 
 	^ newString isNil or: [ newString isEmpty ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotCompletionEngine >> tokenStartPosition [
+	"Answer the position at which the token being completed starts in the editor.
+	The token ends at the current caret, so its start is the caret minus the token size."
+
+	| caretPosition tokenSize |
+	caretPosition := self editor caret.
+	tokenSize := [
+		| token |
+		token := self completionToken.
+		token ifNil: [ 0 ] ifNotNil: [ token size ] ]
+			on: Error
+			do: [ 0 ].
+	^ caretPosition - tokenSize
 ]

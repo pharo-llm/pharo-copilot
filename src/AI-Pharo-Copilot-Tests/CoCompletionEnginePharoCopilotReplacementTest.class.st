@@ -7,18 +7,19 @@ Class {
 }
 
 { #category : 'tests' }
-CoCompletionEnginePharoCopilotReplacementTest >> testReplacementKeepsCaretAndRecordsValue [
+CoCompletionEnginePharoCopilotReplacementTest >> testReplacementMovesCaretToEndOfSuggestion [
 
-    | engine editor |
+    | engine editor suggestion |
+    suggestion := 'suggestion text'.
     engine := CoSpyCompletionEnginePharoCopilot new.
     editor := CoTestEditorMock new.
     editor caret: 7.
     engine editor: editor.
 
-    engine replaceTokenInEditorWith: 'suggestion text'.
+    engine replaceTokenInEditorWith: suggestion.
 
-    self assert: engine basicCalledWith equals: 'suggestion text'.
-    self assert: editor caret equals: 7.
+    self assert: engine basicCalledWith equals: suggestion.
+    self assert: editor caret equals: 7 + suggestion size
 ]
 
 { #category : 'tests' }
@@ -33,5 +34,5 @@ CoCompletionEnginePharoCopilotReplacementTest >> testReplacementSkipsBlankSugges
     engine replaceTokenInEditorWith: ''.
 
     self assert: engine basicCalledWith isNil.
-    self assert: editor caret equals: 5.
+    self assert: editor caret equals: 5
 ]
