@@ -277,7 +277,10 @@ CoPharoCopilotResultSetBuilder >> classStampFor: aBehavior [
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
-	"Normalize suggestion text: prefer code-fence body if present, drop language markers, trim surrounding whitespace."
+	"Extract the suggestion body: prefer code-fence content if present, drop language markers.
+	Preserve leading whitespace so indentation inside fenced code survives (important for a
+	code-completion engine); trim only trailing whitespace to drop the newline before the
+	closing fence. Final normalization of leading whitespace happens in normalizeSuggestion:forPrefix:."
 
 	| text fenceStart rest fenceEnd body newlineIndex firstLine delimiterIndex |
 	text := (aString ifNil: [ '' ]) asString.
@@ -309,7 +312,7 @@ CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
 		ifFalse: [
 			(self isLanguageSpec: body) ifTrue: [ body := '' ] ].
 
-		^ body trimBoth
+		^ body trimRight
 	].
 
 	"Fallback: keep only the first paragraph if multiple paragraphs exist."
@@ -318,7 +321,7 @@ CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
 		ifTrue: [ text ]
 		ifFalse: [ text copyFrom: 1 to: delimiterIndex - 1 ].
 
-	^ body trimBoth
+	^ body trimRight
 ]
 
 { #category : 'initialization' }

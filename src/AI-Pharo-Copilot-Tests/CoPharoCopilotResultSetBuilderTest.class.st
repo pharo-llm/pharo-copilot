@@ -147,12 +147,32 @@ CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromHandlesNoCodeBlock [
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromTrimsWhitespace [
+CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromPreservesLeadingWhitespace [
+	"Code-completion indentation must survive cleanup. Only trailing whitespace is dropped
+	(final normalization in normalizeSuggestion:forPrefix: handles the leading side if needed)."
+
 	| builder raw cleaned |
 	builder := CoPharoCopilotResultSetBuilder new.
 	raw := '   ', String lf, 'code here', String lf, '   '.
 	cleaned := builder cleanedContentFrom: raw.
-	self assert: cleaned equals: 'code here'
+	self assert: cleaned equals: '   ', String lf, 'code here'
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromPreservesIndentationInFencedCode [
+	"Indented code inside a fence keeps its leading whitespace so insertion
+	reproduces the author's formatting verbatim."
+
+	| builder raw cleaned expected |
+	builder := CoPharoCopilotResultSetBuilder new.
+	raw := '```smalltalk', String lf,
+		'  | x |', String lf,
+		'  x := 1.', String lf,
+		'  ^ x', String lf,
+		'```'.
+	expected := '  | x |', String lf, '  x := 1.', String lf, '  ^ x'.
+	cleaned := builder cleanedContentFrom: raw.
+	self assert: cleaned equals: expected
 ]
 
 { #category : 'tests' }
