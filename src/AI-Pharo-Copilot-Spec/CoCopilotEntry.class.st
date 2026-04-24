@@ -35,14 +35,15 @@ CoCopilotEntry class >> contents: aString description: aDescriptionString [
 
 { #category : 'accessing' }
 CoCopilotEntry >> activateOn: aCoCompletionContext [
-	"Apply this suggestion and record it as accepted when the apply succeeds."
+	"Apply this suggestion and record it as accepted when the apply succeeds.
+	Collapses any selection left by the insertion so the caret lands at the end
+	of the accepted suggestion."
 
 	| editor applied evaluatorClass insertionStart |
 	aCoCompletionContext ifNil: [ Error signal: 'Completion context is nil' ].
 
 	applied := false.
 	insertionStart := nil.
-
 
 	editor := (aCoCompletionContext respondsTo: #editor)
 		          ifTrue: [
@@ -155,14 +156,21 @@ CoCopilotEntry >> label: aString [
 { #category : 'private' }
 CoCopilotEntry >> placeCaretOf: editor at: position [
 	"Collapse any selection and position the editor caret at the given 1-based index.
-	Pharo's RubTextEditor leaves inserted text selected after #addString:/#replaceSelectionWith:,
-	which would cause the next keystroke to erase the accepted suggestion."
+	Pharo's RubTextEditor selects the text it just inserted via #addString: (and leaves
+	#replaceSelectionWith: displaying the previous selection), which would cause the next
+	keystroke to erase the accepted suggestion. Prefer #selectAt: because it triggers
+	#selectionChanged and refreshes the visible selection, then fall back to other APIs."
 
 	[
+		(editor respondsTo: #selectAt:) ifTrue: [
+				editor selectAt: position.
+				^ self ].
 		(editor respondsTo: #selectInvisiblyFrom:to:) ifTrue: [
 				editor selectInvisiblyFrom: position to: position - 1.
 				^ self ].
-		(editor respondsTo: #selectAt:) ifTrue: [ editor selectAt: position ]
+		((editor respondsTo: #pointIndex:) and: [ editor respondsTo: #markIndex: ]) ifTrue: [
+				editor pointIndex: position.
+				editor markIndex: position ]
 	]
 		on: Error
 		do: [ :ex |  ]

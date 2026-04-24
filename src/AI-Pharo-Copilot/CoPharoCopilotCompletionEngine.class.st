@@ -28,14 +28,25 @@ CoPharoCopilotCompletionEngine >> completionBuilder [
 
 ]
 
-{ #category : 'new' }
+{ #category : 'replacement' }
 CoPharoCopilotCompletionEngine >> placeCaretAtEndOfSuggestion: newString from: tokenStartPosition [
-	"Position the editor caret right after the accepted suggestion."
+	"Position the editor caret right after the accepted suggestion, collapsing any selection
+	left over from the replacement so the next keystroke does not erase the suggestion."
 
-	self editor selectAt: tokenStartPosition + newString size
+	| endPosition |
+	endPosition := tokenStartPosition + newString size.
+	[
+		(self editor respondsTo: #selectAt:) ifTrue: [
+				self editor selectAt: endPosition.
+				^ self ].
+		(self editor respondsTo: #selectInvisiblyFrom:to:) ifTrue: [
+				self editor selectInvisiblyFrom: endPosition to: endPosition - 1 ]
+	]
+		on: Error
+		do: [ :ex |  ]
 ]
 
-{ #category : 'new' }
+{ #category : 'replacement' }
 CoPharoCopilotCompletionEngine >> replaceTokenInEditorWith: newString [
 
 	| tokenStartPosition |
@@ -46,13 +57,13 @@ CoPharoCopilotCompletionEngine >> replaceTokenInEditorWith: newString [
 	self placeCaretAtEndOfSuggestion: newString from: tokenStartPosition
 ]
 
-{ #category : 'new' }
+{ #category : 'replacement' }
 CoPharoCopilotCompletionEngine >> shouldIgnoreReplacement: newString [
 
 	^ newString isNil or: [ newString isEmpty ]
 ]
 
-{ #category : 'new' }
+{ #category : 'replacement' }
 CoPharoCopilotCompletionEngine >> tokenStartPosition [
 	"Answer the position at which the token being completed starts in the editor.
 	The token ends at the current caret, so its start is the caret minus the token size."

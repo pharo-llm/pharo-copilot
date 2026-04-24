@@ -327,15 +327,25 @@ CopilotSettings class >> ensureOllamaInstalledBeforeUse [
 		response := self newOllamaClient listModels
 	] on: Error do: [ :ex |
 		self logOllamaServiceUnavailable: ex.
-		^ false
+		self launchLocalOllamaServiceIfPossible.
+		[
+			response := self newOllamaClient listModels
+		] on: Error do: [ :retryEx |
+			self logOllamaServiceUnavailable: retryEx.
+			^ false
+		]
 	].
 
 	response ifNil: [
 		self logOllamaMissingResponse.
-		^ false
+		(self launchLocalOllamaServiceIfPossible and: [
+			 [ response := self newOllamaClient listModels ] on: Error do: [ :ex |
+				 self logOllamaServiceUnavailable: ex.
+				 nil ].
+			 response notNil ]) ifFalse: [ ^ false ]
+		
 	].
-
-	^ true
+^ true 
 ]
 
 { #category : 'settings' }
@@ -669,6 +679,32 @@ CopilotSettings class >> isNullModelName: aString [
 	"Answer whether the given model name is the configured null model name."
 
 	^ aString = self nullModelFullName
+]
+
+{ #category : 'persistence' }
+CopilotSettings class >> launchLocalOllamaServiceIfPossible [
+
+	| osPlatform libc command |
+	osPlatform := Smalltalk globals at: #OSPlatform ifAbsent: [ nil ].
+	libc := Smalltalk globals at: #LibC ifAbsent: [ nil ].
+	(osPlatform isNil or: [ libc isNil ]) ifTrue: [ ^ false ].
+
+	command := (osPlatform current isWindows)
+		           ifTrue: [ 'start /B ollama serve' ]
+		           ifFalse: [ 'ollama serve &' ].
+
+	[
+		libc uniqueInstance system: command.
+		(Delay forSeconds: 1) wait.
+		^ true
+	] on: Error do: [ :ex |
+		CoPharoCopilotLogger logBackEndEvent: 'Failed to launch local Ollama service' details: (Dictionary new
+				 at: #command put: command;
+				 at: #errorClass put: ex class name;
+				 at: #error put: ex description;
+				 yourself).
+		^ false
+	]
 ]
 
 { #category : 'persistence' }
