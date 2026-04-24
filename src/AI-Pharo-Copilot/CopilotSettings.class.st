@@ -915,7 +915,7 @@ CopilotSettings class >> minimumPrefixLength [
 CopilotSettings class >> minimumPrefixLength: anObject [
 	"Set the minimum prefix length (1 to 20, default: 2)."
 
-	minimumPrefixLength := self normalizedDuration: anObject default: 2 minimum: 1 maximum: 20.
+	minimumPrefixLength := self normalizedInteger: anObject default: 2 minimum: 0 maximum: 20.
 	self autoSaveSettings
 ]
 
@@ -1083,6 +1083,16 @@ CopilotSettings class >> normalizedFloat: anObject default: defaultValue minimum
 	| candidate |
 	anObject ifNil: [ ^ defaultValue ].
 	candidate := [ anObject asFloat ] on: Error do: [ defaultValue ].
+	candidate := candidate max: minValue.
+	^ candidate min: maxValue
+]
+
+{ #category : 'context' }
+CopilotSettings class >> normalizedInteger: anObject default: defaultValue minimum: minValue maximum: maxValue [ 
+
+	| candidate |
+	anObject ifNil: [ ^ defaultValue ].
+	candidate := [ anObject asInteger ] on: Error do: [ ^ defaultValue ].
 	candidate := candidate max: minValue.
 	^ candidate min: maxValue
 ]
