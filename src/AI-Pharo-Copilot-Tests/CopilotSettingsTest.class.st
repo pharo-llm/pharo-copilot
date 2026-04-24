@@ -98,7 +98,7 @@ CopilotSettingsTest >> testCompletionSuggestionsCountNormalization [
 
 	CopilotSettings withDefaultSettingsDo: [
 		CopilotSettings completionSuggestionsCount: 0.
-		self assert: CopilotSettings completionSuggestionsCount equals: 3.
+		self assert: CopilotSettings completionSuggestionsCount equals: 1.
 		CopilotSettings completionSuggestionsCount: 42.
 		self assert: CopilotSettings completionSuggestionsCount equals: 10.
 		CopilotSettings completionSuggestionsCount: 4.

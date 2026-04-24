@@ -175,9 +175,8 @@ CopilotSettings class >> completionIdleMilliseconds: anObject [
 
 { #category : 'settings' }
 CopilotSettings class >> completionSuggestionsCount [
-	"Answer how many completion alternatives should be requested per completion trigger."
 
-	^ completionSuggestionsCount ifNil: [ completionSuggestionsCount := 3 ]
+	^ completionSuggestionsCount ifNil: [ completionSuggestionsCount := 1 ]
 ]
 
 { #category : 'settings' }
@@ -186,7 +185,7 @@ CopilotSettings class >> completionSuggestionsCount: anObject [
 
 	completionSuggestionsCount := self
 		                              normalizedDuration: anObject
-		                              default: 3
+		                              default: 1
 		                              minimum: 1
 		                              maximum: 10.
 	self autoSaveSettings
@@ -227,17 +226,15 @@ CopilotSettings class >> copilotEnabled: aBoolean [
 
 { #category : 'accessing' }
 CopilotSettings class >> copilotProvider [
-	"Answer the configured provider; default to #ollama."
 
-	^ provider ifNil: [ provider := #ollama ].
-	self autoSaveSettings
+	^ provider ifNil: [ provider := #ollama ]
 ]
 
 { #category : 'accessing' }
 CopilotSettings class >> copilotProvider: aSymbol [
-	"Set the provider symbol."
 
-	provider := aSymbol
+	provider := aSymbol.
+	self autoSaveSettings
 ]
 
 { #category : 'ollama' }
@@ -1352,13 +1349,14 @@ CopilotSettings class >> removeMetadataTextFilesFrom: aDirectory [
 { #category : 'ollama' }
 CopilotSettings class >> repeatPenalty [
 
-	^ repeatPenalty
+	^ repeatPenalty ifNil: [ repeatPenalty := 1.1 ]
 ]
 
 { #category : 'ollama' }
 CopilotSettings class >> repeatPenalty: aNumber [
 
-	repeatPenalty := aNumber
+	repeatPenalty := self normalizedFloat: aNumber default: 1.1 minimum: 0.0 maximum: 2.0.
+	self autoSaveSettings
 ]
 
 { #category : 'settings' }
@@ -1421,7 +1419,9 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
 	templatesPath = nil ifFalse: [
 		templatesDirectory := templatesPath asFileReference
-	]
+	].
+	(aDictionary at: #contextMode ifAbsent: [ nil ])
+		ifNotNil: [ :savedMode | CoPCContextSettings mode: savedMode ]
 ]
 
 { #category : 'accessing' }
@@ -1722,7 +1722,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #completionSuggestionsCount;
 					setSelector: #completionSuggestionsCount:;
 					default: self completionSuggestionsCount;
-					description: 'How many completion alternatives to request per trigger (1-10). Default: 3'.
+					description: 'How many completion alternatives to request per trigger (1-10).'.
 					
 				(aBuilder setting: #modelInstallTimeoutSeconds)
 					order: 0.75;

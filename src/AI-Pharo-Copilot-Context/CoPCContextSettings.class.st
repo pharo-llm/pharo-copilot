@@ -42,5 +42,6 @@ CoPCContextSettings class >> mode: aSymbol [
 
 	mode := (self availableModes includes: aSymbol)
 		ifTrue: [ aSymbol ]
-		ifFalse: [ #fullSource ]
+		ifFalse: [ #fullSource ].
+		CopilotSettings autoSaveSettings
 ]
