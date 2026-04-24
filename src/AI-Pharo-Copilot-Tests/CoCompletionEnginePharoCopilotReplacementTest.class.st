@@ -23,6 +23,22 @@ CoCompletionEnginePharoCopilotReplacementTest >> testReplacementMovesCaretToEndO
 ]
 
 { #category : 'tests' }
+CoCompletionEnginePharoCopilotReplacementTest >> testReplacementMovesCaretToEndOfSuggestion [
+
+    | engine editor suggestion |
+    suggestion := 'suggestion text'.
+    engine := CoSpyCompletionEnginePharoCopilot new.
+    editor := CoTestEditorMock new.
+    editor caret: 7.
+    engine editor: editor.
+
+    engine replaceTokenInEditorWith: suggestion.
+
+    self assert: engine basicCalledWith equals: suggestion.
+    self assert: editor caret equals: 7 + suggestion size
+]
+
+{ #category : 'tests' }
 CoCompletionEnginePharoCopilotReplacementTest >> testReplacementSkipsBlankSuggestion [
 
     | engine editor |
