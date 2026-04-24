@@ -35,13 +35,12 @@ CoCopilotEntry class >> contents: aString description: aDescriptionString [
 
 { #category : 'accessing' }
 CoCopilotEntry >> activateOn: aCoCompletionContext [
-	"Apply this suggestion and record it as accepted when the apply succeeds."
 
-	| editor applied evaluatorClass |
+	| editor applied evaluatorClass insertionStart |
 	aCoCompletionContext ifNil: [ Error signal: 'Completion context is nil' ].
 
 	applied := false.
-
+	insertionStart := nil.
 
 	editor := (aCoCompletionContext respondsTo: #editor)
 		          ifTrue: [
@@ -51,6 +50,7 @@ CoCopilotEntry >> activateOn: aCoCompletionContext [
 		          ifFalse: [ nil ].
 
 	editor ifNotNil: [
+			insertionStart := self insertionStartIn: editor.
 			(editor respondsTo: #addString:) ifTrue: [
 					editor addString: self contents.
 					applied := true ].
@@ -59,7 +59,10 @@ CoCopilotEntry >> activateOn: aCoCompletionContext [
 					 (editor respondsTo: #selectionInterval) and: [
 						 (editor respondsTo: #replaceSelectionWith:) and: [ editor selectionInterval isEmpty ] ] ]) ifTrue: [
 					editor replaceSelectionWith: self contents.
-					applied := true ] ].
+					applied := true ].
+
+			(applied and: [ insertionStart notNil ]) ifTrue: [
+					self placeCaretOf: editor at: insertionStart + self contents size ] ].
 
 	(applied not and: [ aCoCompletionContext respondsTo: #replaceTokenInEditorWith: ]) ifTrue: [
 			aCoCompletionContext replaceTokenInEditorWith: self contents.
@@ -115,6 +118,26 @@ CoCopilotEntry >> displayString [
 ]
 
 { #category : 'accessing' }
+CoCopilotEntry >> insertionStartIn: editor [
+	"Answer the 1-based index where text is about to be inserted in the given editor, or nil if it cannot be determined."
+
+	[
+		(editor respondsTo: #startIndex) ifTrue: [ ^ editor startIndex ].
+		(editor respondsTo: #selectionInterval) ifTrue: [
+				| interval |
+				interval := editor selectionInterval.
+				interval isEmpty
+					ifTrue: [
+						(editor respondsTo: #caret) ifTrue: [ ^ editor caret ] ]
+					ifFalse: [ ^ interval first ] ].
+		(editor respondsTo: #caret) ifTrue: [ ^ editor caret ]
+	]
+		on: Error
+		do: [ :ex |  ].
+	^ nil
+]
+
+{ #category : 'accessing' }
 CoCopilotEntry >> label [
 
 	^ label ifNil: [ self defaultLabel ]
@@ -124,6 +147,22 @@ CoCopilotEntry >> label [
 CoCopilotEntry >> label: aString [
 
 	label := aString
+]
+
+{ #category : 'accessing' }
+CoCopilotEntry >> placeCaretOf: editor at: position [
+	"Collapse any selection and position the editor caret at the given 1-based index.
+	Pharo's RubTextEditor leaves inserted text selected after #addString:/#replaceSelectionWith:,
+	which would cause the next keystroke to erase the accepted suggestion."
+
+	[
+		(editor respondsTo: #selectInvisiblyFrom:to:) ifTrue: [
+				editor selectInvisiblyFrom: position to: position - 1.
+				^ self ].
+		(editor respondsTo: #selectAt:) ifTrue: [ editor selectAt: position ]
+	]
+		on: Error
+		do: [ :ex |  ]
 ]
 
 { #category : 'accessing' }
