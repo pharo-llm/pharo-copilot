@@ -158,7 +158,7 @@ CopilotSettings class >> completionDebounceMilliseconds: anObject [
 { #category : 'settings' }
 CopilotSettings class >> completionIdleMilliseconds [
 
-	^ completionIdleMilliseconds ifNil: [ completionIdleMilliseconds := 300 ]
+	^ completionIdleMilliseconds ifNil: [ completionIdleMilliseconds := 150 ]
 ]
 
 { #category : 'settings' }
@@ -558,7 +558,7 @@ CopilotSettings class >> initializeDefaults [
 	loggingEnabled := true.
 	templatesDirectory := (FileLocator imageDirectory / 'pharo-copilot' / 'templates') asFileReference.
 	completionDebounceMilliseconds := 50.
-	completionIdleMilliseconds := 300.
+	completionIdleMilliseconds := 150.
 	requestTimeoutSeconds := 500.
 	modelInstallTimeoutSeconds := 600.
 	temperature := 0.8.

@@ -49,17 +49,20 @@ CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContex
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
-
 	| entries position |
 
 	(self hasStaleContextFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix)
-		ifTrue: [ ^ self logStaleContextForExpectedPrefix: expectedPrefix suffix: expectedSuffix context: aContext ].
+		ifTrue: [
+			self closeMenuDeferred.
+			^ self logStaleContextForExpectedPrefix: expectedPrefix suffix: expectedSuffix context: aContext ].
 
 	entries := self
 		completionEntriesFrom: contentCollection
 		inContext: aContext
 		contextInfo: contextInfo.
-	entries isEmpty ifTrue: [ ^ self logNoEntriesAfterCleaningFor: contentCollection ].
+	entries isEmpty ifTrue: [
+		self closeMenuDeferred.
+		^ self logNoEntriesAfterCleaningFor: contentCollection ].
 
 	position := self menuPositionForContextOrDefault: aContext.
 
@@ -111,7 +114,10 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	| context snapshot prefix suffix contextInfo delay classContext cached |
 	context := completionContext.
 
-	(self shouldRequestCompletionForContext: context) ifFalse: [ ^ self emptyResultSet ].
+	
+	(self shouldRequestCompletionForContext: context) ifFalse: [
+		self closeMenuDeferred.
+		^ self emptyResultSet ].
 
 	snapshot := self contextSnapshotFor: context.
 	prefix := snapshot at: #prefix.
@@ -119,11 +125,11 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
 
 	self isLoggingEnabled ifTrue: [
-	contextInfo
-		at: #sessionId put: CoPharoCopilotLogger completionSessionId;
-		at: #timestamp put: DateAndTime now asString;
-		at: #rejected put: OrderedCollection new].
-	
+			contextInfo
+				at: #sessionId put: CoPharoCopilotLogger completionSessionId;
+				at: #timestamp put: DateAndTime now asString;
+				at: #rejected put: OrderedCollection new ].
+
 	classContext := self classContextFor: context prefix: prefix.
 	cached := self
 		          cachedSuggestionsForPrefix: prefix
@@ -349,6 +355,16 @@ CoPharoCopilotResultSetBuilder >> closeMenu [
 		menuMorph isClosed ifFalse: [ menuMorph delete ].
 		menuMorph := nil
 	]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> closeMenuDeferred [
+	"Close the menu on the UI thread. Used when the current context no longer warrants a
+	suggestion (stale prefix, no entries, cursor inside a word) so a previous popup does not
+	linger over the editor while the user is typing."
+
+	menuMorph ifNil: [ ^ self ].
+	self deferUI: [ self closeMenu ]
 ]
 
 { #category : 'new' }

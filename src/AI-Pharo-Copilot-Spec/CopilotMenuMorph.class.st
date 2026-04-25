@@ -235,10 +235,10 @@ CopilotMenuMorph >> gotoPage: anInteger [
 	self selectedIndex: firstVisible
 ]
 
-{ #category : 'private' }
+{ #category : 'event handling' }
 CopilotMenuMorph >> handlesKeyDown: anEvent [
 
-	^ true
+^ self isPopupNavigationKey: anEvent key
 ]
 
 { #category : 'private' }
@@ -307,6 +307,22 @@ CopilotMenuMorph >> insertSelected [
 CopilotMenuMorph >> isClosed [
 
 	^ owner isNil
+]
+
+{ #category : 'event handling' }
+CopilotMenuMorph >> isPopupNavigationKey: aKey [
+	"True for the keys the suggestion popup wants to handle itself
+	(navigate selection, accept, dismiss, show / hide detail)."
+
+	^ {
+		KeyboardKey up. KeyboardKey down.
+		KeyboardKey keypadUp. KeyboardKey keypadDown.
+		KeyboardKey pageUp. KeyboardKey pageDown.
+		KeyboardKey home. KeyboardKey end.
+		KeyboardKey enter. KeyboardKey keypadEnter.
+		KeyboardKey tab. KeyboardKey escape.
+		KeyboardKey left. KeyboardKey right
+	} includes: aKey
 ]
 
 { #category : 'private' }
@@ -522,10 +538,13 @@ CopilotMenuMorph >> showDetail [
 	self updateDetail
 ]
 
-{ #category : 'private' }
+{ #category : 'event handling' }
 CopilotMenuMorph >> takesKeyboardFocus [
+	"The popup is a non-focal overlay. The editor must keep keyboard focus so the user can
+	keep typing while suggestions are shown; the popup only handles its own navigation keys
+	(see handlesKeyDown:)."
 
-	^ true
+	^ false
 ]
 
 { #category : 'private' }

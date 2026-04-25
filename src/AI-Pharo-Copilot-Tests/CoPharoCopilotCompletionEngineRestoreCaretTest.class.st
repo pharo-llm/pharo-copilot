@@ -7,6 +7,100 @@ Class {
 }
 
 { #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretCollapsesSelection [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoCopilotMockEditor new.
+	engine editor: editor.
+	engine restoreCaretTo: 5.
+	self assert: editor selectionIsCollapsed
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretDoesNotModifyInsertedText [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoCopilotMockEditor new.
+	engine editor: editor.
+	engine restoreCaretTo: 10.
+	self assert: editor insertedText equals: ''
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretMultipleTimes [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 1.
+	engine restoreCaretTo: 5.
+	engine restoreCaretTo: 9.
+	self assert: editor caret equals: 9
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretOverwritesPreviousCaret [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	editor caret: 42.
+	engine editor: editor.
+	engine restoreCaretTo: 7.
+	self assert: editor caret equals: 7
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretReturnsEngineSuperBehaviorIgnored [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 3.
+	self assert: editor caret equals: 3
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretSetsSelectionStartAndStop [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoCopilotMockEditor new.
+	engine editor: editor.
+	engine restoreCaretTo: 8.
+	self assert: editor selectionStart equals: 8.
+	self assert: editor selectionStop equals: 7
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretSetsStartIndex [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoCopilotMockEditor new.
+	engine editor: editor.
+	engine restoreCaretTo: 15.
+	self assert: editor startIndex equals: 15
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToMaxSmallInt [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: SmallInteger maxVal.
+	self assert: editor caret equals: SmallInteger maxVal
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToNegative [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: -1.
+	self assert: editor caret equals: -1
+]
+
+{ #category : 'tests' }
 CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition1 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
@@ -17,6 +111,76 @@ CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition1 [
 ]
 
 { #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition10 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 10.
+	self assert: editor caret equals: 10
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition100 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 100.
+	self assert: editor caret equals: 100
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition1000 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 1000.
+	self assert: editor caret equals: 1000
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition10000 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 10000.
+	self assert: editor caret equals: 10000
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition1024 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 1024.
+	self assert: editor caret equals: 1024
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition15 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 15.
+	self assert: editor caret equals: 15
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition1500 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 1500.
+	self assert: editor caret equals: 1500
+]
+
+{ #category : 'tests' }
 CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition2 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
@@ -24,6 +188,46 @@ CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition2 [
 	engine editor: editor.
 	engine restoreCaretTo: 2.
 	self assert: editor caret equals: 2
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition20 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 20.
+	self assert: editor caret equals: 20
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition200 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 200.
+	self assert: editor caret equals: 200
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition2048 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 2048.
+	self assert: editor caret equals: 2048
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition25 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 25.
+	self assert: editor caret equals: 25
 ]
 
 { #category : 'tests' }
@@ -47,56 +251,6 @@ CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition5 [
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition7 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 7.
-	self assert: editor caret equals: 7
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition10 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 10.
-	self assert: editor caret equals: 10
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition15 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 15.
-	self assert: editor caret equals: 15
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition20 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 20.
-	self assert: editor caret equals: 20
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition25 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 25.
-	self assert: editor caret equals: 25
-]
-
-{ #category : 'tests' }
 CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition50 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
@@ -104,26 +258,6 @@ CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition50 [
 	engine editor: editor.
 	engine restoreCaretTo: 50.
 	self assert: editor caret equals: 50
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition100 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 100.
-	self assert: editor caret equals: 100
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition200 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 200.
-	self assert: editor caret equals: 200
 ]
 
 { #category : 'tests' }
@@ -137,56 +271,6 @@ CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition500 
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition999 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 999.
-	self assert: editor caret equals: 999
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition1000 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 1000.
-	self assert: editor caret equals: 1000
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition1024 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 1024.
-	self assert: editor caret equals: 1024
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition1500 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 1500.
-	self assert: editor caret equals: 1500
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition2048 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 2048.
-	self assert: editor caret equals: 2048
-]
-
-{ #category : 'tests' }
 CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition5000 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
@@ -197,157 +281,23 @@ CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition5000
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition10000 [
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition7 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 10000.
-	self assert: editor caret equals: 10000
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToZero [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 0.
-	self assert: editor caret equals: 0
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToNegative [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: -1.
-	self assert: editor caret equals: -1
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToMaxSmallInt [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: SmallInteger maxVal.
-	self assert: editor caret equals: SmallInteger maxVal
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretOverwritesPreviousCaret [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	editor caret: 42.
 	engine editor: editor.
 	engine restoreCaretTo: 7.
 	self assert: editor caret equals: 7
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretMultipleTimes [
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPosition999 [
 	| engine editor |
 	engine := CoSpyCompletionEnginePharoCopilot new.
 	editor := CoTestEditorMock new.
 	engine editor: editor.
-	engine restoreCaretTo: 1.
-	engine restoreCaretTo: 5.
-	engine restoreCaretTo: 9.
-	self assert: editor caret equals: 9
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretDoesNotModifyInsertedText [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoCopilotMockEditor new.
-	engine editor: editor.
-	engine restoreCaretTo: 10.
-	self assert: editor insertedText equals: ''
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretSetsStartIndex [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoCopilotMockEditor new.
-	engine editor: editor.
-	engine restoreCaretTo: 15.
-	self assert: editor startIndex equals: 15
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretCollapsesSelection [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoCopilotMockEditor new.
-	engine editor: editor.
-	engine restoreCaretTo: 5.
-	self assert: editor selectionIsCollapsed
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretSetsSelectionStartAndStop [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoCopilotMockEditor new.
-	engine editor: editor.
-	engine restoreCaretTo: 8.
-	self assert: editor selectionStart equals: 8.
-	self assert: editor selectionStop equals: 7
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretWithMockEditorAt1 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoCopilotMockEditor new.
-	engine editor: editor.
-	engine restoreCaretTo: 1.
-	self assert: editor startIndex equals: 1
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretWithMockEditorAt10 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoCopilotMockEditor new.
-	engine editor: editor.
-	engine restoreCaretTo: 10.
-	self assert: editor startIndex equals: 10
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretWithMockEditorAt100 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoCopilotMockEditor new.
-	engine editor: editor.
-	engine restoreCaretTo: 100.
-	self assert: editor startIndex equals: 100
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretWithMockEditorAt1000 [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoCopilotMockEditor new.
-	engine editor: editor.
-	engine restoreCaretTo: 1000.
-	self assert: editor startIndex equals: 1000
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretReturnsEngineSuperBehaviorIgnored [
-	| engine editor |
-	engine := CoSpyCompletionEnginePharoCopilot new.
-	editor := CoTestEditorMock new.
-	engine editor: editor.
-	engine restoreCaretTo: 3.
-	self assert: editor caret equals: 3
+	engine restoreCaretTo: 999.
+	self assert: editor caret equals: 999
 ]
 
 { #category : 'tests' }
@@ -548,4 +498,54 @@ CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToPrime20 [
 	engine editor: editor.
 	engine restoreCaretTo: 89.
 	self assert: editor caret equals: 89
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretToZero [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoTestEditorMock new.
+	engine editor: editor.
+	engine restoreCaretTo: 0.
+	self assert: editor caret equals: 0
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretWithMockEditorAt1 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoCopilotMockEditor new.
+	engine editor: editor.
+	engine restoreCaretTo: 1.
+	self assert: editor startIndex equals: 1
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretWithMockEditorAt10 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoCopilotMockEditor new.
+	engine editor: editor.
+	engine restoreCaretTo: 10.
+	self assert: editor startIndex equals: 10
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretWithMockEditorAt100 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoCopilotMockEditor new.
+	engine editor: editor.
+	engine restoreCaretTo: 100.
+	self assert: editor startIndex equals: 100
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineRestoreCaretTest >> testRestoreCaretWithMockEditorAt1000 [
+	| engine editor |
+	engine := CoSpyCompletionEnginePharoCopilot new.
+	editor := CoCopilotMockEditor new.
+	engine editor: editor.
+	engine restoreCaretTo: 1000.
+	self assert: editor startIndex equals: 1000
 ]
