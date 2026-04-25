@@ -9,9 +9,18 @@ Class {
 		'targetClass',
 		'strategy'
 	],
+	#classInstVars : [
+		'staticContextCache'
+	],
 	#category : 'AI-Pharo-Copilot-Context',
 	#package : 'AI-Pharo-Copilot-Context'
 }
+
+{ #category : 'instance creation' }
+CoPCContextBuilder class >> flushStaticContextCache [ 
+
+	staticContextCache := nil
+]
 
 { #category : 'instance creation' }
 CoPCContextBuilder class >> forClass: aClass strategy: aStrategy [
@@ -22,16 +31,29 @@ CoPCContextBuilder class >> forClass: aClass strategy: aStrategy [
 		yourself
 ]
 
+{ #category : 'instance creation' }
+CoPCContextBuilder class >> staticContextCache [
+
+	^ staticContextCache ifNil: [ staticContextCache := Dictionary new ]
+]
+
 { #category : 'building' }
 CoPCContextBuilder >> buildForFIMWithPrefix: prefixString [
 
-	| stream |
-	stream := String streamContents: [ :s |
-		self writeRepoHeaderOn: s.
-		self writeMethodsOn: s.
-		self writeFIMOn: s prefix: prefixString
-	].
-	^ stream
+| static |
+	static := self cachedStaticContext.
+	^ String streamContents: [ :s |
+		s nextPutAll: static.
+		self writeFIMOn: s prefix: prefixString ]
+]
+
+{ #category : 'building' }
+CoPCContextBuilder >> cachedStaticContext [
+
+	| cache key |
+	cache := self class staticContextCache.
+	key := self staticContextCacheKey.
+	^ cache at: key ifAbsentPut: [ self renderStaticContext ]
 ]
 
 { #category : 'accessing' }
@@ -40,6 +62,24 @@ CoPCContextBuilder >> methodLabelFor: each [
 	(each isKindOf: CompiledMethod)
 		ifTrue: [ ^ each selector asString ].
 	^ each asString
+]
+
+{ #category : 'building' }
+CoPCContextBuilder >> renderStaticContext [
+	"Render only the immutable part of the FIM context (header + methods). The FIM tail is
+	composed per-request because it depends on the user prefix."
+
+	^ String streamContents: [ :s |
+		self writeRepoHeaderOn: s.
+		self writeMethodsOn: s ]
+]
+
+{ #category : 'building' }
+CoPCContextBuilder >> staticContextCacheKey [
+
+	| dict |
+	dict := targetClass methodDict.
+	^ { targetClass. dict identityHash. dict size. strategy class name }
 ]
 
 { #category : 'accessing' }
