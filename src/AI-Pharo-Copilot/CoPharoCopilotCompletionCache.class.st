@@ -34,28 +34,33 @@ CoPharoCopilotCompletionCache class >> withMaxSize: anInteger [
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> at: prefixString suffix: suffixString context: contextString ifPresent: aBlock [
-
-	| key value |
+| key entry |
 	key := self keyFor: prefixString suffix: suffixString context: contextString.
-	value := entries at: key ifAbsent: [
-		misses := misses + 1.
-		^ nil ].
+	entry := entries at: key ifAbsent: [ nil ].
+	(entry notNil and: [ self entry: entry matchesPrefix: prefixString suffix: suffixString context: contextString ])
+		ifFalse: [
+			misses := misses + 1.
+			^ nil ].
 	hits := hits + 1.
 	self touchKey: key.
-	^ aBlock value: value
+	^ aBlock value: (entry at: 4)
 ]
 
 { #category : 'accessing' }
 CoPharoCopilotCompletionCache >> at: prefixString suffix: suffixString context: contextString put: aValue [
 
-	| key |
+| key entry existing |
 	key := self keyFor: prefixString suffix: suffixString context: contextString.
-	(entries includesKey: key) ifTrue: [
-		entries at: key put: aValue.
-		self touchKey: key.
-		^ aValue ].
-	self ensureCapacity.
-	entries at: key put: aValue.
+	entry := { prefixString. suffixString. contextString. aValue }.
+	existing := entries at: key ifAbsent: [ nil ].
+	(existing notNil and: [ self entry: existing matchesPrefix: prefixString suffix: suffixString context: contextString ])
+		ifTrue: [
+			entries at: key put: entry.
+			self touchKey: key.
+			^ aValue ].
+
+	existing ifNil: [ self ensureCapacity ].
+	entries at: key put: entry.
 	self touchKey: key.
 	^ aValue
 ]
@@ -76,6 +81,20 @@ CoPharoCopilotCompletionCache >> ensureCapacity [
 	[ self isAtCapacity ] whileTrue: [
 		self evictOldestEntry
 	]
+]
+
+{ #category : 'accessing' }
+CoPharoCopilotCompletionCache >> entry: anEntry matchesPrefix: prefixString suffix: suffixString context: contextString [
+	"Identity-first equality (cheap when the same string instances are reused), falling back
+	to value equality. Guards integer-hash key collisions."
+
+	| eP eS eC |
+	eP := anEntry at: 1.
+	eS := anEntry at: 2.
+	eC := anEntry at: 3.
+	^ ((eP == prefixString or: [ eP = prefixString ])
+		and: [ eS == suffixString or: [ eS = suffixString ] ])
+		and: [ eC == contextString or: [ eC = contextString ] ]
 ]
 
 { #category : 'new' }
@@ -137,9 +156,8 @@ CoPharoCopilotCompletionCache >> keyFor: prefixString suffix: suffixString conte
 
 	| hash |
 	hash := prefixString hash.
-	hash := hash bitXor: (suffixString hash bitShift: -3).
-	hash := hash bitXor: (contextString hash bitShift: -7).
-	^ { hash. prefixString. suffixString. contextString }
+	hash := (hash hashMultiply bitXor: suffixString hash) hashMultiply.
+	^ hash bitXor: contextString hash
 ]
 
 { #category : 'accessing' }

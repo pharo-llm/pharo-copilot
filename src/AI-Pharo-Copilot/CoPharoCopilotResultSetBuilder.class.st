@@ -18,7 +18,10 @@ Class {
 		'lastSnapshotValue',
 		'classContextClock',
 		'classContextOldestKey',
-		'classContextOldestTime'
+		'classContextOldestTime',
+		'lastSelectorPrefix',
+		'lastSelectorResult',
+		'sortedSelectorsCache'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -278,12 +281,15 @@ CoPharoCopilotResultSetBuilder >> classDefinition: classDefinitionString instanc
 				nextPutAll: classMethodsString ] ]
 ]
 
-{ #category : 'initialization' }
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> classStampFor: aBehavior [
 
-	"Cheap stamp: changes when methodDict is replaced or selector count changes."
+	"Cheap stamp: changes when methodDict is replaced or method count changes.
+	Uses methodDict size (O(1)) instead of selectors size (which builds a fresh Array)."
+	| dict |
 	aBehavior ifNil: [ ^ #(0 0) ].
-	^ { aBehavior methodDict identityHash. aBehavior selectors size }
+	dict := aBehavior methodDict.
+	^ { dict identityHash. dict size }
 ]
 
 { #category : 'initialization' }
@@ -320,7 +326,7 @@ CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
 		ifFalse: [
 			(self isLanguageSpec: body) ifTrue: [ body := '' ] ].
 
-		^ body trimRight
+		^ body trimBoth 
 	].
 
 	"Fallback: keep only the first paragraph if multiple paragraphs exist."
@@ -329,7 +335,7 @@ CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
 		ifTrue: [ text ]
 		ifFalse: [ text copyFrom: 1 to: delimiterIndex - 1 ].
 
-	^ body trimRight
+	^ body trimBoth
 ]
 
 { #category : 'initialization' }
@@ -427,6 +433,19 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 
 		entry
 	]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> computeAndCacheSelectorFromPrefix: prefixString header: header [
+
+	| extractor ast result |
+	extractor := CNSelectorExtractor new.
+	ast := OCParser parseFaultyMethod: prefixString.
+	result := extractor extractSelectorFromAST: ast atPosition: 1.
+
+	lastSelectorPrefix := header.
+	lastSelectorResult := result.
+	^ result
 ]
 
 { #category : 'private' }
@@ -957,21 +976,37 @@ CoPharoCopilotResultSetBuilder >> menuClosed [
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> menuLabelForSuggestion: suggestionString contextInfo: contextInfo [
-	| prefix visiblePrefix |
+	| prefix visiblePrefix size endIndex i ch startIndex |
 
 	prefix := (contextInfo at: #prefix ifAbsent: [ '' ]) asString.
+	size := prefix size.
 
-	"Only show the current line before the caret"
-	visiblePrefix := prefix lines
-		ifEmpty: [ '' ]
-		ifNotEmpty: [ :lines | lines last ].
+	"Find the last non-empty line by scanning backwards. Preserves the previous behavior of
+	`prefix lines ... last` (which dropped trailing empty lines) but avoids the O(N)
+	allocation-heavy split that ran on every keystroke."
+	endIndex := size.
+	[ endIndex > 0 and: [ (prefix at: endIndex) = Character lf or: [ (prefix at: endIndex) = Character cr ] ] ]
+		whileTrue: [ endIndex := endIndex - 1 ].
 
-	"Keep the menu stable and short"
+	startIndex := endIndex.
+	i := endIndex.
+	[ i > 0 ] whileTrue: [
+		ch := prefix at: i.
+		(ch = Character lf or: [ ch = Character cr ])
+			ifTrue: [ startIndex := i + 1. i := 0 ]
+			ifFalse: [
+				startIndex := i.
+				i := i - 1 ] ].
+
+	visiblePrefix := (startIndex > endIndex)
+		ifTrue: [ '' ]
+		ifFalse: [ prefix copyFrom: startIndex to: endIndex ].
+
+	"Keep the menu stable and short."
 	visiblePrefix size > 50 ifTrue: [
-		visiblePrefix := '…', (visiblePrefix last: 50)
-	].
+		visiblePrefix := '…' , (visiblePrefix last: 50) ].
 
-	^ visiblePrefix , suggestionString 
+	^ visiblePrefix , suggestionString
 ]
 
 { #category : 'initialization' }
@@ -1046,25 +1081,25 @@ CoPharoCopilotResultSetBuilder >> methodSourcesFor: aBehavior [
 			do: [ ] ]
 ]
 
-{ #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> methodSourcesFor: aBehavior around: aSelector limit: limitInteger [ 
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> methodSourcesFor: aBehavior around: aSelector limit: limitInteger [
 
-	"Only a window of methods; avoids huge prompt building."
+	"Only a window of methods; avoids huge prompt building. The sorted-selector array is
+	cached per (behavior, methodDict identity, methodDict size) so we don't re-sort on every
+	completion."
 	| sorted idx half start end |
 	aBehavior ifNil: [ ^ '' ].
 
-	sorted := aBehavior selectors asSortedCollection asArray.
+	sorted := self sortedSelectorsFor: aBehavior.
 	sorted isEmpty ifTrue: [ ^ '' ].
 
 	idx := (aSelector isNil)
 		ifTrue: [ 1 ]
 		ifFalse: [ sorted indexOf: aSelector ifAbsent: [ 1 ] ].
-
 	half := limitInteger // 2.
 	start := (idx - half) max: 1.
 	end := (start + limitInteger - 1) min: sorted size.
 	start := (end - limitInteger + 1) max: 1.
-
 	^ String streamContents: [ :stream |
 		(start to: end) do: [ :i |
 			| sel src |
@@ -1360,11 +1395,35 @@ CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefix
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> selectorFromPrefix: prefixString [
+	"The selector is determined by the method header (the first non-empty line up to the first
+	statement separator). While the user types in the body the header is stable, so we cache
+	the (header -> selector) mapping to skip the AST parse on every keystroke."
 
-	| extractor ast |
-	extractor := CNSelectorExtractor new.
-	ast := OCParser parseFaultyMethod: prefixString.
-	^ extractor extractSelectorFromAST: ast atPosition: 1
+	| header |
+	prefixString ifNil: [ ^ nil ].
+
+	header := self selectorHeaderFor: prefixString.
+	(lastSelectorPrefix notNil and: [ lastSelectorPrefix = header ]) ifTrue: [
+		^ lastSelectorResult ].
+
+	^ self computeAndCacheSelectorFromPrefix: prefixString header: header
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> selectorHeaderFor: aString [
+	"Return the method-header substring (everything p to the first newline, capped at 256
+	characters). Cheap to compute and stable while the user edits the method body."
+
+	| size limit i ch |
+	size := aString size.
+	limit := size min: 256.
+	i := 1.
+	[ i <= limit ] whileTrue: [
+		ch := aString at: i.
+		(ch = Character lf or: [ ch = Character cr ])
+			ifTrue: [ ^ aString copyFrom: 1 to: i - 1 ].
+		i := i + 1 ].
+	^ aString copyFrom: 1 to: limit
 ]
 
 { #category : 'private' }
@@ -1395,6 +1454,24 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForPrefix: prefixString
 	prefixString ifNil: [ ^ false ].
 	(prefixString size < self minimumPrefixLength) ifTrue: [ ^ false ].
 	^ true
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> sortedSelectorsFor: aBehavior [
+	"Return a cached sorted-selectors array for aBehavior. Invalidates when the methodDict
+	identity or size changes."
+
+	| cache stamp entry |
+	aBehavior ifNil: [ ^ #() ].
+	cache := sortedSelectorsCache ifNil: [ sortedSelectorsCache := Dictionary new ].
+	stamp := self classStampFor: aBehavior.
+	entry := cache at: aBehavior ifAbsent: [ nil ].
+	(entry notNil and: [ (entry at: 1) = stamp ])
+		ifTrue: [ ^ entry at: 2 ].
+
+	entry := { stamp. aBehavior selectors asSortedCollection asArray }.
+	cache at: aBehavior put: entry.
+	^ entry at: 2
 ]
 
 { #category : 'new' }
