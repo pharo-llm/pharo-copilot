@@ -7,7 +7,7 @@ Class {
 }
 
 { #category : 'tests' }
-CoCompletionEnginePharoCopilotReplacementTest >> testReplacementRecordsValue [
+CoCompletionEnginePharoCopilotReplacementTest >> testReplacementKeepsCaretAndRecordsValue [
 
     | engine editor |
     engine := CoSpyCompletionEnginePharoCopilot new.
@@ -17,7 +17,8 @@ CoCompletionEnginePharoCopilotReplacementTest >> testReplacementRecordsValue [
 
     engine replaceTokenInEditorWith: 'suggestion text'.
 
-    self assert: engine basicCalledWith equals: 'suggestion text'
+    self assert: engine basicCalledWith equals: 'suggestion text'.
+    self assert: editor caret equals: 22.
 ]
 
 { #category : 'tests' }

@@ -29,6 +29,12 @@ CoPharoCopilotCompletionEngine >> completionBuilder [
 ]
 
 { #category : 'replacement' }
+CoPharoCopilotCompletionEngine >> placeCaretAtEndOfSuggestion: suggestion from: tokenStartPosition [
+
+	self restoreCaretTo: tokenStartPosition + suggestion size
+]
+
+{ #category : 'replacement' }
 CoPharoCopilotCompletionEngine >> replaceTokenInEditorWith: newString [
 
 	| tokenStartPosition |
@@ -37,15 +43,6 @@ CoPharoCopilotCompletionEngine >> replaceTokenInEditorWith: newString [
 	tokenStartPosition := self tokenStartPosition.
 	self basicReplaceTokenInEditorWith: newString.
 	self placeCaretAtEndOfSuggestion: newString from: tokenStartPosition
-]
-
-{ #category : 'replacement' }
-CoPharoCopilotCompletionEngine >> placeCaretAtEndOfSuggestion: newString from: tokenStartPosition [
-	"Move the editor caret to the position immediately after the inserted suggestion."
-
-	| endPosition |
-	endPosition := tokenStartPosition + (newString ifNil: [ 0 ] ifNotNil: [ newString size ]).
-	self restoreCaretTo: endPosition
 ]
 
 { #category : 'new' }
