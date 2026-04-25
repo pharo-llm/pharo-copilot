@@ -326,7 +326,7 @@ CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
 		ifFalse: [
 			(self isLanguageSpec: body) ifTrue: [ body := '' ] ].
 
-		^ body trimRight
+		^ body trimBoth 
 	].
 
 	"Fallback: keep only the first paragraph if multiple paragraphs exist."
@@ -335,7 +335,7 @@ CoPharoCopilotResultSetBuilder >> cleanedContentFrom: aString [
 		ifTrue: [ text ]
 		ifFalse: [ text copyFrom: 1 to: delimiterIndex - 1 ].
 
-	^ body trimRight
+	^ body trimBoth
 ]
 
 { #category : 'initialization' }
