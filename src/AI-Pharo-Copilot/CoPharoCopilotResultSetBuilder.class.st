@@ -223,7 +223,7 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext [
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString [
 
-	| behavior selector methodClass cachedContext builtContext |
+	| behavior selector methodClass cachedContext builtContext classContext |
 	behavior := self behaviorFor: aContext.
 	behavior ifNil: [ ^ '' ].
 
@@ -231,12 +231,15 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 	methodClass := self methodClassForBehavior: behavior selector: selector.
 
 	cachedContext := self cachedClassContextFor: methodClass.
-	cachedContext ifNotNil: [ ^ cachedContext ].
+	classContext := cachedContext
+		ifNotNil: [ cachedContext ]
+		ifNil: [
+			builtContext := self buildClassContextFor: methodClass selector: selector prefix: prefixString.
+			self cacheClassContext: builtContext for: methodClass.
+			builtContext ].
 
-	builtContext := self buildClassContextFor: methodClass selector: selector prefix: prefixString.
-	self cacheClassContext: builtContext for: methodClass.
-
-	^ builtContext
+	"Comment the next line to disconnect browser navigation history from the model context."
+	^ self prependNavigationHistoryTo: classContext
 ]
 
 { #category : 'initialization' }
@@ -1227,6 +1230,25 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 CoPharoCopilotResultSetBuilder >> positionFromSnapshot: snapshot [
 
 	^ snapshot at: #position ifAbsent: [ 0 ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> prependNavigationHistoryTo: contextString [
+	| history base |
+	CoPCContextNavigationHistory enabled ifFalse: [ ^ contextString ].
+
+	history := CoPCContextNavigationHistory new gather.
+	history isEmpty ifTrue: [ ^ contextString ].
+
+	base := contextString ifNil: [ '' ].
+	base isEmpty ifTrue: [ ^ history ].
+
+	^ String streamContents: [ :s |
+		s
+			nextPutAll: history;
+			cr;
+			cr;
+			nextPutAll: base ]
 ]
 
 { #category : 'new' }

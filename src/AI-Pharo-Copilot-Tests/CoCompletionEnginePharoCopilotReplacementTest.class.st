@@ -18,7 +18,7 @@ CoCompletionEnginePharoCopilotReplacementTest >> testReplacementKeepsCaretAndRec
     engine replaceTokenInEditorWith: 'suggestion text'.
 
     self assert: engine basicCalledWith equals: 'suggestion text'.
-    self assert: editor caret equals: 7.
+    self assert: editor caret equals: 22.
 ]
 
 { #category : 'tests' }

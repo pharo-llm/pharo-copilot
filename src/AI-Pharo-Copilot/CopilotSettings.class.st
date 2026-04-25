@@ -1467,7 +1467,9 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 		templatesDirectory := templatesPath asFileReference
 	].
 	(aDictionary at: #contextMode ifAbsent: [ nil ])
-		ifNotNil: [ :savedMode | CoPCContextSettings mode: savedMode ]
+		ifNotNil: [ :savedMode | CoPCContextSettings mode: savedMode ].
+	(aDictionary at: #navigationHistoryEnabled ifAbsent: [ nil ])
+		ifNotNil: [ :savedFlag | CoPCContextNavigationHistory enabled: savedFlag ]
 ]
 
 { #category : 'accessing' }
@@ -1606,6 +1608,7 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #maxClassMethods put: maxClassMethods;
 		            at: #minimumPrefixLength put: minimumPrefixLength;
 		            at: #contextMode put: CoPCContextSettings mode;
+		at: #navigationHistoryEnabled put: CoPCContextNavigationHistory enabled;
 		            at: #completionSuggestionsCount put: completionSuggestionsCount;
 		            at: #backgroundColor put: backgroundColor;
 		at: #installModelUserConsent put: installModelUserConsent;
@@ -1723,6 +1726,16 @@ CopilotSettings class >> settingsOn: aBuilder [
 					description: 'Controls whether completions use full source or selectors-only class context.'.
 
 
+				(aBuilder setting: #navigationHistoryEnabled)
+					order: 0.655;
+					label: 'Include browser navigation history';
+					target: CoPCContextSettings;
+					getSelector: #navigationHistoryEnabled;
+					setSelector: #navigationHistoryEnabled:;
+					default: CoPCContextSettings navigationHistoryEnabled;
+					description: 'When enabled, the current Calypso browser selection and recent navigation states are prepended to the class context sent to the model.'.
+					
+					
 				(aBuilder setting: #maxInstanceMethods)
 					order: 0.66;
 					label: 'Max instance methods in context';

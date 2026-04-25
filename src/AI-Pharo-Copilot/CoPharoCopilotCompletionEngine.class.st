@@ -29,6 +29,12 @@ CoPharoCopilotCompletionEngine >> completionBuilder [
 ]
 
 { #category : 'replacement' }
+CoPharoCopilotCompletionEngine >> placeCaretAtEndOfSuggestion: suggestion from: tokenStartPosition [
+
+	self restoreCaretTo: tokenStartPosition + suggestion size
+]
+
+{ #category : 'replacement' }
 CoPharoCopilotCompletionEngine >> replaceTokenInEditorWith: newString [
 
 	| tokenStartPosition |

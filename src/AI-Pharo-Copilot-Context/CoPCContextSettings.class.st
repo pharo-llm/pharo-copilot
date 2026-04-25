@@ -45,3 +45,15 @@ CoPCContextSettings class >> mode: aSymbol [
 		ifFalse: [ #fullSource ].
 		CopilotSettings autoSaveSettings
 ]
+
+{ #category : 'as yet unclassified' }
+CoPCContextSettings class >> navigationHistoryEnabled [
+
+	^ CoPCContextNavigationHistory enabled
+]
+
+{ #category : 'as yet unclassified' }
+CoPCContextSettings class >> navigationHistoryEnabled: aBoolean [
+
+	CoPCContextNavigationHistory enabled: aBoolean
+]
