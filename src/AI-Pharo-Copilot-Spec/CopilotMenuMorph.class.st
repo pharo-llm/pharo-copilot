@@ -321,6 +321,7 @@ CopilotMenuMorph >> isPopupNavigationKey: aKey [
 		KeyboardKey home. KeyboardKey end.
 		KeyboardKey enter. KeyboardKey keypadEnter.
 		KeyboardKey tab. KeyboardKey escape.
+		KeyboardKey left. KeyboardKey right
 	} includes: aKey
 ]
 
@@ -377,7 +378,17 @@ CopilotMenuMorph >> keyDown: anEvent [
 		^ true
 	].
 
+	key = KeyboardKey right ifTrue: [
+		detailMorph
+			ifNil: [ self showDetail ]
+			ifNotNil: [ self browse ].
+		^ true
+	].
 
+	key = KeyboardKey left ifTrue: [
+		self hideDetail.
+		^ true
+	].
 
 	^ false
 ]

@@ -1215,28 +1215,31 @@ CoPharoCopilotResultSetBuilder >> ollamaClient [
 CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entries position: position [
 
 	self deferUI: [
-			[
-				self closeMenu.
-				menuMorph := CopilotMenuMorph
-					             builder: self
-					             context: aContext
-					             entries: entries
-					             position: position 
-					
-					
-				"Do not call takeKeyboardFocus here: the popup is a non-focal overlay
-			(see CopilotMenuMorph>>takesKeyboardFocus). Stealing focus hides the
-			editor caret and prevents the user from typing / navigating." ]
-				on: Error
-				do: [ :ex |
-						CoPharoCopilotLogger
-							logError: 'Failed to open completion menu'
-							origin: #CoPharoCopilotResultSetBuilder
-							exception: ex
-							payload: (Dictionary new
-									 at: #entryCount put: entries size;
-									 at: #position put: position printString;
-									 yourself) ] ]
+		[
+			self closeMenu.
+			menuMorph := CopilotMenuMorph
+				builder: self
+				context: aContext
+				entries: entries
+				position: position.
+
+			(menuMorph respondsTo: #takeKeyboardFocus) ifTrue: [
+				menuMorph takeKeyboardFocus
+			]
+		]
+			on: Error
+			do: [ :ex |
+				CoPharoCopilotLogger
+					logError: 'Failed to open completion menu'
+					origin: #CoPharoCopilotResultSetBuilder
+					exception: ex
+					payload: (
+						Dictionary new
+							at: #entryCount put: entries size;
+							at: #position put: position printString;
+							yourself
+					) ]
+	]
 ]
 
 { #category : 'new' }
