@@ -80,7 +80,6 @@ CopilotSettings class >> autoInstallModelScriptEnabled [
 
 { #category : 'accessing' }
 CopilotSettings class >> autoInstallModelScriptEnabled: aBoolean [
-	"Enable/disable auto-install of missing models."
 
 	autoInstallModelScriptEnabled := aBoolean.
 	self autoSaveSettings
@@ -147,6 +146,7 @@ CopilotSettings class >> completionDebounceMilliseconds [
 CopilotSettings class >> completionDebounceMilliseconds: anObject [
 
 	completionDebounceMilliseconds := anObject.
+	self autoSaveSettings
 ]
 
 { #category : 'settings' }
@@ -159,6 +159,7 @@ CopilotSettings class >> completionIdleMilliseconds [
 CopilotSettings class >> completionIdleMilliseconds: anObject [
 
 	completionIdleMilliseconds := anObject.
+	self autoSaveSettings
 ]
 
 { #category : 'settings' }
@@ -171,6 +172,7 @@ CopilotSettings class >> completionSuggestionsCount [
 CopilotSettings class >> completionSuggestionsCount: anObject [
 
 	completionSuggestionsCount := anObject.
+	self autoSaveSettings
 ]
 
 { #category : 'private' }
@@ -574,8 +576,8 @@ CopilotSettings class >> initializeDefaults [
 	autoInstallModelScriptEnabled := true.
 	loggingEnabled := true.
 	templatesDirectory := (FileLocator imageDirectory / 'pharo-copilot' / 'templates') asFileReference.
-	completionDebounceMilliseconds := 50.
-	completionIdleMilliseconds := 300.
+	completionDebounceMilliseconds := 10.
+	completionIdleMilliseconds := 150.
 	requestTimeoutSeconds := 500.
 	modelInstallTimeoutSeconds := 600.
 	temperature := 0.8.
@@ -583,11 +585,11 @@ CopilotSettings class >> initializeDefaults [
 	topK := 40.
 	numPredict := 128.
 	repeatPenalty := 1.1.
-	numCtx := 2048.
+	numCtx := 4000.
 	seed := 0.
 	customParameters := Dictionary new.
-	maxInstanceMethods := 10.
-	maxClassMethods := 5.
+	maxInstanceMethods := 2.
+	maxClassMethods := 1.
 	minimumPrefixLength := 3.
 	completionSuggestionsCount := 1.
 	backgroundColor := self defaultBackgroundColor.
@@ -894,7 +896,6 @@ CopilotSettings class >> loggingEnabled [
 
 { #category : 'accessing' }
 CopilotSettings class >> loggingEnabled: aBoolean [
-	"Enable/disable logging."
 
 	loggingEnabled := aBoolean.
 	self autoSaveSettings
@@ -910,6 +911,7 @@ CopilotSettings class >> maxClassMethods [
 CopilotSettings class >> maxClassMethods: anObject [
 
 	maxClassMethods := anObject.
+	self autoSaveSettings
 ]
 
 { #category : 'context' }
@@ -970,15 +972,15 @@ CopilotSettings class >> metadataStringForKey: aKey default: defaultString [
 
 { #category : 'context' }
 CopilotSettings class >> minimumPrefixLength [
-	"Answer the minimum prefix length required before requesting a completion. Default: 2"
 
-	^ minimumPrefixLength ifNil: [ minimumPrefixLength := 2 ]
+	^ minimumPrefixLength 
 ]
 
 { #category : 'context' }
 CopilotSettings class >> minimumPrefixLength: anObject [
 
 	minimumPrefixLength := anObject.
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -1007,7 +1009,9 @@ CopilotSettings class >> modelInstallTimeoutSeconds [
 
 { #category : 'accessing' }
 CopilotSettings class >> modelInstallTimeoutSeconds: anObject [
+
 	modelInstallTimeoutSeconds := anObject.
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -1222,6 +1226,7 @@ CopilotSettings class >> numCtx [
 CopilotSettings class >> numCtx: anIntegerOrNil [
 
 	numCtx := anIntegerOrNil.
+	self autoSaveSettings
 ]
 
 { #category : 'ollama' }
@@ -1233,7 +1238,9 @@ CopilotSettings class >> numPredict [
 
 { #category : 'ollama' }
 CopilotSettings class >> numPredict: anInteger [
+
 	numPredict := anInteger.
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -1246,7 +1253,6 @@ CopilotSettings class >> ollamaClientFactory [
 
 { #category : 'accessing' }
 CopilotSettings class >> ollamaClientFactory: aBlockClosure [
-	"Set the client factory and clear cached metadata."
 
 	ollamaClientFactory := aBlockClosure.
 	self clearCachedModelMetadata
@@ -1304,8 +1310,9 @@ CopilotSettings class >> port [
 
 { #category : 'accessing' }
 CopilotSettings class >> port: aNumberOrString [
-	port := aNumberOrString.
 
+	port := aNumberOrString.
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -1456,7 +1463,8 @@ CopilotSettings class >> repeatPenalty [
 { #category : 'ollama' }
 CopilotSettings class >> repeatPenalty: aNumber [
 
-repeatPenalty := aNumber.
+	repeatPenalty := aNumber.
+	self autoSaveSettings
 ]
 
 { #category : 'settings' }
@@ -1469,6 +1477,7 @@ CopilotSettings class >> requestTimeoutSeconds [
 CopilotSettings class >> requestTimeoutSeconds: anObject [
 
 	requestTimeoutSeconds := anObject.
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -1624,6 +1633,7 @@ CopilotSettings class >> seed [
 CopilotSettings class >> seed: anIntegerOrNil [
 
 	seed := anIntegerOrNil.
+	self autoSaveSettings
 ]
 
 { #category : 'persistence' }
@@ -2032,6 +2042,7 @@ CopilotSettings class >> temperature [
 CopilotSettings class >> temperature: aNumber [
 
 	temperature := aNumber.
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -2075,6 +2086,7 @@ CopilotSettings class >> topK [
 { #category : 'ollama' }
 CopilotSettings class >> topK: anInteger [
 	topK := anInteger.
+	self autoSaveSettings
 ]
 
 { #category : 'ollama' }
@@ -2086,6 +2098,7 @@ CopilotSettings class >> topP [
 { #category : 'ollama' }
 CopilotSettings class >> topP: aNumber [
 	topP := aNumber.
+	self autoSaveSettings
 ]
 
 { #category : 'persistence' }
