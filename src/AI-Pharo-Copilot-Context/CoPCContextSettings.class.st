@@ -40,10 +40,8 @@ CoPCContextSettings class >> mode [
 { #category : 'capabilities' }
 CoPCContextSettings class >> mode: aSymbol [
 
-	mode := (self availableModes includes: aSymbol)
-		ifTrue: [ aSymbol ]
-		ifFalse: [ #fullSource ].
-		CopilotSettings autoSaveSettings
+	mode := aSymbol.
+	CopilotSettings autoSaveSettings
 ]
 
 { #category : 'as yet unclassified' }

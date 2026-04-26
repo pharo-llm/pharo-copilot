@@ -145,14 +145,8 @@ CopilotSettings class >> completionDebounceMilliseconds [
 
 { #category : 'settings' }
 CopilotSettings class >> completionDebounceMilliseconds: anObject [
-	"Set the debounce delay (milliseconds) before firing completion requests."
 
-	completionDebounceMilliseconds := self
-		                                  normalizedDuration: anObject
-		                                  default: 50
-		                                  minimum: 1
-		                                  maximum: 60000.
-	self autoSaveSettings
+	completionDebounceMilliseconds := anObject.
 ]
 
 { #category : 'settings' }
@@ -163,14 +157,8 @@ CopilotSettings class >> completionIdleMilliseconds [
 
 { #category : 'settings' }
 CopilotSettings class >> completionIdleMilliseconds: anObject [
-	"Set the idle delay (milliseconds) before firing completion requests."
 
-	completionIdleMilliseconds := self
-		                              normalizedDuration: anObject
-		                              default: 300
-		                              minimum: 1
-		                              maximum: 60000.
-	self autoSaveSettings
+	completionIdleMilliseconds := anObject.
 ]
 
 { #category : 'settings' }
@@ -181,14 +169,8 @@ CopilotSettings class >> completionSuggestionsCount [
 
 { #category : 'settings' }
 CopilotSettings class >> completionSuggestionsCount: anObject [
-	"Set how many completion alternatives should be requested per completion trigger."
 
-	completionSuggestionsCount := self
-		                              normalizedDuration: anObject
-		                              default: 1
-		                              minimum: 1
-		                              maximum: 10.
-	self autoSaveSettings
+	completionSuggestionsCount := anObject.
 ]
 
 { #category : 'private' }
@@ -927,12 +909,7 @@ CopilotSettings class >> maxClassMethods [
 { #category : 'context' }
 CopilotSettings class >> maxClassMethods: anObject [
 
-	maxClassMethods := self
-		                   normalizedDuration: anObject
-		                   default: 5
-		                   minimum: 1
-		                   maximum: 100.
-	self autoSaveSettings
+	maxClassMethods := anObject.
 ]
 
 { #category : 'context' }
@@ -943,14 +920,8 @@ CopilotSettings class >> maxInstanceMethods [
 
 { #category : 'context' }
 CopilotSettings class >> maxInstanceMethods: anObject [
-	"Set the maximum number of instance-side methods for context (1 to 200, default: 30)."
 
-	maxInstanceMethods := self
-		                      normalizedDuration: anObject
-		                      default: 10
-		                      minimum: 1
-		                      maximum: 200.
-	self autoSaveSettings
+	maxInstanceMethods := anObject.
 ]
 
 { #category : 'accessing' }
@@ -1006,10 +977,8 @@ CopilotSettings class >> minimumPrefixLength [
 
 { #category : 'context' }
 CopilotSettings class >> minimumPrefixLength: anObject [
-	"Set the minimum prefix length (1 to 20, default: 2)."
 
-	minimumPrefixLength := self normalizedInteger: anObject default: 2 minimum: 0 maximum: 20.
-	self autoSaveSettings
+	minimumPrefixLength := anObject.
 ]
 
 { #category : 'accessing' }
@@ -1038,14 +1007,7 @@ CopilotSettings class >> modelInstallTimeoutSeconds [
 
 { #category : 'accessing' }
 CopilotSettings class >> modelInstallTimeoutSeconds: anObject [
-	"Set the timeout (seconds) for Ollama model pulls."
-
-	modelInstallTimeoutSeconds := self
-		                              normalizedDuration: anObject
-		                              default: 600
-		                              minimum: 30
-		                              maximum: 3600.
-		self autoSaveSettings
+	modelInstallTimeoutSeconds := anObject.
 ]
 
 { #category : 'accessing' }
@@ -1169,38 +1131,6 @@ CopilotSettings class >> newOllamaClient [
 	^ self ollamaClientFactory value
 ]
 
-{ #category : 'settings' }
-CopilotSettings class >> normalizedDuration: anObject default: defaultValue minimum: minValue maximum: maxValue [
-	"Normalize a duration, enforcing a non-zero range."
-
-	| candidate |
-	anObject ifNil: [ ^ defaultValue ].
-	candidate := [ anObject asInteger ] on: Error do: [ defaultValue ].
-	candidate <= 0 ifTrue: [ ^ defaultValue max: minValue ].
-	candidate := candidate max: minValue.
-	^ candidate min: maxValue
-]
-
-{ #category : 'ollama' }
-CopilotSettings class >> normalizedFloat: anObject default: defaultValue minimum: minValue maximum: maxValue [
-
-	| candidate |
-	anObject ifNil: [ ^ defaultValue ].
-	candidate := [ anObject asFloat ] on: Error do: [ defaultValue ].
-	candidate := candidate max: minValue.
-	^ candidate min: maxValue
-]
-
-{ #category : 'context' }
-CopilotSettings class >> normalizedInteger: anObject default: defaultValue minimum: minValue maximum: maxValue [ 
-
-	| candidate |
-	anObject ifNil: [ ^ defaultValue ].
-	candidate := [ anObject asInteger ] on: Error do: [ ^ defaultValue ].
-	candidate := candidate max: minValue.
-	^ candidate min: maxValue
-]
-
 { #category : 'accessing' }
 CopilotSettings class >> notifyModelDownloadPreparation [
 
@@ -1290,12 +1220,8 @@ CopilotSettings class >> numCtx [
 
 { #category : 'ollama' }
 CopilotSettings class >> numCtx: anIntegerOrNil [
-	numCtx := self
-		normalizedDuration: anIntegerOrNil
-		default: 2048
-		minimum: 512
-		maximum: 32768.
-	self autoSaveSettings
+
+	numCtx := anIntegerOrNil.
 ]
 
 { #category : 'ollama' }
@@ -1307,10 +1233,7 @@ CopilotSettings class >> numPredict [
 
 { #category : 'ollama' }
 CopilotSettings class >> numPredict: anInteger [
-	"Set the num_predict parameter (1 to 2048, default: 128)."
-
-	numPredict := self normalizedDuration: anInteger default: 128 minimum: 1 maximum: 2048.
-	self autoSaveSettings
+	numPredict := anInteger.
 ]
 
 { #category : 'accessing' }
@@ -1381,18 +1304,8 @@ CopilotSettings class >> port [
 
 { #category : 'accessing' }
 CopilotSettings class >> port: aNumberOrString [
-	"Set the Ollama port (accepts string or number) and clear cached metadata."
+	port := aNumberOrString.
 
-	port := aNumberOrString isString
-		ifTrue: [
-			[ aNumberOrString asNumber ]
-				on: Error
-				do: [ self port ]
-		]
-		ifFalse: [ aNumberOrString ].
-
-	self clearCachedModelMetadata.
-	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
@@ -1543,8 +1456,7 @@ CopilotSettings class >> repeatPenalty [
 { #category : 'ollama' }
 CopilotSettings class >> repeatPenalty: aNumber [
 
-	repeatPenalty := self normalizedFloat: aNumber default: 1.1 minimum: 0.0 maximum: 2.0.
-	self autoSaveSettings
+repeatPenalty := aNumber.
 ]
 
 { #category : 'settings' }
@@ -1555,12 +1467,8 @@ CopilotSettings class >> requestTimeoutSeconds [
 
 { #category : 'settings' }
 CopilotSettings class >> requestTimeoutSeconds: anObject [
-	requestTimeoutSeconds := self
-		normalizedDuration: anObject
-		default: 500
-		minimum: 1
-		maximum: 3600.
-	self autoSaveSettings
+
+	requestTimeoutSeconds := anObject.
 ]
 
 { #category : 'accessing' }
@@ -1715,10 +1623,7 @@ CopilotSettings class >> seed [
 { #category : 'ollama' }
 CopilotSettings class >> seed: anIntegerOrNil [
 
-	seed := anIntegerOrNil = nil
-		ifTrue: [ 0 ]
-		ifFalse: [ anIntegerOrNil asInteger ].
-	self autoSaveSettings
+	seed := anIntegerOrNil.
 ]
 
 { #category : 'persistence' }
@@ -2126,8 +2031,7 @@ CopilotSettings class >> temperature [
 { #category : 'ollama' }
 CopilotSettings class >> temperature: aNumber [
 
-	temperature := self normalizedFloat: aNumber default: 0.8 minimum: 0.0 maximum: 2.0.
-	self autoSaveSettings
+	temperature := aNumber.
 ]
 
 { #category : 'accessing' }
@@ -2170,10 +2074,7 @@ CopilotSettings class >> topK [
 
 { #category : 'ollama' }
 CopilotSettings class >> topK: anInteger [
-	"Set the top_k parameter (1 to 100, default: 40)."
-
-	topK := self normalizedDuration: anInteger default: 40 minimum: 1 maximum: 100.
-	self autoSaveSettings
+	topK := anInteger.
 ]
 
 { #category : 'ollama' }
@@ -2184,10 +2085,7 @@ CopilotSettings class >> topP [
 
 { #category : 'ollama' }
 CopilotSettings class >> topP: aNumber [
-	"Set the top_p parameter (0.0 to 1.0, default: 0.9)."
-
-	topP := self normalizedFloat: aNumber default: 0.9 minimum: 0.0 maximum: 1.0.
-	self autoSaveSettings
+	topP := aNumber.
 ]
 
 { #category : 'persistence' }

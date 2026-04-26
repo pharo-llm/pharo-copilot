@@ -143,7 +143,7 @@ CoPCOAHttpTransport >> port [
 
 { #category : 'accessing' }
 CoPCOAHttpTransport >> port: anObject [
-	"Set the port used for requests."
+
 
 	port := anObject
 ]

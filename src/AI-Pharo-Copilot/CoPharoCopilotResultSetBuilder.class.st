@@ -512,9 +512,8 @@ CoPharoCopilotResultSetBuilder >> debounceMilliseconds [
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> debounceMilliseconds: anInteger [
-	"Set the debounce delay (milliseconds) used before firing a completion request."
 
-	debounceMilliseconds := self normalizedDelayMilliseconds: anInteger default: CopilotSettings completionDebounceMilliseconds
+debounceMilliseconds := anInteger
 ]
 
 { #category : 'initialization' }
@@ -696,7 +695,7 @@ CoPharoCopilotResultSetBuilder >> idleMilliseconds [
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> idleMilliseconds: anInteger [
 
-	idleMilliseconds := self normalizedDelayMilliseconds: anInteger default: CopilotSettings completionIdleMilliseconds
+idleMilliseconds := anInteger
 ]
 
 { #category : 'initialization' }
@@ -1143,18 +1142,6 @@ CoPharoCopilotResultSetBuilder >> normalizeSuggestion: rawResponse forPrefix: pr
 	(self isLikelyContextEcho: cleaned forPrefix: prefixString typedFragment: typedFragment) ifTrue: [ ^ '' ].
 
 	^ cleaned trimBoth
-]
-
-{ #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> normalizedDelayMilliseconds: anObject default: defaultValue [
-	"Normalize a delay, enforcing a non-zero millisecond range."
-
-	| candidate |
-	anObject ifNil: [ ^ defaultValue ].
-	candidate := [ anObject asInteger ] on: Error do: [ defaultValue ].
-	candidate <= 0 ifTrue: [ ^ defaultValue ].
-	candidate := candidate max: 1.
-	^ candidate min: 60000
 ]
 
 { #category : 'new' }

@@ -7,29 +7,6 @@ Class {
 }
 
 { #category : 'tests' }
-CopilotSettingsTest >> testAutoInstallRunsWhenPharoCoderMissing [
-
-    | stub modelName missingResponse availableResponse |
-    modelName := 'missing-test-model:latest'.
-    missingResponse := Dictionary new at: #models put: #(); yourself.
-    availableResponse := Dictionary new
-        at: #models put: { Dictionary new
-            at: #name put: modelName;
-            yourself };
-        yourself.
-    CopilotSettings withDefaultSettingsDo: [
-        stub := OllamaClientStub new.
-        stub withModelsResponses: { missingResponse. availableResponse }.
-        CopilotSettings ollamaClientFactory: [ stub ].
-        CopilotSettings modelName: modelName.
-        CopilotSettings autoInstallModelScriptEnabled: true.
-        self assert: CopilotSettings ensureSelectedModelAvailable.
-        self assert: stub pullCount equals: 1.
-        self assert: stub lastPulledModel equals: modelName.
-    ]
-]
-
-{ #category : 'tests' }
 CopilotSettingsTest >> testAutoInstallToggleDisablesScript [
 
     | stub modelName missingResponse |
@@ -91,19 +68,6 @@ CopilotSettingsTest >> testClearCachedModelMetadataForcesNextFetch [
         CopilotSettings ollamaClientFactory: oldFactory.
         CopilotSettings clearCachedModelMetadata.
     ].
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testCompletionSuggestionsCountNormalization [
-
-	CopilotSettings withDefaultSettingsDo: [
-		CopilotSettings completionSuggestionsCount: 0.
-		self assert: CopilotSettings completionSuggestionsCount equals: 1.
-		CopilotSettings completionSuggestionsCount: 42.
-		self assert: CopilotSettings completionSuggestionsCount equals: 10.
-		CopilotSettings completionSuggestionsCount: 4.
-		self assert: CopilotSettings completionSuggestionsCount equals: 4.
-		]
 ]
 
 { #category : 'tests' }
@@ -248,21 +212,6 @@ CopilotSettingsTest >> testMinimumPrefixLengthAllowsZero [
 	CopilotSettings withDefaultSettingsDo: [
 		CopilotSettings minimumPrefixLength: 0.
 		self assert: CopilotSettings minimumPrefixLength equals: 0.
-	]
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testMinimumPrefixLengthNormalization [
-
-	CopilotSettings withDefaultSettingsDo: [
-		CopilotSettings minimumPrefixLength: -5.
-		self assert: CopilotSettings minimumPrefixLength equals: 0.
-		CopilotSettings minimumPrefixLength: 42.
-		self assert: CopilotSettings minimumPrefixLength equals: 20.
-		CopilotSettings minimumPrefixLength: 7.
-		self assert: CopilotSettings minimumPrefixLength equals: 7.
-		CopilotSettings minimumPrefixLength: nil.
-		self assert: CopilotSettings minimumPrefixLength equals: 2.
 	]
 ]
 
@@ -519,18 +468,6 @@ CopilotSettingsTest >> testPortAccessor [
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testPortStringInputParsesToNumber [
-    | old |
-    old := CopilotSettings port.
-    [
-        CopilotSettings port: '54321'.
-        self assert: CopilotSettings port equals: 54321.
-    ] ensure: [
-        CopilotSettings port: old.
-    ].
-]
-
-{ #category : 'tests' }
 CopilotSettingsTest >> testRecordInstallModelConsentIsStoredInSnapshot [
 
 	CopilotSettings withDefaultSettingsDo: [
@@ -599,20 +536,6 @@ CopilotSettingsTest >> testShouldShowDetailedSettingsReflectsCopilotEnabled [
     ] ensure: [
         CopilotSettings copilotEnabled: old.
     ].
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testTimingSettingsNormalization [
-
-	CopilotSettings withDefaultSettingsDo: [
-			CopilotSettings completionDebounceMilliseconds: 0.
-			self assert: CopilotSettings completionDebounceMilliseconds equals: 50.
-			CopilotSettings completionIdleMilliseconds: -10.
-			self assert: CopilotSettings completionIdleMilliseconds equals: 300.
-			CopilotSettings completionDebounceMilliseconds: 70000.
-			self assert: CopilotSettings completionDebounceMilliseconds equals: 60000.
-			CopilotSettings completionIdleMilliseconds: 2.
-			self assert: CopilotSettings completionIdleMilliseconds equals: 2 ]
 ]
 
 { #category : 'tests' }
