@@ -91,7 +91,10 @@ CopilotSettings class >> autoSaveSettings [
 
 	[
 		self saveSettingsToFile
-	] forkAt: Processor userBackgroundPriority named: 'CopilotSettings auto-save'
+	] on: Error do: [ :ex |
+		Transcript
+			show: 'Copilot settings auto-save failed: ', ex messageText;
+			cr ]
 ]
 
 { #category : 'settings' }
@@ -792,6 +795,11 @@ CopilotSettings class >> loadSettingsFromFile [
 
 		fileRef := self settingsFileReference.
 		(fileRef exists and: [ fileRef isFile ]) ifFalse: [ ^ self ].
+		
+		fileRef := self settingsFileReference.
+	(fileRef exists and: [ fileRef isFile ]) ifFalse: [ ^ self ].
+
+	[
 
 		fileRef readStreamDo: [ :stream |
 			stonString := stream contents
@@ -799,6 +807,10 @@ CopilotSettings class >> loadSettingsFromFile [
 
 		snapshot := STON fromString: stonString.
 		self restoreSettingsFromSerializableSnapshot: snapshot.
+		] on: Error do: [ :ex |
+		Transcript
+			show: 'Copilot settings load failed. Keeping defaults. Error: ', ex messageText;
+			cr ].
 
 
 ]
@@ -1610,17 +1622,16 @@ CopilotSettings class >> saveSettingsToFile [
 	"Save current settings to the persistent STON file."
 
 	| fileRef snapshot stonString |
-		fileRef := self settingsFileReference.
-		snapshot := self serializableSettingsSnapshot.
-		stonString := STON toString: snapshot.
+	fileRef := self settingsFileReference.
+	snapshot := self serializableSettingsSnapshot.
+	stonString := STON toString: snapshot.
 
-		fileRef ensureCreateFile.
-		fileRef writeStreamDo: [ :stream |
-			stream truncate.
-			stream nextPutAll: stonString
-		].
-
-
+	fileRef parent ifNotNil: [ :parent | parent ensureCreateDirectory ].
+	fileRef ensureCreateFile.
+	fileRef writeStreamDo: [ :stream |
+		stream truncate.
+		stream nextPutAll: stonString
+	].
 ]
 
 { #category : 'ollama' }
