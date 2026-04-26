@@ -622,6 +622,36 @@ CopilotSettings class >> installModelPromptMessageForModelNamed: aModelName [
 			nextPutAll: 'Do you consent to installing it now?' ]
 ]
 
+{ #category : 'persistence' }
+CopilotSettings class >> installPredefinedSetupModelsNow [
+	"Check Ollama, then download every predefined setup model that is missing."
+
+	| response missingModels |
+	response := self ensureOllamaServiceAvailable.
+	response ifNil: [ ^ false ].
+
+	missingModels := self missingSetupModelNamesFrom: response.
+	missingModels isEmpty ifTrue: [
+		self notifyUser: 'All setup models are already installed.'.
+		^ true
+	].
+
+	CoPCModelDownloadProgressPresenter openOn: missingModels.
+	^ true
+]
+
+{ #category : 'persistence' }
+CopilotSettings class >> installPredefinedSetupModelsNowSetting [
+
+	^ false
+]
+
+{ #category : 'persistence' }
+CopilotSettings class >> installPredefinedSetupModelsNowSetting: aBoolean [
+
+	aBoolean ifTrue: [ self installPredefinedSetupModelsNow ]
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> installSelectedModelNow [
 	"Install the currently selected model via Ollama pull."
@@ -923,6 +953,17 @@ CopilotSettings class >> minimumPrefixLength: anObject [
 CopilotSettings class >> missingOllamaSetupMessage [
 
 	^ 'Ollama is required. Please install Ollama before using this plugin.'
+]
+
+{ #category : 'persistence' }
+CopilotSettings class >> missingSetupModelNamesFrom: listModelsResponse [
+	"Answer setup models that are not currently installed in Ollama."
+
+	| installedModels |
+	installedModels := self modelNamesFromResponse: listModelsResponse.
+
+	^ self predefinedSetupModelNames
+		reject: [ :each | installedModels includes: each ]
 ]
 
 { #category : 'accessing' }
@@ -1279,6 +1320,14 @@ CopilotSettings class >> port: aNumberOrString [
 
 	self clearCachedModelMetadata.
 	self autoSaveSettings
+]
+
+{ #category : 'persistence' }
+CopilotSettings class >> predefinedSetupModelNames [
+	"Answer the predefined model list shown by the setup/settings UI."
+
+	^ (self availableModelNames
+		reject: [ :each | self isNullModelName: each ]) asArray
 ]
 
 { #category : 'settings' }
