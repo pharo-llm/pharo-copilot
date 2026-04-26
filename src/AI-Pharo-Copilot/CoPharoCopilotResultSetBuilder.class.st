@@ -1196,20 +1196,15 @@ CoPharoCopilotResultSetBuilder >> ollamaClient [
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entries position: position [
+CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entries position: position [ 
 
 	self deferUI: [
 		[
-			self closeMenu.
-			menuMorph := CopilotMenuMorph
-				builder: self
-				context: aContext
+			menuMorph := aContext engine
+				openCopilotMenuFor: aContext
 				entries: entries
-				position: position.
-
-			(menuMorph respondsTo: #takeKeyboardFocus) ifTrue: [
-				menuMorph takeKeyboardFocus
-			]
+				position: position
+				builder: self
 		]
 			on: Error
 			do: [ :ex |
@@ -1221,8 +1216,7 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 						Dictionary new
 							at: #entryCount put: entries size;
 							at: #position put: position printString;
-							yourself
-					) ]
+							yourself ) ]
 	]
 ]
 

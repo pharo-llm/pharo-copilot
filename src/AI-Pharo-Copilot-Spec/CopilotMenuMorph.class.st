@@ -128,10 +128,15 @@ CopilotMenuMorph >> defaultColor [
 ]
 
 { #category : 'private' }
-CopilotMenuMorph >> delete [
+CopilotMenuMorph >> delete [ 
 
+	| engine |
 	super delete.
-	builder ifNotNil: [ builder menuClosed ]
+
+	builder ifNotNil: [ builder menuClosed ].
+
+	engine := [ context engine ] on: Error do: [ nil ].
+	engine ifNotNil: [ engine menuClosed ]
 ]
 
 { #category : 'private' }
@@ -238,7 +243,7 @@ CopilotMenuMorph >> gotoPage: anInteger [
 { #category : 'private' }
 CopilotMenuMorph >> handlesKeyDown: anEvent [
 
-	^ true
+	^ false
 ]
 
 { #category : 'private' }
@@ -315,9 +320,9 @@ CopilotMenuMorph >> itemsCount [
 	^ entries size
 ]
 
-{ #category : 'private' }
+{ #category : 'event handling' }
 CopilotMenuMorph >> keyDown: anEvent [
-	"Handle keyboard navigation."
+	"Handle keyboard navigation and consume typing while the menu is open."
 
 	| key |
 	key := anEvent key.
@@ -374,7 +379,12 @@ CopilotMenuMorph >> keyDown: anEvent [
 		^ true
 	].
 
+	anEvent keyCharacter isCompletionCharacter ifTrue: [
+		^ true
+	].
+
 	^ false
+
 ]
 
 { #category : 'private' }
@@ -469,6 +479,19 @@ CopilotMenuMorph >> previewTextFor: aString maxLines: maxLineCount [
 ]
 
 { #category : 'private' }
+CopilotMenuMorph >> refreshSelection [
+
+	firstVisible := 1.
+	selectedIndex := entries isEmpty
+		ifTrue: [ 0 ]
+		ifFalse: [ 1 ].
+
+	self resize.
+	self changed.
+	^ true
+]
+
+{ #category : 'private' }
 CopilotMenuMorph >> resize [
 	"Calculate and set the appropriate size for the menu."
 
@@ -525,7 +548,7 @@ CopilotMenuMorph >> showDetail [
 { #category : 'private' }
 CopilotMenuMorph >> takesKeyboardFocus [
 
-	^ true
+	^ false
 ]
 
 { #category : 'private' }
