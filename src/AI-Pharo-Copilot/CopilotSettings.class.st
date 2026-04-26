@@ -560,10 +560,11 @@ CopilotSettings class >> host: aString [
 	self autoSaveSettings
 ]
 
-{ #category : 'accessing' }
+{ #category : 'class initialization' }
 CopilotSettings class >> initialize [
 
-	super initialize.
+	.
+	provider ifNotNil: [ ^ self ].
 	self initializeDefaults.
 	self loadSettingsFromFile
 ]

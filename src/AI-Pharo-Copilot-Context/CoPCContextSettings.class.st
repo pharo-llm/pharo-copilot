@@ -21,7 +21,7 @@ CoPCContextSettings class >> availableModes [
 { #category : 'class initialization' }
 CoPCContextSettings class >> initialize [
 
-	super initialize.
+	mode ifNotNil: [ ^ self ].
 	self initializeDefaults
 ]
 

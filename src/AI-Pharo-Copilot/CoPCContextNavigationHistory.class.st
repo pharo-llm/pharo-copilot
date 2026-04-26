@@ -37,10 +37,10 @@ CoPCContextNavigationHistory class >> enabled: aBoolean [
 	CopilotSettings autoSaveSettings
 ]
 
-{ #category : 'accessing' }
+{ #category : 'class initialization' }
 CoPCContextNavigationHistory class >> initialize [
 
-	super initialize.
+	enabled ifNotNil: [ ^ self ].
 	self initializeDefaults
 ]
 
