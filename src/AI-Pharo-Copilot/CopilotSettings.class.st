@@ -924,6 +924,7 @@ CopilotSettings class >> maxInstanceMethods [
 CopilotSettings class >> maxInstanceMethods: anObject [
 
 	maxInstanceMethods := anObject.
+	self autoSaveSettings
 ]
 
 { #category : 'accessing' }
