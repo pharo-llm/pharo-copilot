@@ -323,51 +323,86 @@ CopilotSettings class >> ensureModelMetadataDirectoryFor: modelNameString [
 CopilotSettings class >> ensureOllamaInstalledBeforeUse [
 
 	| response |
+
+	response := self ensureOllamaServiceAvailable.
+	response ifNil: [ ^ false ].
+
+	^ self ensurePredefinedModelsDownloadedUsingInitialResponse: response
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> ensureOllamaServiceAvailable [
+	"Verify Ollama responds. If it does not, try to launch it locally."
+
+	| response |
+
+	self notifyModelDownloadPreparation.
+
 	[
 		response := self newOllamaClient listModels
 	] on: Error do: [ :ex |
 		self logOllamaServiceUnavailable: ex.
-		self launchLocalOllamaServiceIfPossible.
+		self notifyUser:
+			'Ollama is not responding. Pharo Copilot will try to launch Ollama locally, then handle model downloading.'.
+
+		(self launchLocalOllamaServiceIfPossible) ifFalse: [
+			self notifyUser:
+				'Ollama could not be launched automatically. Please install/start Ollama and stay connected to the internet.'.
+			^ nil ].
+
+		(Delay forSeconds: 2) wait.
+
 		[
 			response := self newOllamaClient listModels
 		] on: Error do: [ :retryEx |
 			self logOllamaServiceUnavailable: retryEx.
-			^ false
-		]
+			self notifyUser:
+				'Ollama still is not responding. Please install/start Ollama and try again.'.
+			^ nil ]
 	].
 
 	response ifNil: [
 		self logOllamaMissingResponse.
-		(self launchLocalOllamaServiceIfPossible and: [
-			 [ response := self newOllamaClient listModels ] on: Error do: [ :ex |
-				 self logOllamaServiceUnavailable: ex.
-				 nil ].
-			 response notNil ]) ifFalse: [ ^ false ]
-		
-	].
-^ true 
-]
-
-{ #category : 'settings' }
-CopilotSettings class >> ensureOllamaServiceAvailable [
-	"Verify the Ollama service responds; answer the listModels response or nil if unavailable."
-
-	| response |
-	[
-		response := self newOllamaClient listModels
-	] on: Error do: [ :ex |
-		self logOllamaServiceUnavailable: ex.
-		self notifyUser: 'Ollama is not configured. Please configure it.'.
-		^ nil
-	].
-
-	response ifNil: [
-		self logOllamaMissingResponse.
-		self notifyUser: 'Ollama is not configured. Please configure it.'.
-		^ nil
-	].
+		self notifyUser:
+			'Ollama did not return a model list. Please check Ollama and try again.'.
+		^ nil ].
 
 	^ response
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> ensurePredefinedModelsDownloadedUsingInitialResponse: initialResponse [
+
+	| availableModels allDownloaded |
+
+	availableModels := self modelNamesFromResponse: initialResponse.
+	allDownloaded := true.
+
+	self predefinedDownloadableModelNames do: [ :modelName |
+		(availableModels includes: modelName) ifFalse: [
+			self notifyUser:
+				('Handling model download for {1}.' , String cr ,
+				'Please stay connected to the internet. Otherwise, the download cannot start or complete.'
+					format: { modelName }).
+
+			((self installModelNamed: modelName)
+				and: [ self refreshModelsAfterInstallOf: modelName usingInitialResponse: initialResponse ])
+					ifTrue: [
+						[
+							availableModels := self modelNamesFromResponse: self newOllamaClient listModels
+						] on: Error do: [ :ex |
+							self logOllamaServiceUnavailable: ex ] ]
+					ifFalse: [
+						allDownloaded := false ] ] ].
+
+	allDownloaded
+		ifTrue: [
+			self notifyUser: 'All predefined Copilot models are available locally.' ]
+		ifFalse: [
+			self notifyUser:
+				'Some predefined models could not be downloaded. Please check your internet connection and Ollama logs.' ].
+
+	^ allDownloaded
 ]
 
 { #category : 'settings' }
@@ -581,30 +616,46 @@ CopilotSettings class >> initializeDefaults [
 
 { #category : 'accessing' }
 CopilotSettings class >> installModelNamed: aModelName [
-	"Invoke Ollama to pull/install the given model; answer whether it succeeded."
-
+	
 	| client |
+
+	(self isPredefinedDownloadableModelName: aModelName) ifFalse: [
+		self notifyUser:
+			('The model "{1}" is not in the predefined downloadable model list.' format: { aModelName }).
+		^ false ].
+
 	[
 		client := self newOllamaClient.
 
-		self notifyUser: ('Downloading {1}... This may take a few minutes.' format: { aModelName }).
-		CoPharoCopilotLogger logBackEndEvent: 'Invoking Ollama model install script' details: (Dictionary new
-				 at: #model put: aModelName;
-				 yourself).
+		self notifyUser:
+			('Downloading {1}...' , String cr ,
+			'Please stay connected to the internet. Otherwise, this download cannot start or complete.'
+				format: { aModelName }).
 
-			(client respondsTo: #pullModelNamed:timeoutSeconds:)
-			ifTrue: [ client pullModelNamed: aModelName timeoutSeconds: self modelInstallTimeoutSeconds ]
-			ifFalse: [ client pullModelNamed: aModelName ].
+		CoPharoCopilotLogger logBackEndEvent: 'Invoking Ollama model install script' details: (Dictionary new
+			at: #model put: aModelName;
+			yourself).
+
+		(client respondsTo: #pullModelNamed:timeoutSeconds:)
+			ifTrue: [
+				client
+					pullModelNamed: aModelName
+					timeoutSeconds: self modelInstallTimeoutSeconds ]
+			ifFalse: [
+				client pullModelNamed: aModelName ].
 
 		CoPharoCopilotLogger logBackEndEvent: 'Ollama model install script completed' details: (Dictionary new
-				 at: #model put: aModelName;
-				 yourself).
+			at: #model put: aModelName;
+			yourself).
+
 		self notifyUser: ('Download completed for {1}.' format: { aModelName }).
-		^ true ]
-		on: Error
-		do: [ :ex |
-				self notifyUser: ('Failed to download {1}. Please check Ollama logs.' format: { aModelName }).
-				^ false ]
+		^ true
+	] on: Error do: [ :ex |
+		self notifyUser:
+			('Failed to download {1}.' , String cr ,
+			'Please check your internet connection and Ollama logs.'
+				format: { aModelName }).
+		^ false ]
 ]
 
 { #category : 'persistence' }
@@ -711,17 +762,30 @@ CopilotSettings class >> isNullModelName: aString [
 	^ aString = self nullModelFullName
 ]
 
-{ #category : 'persistence' }
+{ #category : 'accessing' }
+CopilotSettings class >> isPredefinedDownloadableModelName: aModelName [
+
+	aModelName ifNil: [ ^ false ].
+	^ self predefinedDownloadableModelNames includes: aModelName asString
+]
+
+{ #category : 'accessing' }
 CopilotSettings class >> launchLocalOllamaServiceIfPossible [
 
 	| osPlatform libc command |
+
 	osPlatform := Smalltalk globals at: #OSPlatform ifAbsent: [ nil ].
 	libc := Smalltalk globals at: #LibC ifAbsent: [ nil ].
 	(osPlatform isNil or: [ libc isNil ]) ifTrue: [ ^ false ].
 
-	command := (osPlatform current isWindows)
-		           ifTrue: [ 'start /B ollama serve' ]
-		           ifFalse: [ 'ollama serve &' ].
+	command := osPlatform current isWindows
+		ifTrue: [ 'start /B ollama serve' ]
+		ifFalse: [ 'ollama serve &' ].
+
+	self notifyUser:
+		('Launching Ollama locally.' , String cr ,
+		'After Ollama starts, Pharo Copilot will handle model downloading.' , String cr ,
+		'Please stay connected to the internet.').
 
 	[
 		libc uniqueInstance system: command.
@@ -729,12 +793,11 @@ CopilotSettings class >> launchLocalOllamaServiceIfPossible [
 		^ true
 	] on: Error do: [ :ex |
 		CoPharoCopilotLogger logBackEndEvent: 'Failed to launch local Ollama service' details: (Dictionary new
-				 at: #command put: command;
-				 at: #errorClass put: ex class name;
-				 at: #error put: ex description;
-				 yourself).
-		^ false
-	]
+			at: #command put: command;
+			at: #errorClass put: ex class name;
+			at: #error put: ex description;
+			yourself).
+		^ false ]
 ]
 
 { #category : 'persistence' }
@@ -1138,6 +1201,16 @@ CopilotSettings class >> normalizedInteger: anObject default: defaultValue minim
 	^ candidate min: maxValue
 ]
 
+{ #category : 'accessing' }
+CopilotSettings class >> notifyModelDownloadPreparation [
+
+	self notifyUser:
+		('Pharo Copilot is checking Ollama and handling model downloading.' , String cr ,
+		'Models to download/check:' , String cr ,
+		self predefinedDownloadableModelNamesText , String cr ,
+		'Please stay connected to the internet. Otherwise, the model download process cannot start or complete.')
+]
+
 { #category : 'settings' }
 CopilotSettings class >> notifyUser: aString [
 	"Display a message to the user (UIManager if available, otherwise Transcript)."
@@ -1320,6 +1393,26 @@ CopilotSettings class >> port: aNumberOrString [
 
 	self clearCachedModelMetadata.
 	self autoSaveSettings
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> predefinedDownloadableModelNames [
+
+	^ #(
+		'qwen2.5-coder:0.5b'
+	)
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> predefinedDownloadableModelNamesText [
+
+	^ String streamContents: [ :stream |
+		self predefinedDownloadableModelNames
+			do: [ :each |
+				stream
+					nextPutAll: '- ';
+					nextPutAll: each asString ]
+			separatedBy: [ stream cr ] ]
 ]
 
 { #category : 'persistence' }

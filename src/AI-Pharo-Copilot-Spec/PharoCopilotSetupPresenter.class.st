@@ -66,10 +66,17 @@ PharoCopilotSetupPresenter >> handleOk [
 		^ self inform: 'You must accept the privacy policy before continuing.' ].
 
 	CopilotSettings recordPrivacyPolicyUserConsentAccepted: true.
+	
+	
+	statusLabel label:
+		'Checking Ollama and handling model downloading. Please stay connected to the internet.'.
 
 	(CopilotSettings ensureOllamaInstalledBeforeUse)
 		ifTrue: [ ^ self window close ].
 
+self inform:
+		'Setup could not finish. Please make sure Ollama is installed/running and that you are connected to the internet, then try again.'.
+		
 	self showMissingOllamaStep
 ]
 
