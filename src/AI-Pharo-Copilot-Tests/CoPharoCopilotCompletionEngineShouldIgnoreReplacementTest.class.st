@@ -7,10 +7,10 @@ Class {
 }
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmptyStreamContents [
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreNil [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self assert: (engine shouldIgnoreReplacement: (String streamContents: [ :s | ]))
+	self assert: (engine shouldIgnoreReplacement: nil)
 ]
 
 { #category : 'tests' }
@@ -21,17 +21,10 @@ CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmp
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmptyStringAsSymbolEmpty [
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmptyStringViaNewString [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self assert: (engine shouldIgnoreReplacement: '' asSymbol)
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmptyStringViaConcatenation [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self assert: (engine shouldIgnoreReplacement: '', '')
+	self assert: (engine shouldIgnoreReplacement: String new)
 ]
 
 { #category : 'tests' }
@@ -42,262 +35,24 @@ CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmp
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmptyStringViaNewString [
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmptyStringViaConcatenation [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self assert: (engine shouldIgnoreReplacement: String new)
+	self assert: (engine shouldIgnoreReplacement: '', '')
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreNil [
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmptyStringAsSymbolEmpty [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self assert: (engine shouldIgnoreReplacement: nil)
+	self assert: (engine shouldIgnoreReplacement: '' asSymbol)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreArrayLiteralSource [
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldIgnoreEmptyStreamContents [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '#(1 2 3)')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreAssignmentSyntax [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'x := 1')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreBinaryOp [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '+ ')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreBlockLiteralSource [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '[ :x | x + 1 ]')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreBooleanFalse [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'false')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreBooleanTrue [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'true')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreByteArrayLiteralSource [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '#[1 2 3]')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreCascadeSnippet [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'self x; y; z')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreClassDefinitionSnippet [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'Object subclass: #Foo')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreContainsNullChar [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: (String with: Character null))
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreCrLf [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: String crlf)
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreExpression [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'self yourself')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreIndentedMessage [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '    indented')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreKeyword [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'foo: ')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreKeywordSelector [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'self assert: x equals: y')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreLargeNumber [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '1000000')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreLeadingSpace [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: ' value')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreLongString [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: (String new: 10000 withAll: $a))
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreMixedWhitespace [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: ' ' , String tab , String lf)
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreMultilineMessage [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'line1' , String lf , 'line2')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreNegativeNumber [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '-5')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreNilLiteral [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'nil')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreNumber [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '42')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreNumericDecimal [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '3.14')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreOnlyNewlines [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: String lf , String lf , String lf)
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreOnlySpaces [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '     ')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreOnlyTabs [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: String tab , String tab)
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnorePunctuationOnly [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '.;,:')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreReturnExpression [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '^ self')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSelfKeyword [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'self')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSentence [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'hello world')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSingleCarriageReturn [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: String cr)
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSingleDigit [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '1')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSingleEquals [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '=')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSingleHyphen [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '-')
+	self assert: (engine shouldIgnoreReplacement: (String streamContents: [ :s | ]))
 ]
 
 { #category : 'tests' }
@@ -308,10 +63,10 @@ CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnore
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSingleNewline [
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSingleDigit [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: String lf)
+	self deny: (engine shouldIgnoreReplacement: '1')
 ]
 
 { #category : 'tests' }
@@ -329,101 +84,24 @@ CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnore
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSmalltalkReturnArrow [
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSingleNewline [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '^ nil')
+	self deny: (engine shouldIgnoreReplacement: String lf)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithAmpersand [
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSingleCarriageReturn [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '&')
+	self deny: (engine shouldIgnoreReplacement: String cr)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithBackslash [
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreCrLf [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '\')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithBang [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '!')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithDollar [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '$')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithDoubleQuote [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '"')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithForwardSlash [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '/')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithHash [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '#')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithPipe [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '|')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithQuestionMark [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '?')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithSingleQuote [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: '''')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSuperKeyword [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'super')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreThisContextKeyword [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'thisContext')
-]
-
-{ #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreTrailingSpace [
-	| engine |
-	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'value ')
+	self deny: (engine shouldIgnoreReplacement: String crlf)
 ]
 
 { #category : 'tests' }
@@ -431,6 +109,62 @@ CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnore
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
 	self deny: (engine shouldIgnoreReplacement: '  ')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreWord [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'hello')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSentence [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'hello world')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreNumber [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '42')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreKeyword [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'foo: ')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreBinaryOp [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '+ ')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreExpression [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'self yourself')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreAssignmentSyntax [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'x := 1')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreKeywordSelector [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'self assert: x equals: y')
 ]
 
 { #category : 'tests' }
@@ -448,6 +182,55 @@ CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnore
 ]
 
 { #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreMultilineMessage [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'line1' , String lf , 'line2')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreIndentedMessage [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '    indented')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreTrailingSpace [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'value ')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreLeadingSpace [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: ' value')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnorePunctuationOnly [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '.;,:')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSmalltalkReturnArrow [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '^ nil')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreLongString [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: (String new: 10000 withAll: $a))
+]
+
+{ #category : 'tests' }
 CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreVeryLongString [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
@@ -455,8 +238,225 @@ CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnore
 ]
 
 { #category : 'tests' }
-CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreWord [
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreContainsNullChar [
 	| engine |
 	engine := CoPharoCopilotCompletionEngine new.
-	self deny: (engine shouldIgnoreReplacement: 'hello')
+	self deny: (engine shouldIgnoreReplacement: (String with: Character null))
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithSingleQuote [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '''')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithDoubleQuote [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '"')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithBackslash [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '\')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithForwardSlash [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '/')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithHash [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '#')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithDollar [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '$')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithPipe [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '|')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithBang [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '!')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithAmpersand [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '&')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreStringWithQuestionMark [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '?')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreOnlyNewlines [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: String lf , String lf , String lf)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreOnlyTabs [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: String tab , String tab)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreOnlySpaces [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '     ')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreMixedWhitespace [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: ' ' , String tab , String lf)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreArrayLiteralSource [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '#(1 2 3)')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreBlockLiteralSource [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '[ :x | x + 1 ]')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreByteArrayLiteralSource [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '#[1 2 3]')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreClassDefinitionSnippet [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'Object subclass: #Foo')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreCascadeSnippet [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'self x; y; z')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreReturnExpression [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '^ self')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSingleHyphen [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '-')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSingleEquals [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '=')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreNumericDecimal [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '3.14')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreNegativeNumber [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '-5')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreLargeNumber [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: '1000000')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreBooleanTrue [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'true')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreBooleanFalse [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'false')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreNilLiteral [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'nil')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSelfKeyword [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'self')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreSuperKeyword [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'super')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotCompletionEngineShouldIgnoreReplacementTest >> testShouldNotIgnoreThisContextKeyword [
+	| engine |
+	engine := CoPharoCopilotCompletionEngine new.
+	self deny: (engine shouldIgnoreReplacement: 'thisContext')
 ]

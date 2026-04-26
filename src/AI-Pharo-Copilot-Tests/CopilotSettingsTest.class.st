@@ -608,7 +608,7 @@ CopilotSettingsTest >> testTimingSettingsNormalization [
 			CopilotSettings completionDebounceMilliseconds: 0.
 			self assert: CopilotSettings completionDebounceMilliseconds equals: 50.
 			CopilotSettings completionIdleMilliseconds: -10.
-			self assert: CopilotSettings completionIdleMilliseconds equals: 150.
+			self assert: CopilotSettings completionIdleMilliseconds equals: 300.
 			CopilotSettings completionDebounceMilliseconds: 70000.
 			self assert: CopilotSettings completionDebounceMilliseconds equals: 60000.
 			CopilotSettings completionIdleMilliseconds: 2.
