@@ -76,6 +76,14 @@ CopilotSettings class >> initializeDefaults [
 	ollamaClientFactory := [ CoPCOllamaClient new ].
 	modelMetadata := nil
 ]
+
+{ #category : 'settings' }
+CopilotSettings class >> loadSettingsFromFile [
+
+	"Legacy hook kept for compatibility during class initialization.
+	Settings are now managed through the singleton instance and System Settings."
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> copilotEnabled [
 

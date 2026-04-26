@@ -435,7 +435,7 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
 		select: [ :each | each isEmpty not ].
 
-	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].\
+	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
 	entryClass := self classNamed: #CoCopilotEntry.
 	entryClass ifNil: [ ^ #() ].
 
