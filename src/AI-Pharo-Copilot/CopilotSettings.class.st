@@ -176,12 +176,6 @@ CopilotSettings class >> backgroundColor: aColor [
 ]
 
 { #category : 'accessing' }
-CopilotSettings class >> defaultBackgroundColor [
-
-	^ Color veryVeryLightGray
-]
-
-{ #category : 'accessing' }
 CopilotSettings class >> templatesDirectory [
 
 	^ self current templatesDirectory
@@ -431,8 +425,8 @@ CopilotSettings class >> installModelUserConsent: anObject [
 { #category : 'persistence' }
 CopilotSettings class >> serializableSettingsSnapshot [
 
-	| snapshot templatesPath contextSettingsClass |
-	contextSettingsClass := Smalltalk globals at: #CoPCContextSettings ifAbsent: [ nil ].
+	| snapshot templatesPath |
+	snapshot := Dictionary new
 		at: #enabled put: self copilotEnabled;
 		at: #provider put: self copilotProvider;
 		at: #modelName put: self modelName;
@@ -458,7 +452,7 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		at: #completionSuggestionsCount put: self completionSuggestionsCount;
 		at: #backgroundColor put: self backgroundColor;
 		at: #installModelUserConsent put: self installModelUserConsent;
-		at: #contextMode put: (contextSettingsClass ifNotNil: [ contextSettingsClass mode ]);
+		at: #contextMode put: CoPCContextSettings mode;
 		at: #navigationHistoryEnabled put: CoPCContextNavigationHistory enabled;
 		yourself.
 
@@ -475,13 +469,11 @@ CopilotSettings class >> serializableSettingsSnapshot [
 { #category : 'persistence' }
 CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 
-	| contextSettingsClass |
 	self resetCurrent.
 	self current restoreSettingsFromSerializableSnapshot: aDictionary.
-	contextSettingsClass := Smalltalk globals at: #CoPCContextSettings ifAbsent: [ nil ].
 
 	(aDictionary at: #contextMode ifAbsent: [ nil ])
-		ifNotNil: [ :savedMode | contextSettingsClass ifNotNil: [ contextSettingsClass mode: savedMode ] ].
+		ifNotNil: [ :savedMode | CoPCContextSettings mode: savedMode ].
 
 	(aDictionary at: #navigationHistoryEnabled ifAbsent: [ nil ])
 		ifNotNil: [ :savedFlag | CoPCContextNavigationHistory enabled: savedFlag ]
@@ -502,8 +494,6 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 CopilotSettings class >> settingsOn: aBuilder [
 
 	<systemsettings>
-	| contextSettingsClass |
-	contextSettingsClass := Smalltalk globals at: #CoPCContextSettings ifAbsent: [ nil ].
 	(aBuilder setting: #CopilotSettings)
 		target: self current;
 		parentName: #codeBrowsing;
@@ -573,25 +563,24 @@ CopilotSettings class >> settingsOn: aBuilder [
 				default: self completionIdleMilliseconds;
 				description: 'Milliseconds to wait after typing stops before requesting completions (1-60000).'.
 
-			contextSettingsClass ifNotNil: [
-					(aBuilder pickOne: #contextMode)
-						order: 0.65;
-						label: 'Context mode';
-						target: contextSettingsClass;
-						getSelector: #mode;
-						setSelector: #mode:;
-						default: contextSettingsClass mode;
-						domainValues: contextSettingsClass availableModes;
-						description: 'Controls whether completions use full source or selectors-only class context.'.
+			(aBuilder pickOne: #contextMode)
+				order: 0.65;
+				label: 'Context mode';
+				target: CoPCContextSettings;
+				getSelector: #mode;
+				setSelector: #mode:;
+				default: CoPCContextSettings mode;
+				domainValues: CoPCContextSettings availableModes;
+				description: 'Controls whether completions use full source or selectors-only class context.'.
 
-					(aBuilder setting: #navigationHistoryEnabled)
-						order: 0.655;
-						label: 'Include browser navigation history';
-						target: contextSettingsClass;
-						getSelector: #navigationHistoryEnabled;
-						setSelector: #navigationHistoryEnabled:;
-						default: contextSettingsClass navigationHistoryEnabled;
-						description: 'When enabled, the current Calypso browser selection and recent navigation states are prepended to the class context sent to the model.' ].
+			(aBuilder setting: #navigationHistoryEnabled)
+				order: 0.655;
+				label: 'Include browser navigation history';
+				target: CoPCContextSettings;
+				getSelector: #navigationHistoryEnabled;
+				setSelector: #navigationHistoryEnabled:;
+				default: CoPCContextSettings navigationHistoryEnabled;
+				description: 'When enabled, the current Calypso browser selection and recent navigation states are prepended to the class context sent to the model.'.
 
 			(aBuilder setting: #maxInstanceMethods)
 				order: 0.66;
@@ -1068,7 +1057,7 @@ CopilotSettings >> installSelectedModelNowSetting [
 CopilotSettings >> installSelectedModelNowSetting: aBoolean [
 	CopilotSettings installSelectedModelNowSetting: aBoolean
 ]
-
+Also change this class-side method to store consent on the instance:
 { #category : 'settings' }
 CopilotSettings class >> recordInstallModelUserConsentForModelNamed: aModelName accepted: aBoolean [
 

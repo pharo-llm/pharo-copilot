@@ -31,18 +31,16 @@ CoPharoCopilotCompletionEngine >> completionBuilder [
 { #category : 'replacement' }
 CoPharoCopilotCompletionEngine >> openCopilotMenuFor: aContext entries: entryCollection position: aPoint builder: aBuilder [
 
-	| editorMorph menuClass |
+	| editorMorph |
 
 	self closeMenu.
 
 	context := aContext.
-	menuClass := Smalltalk globals at: #CopilotMenuMorph ifAbsent: [ nil ].
-	menuMorph := menuClass ifNotNil: [
-		menuClass
-			builder: aBuilder
-			context: aContext
-			entries: entryCollection
-			position: aPoint ].
+	menuMorph := CopilotMenuMorph
+		builder: aBuilder
+		context: aContext
+		entries: entryCollection
+		position: aPoint.
 
 	editorMorph := [ self editor morph ] on: Error do: [ nil ].
 	editorMorph ifNotNil: [

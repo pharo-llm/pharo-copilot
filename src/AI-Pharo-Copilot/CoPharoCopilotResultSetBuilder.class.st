@@ -82,9 +82,7 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 
 	| builder context classDefinition instanceSide classSide |
 
-	builder := selector ifNotNil: [
-		(self classNamed: #CoPCContextFactory)
-			ifNotNil: [ :factoryClass | factoryClass forSelector: selector ] ].
+	builder := selector ifNotNil: [ CoPCContextFactory forSelector: selector ].
 	builder ifNotNil: [
 		^ builder buildForFIMWithPrefix: prefixString
 	].
@@ -396,16 +394,8 @@ CoPharoCopilotResultSetBuilder >> completionCache: aCache [
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> classNamed: aSymbol [
-
-	^ Smalltalk globals
-		at: aSymbol
-		ifAbsent: [ nil ]
-]
-
-{ #category : 'private' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext [
-	| cleaned fakeContextInfo entryClass |
+	| cleaned fakeContextInfo |
 
 	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
 		select: [ :each | each isEmpty not ].
@@ -413,14 +403,10 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 	fakeContextInfo := Dictionary new
 		at: #prefix put: '';
 		yourself.
-	
-	entryClass := self classNamed: #CoCopilotEntry.
-	entryClass ifNil: [ ^ #() ].
-
 
 	^ cleaned collect: [ :each |
 		| entry |
-		entry := entryClass
+		entry := CoCopilotEntry
 			contents: each
 			description: (self descriptionForSuggestion: each inContext: aContext).
 		entry label: (self menuLabelForSuggestion: each contextInfo: fakeContextInfo).
@@ -435,13 +421,11 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
 		select: [ :each | each isEmpty not ].
 
-	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].\
-	entryClass := self classNamed: #CoCopilotEntry.
-	entryClass ifNil: [ ^ #() ].
+	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
 
 	^ cleaned collect: [ :each |
 		| entry |
-		entry := entryClass
+		entry := CoCopilotEntry
 			contents: each
 			description: (self descriptionForSuggestion: each inContext: aContext).
 
