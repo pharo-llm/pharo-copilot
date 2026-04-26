@@ -9,7 +9,9 @@ Class {
 		'descriptionLabel',
 		'statusLabel',
 		'contentContainer',
-		'privacyConsentCheckbox'
+		'privacyConsentCheckbox',
+		'progressBar',
+		'downloadProcess'
 	],
 	#category : 'AI-Pharo-Copilot-Spec',
 	#package : 'AI-Pharo-Copilot-Spec'
@@ -47,6 +49,19 @@ PharoCopilotSetupPresenter >> defaultLayout [
 		  yourself
 ]
 
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> deferUI: aBlock [
+
+	| ui |
+	ui := [ UIManager default ] on: Error do: [ nil ].
+
+	(ui notNil and: [ ui respondsTo: #defer: ]) ifTrue: [
+		^ ui defer: aBlock
+	].
+
+	^ aBlock value
+]
+
 { #category : 'accessing' }
 PharoCopilotSetupPresenter >> descriptionLabel [
 
@@ -62,22 +77,13 @@ PharoCopilotSetupPresenter >> descriptionLabel: anObject [
 { #category : 'accessing' }
 PharoCopilotSetupPresenter >> handleOk [
 
-	privacyConsentCheckbox state ifFalse: [
-		^ self inform: 'You must accept the privacy policy before continuing.' ].
+	privacyConsentCheckbox state ifFalse: [ statusLabel label: 'You must accept the privacy policy before continuing.'.
+		^ self ].
 
 	CopilotSettings recordPrivacyPolicyUserConsentAccepted: true.
-	
-	
-	statusLabel label:
-		'Checking Ollama and handling model downloading. Please stay connected to the internet.'.
 
-	(CopilotSettings ensureOllamaInstalledBeforeUse)
-		ifTrue: [ ^ self window close ].
-
-self inform:
-		'Setup could not finish. Please make sure Ollama is installed/running and that you are connected to the internet, then try again.'.
-		
-	self showMissingOllamaStep
+self showDownloadStep.
+	self startSetupDownloads
 ]
 
 { #category : 'initialization' }
@@ -96,6 +102,10 @@ PharoCopilotSetupPresenter >> initializePresenters [
 	statusLabel := self newLabel
 		               label: '';
 		               yourself.
+		
+		
+		progressBar := self newProgressBar.
+	progressBar fixedPercentage: 0.
 
 	contentContainer := SpPresenter new.
 
@@ -115,12 +125,41 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 ]
 
 { #category : 'initialization' }
+PharoCopilotSetupPresenter >> showDownloadStep [
+
+	| centeredRow centeredColumn |
+	titleLabel label: 'Setting up Pharo-Copilot'.
+	descriptionLabel label: 'Checking Ollama and downloading required models.'.
+	statusLabel label: 'Preparing download...'.
+	progressBar fixedPercentage: 0.
+
+	centeredRow := SpBoxLayout newLeftToRight
+		add: SpNullPresenter new expand: true;
+		add: (SpBoxLayout newTopToBottom
+			spacing: 12;
+			add: progressBar expand: false;
+			yourself)
+		expand: true;
+		add: SpNullPresenter new expand: true;
+		yourself.
+
+	centeredColumn := SpBoxLayout newTopToBottom
+		add: SpNullPresenter new expand: true;
+		add: centeredRow expand: false;
+		add: SpNullPresenter new expand: true;
+		yourself.
+
+	contentContainer layout: centeredColumn.
+	self layout: self defaultLayout
+]
+
+{ #category : 'initialization' }
 PharoCopilotSetupPresenter >> showMissingOllamaStep [
 
 	| messageLabel installButton centeredRow centeredColumn |
 	titleLabel label: 'Ollama Required'.
 	descriptionLabel label: 'Pharo-Copilot needs Ollama to continue.'.
-	statusLabel label: ''.
+	statusLabel label: 'Setup could not continue without Ollama.'.
 
 	messageLabel := self newLabel
 		label: CopilotSettings missingOllamaSetupMessage;
@@ -205,6 +244,58 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 		yourself).
 
 	self layout: self defaultLayout
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> startSetupDownloads [
+
+	downloadProcess := [
+		| response missingModels failedModels |
+
+		response := CopilotSettings ensureOllamaServiceAvailable.
+		response ifNil: [
+			^ self deferUI: [
+				statusLabel label: 'Setup could not finish. Please install/start Ollama and try again.'.
+				self showMissingOllamaStep ] ].
+
+		missingModels := CopilotSettings missingSetupModelNamesFrom: response.
+		missingModels isEmpty ifTrue: [
+			[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
+			^ self deferUI: [
+				progressBar fixedPercentage: 100.
+				statusLabel label: 'Setup completed. All setup models are already installed.'.
+				self window close ] ].
+
+		failedModels := OrderedCollection new.
+		missingModels doWithIndex: [ :modelName :index |
+			self deferUI: [
+				statusLabel label:
+					('Downloading {1} ({2}/{3})'
+						format: { modelName. index. missingModels size })
+			].
+
+			((CopilotSettings installModelNamed: modelName)
+				and: [ CopilotSettings refreshModelsAfterInstallOf: modelName usingInitialResponse: response ])
+				ifFalse: [ failedModels add: modelName ].
+
+			self deferUI: [
+				progressBar fixedPercentage: ((index / missingModels size) * 100) rounded
+			]
+		].
+
+		[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
+
+		self deferUI: [
+			failedModels isEmpty
+				ifTrue: [
+					statusLabel label: 'Setup completed. All setup models are available.'.
+					self window close ]
+				ifFalse: [
+					statusLabel label:
+						('Some models failed to download ({1}). Please check your internet connection and Ollama logs.'
+							format: { failedModels size }) ]
+		]
+	] forkAt: Processor userBackgroundPriority named: 'Pharo Copilot setup download'
 ]
 
 { #category : 'accessing' }
