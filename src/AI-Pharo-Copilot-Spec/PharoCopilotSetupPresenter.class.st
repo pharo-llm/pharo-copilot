@@ -44,7 +44,6 @@ PharoCopilotSetupPresenter >> defaultLayout [
 		  borderWidth: 20;
 		  add: titleLabel expand: false;
 		  add: descriptionLabel expand: false;
-		  add: progressBar expand: false;
 		  add: contentContainer expand: true;
 		  add: statusLabel expand: false;
 		  yourself
@@ -93,20 +92,19 @@ PharoCopilotSetupPresenter >> initializePresenters [
 	super initializePresenters.
 
 	titleLabel := self newLabel
-		              label: 'Welcome to ChatPharo';
-		              yourself.
+		label: 'Welcome to Pharo-Copilot';
+		yourself.
 
 	descriptionLabel := self newLabel
-		                    label: '';
-		                    yourself.
+		label: '';
+		yourself.
 
 	statusLabel := self newLabel
-		               label: '';
-		               yourself.
-		
-		
-		progressBar := self newProgressBar.
-	progressBar fixedPercentage: 0.
+		label: '';
+		yourself.
+
+	progressBar := self newProgressBar.
+	progressBar indeterminate.
 
 	contentContainer := SpPresenter new.
 
@@ -132,7 +130,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 
 	self deferUI: [
 		progressBar indeterminate.
-		statusLabel label: 'Checking if Ollama is running...'
+		statusLabel label: ''
 	].
 
 	response := CopilotSettings listModelsForSetupAfterLaunchingOllamaIfNeeded.
@@ -145,18 +143,14 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		]
 	].
 
-	self deferUI: [
-		progressBar indeterminate.
-		statusLabel label: 'Ollama is running. Checking required models...'
-	].
-
 	missingModels := CopilotSettings missingSetupModelNamesFrom: response.
 
 	missingModels isEmpty ifTrue: [
 		[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
 		^ self deferUI: [
 			progressBar fixedPercentage: 100.
-			statusLabel label: 'Setup completed. All setup models are already installed.'.
+			statusLabel label: 'OKAY! Pharo-Copilot setup is complete.'.
+			CopilotSettings notifyUser: 'OKAY! Pharo-Copilot setup is complete.'.
 			self window close
 		]
 	].
@@ -167,9 +161,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 
 		self deferUI: [
 			progressBar indeterminate.
-			statusLabel label:
-				('Installing model {1} ({2}/{3})...'
-					format: { modelName. index. missingModels size })
+			statusLabel label: ''
 		].
 
 		((CopilotSettings installModelNamedForSetup: modelName)
@@ -182,13 +174,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		self deferUI: [
 			progressBar fixedPercentage:
 				((index / missingModels size) * 100) rounded.
-
-			statusLabel label:
-				((failedModels includes: modelName)
-					ifTrue: [
-						'Failed installing ', modelName ]
-					ifFalse: [
-						'Installed ', modelName ])
+			statusLabel label: ''
 		]
 	].
 
@@ -198,7 +184,8 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		failedModels isEmpty
 			ifTrue: [
 				progressBar fixedPercentage: 100.
-				statusLabel label: 'Setup completed. All setup models are available.'.
+				statusLabel label: 'Pharo-Copilot setup is complete.'.
+				CopilotSettings notifyUser: 'Pharo-Copilot setup is complete.'.
 				self window close ]
 			ifFalse: [
 				statusLabel label:
@@ -207,12 +194,12 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 	]
 ]
 
-{ #category : 'accessing' }
+{ #category : 'initialization' }
 PharoCopilotSetupPresenter >> showDownloadStep [
 
 	titleLabel label: 'Setting up Pharo-Copilot'.
-	descriptionLabel label: 'Checking Ollama, launching it if needed, and downloading required models.'.
-	statusLabel label: 'Checking if Ollama is running...'.
+	descriptionLabel label: 'LOADING .....'.
+	statusLabel label: ''.
 
 	progressBar indeterminate.
 
