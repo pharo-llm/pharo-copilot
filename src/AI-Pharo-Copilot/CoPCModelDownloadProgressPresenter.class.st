@@ -64,28 +64,33 @@ CoPCModelDownloadProgressPresenter >> deferUI: aBlock [
 	^ aBlock value
 ]
 
-{ #category : 'layout' }
+{ #category : 'initialization' }
 CoPCModelDownloadProgressPresenter >> downloadModels [
 
 	models doWithIndex: [ :modelName :index |
 		self deferUI: [
 			statusLabel label:
-				('Downloading {1} ({2}/{3})'
+				('Installing model {1} ({2}/{3})...'
 					format: { modelName. index. models size }).
-			self appendLog: 'Starting ', modelName
+
+			progressBar indeterminate.
+
+			self appendLog:
+				('Installing model ', modelName, '... Please keep your internet connection active.')
 		].
 
-		(CopilotSettings installModelNamed: modelName)
+		(CopilotSettings installModelNamedForSetup: modelName)
 			ifFalse: [ failed add: modelName ].
 
 		completed := completed + 1.
 
 		self deferUI: [
 			progressBar fixedPercentage: self completedPercentage.
+
 			self appendLog:
 				((failed includes: modelName)
 					ifTrue: [ 'Failed: ', modelName ]
-					ifFalse: [ 'Completed: ', modelName ])
+					ifFalse: [ 'Installed: ', modelName ])
 		]
 	].
 
@@ -93,23 +98,44 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 
 	self deferUI: [
 		failed isEmpty
-			ifTrue: [ statusLabel label: 'All setup models downloaded.' ]
+			ifTrue: [ statusLabel label: 'All setup models installed.' ]
 			ifFalse: [
 				statusLabel label:
-					('Finished with {1} failed model(s).'
+					('Finished with {1} failed model(s). Check your internet connection and Ollama logs.'
 						format: { failed size }) ].
+
 		progressBar fixedPercentage: 100
 	]
+]
+
+{ #category : 'initialization' }
+CoPCModelDownloadProgressPresenter >> ensureInternetConnectionAvailable [
+
+	CopilotSettings internetConnectionAvailable ifTrue: [ ^ true ].
+
+	self deferUI: [
+		statusLabel label: 'Internet connection required to install models.'.
+		progressBar fixedPercentage: 0.
+		self appendLog: 'No internet connection detected.'.
+		self appendLog: 'Models cannot be downloaded without internet access.'
+	].
+
+	CopilotSettings notifyUser:
+		('Internet connection required.' , String cr ,
+		'Pharo Copilot cannot download Ollama models while offline.' , String cr ,
+		'Please connect to the internet and try again.').
+
+	^ false
 ]
 
 { #category : 'initialization' }
 CoPCModelDownloadProgressPresenter >> initializePresenters [
 
 	statusLabel := self newLabel.
-	statusLabel label: 'Preparing Ollama model downloads...'.
+	statusLabel label: 'Preparing Ollama model installation...'.
 
 	progressBar := self newProgressBar.
-	progressBar fixedPercentage: 0.
+	progressBar indeterminate.
 
 	logText := self newText.
 	logText beNotEditable.
@@ -124,16 +150,23 @@ CoPCModelDownloadProgressPresenter >> models: aCollection [
 	models := aCollection asArray
 ]
 
-{ #category : 'layout' }
+{ #category : 'initialization' }
 CoPCModelDownloadProgressPresenter >> startDownload [
 
 	(models isNil or: [ models isEmpty ]) ifTrue: [
-		statusLabel label: 'No setup models need to be downloaded.'.
+		statusLabel label: 'No setup models need to be installed.'.
 		progressBar fixedPercentage: 100.
 		^ self
 	].
 
 	process := [
-		self downloadModels
+		(self ensureInternetConnectionAvailable)
+			ifTrue: [ self downloadModels ]
+			ifFalse: [
+				self deferUI: [
+					progressBar fixedPercentage: 0.
+					statusLabel label: 'Internet connection required to install models.'
+				]
+			]
 	] forkAt: Processor userBackgroundPriority named: 'Pharo Copilot model download'
 ]

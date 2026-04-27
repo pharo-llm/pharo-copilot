@@ -769,6 +769,21 @@ CopilotSettings class >> installSelectedModelNowSetting: aBoolean [
 	aBoolean ifTrue: [ self installSelectedModelNow ]
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> internetConnectionAvailable [
+
+	^ [
+		ZnEasy get: 'https://ollama.com'.
+		true
+	] on: Error do: [ :ex |
+		CoPharoCopilotLogger logBackEndEvent: 'Internet connection check failed' details: (Dictionary new
+			at: #errorClass put: ex class name;
+			at: #error put: ex description;
+			yourself).
+		false
+	]
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> isCopilotEngineSelected [
 	"Answer whether a Copilot completion engine is currently selected in the editor."

@@ -44,6 +44,7 @@ PharoCopilotSetupPresenter >> defaultLayout [
 		  borderWidth: 20;
 		  add: titleLabel expand: false;
 		  add: descriptionLabel expand: false;
+		  add: progressBar expand: false;
 		  add: contentContainer expand: true;
 		  add: statusLabel expand: false;
 		  yourself
@@ -124,87 +125,103 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 
 ]
 
-{ #category : 'initialization' }
+{ #category : 'accessing' }
 PharoCopilotSetupPresenter >> performSetupDownloads [
 
 	| response missingModels failedModels |
 
-	self deferUI: [ statusLabel label: 'Checking if Ollama is running...' ].
+	self deferUI: [
+		progressBar indeterminate.
+		statusLabel label: 'Checking if Ollama is running...'
+	].
+
 	response := CopilotSettings listModelsForSetupAfterLaunchingOllamaIfNeeded.
 
 	response ifNil: [
-		self deferUI: [
-			statusLabel label: 'Cannot use this tool without downloading Ollama.'.
-			self showMissingOllamaStep ].
-		^ self ].
+		^ self deferUI: [
+			progressBar fixedPercentage: 0.
+			statusLabel label: 'Cannot continue. Ollama is required.'.
+			self showMissingOllamaStep
+		]
+	].
 
-	self deferUI: [ statusLabel label: 'Ollama is running. Checking setup models...' ].
+	self deferUI: [
+		progressBar indeterminate.
+		statusLabel label: 'Ollama is running. Checking required models...'
+	].
+
 	missingModels := CopilotSettings missingSetupModelNamesFrom: response.
 
 	missingModels isEmpty ifTrue: [
 		[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
-		self deferUI: [
+		^ self deferUI: [
 			progressBar fixedPercentage: 100.
 			statusLabel label: 'Setup completed. All setup models are already installed.'.
-			self window close ].
-		^ self ].
+			self window close
+		]
+	].
 
 	failedModels := OrderedCollection new.
 
 	missingModels doWithIndex: [ :modelName :index |
+
 		self deferUI: [
+			progressBar indeterminate.
 			statusLabel label:
-				('Downloading {1} ({2}/{3})'
-					format: { modelName. index. missingModels size }) ].
+				('Installing model {1} ({2}/{3})...'
+					format: { modelName. index. missingModels size })
+		].
 
 		((CopilotSettings installModelNamedForSetup: modelName)
-			and: [ CopilotSettings refreshModelsAfterInstallOf: modelName usingInitialResponse: response ])
+			and: [
+				CopilotSettings
+					refreshModelsAfterInstallOf: modelName
+					usingInitialResponse: response ])
 			ifFalse: [ failedModels add: modelName ].
 
 		self deferUI: [
 			progressBar fixedPercentage:
-				((index / missingModels size) * 100) rounded ] ].
+				((index / missingModels size) * 100) rounded.
+
+			statusLabel label:
+				((failedModels includes: modelName)
+					ifTrue: [
+						'Failed installing ', modelName ]
+					ifFalse: [
+						'Installed ', modelName ])
+		]
+	].
 
 	[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
 
 	self deferUI: [
 		failedModels isEmpty
 			ifTrue: [
+				progressBar fixedPercentage: 100.
 				statusLabel label: 'Setup completed. All setup models are available.'.
 				self window close ]
 			ifFalse: [
 				statusLabel label:
 					('Some models failed to download ({1}). Please check your internet connection and Ollama logs.'
-						format: { failedModels size }) ] ]
-
+						format: { failedModels size }) ]
+	]
 ]
 
-{ #category : 'initialization' }
+{ #category : 'accessing' }
 PharoCopilotSetupPresenter >> showDownloadStep [
 
-	| centeredRow centeredColumn |
 	titleLabel label: 'Setting up Pharo-Copilot'.
 	descriptionLabel label: 'Checking Ollama, launching it if needed, and downloading required models.'.
 	statusLabel label: 'Checking if Ollama is running...'.
-	progressBar fixedPercentage: 0.
 
-	centeredRow := SpBoxLayout newLeftToRight
-		add: SpNullPresenter new expand: true;
-		add: (SpBoxLayout newTopToBottom
-			spacing: 12;
-			add: progressBar expand: false;
-			yourself)
-		expand: true;
-		add: SpNullPresenter new expand: true;
-		yourself.
+	progressBar indeterminate.
 
-	centeredColumn := SpBoxLayout newTopToBottom
+	contentContainer layout: (SpBoxLayout newTopToBottom
+		spacing: 12;
+		add: progressBar expand: false;
 		add: SpNullPresenter new expand: true;
-		add: centeredRow expand: false;
-		add: SpNullPresenter new expand: true;
-		yourself.
+		yourself).
 
-	contentContainer layout: centeredColumn.
 	self layout: self defaultLayout
 ]
 
