@@ -125,6 +125,61 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 ]
 
 { #category : 'initialization' }
+PharoCopilotSetupPresenter >> performSetupDownloads [
+
+	| response missingModels failedModels |
+
+	self deferUI: [ statusLabel label: 'Checking if Ollama is running...' ].
+	response := CopilotSettings listModelsForSetupAfterLaunchingOllamaIfNeeded.
+
+	response ifNil: [
+		self deferUI: [
+			statusLabel label: 'Cannot use this tool without downloading Ollama.'.
+			self showMissingOllamaStep ].
+		^ self ].
+
+	self deferUI: [ statusLabel label: 'Ollama is running. Checking setup models...' ].
+	missingModels := CopilotSettings missingSetupModelNamesFrom: response.
+
+	missingModels isEmpty ifTrue: [
+		[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
+		self deferUI: [
+			progressBar fixedPercentage: 100.
+			statusLabel label: 'Setup completed. All setup models are already installed.'.
+			self window close ].
+		^ self ].
+
+	failedModels := OrderedCollection new.
+
+	missingModels doWithIndex: [ :modelName :index |
+		self deferUI: [
+			statusLabel label:
+				('Downloading {1} ({2}/{3})'
+					format: { modelName. index. missingModels size }) ].
+
+		((CopilotSettings installModelNamedForSetup: modelName)
+			and: [ CopilotSettings refreshModelsAfterInstallOf: modelName usingInitialResponse: response ])
+			ifFalse: [ failedModels add: modelName ].
+
+		self deferUI: [
+			progressBar fixedPercentage:
+				((index / missingModels size) * 100) rounded ] ].
+
+	[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
+
+	self deferUI: [
+		failedModels isEmpty
+			ifTrue: [
+				statusLabel label: 'Setup completed. All setup models are available.'.
+				self window close ]
+			ifFalse: [
+				statusLabel label:
+					('Some models failed to download ({1}). Please check your internet connection and Ollama logs.'
+						format: { failedModels size }) ] ]
+
+]
+
+{ #category : 'initialization' }
 PharoCopilotSetupPresenter >> showDownloadStep [
 
 	| centeredRow centeredColumn |
@@ -250,53 +305,7 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 PharoCopilotSetupPresenter >> startSetupDownloads [
 
 	downloadProcess := [
-		| response missingModels failedModels |
-
-		self deferUI: [ statusLabel label: 'Checking if Ollama is running...' ].
-		response := CopilotSettings listModelsForSetupAfterLaunchingOllamaIfNeeded.
-		response ifNil: [
-			^ self deferUI: [
-				statusLabel label: 'Cannot use this tool without downloading Ollama.'.
-				self showMissingOllamaStep ] ].
-
-		self deferUI: [ statusLabel label: 'Ollama is running. Checking setup models...' ].
-		missingModels := CopilotSettings missingSetupModelNamesFrom: response.
-		missingModels isEmpty ifTrue: [
-			[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
-			^ self deferUI: [
-				progressBar fixedPercentage: 100.
-				statusLabel label: 'Setup completed. All setup models are already installed.'.
-				self window close ] ].
-
-		failedModels := OrderedCollection new.
-		missingModels doWithIndex: [ :modelName :index |
-			self deferUI: [
-				statusLabel label:
-					('Downloading {1} ({2}/{3})'
-						format: { modelName. index. missingModels size })
-			].
-
-			((CopilotSettings installModelNamedForSetup: modelName)
-				and: [ CopilotSettings refreshModelsAfterInstallOf: modelName usingInitialResponse: response ])
-				ifFalse: [ failedModels add: modelName ].
-
-			self deferUI: [
-				progressBar fixedPercentage: ((index / missingModels size) * 100) rounded
-			]
-		].
-
-		[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
-
-		self deferUI: [
-			failedModels isEmpty
-				ifTrue: [
-					statusLabel label: 'Setup completed. All setup models are available.'.
-					self window close ]
-				ifFalse: [
-					statusLabel label:
-						('Some models failed to download ({1}). Please check your internet connection and Ollama logs.'
-							format: { failedModels size }) ]
-		]
+		self performSetupDownloads
 	] forkAt: Processor userBackgroundPriority named: 'Pharo Copilot setup download'
 ]
 
