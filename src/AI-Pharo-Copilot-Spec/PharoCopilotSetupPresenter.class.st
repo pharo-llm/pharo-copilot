@@ -129,8 +129,8 @@ PharoCopilotSetupPresenter >> showDownloadStep [
 
 	| centeredRow centeredColumn |
 	titleLabel label: 'Setting up Pharo-Copilot'.
-	descriptionLabel label: 'Checking Ollama and downloading required models.'.
-	statusLabel label: 'Preparing download...'.
+	descriptionLabel label: 'Checking Ollama, launching it if needed, and downloading required models.'.
+	statusLabel label: 'Checking if Ollama is running...'.
 	progressBar fixedPercentage: 0.
 
 	centeredRow := SpBoxLayout newLeftToRight
@@ -166,9 +166,9 @@ PharoCopilotSetupPresenter >> showMissingOllamaStep [
 		yourself.
 
 	installButton := self newButton
-		label: 'Install Ollama';
+		label: 'Download Ollama';
 		icon: (self iconNamed: #glamorousBrowse);
-		action: [ WebBrowser openOn: 'https://ollama.com/download/windows' ];
+		action: [ WebBrowser openOn: CopilotSettings ollamaDownloadPageUrl ];
 		yourself.
 
 	centeredRow := SpBoxLayout newLeftToRight
@@ -252,12 +252,14 @@ PharoCopilotSetupPresenter >> startSetupDownloads [
 	downloadProcess := [
 		| response missingModels failedModels |
 
-		response := CopilotSettings ensureOllamaServiceAvailable.
+		self deferUI: [ statusLabel label: 'Checking if Ollama is running...' ].
+		response := CopilotSettings listModelsForSetupAfterLaunchingOllamaIfNeeded.
 		response ifNil: [
 			^ self deferUI: [
-				statusLabel label: 'Setup could not finish. Please install/start Ollama and try again.'.
+				statusLabel label: 'Cannot use this tool without downloading Ollama.'.
 				self showMissingOllamaStep ] ].
 
+		self deferUI: [ statusLabel label: 'Ollama is running. Checking setup models...' ].
 		missingModels := CopilotSettings missingSetupModelNamesFrom: response.
 		missingModels isEmpty ifTrue: [
 			[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
@@ -274,7 +276,7 @@ PharoCopilotSetupPresenter >> startSetupDownloads [
 						format: { modelName. index. missingModels size })
 			].
 
-			((CopilotSettings installModelNamed: modelName)
+			((CopilotSettings installModelNamedForSetup: modelName)
 				and: [ CopilotSettings refreshModelsAfterInstallOf: modelName usingInitialResponse: response ])
 				ifFalse: [ failedModels add: modelName ].
 
