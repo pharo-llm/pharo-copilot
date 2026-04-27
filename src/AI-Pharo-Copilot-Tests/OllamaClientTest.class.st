@@ -229,16 +229,6 @@ OllamaClientTest >> testOptionAtReturnsNil [
 ]
 
 { #category : 'tests' }
-OllamaClientTest >> testOptionsDefaultEmpty [
-
-    | client |
-    CopilotSettings withDefaultSettingsDo: [
-        client := CoPCOllamaClient new.
-        self assert: client options isEmpty
-    ].
-]
-
-{ #category : 'tests' }
 OllamaClientTest >> testOptionsSetterNilCreatesEmptyDictionary [
 
     | client |

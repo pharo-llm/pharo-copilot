@@ -53,7 +53,7 @@ CopilotSettings class >> allOllamaOptions [
 	(topK notNil and: [ topK ~= 40 ]) ifTrue: [ options at: #top_k put: topK ].
 	(numPredict notNil and: [ numPredict ~= 128 ]) ifTrue: [ options at: #num_predict put: numPredict ].
 	(repeatPenalty notNil and: [ repeatPenalty ~= 1.1 ]) ifTrue: [ options at: #repeat_penalty put: repeatPenalty ].
-	(numCtx notNil and: [ numCtx ~= 4000 ]) ifTrue: [ options at: #num_ctx put: numCtx ].
+	(numCtx notNil and: [ numCtx ~= 2048 ]) ifTrue: [ options at: #num_ctx put: numCtx ].
 	(seed notNil and: [ seed ~= 0 ]) ifTrue: [ options at: #seed put: seed ].
 
 	(customParameters notNil and: [ customParameters isEmpty not ]) ifTrue: [
