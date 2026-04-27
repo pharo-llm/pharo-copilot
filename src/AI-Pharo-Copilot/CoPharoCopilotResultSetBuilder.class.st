@@ -978,37 +978,20 @@ CoPharoCopilotResultSetBuilder >> menuClosed [
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> menuLabelForSuggestion: suggestionString contextInfo: contextInfo [
-	| prefix visiblePrefix size endIndex i ch startIndex |
 
-	prefix := (contextInfo at: #prefix ifAbsent: [ '' ]) asString.
-	size := prefix size.
+	| label newlineIndex |
 
-	"Find the last non-empty line by scanning backwards. Preserves the previous behavior of
-	`prefix lines ... last` (which dropped trailing empty lines) but avoids the O(N)
-	allocation-heavy split that ran on every keystroke."
-	endIndex := size.
-	[ endIndex > 0 and: [ (prefix at: endIndex) = Character lf or: [ (prefix at: endIndex) = Character cr ] ] ]
-		whileTrue: [ endIndex := endIndex - 1 ].
+	label := (suggestionString ifNil: [ '' ]) asString.
 
-	startIndex := endIndex.
-	i := endIndex.
-	[ i > 0 ] whileTrue: [
-		ch := prefix at: i.
-		(ch = Character lf or: [ ch = Character cr ])
-			ifTrue: [ startIndex := i + 1. i := 0 ]
-			ifFalse: [
-				startIndex := i.
-				i := i - 1 ] ].
+	newlineIndex := label indexOf: Character lf ifAbsent: [ 0 ].
+	newlineIndex > 0 ifTrue: [
+		label := label copyFrom: 1 to: newlineIndex - 1 ].
 
-	visiblePrefix := (startIndex > endIndex)
-		ifTrue: [ '' ]
-		ifFalse: [ prefix copyFrom: startIndex to: endIndex ].
+	label := label trimBoth.
 
-	"Keep the menu stable and short."
-	visiblePrefix size > 50 ifTrue: [
-		visiblePrefix := '…' , (visiblePrefix last: 50) ].
-
-	^ visiblePrefix , suggestionString
+	^ label size > 80
+		ifTrue: [ (label copyFrom: 1 to: 77), '…' ]
+		ifFalse: [ label ]
 ]
 
 { #category : 'initialization' }
