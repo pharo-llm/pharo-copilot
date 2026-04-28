@@ -21,3 +21,11 @@ Metacello new
   baseline: 'AIPharoCopilot';
   load.
 ```
+
+
+# Example
+
+https://github.com/user-attachments/assets/dc33edb3-6e3c-4d1d-a6f8-550f03c17631
+
+
+
