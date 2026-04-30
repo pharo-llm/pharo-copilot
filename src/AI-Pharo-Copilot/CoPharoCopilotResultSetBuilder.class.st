@@ -37,6 +37,22 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
 ]
 
 { #category : 'new' }
+CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext [
+
+	| combined fallback |
+	combined := OrderedCollection new.
+	combined addAll: entryCollection.
+
+	fallback := self
+		fallbackCompletionEntriesFor: aContext
+		excluding: combined.
+	combined addAll: fallback.
+
+	^ combined asArray
+
+]
+
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [ 
 
 	self
@@ -393,10 +409,10 @@ CoPharoCopilotResultSetBuilder >> completionCache: aCache [
 	completionCache := aCache
 ]
 
-{ #category : 'private' }
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext [
-	| cleaned fakeContextInfo |
 
+	| cleaned fakeContextInfo copilotEntries |
 	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
 		select: [ :each | each isEmpty not ].
 
@@ -404,26 +420,27 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 		at: #prefix put: '';
 		yourself.
 
-	^ cleaned collect: [ :each |
+	copilotEntries := cleaned collect: [ :each |
 		| entry |
 		entry := CoCopilotEntry
 			contents: each
 			description: (self descriptionForSuggestion: each inContext: aContext).
 		entry label: (self menuLabelForSuggestion: each contextInfo: fakeContextInfo).
-		entry
-	]
+		entry ].
+
+	^ self appendFallbackCompletionEntriesTo: copilotEntries inContext: aContext
 ]
 
-{ #category : 'initialization' }
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext contextInfo: contextInfo [
-	| cleaned sessionId |
 
+	| cleaned sessionId copilotEntries |
 	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
 		select: [ :each | each isEmpty not ].
 
 	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
 
-	^ cleaned collect: [ :each |
+	copilotEntries := cleaned collect: [ :each |
 		| entry |
 		entry := CoCopilotEntry
 			contents: each
@@ -434,8 +451,9 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 		(entry respondsTo: #sessionId:) ifTrue: [
 			entry sessionId: sessionId ].
 
-		entry
-	]
+		entry ].
+
+	^ self appendFallbackCompletionEntriesTo: copilotEntries inContext: aContext
 ]
 
 { #category : 'new' }
@@ -575,6 +593,17 @@ CoPharoCopilotResultSetBuilder >> ensureClassContextCacheCapacity [
 ]
 
 { #category : 'new' }
+CoPharoCopilotResultSetBuilder >> entryContentsFor: anEntry [
+
+	^ [
+		(anEntry respondsTo: #contents)
+			ifTrue: [ anEntry contents asString ]
+			ifFalse: [ anEntry asString ] ]
+		on: Error
+		do: [ '' ]
+]
+
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> exactCachedSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext [
 
 	^ self completionCache
@@ -592,6 +621,41 @@ CoPharoCopilotResultSetBuilder >> extractResponseContentFromRaw: rawResponseStri
 	"Convert the response to a string. The response is already normalized by OllamaClient"
 
 	^ rawResponseString asString
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> fallbackCompletionEntriesFor: aContext excluding: existingEntries [
+
+	| result rawEntries seen |
+	seen := Set new.
+	existingEntries do: [ :each |
+		| contents |
+		contents := self entryContentsFor: each.
+		contents isEmpty ifFalse: [ seen add: contents ] ].
+
+	result := self fallbackResultSetFor: aContext.
+	result ifNil: [ ^ #() ].
+
+	rawEntries := [ result first: self fallbackCompletionLimit ]
+		on: Error
+		do: [ #() ].
+
+	^ (rawEntries select: [ :each |
+			| contents |
+			contents := self entryContentsFor: each.
+			(contents isEmpty or: [ seen includes: contents ])
+				ifTrue: [ false ]
+				ifFalse: [
+					seen add: contents.
+					true ] ])
+		collect: [ :each | CoPCFallbackCompletionEntry on: each ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> fallbackCompletionLimit [
+	"Keep the total menu useful without overloading the Copilot UI."
+
+	^ 10
 ]
 
 { #category : 'initialization' }
@@ -635,6 +699,17 @@ CoPharoCopilotResultSetBuilder >> fallbackMenuPositionFor: aContext [
 		do: [ ].
 
 	^ [ textArea boundsInWorld bottomLeft ] on: Error do: [ nil ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> fallbackResultSetFor: aContext [
+	"Build the same AST/heuristic result set used by CoCompletionEngine in Complishon."
+
+	^ [
+		(CoASTHeuristicsResultSetBuilder initializeOnContext: aContext)
+			buildCompletion ]
+		on: Error
+		do: [ nil ]
 ]
 
 { #category : 'new' }
