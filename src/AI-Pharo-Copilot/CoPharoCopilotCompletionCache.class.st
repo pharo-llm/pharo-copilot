@@ -1,5 +1,6 @@
 "
-a cach
+I cache completion suggestions keyed by prefix/suffix/classContext hash.
+Supports LRU eviction, near-match lookups, and hit-rate statistics.
 "
 Class {
 	#name : 'CoPharoCopilotCompletionCache',
@@ -71,7 +72,7 @@ CoPharoCopilotCompletionCache >> clear [
 	entries removeAll.
 	timestamps removeAll.
 	clock := 0.
-		oldestKey := nil.
+	oldestKey := nil.
 	oldestTime := nil.
 ]
 

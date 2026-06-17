@@ -112,13 +112,8 @@ CopilotSettings class >> availableProviders [
 CopilotSettings class >> backgroundColor [
 	"Answer the background color for the Copilot completion menu."
 
-	| uiThemeClass theme |
-	uiThemeClass := Smalltalk globals at: #UITheme ifAbsent: [ nil ].
-	uiThemeClass ifNotNil: [
-		(uiThemeClass respondsTo: #current) ifTrue: [
-			theme := uiThemeClass current.
-			(theme respondsTo: #windowColor) ifTrue: [ ^ theme windowColor ] ] ].
-	^ Color darkGray
+	backgroundColor ifNotNil: [ ^ backgroundColor ].
+	^ self defaultBackgroundColor
 ]
 
 { #category : 'accessing' }
@@ -560,7 +555,6 @@ CopilotSettings class >> host: aString [
 { #category : 'class initialization' }
 CopilotSettings class >> initialize [
 
-	.
 	provider ifNotNil: [ ^ self ].
 	self initializeDefaults.
 	self loadSettingsFromFile
@@ -879,10 +873,7 @@ CopilotSettings class >> loadSettingsFromFile [
 
 	| fileRef stonString snapshot |
 
-		fileRef := self settingsFileReference.
-		(fileRef exists and: [ fileRef isFile ]) ifFalse: [ ^ self ].
-		
-		fileRef := self settingsFileReference.
+	fileRef := self settingsFileReference.
 	(fileRef exists and: [ fileRef isFile ]) ifFalse: [ ^ self ].
 
 	[
