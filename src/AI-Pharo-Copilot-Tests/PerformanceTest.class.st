@@ -1,6 +1,6 @@
 Class {
 	#name : 'PerformanceTest',
-	#superclass : 'TestCase',
+	#superclass : 'CopilotMockModelTestCase',
 	#category : 'AI-Pharo-Copilot-Tests-Tests',
 	#package : 'AI-Pharo-Copilot-Tests',
 	#tag : 'Tests'
