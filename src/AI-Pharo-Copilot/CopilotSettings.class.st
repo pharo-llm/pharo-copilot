@@ -1416,8 +1416,9 @@ CopilotSettings class >> port: aNumberOrString [
 CopilotSettings class >> predefinedDownloadableModelNames [
 
 	^ #(
-		'pharo-llm/pharo-copilot:3b'
-		'pharo-llm/pharo-copilot:7b'
+		'pharo-llm/Qwen2.5-Coder-SFT:3b'
+		'pharo-llm/Qwen2.5-Coder-SFT:7b'
+		'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
 	)
 ]
 

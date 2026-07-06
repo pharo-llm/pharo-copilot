@@ -468,6 +468,17 @@ CopilotSettingsTest >> testPortAccessor [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testPredefinedDownloadableModelNamesUsePharoQwenSFTModels [
+
+	self
+		assert: CopilotSettings predefinedDownloadableModelNames
+		equals: #(
+			'pharo-llm/Qwen2.5-Coder-SFT:3b'
+			'pharo-llm/Qwen2.5-Coder-SFT:7b'
+		)
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testRecordInstallModelConsentIsStoredInSnapshot [
 
 	CopilotSettings withDefaultSettingsDo: [
