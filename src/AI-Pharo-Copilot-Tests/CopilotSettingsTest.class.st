@@ -470,12 +470,18 @@ CopilotSettingsTest >> testPortAccessor [
 { #category : 'tests' }
 CopilotSettingsTest >> testPredefinedDownloadableModelNamesUsePharoQwenSFTModels [
 
-	self
-		assert: CopilotSettings predefinedDownloadableModelNames
-		equals: #(
-			'pharo-llm/Qwen2.5-Coder-SFT:3b'
-			'pharo-llm/Qwen2.5-Coder-SFT:7b'
-		)
+	| modelNames expectedModels |
+	modelNames := CopilotSettings predefinedDownloadableModelNames.
+	expectedModels := #(
+		'pharo-llm/Qwen2.5-Coder-SFT:3b'
+		'pharo-llm/Qwen2.5-Coder-SFT:7b'
+		'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
+	).
+
+	expectedModels do: [ :each |
+		self assert: (modelNames includes: each) ].
+	self assert: (modelNames allSatisfy: [ :each |
+		each beginsWith: 'pharo-llm/Qwen2.5-Coder-SFT:' ])
 ]
 
 { #category : 'tests' }

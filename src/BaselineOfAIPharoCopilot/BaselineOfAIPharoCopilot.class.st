@@ -27,7 +27,6 @@ BaselineOfAIPharoCopilot >> baseline: spec [
 	<baseline>
 	spec for: #common do: [
 			spec postLoadDoIt: #postLoad.
-			spec baseline: 'NeoJSON' with: [ spec repository: 'github://svenvc/NeoJSON/repository' ].
 			spec package: 'AI-Pharo-Copilot-Ollama'.
 			spec package: 'AI-Pharo-Copilot' with: [ spec requires: #( 'AI-Pharo-Copilot-Ollama' ) ].
 			spec package: 'AI-Pharo-Copilot-Evaluator' with: [ spec requires: #( 'AI-Pharo-Copilot' ) ].
