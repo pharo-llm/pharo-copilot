@@ -1,15 +1,15 @@
 "
 I gather the current Calypso browser navigation history (currently visible
 selection plus the recent undo/redo navigation states) and format it as a
-short textual block that can be prepended to the class context sent to the
-completion model.
+short textual block that is appended as the final context section before the
+FIM prompt sent to the completion model.
 I am completely safe to call from any environment: if Calypso is not loaded,
 no browser is open, or anything fails while reading the browser state, I
 return an empty string and never raise.
 To disable me from runtime code use:
 	CoPCContextNavigationHistory enabled: false.
 To disable me from the source, comment out the call to
-#prependNavigationHistoryTo: in CoPharoCopilotResultSetBuilder>>classContextFor:prefix:.
+#appendInteractionHistoryToContext: in CoPharoCopilotResultSetBuilder>>classContextFor:prefix:.
 "
 Class {
 	#name : 'CoPCContextNavigationHistory',

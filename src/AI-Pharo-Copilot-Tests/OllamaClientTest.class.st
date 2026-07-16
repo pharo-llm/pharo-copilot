@@ -60,6 +60,50 @@ OllamaClientTest >> testGenerateIncludesOptionsWhenNotEmpty [
 ]
 
 { #category : 'tests' }
+OllamaClientTest >> testGenerateForPrefixPlacesInteractionHistoryBeforeFimPrompt [
+
+	| client mock payload prompt context historyIndex fimIndex middleIndex oldFactory stub |
+	oldFactory := CopilotSettings ollamaClientFactory.
+	[
+		stub := OllamaClientStub new
+			withResponse: (Dictionary new
+				at: #template put: CoPCOllamaClient defaultFimGenerationTemplate;
+				yourself).
+		CopilotSettings ollamaClientFactory: [ stub ].
+		CopilotSettings clearCachedModelMetadata.
+
+		client := CoPCOllamaClient new.
+		mock := OAHttpTransportMockExtended new.
+		mock mockResponse: (Dictionary new at: #response put: 'completion'; yourself).
+		client instVarNamed: 'transport' put: mock.
+
+		context := '<|repo_name|>Sample', String lf,
+			'<|file_sep|>Sample', String lf,
+			'Class { #name : #Sample }', String lf,
+			'<|file_sep|>IDE interaction history', String lf,
+			'Current selection: Sample', String lf.
+
+		client generateForPrefix: 'self ' suffix: ' yourself' context: context.
+
+		payload := mock lastBody.
+		prompt := payload at: #prompt.
+		historyIndex := prompt findString: '<|file_sep|>IDE interaction history' startingAt: 1.
+		fimIndex := prompt findString: '<|fim_prefix|>' startingAt: 1.
+		middleIndex := prompt findString: '<|fim_middle|>' startingAt: 1.
+
+		self assert: (payload at: #raw) equals: true.
+		self deny: (payload includesKey: #context).
+		self assert: historyIndex > 0.
+		self assert: fimIndex > 0.
+		self assert: middleIndex > 0.
+		self assert: historyIndex < fimIndex.
+		self assert: fimIndex < middleIndex
+	] ensure: [
+		CopilotSettings ollamaClientFactory: oldFactory.
+		CopilotSettings clearCachedModelMetadata ]
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testGenerateReturnsNullModelMessageWhenNullSelected [
 
         | client mock oldModel response |

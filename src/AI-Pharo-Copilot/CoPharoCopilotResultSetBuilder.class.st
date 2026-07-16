@@ -315,8 +315,40 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 			self cacheClassContext: builtContext for: methodClass.
 			builtContext ].
 
-	"Comment the next line to disconnect browser navigation history from the model context."
-	^ self prependNavigationHistoryTo: classContext
+	"Comment the next line to disconnect IDE interaction history from the model context."
+	^ self appendInteractionHistoryToContext: classContext
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> appendInteractionHistory: historyString toContext: contextString [
+	"Append IDE/user interaction history as the final repo-style context section.
+	The FIM tail is added later by the Ollama client, so this section lands immediately
+	before <|fim_prefix|> without appearing after <|fim_middle|>."
+
+	| history base lf |
+	history := historyString ifNil: [ '' ] ifNotNil: [ historyString asString ].
+	base := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
+	history isEmpty ifTrue: [ ^ base ].
+
+	lf := Character lf.
+	^ String streamContents: [ :s |
+		base isEmpty ifFalse: [
+			s nextPutAll: base.
+			base last = lf ifFalse: [ s nextPut: lf ] ].
+		s
+			nextPutAll: '<|file_sep|>IDE interaction history';
+			nextPut: lf;
+			nextPutAll: history.
+		history last = lf ifFalse: [ s nextPut: lf ] ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> appendInteractionHistoryToContext: contextString [
+
+	CoPCContextNavigationHistory enabled ifFalse: [ ^ contextString ifNil: [ '' ] ].
+	^ self
+		appendInteractionHistory: self interactionHistoryForPrompt
+		toContext: contextString
 ]
 
 { #category : 'initialization' }
@@ -1334,24 +1366,16 @@ CoPharoCopilotResultSetBuilder >> positionFromSnapshot: snapshot [
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> prependNavigationHistoryTo: contextString [
-	| history base |
-	CoPCContextNavigationHistory enabled ifFalse: [ ^ contextString ].
+	"Compatibility wrapper for old callers. The behavior is append, not prepend:
+	history belongs at the end of the context block just before the FIM tail."
 
-	history := CoPCContextNavigationHistory new gather.
-	history isEmpty ifTrue: [ ^ contextString ].
+	^ self appendInteractionHistoryToContext: contextString
+]
 
-	base := contextString ifNil: [ '' ].
-	base isEmpty ifTrue: [ ^ history ].
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> interactionHistoryForPrompt [
 
-	"Appended as a trailing section so the repo-level markers stay first, matching the
-	format the model was trained on."
-	^ String streamContents: [ :s |
-		s
-			nextPutAll: base;
-			nextPutAll: '<|file_sep|>IDE navigation history';
-			nextPut: Character lf;
-			nextPutAll: history;
-			nextPut: Character lf ]
+	^ CoPCContextNavigationHistory new gather
 ]
 
 { #category : 'new' }

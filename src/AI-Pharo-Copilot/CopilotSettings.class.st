@@ -1934,7 +1934,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #navigationHistoryEnabled;
 					setSelector: #navigationHistoryEnabled:;
 					default: CoPCContextSettings navigationHistoryEnabled;
-					description: 'When enabled, the current Calypso browser selection and recent navigation states are prepended to the class context sent to the model.'.
+					description: 'When enabled, the current Calypso browser selection and recent navigation states are appended as the final context section before the FIM prompt sent to the model.'.
 					
 					
 				(aBuilder setting: #maxInstanceMethods)
