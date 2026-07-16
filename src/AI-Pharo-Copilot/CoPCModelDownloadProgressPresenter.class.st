@@ -15,7 +15,8 @@ Class {
 		'failed',
 		'process',
 		'statusByModel',
-		'lastPercent'
+		'lastPercent',
+		'currentProgress'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -166,7 +167,7 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 			statusLabel label:
 				('Downloading {1} ({2}/{3})...'
 					format: { modelName. index. models size }).
-			progressBar fixedPercentage: self completedPercentage.
+			self progressPercentage: self completedPercentage.
 			self renderStatusBoard
 		].
 
@@ -182,7 +183,7 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 			put: (installed ifTrue: [ 'installed' ] ifFalse: [ 'FAILED — check internet connection and Ollama logs' ]).
 
 		self deferUI: [
-			progressBar fixedPercentage: self completedPercentage.
+			self progressPercentage: self completedPercentage.
 			self renderStatusBoard
 		]
 	].
@@ -197,7 +198,7 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 					('Finished with {1} failed model(s). Check your internet connection and Ollama logs.'
 						format: { failed size }) ].
 
-		progressBar fixedPercentage: 100
+		self progressPercentage: 100
 	]
 ]
 
@@ -208,7 +209,7 @@ CoPCModelDownloadProgressPresenter >> ensureInternetConnectionAvailable [
 
 	self deferUI: [
 		statusLabel label: 'Internet connection required to install models.'.
-		progressBar fixedPercentage: 0.
+		self progressPercentage: 0.
 		self appendLog: 'No internet connection detected.'.
 		self appendLog: 'Models cannot be downloaded without internet access.'
 	].
@@ -267,7 +268,7 @@ CoPCModelDownloadProgressPresenter >> handlePullEvent: event forModel: modelName
 		statusLabel label:
 			('Downloading {1} ({2}/{3}) - {4}%'
 				format: { modelName. completed + 1. models size. percent }).
-		progressBar fixedPercentage: self overallPercentageWithCurrent: percent.
+		self progressPercentage: (self overallPercentageWithCurrent: percent).
 		self renderStatusBoard
 	]
 ]
@@ -278,8 +279,11 @@ CoPCModelDownloadProgressPresenter >> initializePresenters [
 	statusLabel := self newLabel.
 	statusLabel label: 'Preparing Ollama model installation...'.
 
+	currentProgress := 0.
 	progressBar := self newProgressBar.
-	progressBar indeterminate.
+	progressBar
+		progress: [ currentProgress ifNil: [ 0 ] ]
+		every: 0.5 second.
 
 	logText := self newText.
 	logText beNotEditable.
@@ -319,6 +323,15 @@ CoPCModelDownloadProgressPresenter >> overallPercentageWithCurrent: currentModel
 ]
 
 { #category : 'layout' }
+CoPCModelDownloadProgressPresenter >> progressPercentage: aNumber [
+
+	| bounded |
+	bounded := (aNumber ifNil: [ 0 ]) max: 0.
+	bounded := bounded min: 100.
+	currentProgress := bounded / 100.0
+]
+
+{ #category : 'layout' }
 CoPCModelDownloadProgressPresenter >> renderStatusBoard [
 	"Re-render the whole per-model status list."
 
@@ -340,7 +353,7 @@ CoPCModelDownloadProgressPresenter >> startDownload [
 
 	(models isNil or: [ models isEmpty ]) ifTrue: [
 		statusLabel label: 'No setup models need to be installed.'.
-		progressBar fixedPercentage: 100.
+		self progressPercentage: 100.
 		^ self
 	].
 
@@ -349,7 +362,7 @@ CoPCModelDownloadProgressPresenter >> startDownload [
 			ifTrue: [ self downloadModels ]
 			ifFalse: [
 				self deferUI: [
-					progressBar fixedPercentage: 0.
+					self progressPercentage: 0.
 					statusLabel label: 'Internet connection required to install models.'
 				]
 			]

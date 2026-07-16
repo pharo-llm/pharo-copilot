@@ -11,7 +11,8 @@ Class {
 		'contentContainer',
 		'privacyConsentCheckbox',
 		'progressBar',
-		'downloadProcess'
+		'downloadProcess',
+		'setupProgress'
 	],
 	#category : 'AI-Pharo-Copilot-Spec',
 	#package : 'AI-Pharo-Copilot-Spec'
@@ -103,8 +104,11 @@ PharoCopilotSetupPresenter >> initializePresenters [
 		label: '';
 		yourself.
 
+	setupProgress := 0.
 	progressBar := self newProgressBar.
-	progressBar indeterminate.
+	progressBar
+		progress: [ setupProgress ifNil: [ 0 ] ]
+		every: 0.5 second.
 
 	contentContainer := SpPresenter new.
 
@@ -128,16 +132,14 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 
 	| response missingModels failedModels |
 
-	self deferUI: [
-		progressBar indeterminate.
-		statusLabel label: ''
-	].
+	self setupProgressPercentage: 0.
+	self deferUI: [ statusLabel label: '' ].
 
 	response := CopilotSettings listModelsForSetupAfterLaunchingOllamaIfNeeded.
 
 	response ifNil: [
+		self setupProgressPercentage: 0.
 		^ self deferUI: [
-			progressBar fixedPercentage: 0.
 			statusLabel label: 'Cannot continue. Ollama is required.'.
 			self showMissingOllamaStep
 		]
@@ -147,8 +149,8 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 
 	missingModels isEmpty ifTrue: [
 		[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
+		self setupProgressPercentage: 100.
 		^ self deferUI: [
-			progressBar fixedPercentage: 100.
 			statusLabel label: 'OKAY! Pharo-Copilot setup is complete.'.
 			CopilotSettings notifyUser: 'OKAY! Pharo-Copilot setup is complete.'.
 			self window close
@@ -167,8 +169,8 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 	missingModels doWithIndex: [ :modelName :index |
 
 		| installed verified |
+		self setupProgressPercentage: (((index - 1) / missingModels size) * 100) rounded.
 		self deferUI: [
-			progressBar fixedPercentage: (((index - 1) / missingModels size) * 100) rounded.
 			statusLabel label:
 				('Downloading {1} ({2}/{3})...'
 					format: { modelName. index. missingModels size })
@@ -191,8 +193,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		installed ifFalse: [ failedModels add: modelName ].
 
 		self deferUI: [
-			progressBar fixedPercentage:
-				((index / missingModels size) * 100) rounded.
+			self setupProgressPercentage: ((index / missingModels size) * 100) rounded.
 			statusLabel label:
 				((failedModels includes: modelName)
 					ifTrue: [ 'Failed: ' , modelName ]
@@ -208,7 +209,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 	self deferUI: [
 		failedModels isEmpty
 			ifTrue: [
-				progressBar fixedPercentage: 100.
+				self setupProgressPercentage: 100.
 				statusLabel label: 'Pharo-Copilot setup is complete.'.
 				CopilotSettings notifyUser: 'Pharo-Copilot setup is complete.'.
 				self window close ]
@@ -226,7 +227,7 @@ PharoCopilotSetupPresenter >> showDownloadStep [
 	descriptionLabel label: 'LOADING .....'.
 	statusLabel label: ''.
 
-	progressBar indeterminate.
+	self setupProgressPercentage: 0.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
@@ -301,12 +302,21 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 		overallPercentageForCompleted: index - 1
 		total: totalModels
 		currentPercent: percent.
+	self setupProgressPercentage: overall.
 
 	self deferUI: [
-		progressBar fixedPercentage: overall.
 		statusLabel label:
 			('Downloading {1} ({2}/{3}) - {4}%{5}'
 				format: { modelName. index. totalModels. percent. detail }) ]
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> setupProgressPercentage: aNumber [
+
+	| bounded |
+	bounded := (aNumber ifNil: [ 0 ]) max: 0.
+	bounded := bounded min: 100.
+	setupProgress := bounded / 100.0
 ]
 
 { #category : 'initialization' }
