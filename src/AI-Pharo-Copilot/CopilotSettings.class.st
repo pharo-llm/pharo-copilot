@@ -30,6 +30,7 @@ Class {
 		'repeatPenalty',
 		'numCtx',
 		'seed',
+		'modelKeepAlive',
 		'customParameters',
 		'maxInstanceMethods',
 		'maxClassMethods',
@@ -45,15 +46,19 @@ Class {
 { #category : 'accessing' }
 CopilotSettings class >> allOllamaOptions [
 
+	"Always send the configured values so the behavior matches what the settings UI
+	shows — silently omitting values that happen to equal some hardcoded default made
+	the effective model behavior depend on Ollama-side defaults instead."
+
 	| options |
 	options := Dictionary new.
 
-	(temperature notNil and: [ temperature ~= 0.8 ]) ifTrue: [ options at: #temperature put: temperature ].
-	(topP notNil and: [ topP ~= 0.9 ]) ifTrue: [ options at: #top_p put: topP ].
-	(topK notNil and: [ topK ~= 40 ]) ifTrue: [ options at: #top_k put: topK ].
-	(numPredict notNil and: [ numPredict ~= 128 ]) ifTrue: [ options at: #num_predict put: numPredict ].
-	(repeatPenalty notNil and: [ repeatPenalty ~= 1.1 ]) ifTrue: [ options at: #repeat_penalty put: repeatPenalty ].
-	(numCtx notNil and: [ numCtx ~= 2048 ]) ifTrue: [ options at: #num_ctx put: numCtx ].
+	self temperature ifNotNil: [ :value | options at: #temperature put: value ].
+	self topP ifNotNil: [ :value | options at: #top_p put: value ].
+	self topK ifNotNil: [ :value | options at: #top_k put: value ].
+	self numPredict ifNotNil: [ :value | options at: #num_predict put: value ].
+	self repeatPenalty ifNotNil: [ :value | options at: #repeat_penalty put: value ].
+	self numCtx ifNotNil: [ :value | options at: #num_ctx put: value ].
 	(seed notNil and: [ seed ~= 0 ]) ifTrue: [ options at: #seed put: seed ].
 
 	(customParameters notNil and: [ customParameters isEmpty not ]) ifTrue: [
@@ -96,9 +101,12 @@ CopilotSettings class >> autoSaveSettings [
 
 { #category : 'settings' }
 CopilotSettings class >> availableModelNames [
-	"Answer the list of available model names for the settings UI."
+	"Answer the list of available model names for the settings UI.
+	Uses the cached registry: refreshing here would perform a synchronous HTTP call
+	every time the settings browser builds its tree, and when Ollama is unreachable
+	the saved selection would vanish from the list (looking like a lost setting)."
 
-	^ CoPCModelRegistry refresh domainValuesForSettings
+	^ CoPCModelRegistry current domainValuesForSettings
 ]
 
 { #category : 'settings' }
@@ -134,7 +142,7 @@ CopilotSettings class >> clearCachedModelMetadata [
 { #category : 'settings' }
 CopilotSettings class >> completionDebounceMilliseconds [
 
-	^ completionDebounceMilliseconds
+	^ completionDebounceMilliseconds ifNil: [ completionDebounceMilliseconds := 100 ]
 ]
 
 { #category : 'settings' }
@@ -315,8 +323,6 @@ CopilotSettings class >> ensureOllamaServiceAvailable [
 
 	| response |
 
-	self notifyModelDownloadPreparation.
-
 	[
 		response := self newOllamaClient listModels
 	] on: Error do: [ :ex |
@@ -352,27 +358,31 @@ CopilotSettings class >> ensureOllamaServiceAvailable [
 { #category : 'accessing' }
 CopilotSettings class >> ensurePredefinedModelsDownloadedUsingInitialResponse: initialResponse [
 
-	| availableModels allDownloaded |
+	| availableModels missingModels allDownloaded |
 
 	availableModels := self modelNamesFromResponse: initialResponse.
+	missingModels := self predefinedDownloadableModelNames
+		reject: [ :each | availableModels includes: each ].
+
+	missingModels isEmpty ifTrue: [ ^ true ].
+
+	"One single announcement listing exactly what will be downloaded — per-model chatter
+	goes to the Transcript instead of popup dialogs."
+	self notifyUser:
+		('Pharo Copilot will download {1} model(s):' , String cr ,
+		(self modelNamesTextFor: missingModels) , String cr ,
+		'Please stay connected to the internet until the download completes.'
+			format: { missingModels size asString }).
+
 	allDownloaded := true.
+	missingModels doWithIndex: [ :modelName :index |
+		self notifyViaTranscript:
+			('Downloading model {1} ({2}/{3})...'
+				format: { modelName. index asString. missingModels size asString }).
 
-	self predefinedDownloadableModelNames do: [ :modelName |
-		(availableModels includes: modelName) ifFalse: [
-			self notifyUser:
-				('Handling model download for {1}.' , String cr ,
-				'Please stay connected to the internet. Otherwise, the download cannot start or complete.'
-					format: { modelName }).
-
-			((self installModelNamed: modelName)
-				and: [ self refreshModelsAfterInstallOf: modelName usingInitialResponse: initialResponse ])
-					ifTrue: [
-						[
-							availableModels := self modelNamesFromResponse: self newOllamaClient listModels
-						] on: Error do: [ :ex |
-							self logOllamaServiceUnavailable: ex ] ]
-					ifFalse: [
-						allDownloaded := false ] ] ].
+		((self installModelNamed: modelName)
+			and: [ self refreshModelsAfterInstallOf: modelName usingInitialResponse: initialResponse ])
+				ifFalse: [ allDownloaded := false ] ].
 
 	allDownloaded
 		ifTrue: [
@@ -571,20 +581,21 @@ CopilotSettings class >> initializeDefaults [
 	autoInstallModelScriptEnabled := true.
 	loggingEnabled := true.
 	templatesDirectory := (FileLocator imageDirectory / 'pharo-copilot' / 'templates') asFileReference.
-	completionDebounceMilliseconds := 10.
-	completionIdleMilliseconds := 150.
-	requestTimeoutSeconds := 500.
+	completionDebounceMilliseconds := 100.
+	completionIdleMilliseconds := 300.
+	requestTimeoutSeconds := 60.
 	modelInstallTimeoutSeconds := 600.
-	temperature := 0.3.
+	temperature := 0.2.
 	topP := 0.9.
 	topK := 40.
-	numPredict := 128.
+	numPredict := 64.
 	repeatPenalty := 1.1.
-	numCtx := 4000.
+	numCtx := 4096.
 	seed := 0.
+	modelKeepAlive := '30m'.
 	customParameters := Dictionary new.
-	maxInstanceMethods := 2.
-	maxClassMethods := 1.
+	maxInstanceMethods := 10.
+	maxClassMethods := 5.
 	minimumPrefixLength := 3.
 	completionSuggestionsCount := 1.
 	backgroundColor := self defaultBackgroundColor.
@@ -606,9 +617,8 @@ CopilotSettings class >> installModelNamed: aModelName [
 	[
 		client := self newOllamaClient.
 
-		self notifyUser:
-			('Downloading {1}...' , String cr ,
-			'Please stay connected to the internet. Otherwise, this download cannot start or complete.'
+		self notifyViaTranscript:
+			('Downloading {1}... Please stay connected to the internet.'
 				format: { aModelName }).
 
 		CoPharoCopilotLogger logBackEndEvent: 'Invoking Ollama model install script' details: (Dictionary new
@@ -627,7 +637,7 @@ CopilotSettings class >> installModelNamed: aModelName [
 			at: #model put: aModelName;
 			yourself).
 
-		self notifyUser: ('Download completed for {1}.' format: { aModelName }).
+		self notifyViaTranscript: ('Download completed for {1}.' format: { aModelName }).
 		^ true
 	] on: Error do: [ :ex |
 		self notifyUser:
@@ -639,6 +649,14 @@ CopilotSettings class >> installModelNamed: aModelName [
 
 { #category : 'accessing' }
 CopilotSettings class >> installModelNamedForSetup: aModelName [
+
+	^ self installModelNamedForSetup: aModelName progress: nil
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> installModelNamedForSetup: aModelName progress: aProgressBlockOrNil [
+	"Pull a predefined model, reporting streaming download progress to the optional
+	block (a dictionary per Ollama status line: status, total, completed)."
 
 	| client |
 
@@ -655,13 +673,20 @@ CopilotSettings class >> installModelNamedForSetup: aModelName [
 			at: #model put: aModelName;
 			yourself).
 
-		(client respondsTo: #pullModelNamed:timeoutSeconds:)
+		(aProgressBlockOrNil notNil and: [ client respondsTo: #pullModelNamed:timeoutSeconds:progress: ])
 			ifTrue: [
 				client
 					pullModelNamed: aModelName
-					timeoutSeconds: self modelInstallTimeoutSeconds ]
+					timeoutSeconds: self modelInstallTimeoutSeconds
+					progress: aProgressBlockOrNil ]
 			ifFalse: [
-				client pullModelNamed: aModelName ].
+				(client respondsTo: #pullModelNamed:timeoutSeconds:)
+					ifTrue: [
+						client
+							pullModelNamed: aModelName
+							timeoutSeconds: self modelInstallTimeoutSeconds ]
+					ifFalse: [
+						client pullModelNamed: aModelName ] ].
 
 		CoPharoCopilotLogger logBackEndEvent: 'Setup Ollama model install script completed' details: (Dictionary new
 			at: #model put: aModelName;
@@ -724,9 +749,10 @@ CopilotSettings class >> installPredefinedSetupModelsNowSetting: aBoolean [
 
 { #category : 'accessing' }
 CopilotSettings class >> installSelectedModelNow [
-	"Install the currently selected model via Ollama pull."
+	"Install the currently selected model via Ollama pull, showing download progress in
+	a dedicated window instead of blocking the UI thread."
 
-	| selectedModelName response |
+	| selectedModelName response availableModels |
 	selectedModelName := self modelName.
 	(selectedModelName isNil or: [ selectedModelName isEmpty ]) ifTrue: [
 		self notifyUser: 'Please select an Ollama model before installing.'.
@@ -736,14 +762,20 @@ CopilotSettings class >> installSelectedModelNow [
 	response := self ensureOllamaServiceAvailable.
 	response ifNil: [ ^ self handleMissingOllamaForModelNamed: selectedModelName ].
 
-	(self installModelNamed: selectedModelName) ifFalse: [ ^ false ].
+	availableModels := self modelNamesFromResponse: response.
+	(availableModels includes: selectedModelName) ifTrue: [
+		self notifyUser: ('The model "{1}" is already installed.' format: { selectedModelName }).
+		^ true
+	].
 
-	(self refreshModelsAfterInstallOf: selectedModelName usingInitialResponse: response)
-		ifTrue: [ ^ true ].
+	(self isPredefinedDownloadableModelName: selectedModelName) ifFalse: [
+		self notifyUser:
+			('The model "{1}" is not in the predefined downloadable model list.' format: { selectedModelName }).
+		^ false
+	].
 
-	self notifyUser:
-		'Model download is still in progress. Please wait and refresh the model list.'.
-	^ false
+	CoPCModelDownloadProgressPresenter openOn: { selectedModelName }.
+	^ true
 ]
 
 { #category : 'accessing' }
@@ -1063,7 +1095,7 @@ CopilotSettings class >> metadataStringForKey: aKey default: defaultString [
 { #category : 'context' }
 CopilotSettings class >> minimumPrefixLength [
 
-	^ minimumPrefixLength 
+	^ minimumPrefixLength ifNil: [ minimumPrefixLength := 3 ]
 ]
 
 { #category : 'context' }
@@ -1102,6 +1134,21 @@ CopilotSettings class >> modelInstallTimeoutSeconds [
 CopilotSettings class >> modelInstallTimeoutSeconds: anObject [
 
 	modelInstallTimeoutSeconds := anObject.
+	self autoSaveSettings
+]
+
+{ #category : 'ollama' }
+CopilotSettings class >> modelKeepAlive [
+	"Answer the keep_alive value sent with generation requests. Keeping the model loaded
+	between completions avoids paying the multi-second model load on every idle gap."
+
+	^ modelKeepAlive ifNil: [ modelKeepAlive := '30m' ]
+]
+
+{ #category : 'ollama' }
+CopilotSettings class >> modelKeepAlive: aStringOrNumber [
+
+	modelKeepAlive := aStringOrNumber.
 	self autoSaveSettings
 ]
 
@@ -1227,13 +1274,16 @@ CopilotSettings class >> newOllamaClient [
 ]
 
 { #category : 'accessing' }
-CopilotSettings class >> notifyModelDownloadPreparation [
+CopilotSettings class >> modelNamesTextFor: modelNames [
+	"Answer a bullet list text for the given model names."
 
-	self notifyUser:
-		('Pharo Copilot is checking Ollama and handling model downloading.' , String cr ,
-		'Models to download/check:' , String cr ,
-		self predefinedDownloadableModelNamesText , String cr ,
-		'Please stay connected to the internet. Otherwise, the model download process cannot start or complete.')
+	^ String streamContents: [ :stream |
+		modelNames
+			do: [ :each |
+				stream
+					nextPutAll: '- ';
+					nextPutAll: each asString ]
+			separatedBy: [ stream cr ] ]
 ]
 
 { #category : 'settings' }
@@ -1308,9 +1358,9 @@ CopilotSettings class >> nullModelMetadata [
 
 { #category : 'ollama' }
 CopilotSettings class >> numCtx [
-	"Answer the num_ctx parameter for Ollama (context window size). Default: nil (use model default)"
+	"Answer the num_ctx parameter for Ollama (context window size). Default: 4096"
 
-	^ numCtx ifNil: [ 2048 ]
+	^ numCtx ifNil: [ numCtx := 4096 ]
 ]
 
 { #category : 'ollama' }
@@ -1322,9 +1372,9 @@ CopilotSettings class >> numCtx: anIntegerOrNil [
 
 { #category : 'ollama' }
 CopilotSettings class >> numPredict [
-	"Answer the num_predict parameter for Ollama (max tokens to generate). Default: 128"
+	"Answer the num_predict parameter for Ollama (max tokens to generate). Default: 64 — keeps completions snappy while still covering several lines"
 
-	^ numPredict ifNil: [ numPredict := 128 ]
+	^ numPredict ifNil: [ numPredict := 64 ]
 ]
 
 { #category : 'ollama' }
@@ -1425,13 +1475,7 @@ CopilotSettings class >> predefinedDownloadableModelNames [
 { #category : 'accessing' }
 CopilotSettings class >> predefinedDownloadableModelNamesText [
 
-	^ String streamContents: [ :stream |
-		self predefinedDownloadableModelNames
-			do: [ :each |
-				stream
-					nextPutAll: '- ';
-					nextPutAll: each asString ]
-			separatedBy: [ stream cr ] ]
+	^ self modelNamesTextFor: self predefinedDownloadableModelNames
 ]
 
 { #category : 'accessing' }
@@ -1568,7 +1612,7 @@ CopilotSettings class >> repeatPenalty: aNumber [
 { #category : 'settings' }
 CopilotSettings class >> requestTimeoutSeconds [
 
-	^ requestTimeoutSeconds
+	^ requestTimeoutSeconds ifNil: [ requestTimeoutSeconds := 60 ]
 ]
 
 { #category : 'settings' }
@@ -1611,6 +1655,7 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	repeatPenalty := self valueAt: #repeatPenalty from: aDictionary default: repeatPenalty.
 	numCtx := self valueAt: #numCtx from: aDictionary default: numCtx.
 	seed := self valueAt: #seed from: aDictionary default: seed.
+	modelKeepAlive := self valueAt: #modelKeepAlive from: aDictionary default: modelKeepAlive.
 	customParameters := self dictionaryValueAt: #customParameters from: aDictionary default: customParameters.
 	maxInstanceMethods := self valueAt: #maxInstanceMethods from: aDictionary default: maxInstanceMethods.
 	maxClassMethods := self valueAt: #maxClassMethods from: aDictionary default: maxClassMethods.
@@ -1664,6 +1709,7 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	repeatPenalty := aDictionary at: #repeatPenalty ifAbsent: [ nil ].
 	numCtx := aDictionary at: #numCtx ifAbsent: [ nil ].
 	seed := aDictionary at: #seed ifAbsent: [ nil ].
+	modelKeepAlive := aDictionary at: #modelKeepAlive ifAbsent: [ nil ].
 	customParameters := aDictionary at: #customParameters ifAbsent: [ Dictionary new ].
 	maxInstanceMethods := aDictionary at: #maxInstanceMethods ifAbsent: [ aDictionary at: #MaxInstanceMethods ifAbsent: [ nil ] ].
 	maxClassMethods := aDictionary at: #maxClassMethods ifAbsent: [ aDictionary at: #MaxClassMethods ifAbsent: [ nil ] ].
@@ -1757,6 +1803,7 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #repeatPenalty put: repeatPenalty;
 		            at: #numCtx put: numCtx;
 		            at: #seed put: seed;
+		            at: #modelKeepAlive put: modelKeepAlive;
 		            at: #customParameters put: (customParameters ifNil: [ Dictionary new ]);
 		            at: #maxInstanceMethods put: maxInstanceMethods;
 		            at: #maxClassMethods put: maxClassMethods;
@@ -1841,7 +1888,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #autoInstallModelScriptEnabled:;
 					default: self autoInstallModelScriptEnabled;
 					description:
-						'When enabled, Pharo Copilot automatically runs the installation script if the "pharo-coder-1.5b-fim-f16.gguf:latest" model is missing.'.
+						'When enabled, Pharo Copilot automatically downloads the selected model when it is missing from your Ollama installation.'.
 
 				(aBuilder setting: #installSelectedModelNowSetting)
 					order: 0.45;
@@ -1898,7 +1945,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #maxInstanceMethods:;
 					default: self maxInstanceMethods;
 					description:
-						'Maximum number of instance-side methods to include in the class context sent with completions (1-200). Default: 30'.
+						'Maximum number of instance-side methods to include in the class context sent with completions (1-200). Default: 10'.
 
 				(aBuilder setting: #maxClassMethods)
 					order: 0.67;
@@ -1908,7 +1955,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #maxClassMethods:;
 					default: self maxClassMethods;
 					description:
-						'Maximum number of class-side methods to include in the class context sent with completions (1-100). Default: 15'.
+						'Maximum number of class-side methods to include in the class context sent with completions (1-100). Default: 5'.
 
 				(aBuilder setting: #minimumPrefixLength)
 					order: 0.68;
@@ -1917,7 +1964,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #minimumPrefixLength;
 					setSelector: #minimumPrefixLength:;
 					default: self minimumPrefixLength;
-					description: 'Minimum number of characters typed before requesting a completion (1-20). Default: 2'.
+					description: 'Minimum number of characters typed before requesting a completion (1-20). Default: 3'.
 
 				(aBuilder setting: #requestTimeoutSeconds)
 					order: 0.7;
@@ -1982,7 +2029,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 								getSelector: #temperature;
 								setSelector: #temperature:;
 								default: self temperature;
-								description: 'Controls randomness in generation (0.0 = deterministic, 2.0 = very random). Default: 0.8'.
+								description: 'Controls randomness in generation (0.0 = deterministic, 2.0 = very random). Default: 0.2 — low values give more reliable code completions.'.
 
 							(aBuilder setting: #topP)
 								order: 2;
@@ -2009,7 +2056,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 								getSelector: #numPredict;
 								setSelector: #numPredict:;
 								default: self numPredict;
-								description: 'Maximum number of tokens to generate (1 to 2048). Default: 128'.
+								description: 'Maximum number of tokens to generate (1 to 2048). Default: 64 — lower values respond faster.'.
 
 							(aBuilder setting: #repeatPenalty)
 								order: 5;
@@ -2065,6 +2112,7 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #repeatPenalty put: repeatPenalty;
 		  at: #numCtx put: numCtx;
 		  at: #seed put: seed;
+		  at: #modelKeepAlive put: modelKeepAlive;
 		  at: #customParameters put: customParameters;
 		  at: #maxInstanceMethods put: maxInstanceMethods;
 		  at: #maxClassMethods put: maxClassMethods;
@@ -2129,10 +2177,10 @@ CopilotSettings class >> switchToNullModelDueToMissingOllamaFor: selectedModelNa
 ]
 
 { #category : 'ollama' }
-CopilotSettings class >> temperature [ 
-	"Answer the temperature parameter for Ollama (controls randomness). Default: 0.8"
+CopilotSettings class >> temperature [
+	"Answer the temperature parameter for Ollama (controls randomness). Default: 0.2 — low randomness suits code completion"
 
-	^ temperature ifNil: [ temperature := 0.8 ]
+	^ temperature ifNil: [ temperature := 0.2 ]
 ]
 
 { #category : 'ollama' }
@@ -2177,7 +2225,7 @@ CopilotSettings class >> templatesDirectory: aFileReference [
 { #category : 'ollama' }
 CopilotSettings class >> topK [
 
-	^ topK
+	^ topK ifNil: [ topK := 40 ]
 ]
 
 { #category : 'ollama' }
@@ -2189,7 +2237,7 @@ CopilotSettings class >> topK: anInteger [
 { #category : 'ollama' }
 CopilotSettings class >> topP [
 
-	^ topP
+	^ topP ifNil: [ topP := 0.9 ]
 ]
 
 { #category : 'ollama' }

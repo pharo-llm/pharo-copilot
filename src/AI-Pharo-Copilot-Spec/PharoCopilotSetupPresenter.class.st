@@ -155,16 +155,32 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		]
 	].
 
+	self deferUI: [
+		descriptionLabel label:
+			('{1} model(s) will be downloaded:'
+				format: { missingModels size }).
+		statusLabel label: (CopilotSettings modelNamesTextFor: missingModels)
+	].
+
 	failedModels := OrderedCollection new.
 
 	missingModels doWithIndex: [ :modelName :index |
 
 		self deferUI: [
-			progressBar indeterminate.
-			statusLabel label: ''
+			progressBar fixedPercentage: (((index - 1) / missingModels size) * 100) rounded.
+			statusLabel label:
+				('Downloading {1} ({2}/{3})...'
+					format: { modelName. index. missingModels size })
 		].
 
-		((CopilotSettings installModelNamedForSetup: modelName)
+		((CopilotSettings
+			installModelNamedForSetup: modelName
+			progress: [ :event |
+				self
+					showPullEvent: event
+					forModel: modelName
+					index: index
+					total: missingModels size ])
 			and: [
 				CopilotSettings
 					refreshModelsAfterInstallOf: modelName
@@ -174,7 +190,10 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		self deferUI: [
 			progressBar fixedPercentage:
 				((index / missingModels size) * 100) rounded.
-			statusLabel label: ''
+			statusLabel label:
+				((failedModels includes: modelName)
+					ifTrue: [ 'Failed: ' , modelName ]
+					ifFalse: [ 'Installed: ' , modelName ])
 		]
 	].
 

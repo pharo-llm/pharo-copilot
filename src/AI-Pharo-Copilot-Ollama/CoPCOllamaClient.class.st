@@ -25,6 +25,20 @@ CoPCOllamaClient class >> defaultModelFullName [
 ]
 
 { #category : 'accessing' }
+CoPCOllamaClient class >> defaultFimGenerationTemplate [
+	"Matches the TEMPLATE shipped with the pharo-llm Qwen2.5-Coder FIM models on Ollama."
+
+	^ '<|fim_prefix|>{{ .Prompt }}<|fim_suffix|>{{ .Suffix }}<|fim_middle|>'
+]
+
+{ #category : 'accessing' }
+CoPCOllamaClient class >> fimStopSequences [
+	"Special tokens after which a FIM completion must stop generating."
+
+	^ #( '<|endoftext|>' '<|fim_prefix|>' '<|fim_suffix|>' '<|fim_middle|>' '<|repo_name|>' '<|file_sep|>' )
+]
+
+{ #category : 'accessing' }
 CoPCOllamaClient class >> nullModelFullName [
 
   ^ 'pharo-copilot-null'
@@ -130,6 +144,7 @@ CoPCOllamaClient >> generate: aPromptString [
 		           at: #model put: modelSpec fullName;
 		           at: #prompt put: aPromptString;
 		           at: #stream put: stream;
+		           at: #keep_alive put: CopilotSettings modelKeepAlive;
 		           yourself.
 	format ifNotNil: [ payload at: #format put: format ].
 	(options notNil and: [ options isEmpty not ]) ifTrue: [ payload at: #options put: options ].
@@ -140,36 +155,55 @@ CoPCOllamaClient >> generate: aPromptString [
 ]
 
 { #category : 'generation-operations' }
-CoPCOllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
-	"Generate a fill-in-the-middle completion using Ollama's native prompt/suffix API."
+CoPCOllamaClient >> fimTemplateForGeneration [
+	"Answer the FIM template used to assemble the raw prompt, falling back to the
+	standard Qwen2.5-Coder template when model metadata is unavailable."
 
-	| safePrefix safeSuffix safeSystem payload response normalized |
+	^ [ CopilotSettings fimTemplate ]
+		on: Error
+		do: [ self class defaultFimGenerationTemplate ]
+]
+
+{ #category : 'generation-operations' }
+CoPCOllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString [
+	"Generate a fill-in-the-middle completion.
+	The full FIM prompt (class context + prefix + suffix) is assembled locally and sent
+	with raw mode so the model receives exactly the repo-level format it was fine-tuned on.
+	The class context must NOT be sent as a system prompt: the FIM model templates have
+	no {{ .System }} slot, so Ollama silently drops system content."
+
+	| safePrefix safeSuffix safeContext prompt payload requestOptions response |
 	self isNullModel ifTrue: [ ^ self class nullModelResponseString ].
 
-	safePrefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
-	safeSuffix := suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ].
-	safeSystem := self systemPromptPrefixedContextFor: contextString.
+	safePrefix := self normalizeLineEndings: prefixString.
+	safeSuffix := self normalizeLineEndings: suffixString.
+	safeContext := self normalizeLineEndings: contextString.
+
+	prompt := self
+		expandFimTemplate: self fimTemplateForGeneration
+		prefix: safePrefix
+		suffix: safeSuffix
+		context: safeContext.
 
 	payload := Dictionary new
 		at: #model put: modelSpec fullName;
-		at: #prompt put: safePrefix;
-		at: #suffix put: safeSuffix;
+		at: #prompt put: prompt;
+		at: #raw put: true;
 		at: #stream put: stream;
+		at: #keep_alive put: CopilotSettings modelKeepAlive;
 		yourself.
-
-	safeSystem isEmpty ifFalse: [
-		payload at: #system put: safeSystem ].
 
 	format ifNotNil: [
 		payload at: #format put: format ].
 
-	(options notNil and: [ options isEmpty not ]) ifTrue: [
-		payload at: #options put: options copy ].
+	requestOptions := options
+		ifNil: [ Dictionary new ]
+		ifNotNil: [ options copy ].
+	requestOptions at: #stop ifAbsentPut: [ self class fimStopSequences ].
+	payload at: #options put: requestOptions.
 
 	response := transport postJsonAt: 'api/generate' body: payload.
-	normalized := self normalizeResponse: response.
-
-	^ normalized
+	^ self normalizeResponse: response
 ]
 
 { #category : 'generation-operations' }
@@ -215,6 +249,18 @@ CoPCOllamaClient >> loadOptionsFromSettings [
 	| settingsOptions |
 	settingsOptions := CopilotSettings allOllamaOptions.
 	settingsOptions keysAndValuesDo: [ :key :value | options at: key put: value ].
+]
+
+{ #category : 'response-normalization' }
+CoPCOllamaClient >> normalizeLineEndings: aString [
+	"Answer the string with all line endings normalized to LF. Pharo editors and method
+	sources historically use CR, but the completion models are trained on LF text."
+
+	| text |
+	text := (aString ifNil: [ '' ]) asString.
+	(text includes: Character cr) ifFalse: [ ^ text ].
+	^ (text copyReplaceAll: String crlf with: String lf)
+		copyReplaceAll: String cr with: String lf
 ]
 
 { #category : 'response-normalization' }
@@ -268,12 +314,13 @@ CoPCOllamaClient >> parseJsonSafely: aString [
 { #category : 'generation-operations' }
 CoPCOllamaClient >> prependContext: contextString toPrompt: promptString [
 
+	"No prose banner here: the context is already structured with repo/file markers and
+	the whole string goes to the model verbatim (raw mode)."
+
 	| delimiter |
-	delimiter := String lf , String lf.
+	delimiter := String lf.
 	^ String streamContents: [ :s |
 			  s
-				  nextPutAll: 'Class context provided by Pharo Copilot:';
-				  nextPutAll: delimiter;
 				  nextPutAll: contextString;
 				  nextPutAll: delimiter;
 				  nextPutAll: promptString ]
@@ -297,6 +344,34 @@ CoPCOllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds [
 	response := transport postJsonAt: 'api/pull' body: payload timeoutSeconds: timeoutSeconds.
 
 	^ response
+]
+
+{ #category : 'ollama' }
+CoPCOllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds progress: aProgressBlock [
+	"Pull a model with streaming progress. The block receives a dictionary per status line
+	(keys: status, total, completed when Ollama provides them). Falls back to the blocking
+	pull when streaming is unavailable."
+
+	| payload |
+	aProgressBlock ifNil: [ ^ self pullModelNamed: aString timeoutSeconds: timeoutSeconds ].
+	(transport respondsTo: #postStreamingAt:body:timeoutSeconds:linesDo:) ifFalse: [
+		^ self pullModelNamed: aString timeoutSeconds: timeoutSeconds ].
+
+	payload := Dictionary new
+		           at: #name put: aString;
+		           at: #stream put: true;
+		           yourself.
+
+	transport
+		postStreamingAt: 'api/pull'
+		body: payload
+		timeoutSeconds: timeoutSeconds
+		linesDo: [ :line |
+			| parsed |
+			parsed := self parseJsonSafely: line.
+			(parsed isKindOf: Dictionary) ifTrue: [ aProgressBlock value: parsed ] ].
+
+	^ true
 ]
 
 { #category : 'ollama' }

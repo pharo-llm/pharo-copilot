@@ -40,11 +40,17 @@ CoPCContextBuilder class >> staticContextCache [
 { #category : 'building' }
 CoPCContextBuilder >> buildForFIMWithPrefix: prefixString [
 
-| static |
+	^ self buildForFIMWithPrefix: prefixString suffix: ''
+]
+
+{ #category : 'building' }
+CoPCContextBuilder >> buildForFIMWithPrefix: prefixString suffix: suffixString [
+
+	| static |
 	static := self cachedStaticContext.
 	^ String streamContents: [ :s |
 		s nextPutAll: static.
-		self writeFIMOn: s prefix: prefixString ]
+		self writeFIMOn: s prefix: prefixString suffix: suffixString ]
 ]
 
 { #category : 'building' }
@@ -107,15 +113,15 @@ CoPCContextBuilder >> targetClass: aClass [
 ]
 
 { #category : 'accessing' }
-CoPCContextBuilder >> writeFIMOn: aStream prefix: prefixString [
+CoPCContextBuilder >> writeFIMOn: aStream prefix: prefixString suffix: suffixString [
+	"Exact Qwen FIM layout: no newlines between the markers and the code, otherwise the
+	model believes the cursor sits on a fresh line."
 
 	aStream
 		nextPutAll: '<|fim_prefix|>';
-		cr;
-		nextPutAll: prefixString;
-		cr;
+		nextPutAll: (prefixString ifNil: [ '' ]);
 		nextPutAll: '<|fim_suffix|>';
-		cr;
+		nextPutAll: (suffixString ifNil: [ '' ]);
 		nextPutAll: '<|fim_middle|>'
 ]
 
@@ -126,12 +132,11 @@ CoPCContextBuilder >> writeMethodsOn: aStream [
 
 	methods do: [ :each |
 		aStream
-			nextPutAll: '<|file_sep|> ';
+			nextPutAll: '<|file_sep|>';
 			nextPutAll: (self methodLabelFor: each);
-			cr;
+			nextPut: Character lf;
 			nextPutAll: (strategy renderMethod: each);
-			cr;
-			cr
+			nextPut: Character lf
 	]
 ]
 
@@ -141,6 +146,5 @@ CoPCContextBuilder >> writeRepoHeaderOn: aStream [
 	aStream
 		nextPutAll: '<|repo_name|>';
 		nextPutAll: targetClass name;
-		cr;
-		cr
+		nextPut: Character lf
 ]

@@ -95,30 +95,91 @@ CoPharoCopilotResultSetBuilder >> behaviorFor: aContext [
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: selector prefix: prefixString [
+	"Answer the STATIC repo-level context for the class being edited — never the FIM
+	tail with the user prefix. The result is cached per class, and a baked-in prefix
+	would poison every later completion; the FIM tail is composed per request by the
+	Ollama client. methodClass comes from the editor and is authoritative: resolving
+	the class by scanning the system for the typed selector can hit an unrelated class."
 
-	| builder context classDefinition instanceSide classSide |
-
-	builder := selector ifNotNil: [ CoPCContextFactory forSelector: selector ].
-	builder ifNotNil: [
-		^ builder buildForFIMWithPrefix: prefixString
-	].
+	| classDefinition instanceSide classSide |
+	methodClass ifNil: [ ^ '' ].
 
 	classDefinition := self safeDefinitionStringFor: methodClass.
 	instanceSide := self
-		methodSourcesFor: methodClass
+		contextMethodSectionFor: methodClass
 		around: selector
 		limit: CopilotSettings maxInstanceMethods.
 	classSide := self
-		methodSourcesFor: (methodClass ifNotNil: [ methodClass class ])
+		contextMethodSectionFor: methodClass class
 		around: nil
 		limit: CopilotSettings maxClassMethods.
 
-	context := self
-		classDefinition: classDefinition
+	^ self
+		repoContextForClass: methodClass
+		definition: classDefinition
 		instanceMethods: instanceSide
-		classMethods: classSide.
+		classMethods: classSide
+]
 
-	^ context
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> contextMethodSectionFor: aBehavior around: aSelector limit: limitInteger [
+	"Render the methods section honoring the configured context mode: full sources
+	(windowed around the current selector) or a lightweight selectors-only overview."
+
+	aBehavior ifNil: [ ^ '' ].
+
+	CoPCContextSettings mode = #selectors ifTrue: [
+		^ String streamContents: [ :s |
+			(self sortedSelectorsFor: aBehavior)
+				do: [ :sel | s nextPutAll: sel asString ]
+				separatedBy: [ s nextPut: Character lf ] ] ].
+
+	^ self methodSourcesFor: aBehavior around: aSelector limit: limitInteger
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> repoContextForClass: aClass definition: classDefinitionString instanceMethods: instanceMethodsString classMethods: classMethodsString [
+	"Format the class context in the repo-level marker layout the completion models were
+	fine-tuned on (<|repo_name|> / <|file_sep|> sections), instead of English prose
+	headers the models never saw during training."
+
+	| hasDefinition hasInstance hasClass lf |
+	hasDefinition := classDefinitionString isEmpty not.
+	hasInstance := instanceMethodsString isEmpty not.
+	hasClass := classMethodsString isEmpty not.
+
+	(hasDefinition or: [ hasInstance or: hasClass ]) ifFalse: [ ^ '' ].
+
+	lf := Character lf.
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: '<|repo_name|>';
+			nextPutAll: aClass name;
+			nextPut: lf.
+
+		hasDefinition ifTrue: [
+			stream
+				nextPutAll: '<|file_sep|>';
+				nextPutAll: aClass name;
+				nextPut: lf;
+				nextPutAll: classDefinitionString;
+				nextPut: lf ].
+
+		hasInstance ifTrue: [
+			stream
+				nextPutAll: '<|file_sep|>';
+				nextPutAll: aClass name , ' (instance side)';
+				nextPut: lf;
+				nextPutAll: instanceMethodsString;
+				nextPut: lf ].
+
+		hasClass ifTrue: [
+			stream
+				nextPutAll: '<|file_sep|>';
+				nextPutAll: aClass name , ' (class side)';
+				nextPut: lf;
+				nextPutAll: classMethodsString;
+				nextPut: lf ] ]
 ]
 
 { #category : 'new' }
@@ -1282,12 +1343,15 @@ CoPharoCopilotResultSetBuilder >> prependNavigationHistoryTo: contextString [
 	base := contextString ifNil: [ '' ].
 	base isEmpty ifTrue: [ ^ history ].
 
+	"Appended as a trailing section so the repo-level markers stay first, matching the
+	format the model was trained on."
 	^ String streamContents: [ :s |
 		s
+			nextPutAll: base;
+			nextPutAll: '<|file_sep|>IDE navigation history';
+			nextPut: Character lf;
 			nextPutAll: history;
-			cr;
-			cr;
-			nextPutAll: base ]
+			nextPut: Character lf ]
 ]
 
 { #category : 'new' }

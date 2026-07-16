@@ -156,6 +156,40 @@ CoPCOAHttpTransport >> postJsonAt: aPath body: aDictionary [
 ]
 
 { #category : 'requests' }
+CoPCOAHttpTransport >> postStreamingAt: aPath body: aDictionary timeoutSeconds: timeoutSeconds linesDo: aBlock [
+	"POST the body as JSON and evaluate aBlock with each non-empty NDJSON line of the
+	streaming response (used for Ollama pull progress). The timeout applies per socket
+	read, so long downloads survive as long as data keeps arriving."
+
+	| client entity lineStream line |
+	client := ZnEasy client.
+	client
+		host: host;
+		port: port;
+		path: aPath.
+	(client respondsTo: #timeout:) ifTrue: [
+		client timeout: (timeoutSeconds ifNil: [ CopilotSettings requestTimeoutSeconds ]) ].
+
+	self applyDefaultHeadersTo: client.
+	client entity: (ZnEntity json: (jsonWriter toString: aDictionary)).
+	client streaming: true.
+
+	[
+		client post.
+		client isSuccess ifFalse: [
+			self error: 'Streaming POST to ', aPath, ' failed: ', client response printString ].
+
+		entity := client entity.
+		entity ifNil: [ ^ self ].
+
+		lineStream := ZnCharacterReadStream on: entity stream.
+		[ lineStream atEnd ] whileFalse: [
+			line := (lineStream upTo: Character lf) trimBoth.
+			line isEmpty ifFalse: [ aBlock value: line ] ]
+	] ensure: [ [ client close ] on: Error do: [ :ignored | ] ]
+]
+
+{ #category : 'requests' }
 CoPCOAHttpTransport >> postJsonAt: aPath body: aDictionary timeoutSeconds: timeoutSeconds [
 	"Perform a POST request with an optional timeout override."
 

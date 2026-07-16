@@ -106,6 +106,22 @@ CoPCModelRegistry >> addNullSpecFromKnownSpecs: knownSpecs [
 ]
 
 { #category : 'private' }
+CoPCModelRegistry >> addConfiguredModelsUsingKnownSpecs: knownSpecs [
+	"Guarantee the predefined downloadable models and the currently selected model always
+	have a spec, even when Ollama is unreachable. Otherwise the settings browser cannot
+	display the saved selection when it rebuilds its model list."
+
+	| names |
+	names := OrderedCollection new.
+	[ names addAll: CopilotSettings predefinedDownloadableModelNames ] on: Error do: [ :ignored | ].
+	[ CopilotSettings modelName ifNotNil: [ :name | names add: name ] ] on: Error do: [ :ignored | ].
+
+	names do: [ :each |
+		(self byFullName includesKey: each) ifFalse: [
+			self addSpec: (self specForModelNamed: each knownSpecs: knownSpecs) ] ]
+]
+
+{ #category : 'private' }
 CoPCModelRegistry >> addRemoteModelsUsingKnownSpecs: knownSpecs [
 	"Fetch server models and add them, reusing known specs when possible."
 
@@ -255,7 +271,8 @@ CoPCModelRegistry >> rebuild [
 	knownSpecs := self collectKnownSpecsFromPragmas.
 	self addNullSpecFromKnownSpecs: knownSpecs.
 	self addKnownSpecsExceptNullFrom: knownSpecs.
-	self addRemoteModelsUsingKnownSpecs: knownSpecs
+	self addRemoteModelsUsingKnownSpecs: knownSpecs.
+	self addConfiguredModelsUsingKnownSpecs: knownSpecs
 ]
 
 { #category : 'initialization' }
