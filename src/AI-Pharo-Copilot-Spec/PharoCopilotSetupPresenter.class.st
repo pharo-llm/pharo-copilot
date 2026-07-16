@@ -271,6 +271,39 @@ PharoCopilotSetupPresenter >> showMissingOllamaStep [
 ]
 
 { #category : 'initialization' }
+PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: index total: totalModels [
+
+	| percent status overall done totalBytes detail |
+	status := CoPCModelDownloadProgressPresenter pullEventStatusFrom: event.
+	percent := CoPCModelDownloadProgressPresenter pullEventPercentFrom: event.
+
+	percent ifNil: [
+		status isEmpty ifTrue: [ ^ self ].
+		^ self deferUI: [
+			statusLabel label:
+				('Downloading {1} ({2}/{3}) - {4}'
+					format: { modelName. index. totalModels. status }) ] ].
+
+	done := CoPCModelDownloadProgressPresenter pullEventNumberAt: #completed from: event.
+	totalBytes := CoPCModelDownloadProgressPresenter pullEventNumberAt: #total from: event.
+	detail := (done isNumber and: [ totalBytes isNumber ])
+		ifTrue: [
+			' (', (CoPCModelDownloadProgressPresenter formatBytes: done),
+			' / ', (CoPCModelDownloadProgressPresenter formatBytes: totalBytes), ')' ]
+		ifFalse: [ '' ].
+	overall := CoPCModelDownloadProgressPresenter
+		overallPercentageForCompleted: index - 1
+		total: totalModels
+		currentPercent: percent.
+
+	self deferUI: [
+		progressBar fixedPercentage: overall.
+		statusLabel label:
+			('Downloading {1} ({2}/{3}) - {4}%{5}'
+				format: { modelName. index. totalModels. percent. detail }) ]
+]
+
+{ #category : 'initialization' }
 PharoCopilotSetupPresenter >> showWelcomeStep [
 
 	| welcomeContainer privacyLabel privacyDetailLabel termsButton okButton buttonRow |

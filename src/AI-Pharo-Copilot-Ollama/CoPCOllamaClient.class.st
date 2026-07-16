@@ -369,7 +369,17 @@ CoPCOllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds progr
 		linesDo: [ :line |
 			| parsed |
 			parsed := self parseJsonSafely: line.
-			(parsed isKindOf: Dictionary) ifTrue: [ aProgressBlock value: parsed ] ].
+			(parsed isKindOf: Dictionary) ifTrue: [
+				[ aProgressBlock value: parsed ]
+					on: Error
+					do: [ :ex |
+						CoPharoCopilotLogger
+							logBackEndEvent: 'Ollama pull progress callback failed'
+							details: (Dictionary new
+								at: #model put: aString;
+								at: #errorClass put: ex class name;
+								at: #error put: ex description;
+								yourself) ] ] ].
 
 	^ true
 ]

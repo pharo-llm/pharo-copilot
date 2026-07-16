@@ -32,6 +32,83 @@ CoPCModelDownloadProgressPresenter class >> openOn: modelNames [
 	^ presenter
 ]
 
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter class >> formatBytes: aNumber [
+
+	| bytes |
+	(aNumber isNumber and: [ aNumber >= 0 ]) ifFalse: [ ^ '?' ].
+	bytes := aNumber asFloat.
+	bytes >= 1e9 ifTrue: [ ^ ((bytes / 1e9) printShowingDecimalPlaces: 2) , ' GB' ].
+	bytes >= 1e6 ifTrue: [ ^ ((bytes / 1e6) printShowingDecimalPlaces: 1) , ' MB' ].
+	bytes >= 1e3 ifTrue: [ ^ ((bytes / 1e3) printShowingDecimalPlaces: 0) , ' KB' ].
+	^ (bytes printShowingDecimalPlaces: 0) , ' B'
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter class >> numberFromPullEventValue: value [
+
+	| string |
+	value ifNil: [ ^ nil ].
+	value isNumber ifTrue: [ ^ value ].
+	(value respondsTo: #asString) ifFalse: [ ^ nil ].
+
+	string := value asString trimBoth.
+	string isEmpty ifTrue: [ ^ nil ].
+	^ [ Number readFrom: string readStream ] on: Error do: [ nil ]
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter class >> overallPercentageForCompleted: completedCount total: modelCount currentPercent: currentModelPercent [
+
+	modelCount <= 0 ifTrue: [ ^ 100 ].
+	^ ((((completedCount * 100) + currentModelPercent) / modelCount) rounded min: 100) max: 0
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter class >> pullEventNumberAt: key from: event [
+
+	^ self numberFromPullEventValue: (self pullEventValueAt: key from: event)
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter class >> pullEventPercentFrom: event [
+
+	| total done |
+	(self pullEventStatusIsSuccess: event) ifTrue: [ ^ 100 ].
+
+	total := self pullEventNumberAt: #total from: event.
+	done := self pullEventNumberAt: #completed from: event.
+	(total isNumber and: [ done isNumber and: [ total > 0 ] ]) ifFalse: [ ^ nil ].
+
+	^ (((done / total) * 100) truncated min: 100) max: 0
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter class >> pullEventStatusFrom: event [
+
+	| status |
+	status := self pullEventValueAt: #status from: event.
+	^ status ifNil: [ '' ] ifNotNil: [ status asString ]
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter class >> pullEventStatusIsSuccess: event [
+
+	| status |
+	status := self pullEventStatusFrom: event.
+	status isEmpty ifTrue: [ ^ false ].
+	^ status asLowercase includesSubstring: 'success'
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter class >> pullEventValueAt: key from: event [
+
+	(event respondsTo: #at:ifAbsent:) ifFalse: [ ^ nil ].
+	^ event
+		at: key
+		ifAbsent: [ event at: key asString ifAbsent: [ nil ] ]
+]
+
 { #category : 'layout' }
 CoPCModelDownloadProgressPresenter >> appendLog: aString [
 
@@ -147,13 +224,7 @@ CoPCModelDownloadProgressPresenter >> ensureInternetConnectionAvailable [
 { #category : 'formatting' }
 CoPCModelDownloadProgressPresenter >> formatBytes: aNumber [
 
-	| bytes |
-	(aNumber isNumber and: [ aNumber >= 0 ]) ifFalse: [ ^ '?' ].
-	bytes := aNumber asFloat.
-	bytes >= 1e9 ifTrue: [ ^ ((bytes / 1e9) printShowingDecimalPlaces: 2) , ' GB' ].
-	bytes >= 1e6 ifTrue: [ ^ ((bytes / 1e6) printShowingDecimalPlaces: 1) , ' MB' ].
-	bytes >= 1e3 ifTrue: [ ^ ((bytes / 1e3) printShowingDecimalPlaces: 0) , ' KB' ].
-	^ (bytes printShowingDecimalPlaces: 0) , ' B'
+	^ self class formatBytes: aNumber
 ]
 
 { #category : 'initialization' }
@@ -161,27 +232,40 @@ CoPCModelDownloadProgressPresenter >> handlePullEvent: event forModel: modelName
 	"React to one streaming status line from an Ollama pull. Updates the UI only when
 	the integer percentage changes, to avoid flooding the UI queue."
 
-	| total done percent |
-	total := event at: #total ifAbsent: [ event at: 'total' ifAbsent: [ nil ] ].
-	done := event at: #completed ifAbsent: [ event at: 'completed' ifAbsent: [ nil ] ].
+	| total done percent status statusText |
+	status := self class pullEventStatusFrom: event.
+	percent := self class pullEventPercentFrom: event.
 
-	(total isNumber and: [ done isNumber and: [ total > 0 ] ]) ifFalse: [ ^ self ].
+	percent ifNil: [
+		status isEmpty ifTrue: [ ^ self ].
+		(statusByModel at: modelName ifAbsent: [ '' ]) = status ifTrue: [ ^ self ].
+		statusByModel at: modelName put: status.
+		^ self deferUI: [
+			statusLabel label:
+				('Downloading {1} ({2}/{3}) - {4}'
+					format: { modelName. completed + 1. models size. status }).
+			self renderStatusBoard ] ].
 
-	percent := ((done / total) * 100) truncated min: 100.
-	percent = lastPercent ifTrue: [ ^ self ].
-	lastPercent := percent.
-
-	statusByModel
-		at: modelName
-		put: ('downloading — {1}% ({2} / {3})'
+	total := self class pullEventNumberAt: #total from: event.
+	done := self class pullEventNumberAt: #completed from: event.
+	statusText := (total isNumber and: [ done isNumber ])
+		ifTrue: [
+			'downloading - {1}% ({2} / {3})'
 			format: {
 				percent.
 				self formatBytes: done.
-				self formatBytes: total }).
+				self formatBytes: total } ]
+		ifFalse: [ 'downloading - ', percent asString, '%' ].
+
+	(percent = lastPercent
+		and: [ (statusByModel at: modelName ifAbsent: [ '' ]) = statusText ]) ifTrue: [ ^ self ].
+	lastPercent := percent.
+
+	statusByModel at: modelName put: statusText.
 
 	self deferUI: [
 		statusLabel label:
-			('Downloading {1} ({2}/{3}) — {4}%'
+			('Downloading {1} ({2}/{3}) - {4}%'
 				format: { modelName. completed + 1. models size. percent }).
 		progressBar fixedPercentage: self overallPercentageWithCurrent: percent.
 		self renderStatusBoard
@@ -228,7 +312,10 @@ CoPCModelDownloadProgressPresenter >> overallPercentageWithCurrent: currentModel
 	downloaded contributes its own fraction."
 
 	models isEmptyOrNil ifTrue: [ ^ 100 ].
-	^ ((((completed * 100) + currentModelPercent) / models size) rounded min: 100) max: 0
+	^ self class
+		overallPercentageForCompleted: completed
+		total: models size
+		currentPercent: currentModelPercent
 ]
 
 { #category : 'layout' }
