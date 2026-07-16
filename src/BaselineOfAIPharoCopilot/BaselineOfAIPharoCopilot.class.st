@@ -39,6 +39,7 @@ BaselineOfAIPharoCopilot >> baseline: spec [
 { #category : 'baselines' }
 BaselineOfAIPharoCopilot >> postLoad [
 
-	RubSmalltalkEditor completionEngineClass: CoPharoCopilotCompletionEngine.
+	CopilotSettings ensureDefaultCompletionModelSelected.
+	CopilotSettings installCompletionEngineIfAvailable.
 	self class showFirstLaunchSetupIfNeeded
 ]

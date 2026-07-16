@@ -149,6 +149,8 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 
 	missingModels isEmpty ifTrue: [
 		[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
+		CopilotSettings ensureDefaultCompletionModelSelected.
+		CopilotSettings installCompletionEngineIfAvailable.
 		self setupProgressPercentage: 100.
 		^ self deferUI: [
 			statusLabel label: 'OKAY! Pharo-Copilot setup is complete.'.
@@ -161,7 +163,9 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		descriptionLabel label:
 			('{1} model(s) will be downloaded:'
 				format: { missingModels size }).
-		statusLabel label: (CopilotSettings modelNamesTextFor: missingModels)
+		statusLabel label:
+			('Ready to download 1/{1}: {2}'
+				format: { missingModels size. missingModels first })
 	].
 
 	failedModels := OrderedCollection new.
@@ -172,18 +176,13 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		self setupProgressPercentage: (((index - 1) / missingModels size) * 100) rounded.
 		self deferUI: [
 			statusLabel label:
-				('Downloading {1} ({2}/{3})...'
-					format: { modelName. index. missingModels size })
+				(self
+					setupDownloadingMessageFor: modelName
+					index: index
+					total: missingModels size)
 		].
 
-		installed := CopilotSettings
-			installModelNamedForSetup: modelName
-			progress: [ :event |
-				self
-					showPullEvent: event
-					forModel: modelName
-					index: index
-					total: missingModels size ].
+		installed := CopilotSettings installModelNamedForSetup: modelName.
 
 		verified := installed and: [
 				CopilotSettings
@@ -196,11 +195,19 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 			self setupProgressPercentage: ((index / missingModels size) * 100) rounded.
 			statusLabel label:
 				((failedModels includes: modelName)
-					ifTrue: [ 'Failed: ' , modelName ]
+					ifTrue: [
+						self
+							setupFailedMessageFor: modelName
+							index: index
+							total: missingModels size
+							nextModel: (missingModels at: index + 1 ifAbsent: [ nil ]) ]
 					ifFalse: [
-						verified
-							ifTrue: [ 'Installed: ' , modelName ]
-							ifFalse: [ 'Downloaded: ' , modelName , ' (Ollama list will refresh shortly)' ] ])
+						self
+							setupDownloadedMessageFor: modelName
+							index: index
+							total: missingModels size
+							nextModel: (missingModels at: index + 1 ifAbsent: [ nil ])
+							verified: verified ])
 		]
 	].
 
@@ -209,14 +216,16 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 	self deferUI: [
 		failedModels isEmpty
 			ifTrue: [
+				CopilotSettings ensureDefaultCompletionModelSelected.
+				CopilotSettings installCompletionEngineIfAvailable.
 				self setupProgressPercentage: 100.
 				statusLabel label: 'Pharo-Copilot setup is complete.'.
 				CopilotSettings notifyUser: 'Pharo-Copilot setup is complete.'.
 				self window close ]
 			ifFalse: [
 				statusLabel label:
-					('Some models failed to download ({1}). Please check your internet connection and Ollama logs.'
-						format: { failedModels size }) ]
+					('Download finished with {1}/{2} failed model(s). Check Ollama logs for the failed pull.'
+						format: { failedModels size. missingModels size }) ]
 	]
 ]
 
@@ -231,7 +240,6 @@ PharoCopilotSetupPresenter >> showDownloadStep [
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
-		add: progressBar expand: false;
 		add: SpNullPresenter new expand: true;
 		yourself).
 
@@ -280,34 +288,25 @@ PharoCopilotSetupPresenter >> showMissingOllamaStep [
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: index total: totalModels [
 
-	| percent status overall done totalBytes detail |
+	| status message |
 	status := CoPCModelDownloadProgressPresenter pullEventStatusFrom: event.
-	percent := CoPCModelDownloadProgressPresenter pullEventPercentFrom: event.
+	status isEmpty ifTrue: [ ^ self ].
 
-	percent ifNil: [
-		status isEmpty ifTrue: [ ^ self ].
-		^ self deferUI: [
-			statusLabel label:
-				('Downloading {1} ({2}/{3}) - {4}'
-					format: { modelName. index. totalModels. status }) ] ].
-
-	done := CoPCModelDownloadProgressPresenter pullEventNumberAt: #completed from: event.
-	totalBytes := CoPCModelDownloadProgressPresenter pullEventNumberAt: #total from: event.
-	detail := (done isNumber and: [ totalBytes isNumber ])
+	message := (CoPCModelDownloadProgressPresenter pullEventStatusIsSuccess: event)
 		ifTrue: [
-			' (', (CoPCModelDownloadProgressPresenter formatBytes: done),
-			' / ', (CoPCModelDownloadProgressPresenter formatBytes: totalBytes), ')' ]
-		ifFalse: [ '' ].
-	overall := CoPCModelDownloadProgressPresenter
-		overallPercentageForCompleted: index - 1
-		total: totalModels
-		currentPercent: percent.
-	self setupProgressPercentage: overall.
+			self
+				setupDownloadedMessageFor: modelName
+				index: index
+				total: totalModels
+				nextModel: nil
+				verified: true ]
+		ifFalse: [
+			(self setupDownloadingMessageFor: modelName index: index total: totalModels)
+				, String cr
+				, status ].
 
 	self deferUI: [
-		statusLabel label:
-			('Downloading {1} ({2}/{3}) - {4}%{5}'
-				format: { modelName. index. totalModels. percent. detail }) ]
+		statusLabel label: message ]
 ]
 
 { #category : 'initialization' }
@@ -317,6 +316,34 @@ PharoCopilotSetupPresenter >> setupProgressPercentage: aNumber [
 	bounded := (aNumber ifNil: [ 0 ]) max: 0.
 	bounded := bounded min: 100.
 	setupProgress := bounded / 100.0
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> setupDownloadedMessageFor: modelName index: index total: totalModels nextModel: nextModel verified: verified [
+
+	| message |
+	message := 'Downloaded ', index asString, '/', totalModels asString, ': ', modelName.
+	verified ifFalse: [
+		message := message , String cr , 'Ollama list will refresh shortly.' ].
+	nextModel ifNotNil: [
+		message := message , String cr , 'Next: downloading ', (index + 1) asString, '/', totalModels asString, ': ', nextModel ].
+	^ message
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> setupDownloadingMessageFor: modelName index: index total: totalModels [
+
+	^ 'Downloading ', index asString, '/', totalModels asString, ': ', modelName
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> setupFailedMessageFor: modelName index: index total: totalModels nextModel: nextModel [
+
+	| message |
+	message := 'Failed ', index asString, '/', totalModels asString, ': ', modelName.
+	nextModel ifNotNil: [
+		message := message , String cr , 'Continuing with ', (index + 1) asString, '/', totalModels asString, ': ', nextModel ].
+	^ message
 ]
 
 { #category : 'initialization' }

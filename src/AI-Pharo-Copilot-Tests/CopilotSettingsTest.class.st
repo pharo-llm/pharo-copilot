@@ -71,6 +71,30 @@ CopilotSettingsTest >> testClearCachedModelMetadataForcesNextFetch [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testDefaultCompletionModelIsQuantizedPharoQwen [
+
+	self
+		assert: CopilotSettings defaultCompletionModelName
+		equals: 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'.
+	self
+		assert: CoPCOllamaClient defaultModelFullName
+		equals: 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testEnsureDefaultCompletionModelSelectedReplacesNullModel [
+
+	CopilotSettings withDefaultSettingsDo: [
+		CopilotSettings modelName: CopilotSettings nullModelFullName.
+		self
+			assert: CopilotSettings ensureDefaultCompletionModelSelected
+			equals: CopilotSettings defaultCompletionModelName.
+		self
+			assert: CopilotSettings modelName
+			equals: CopilotSettings defaultCompletionModelName ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testCompletionSuggestionsCountSnapshotRestore [
 
 	CopilotSettings withDefaultSettingsDo: [
@@ -542,6 +566,19 @@ CopilotSettingsTest >> testRecordInstallModelConsentIsStoredInSnapshot [
 		self assert: (consentRecord at: #accepted) equals: true.
 		self assert: (consentRecord includesKey: #timestamp)
 	]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRestoreSettingsMigratesNullModelToDefaultCompletionModel [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		snapshot := CopilotSettings settingsSnapshot.
+		snapshot at: #modelName put: CopilotSettings nullModelFullName.
+		CopilotSettings restoreSettingsFromSnapshot: snapshot.
+		self
+			assert: CopilotSettings modelName
+			equals: CopilotSettings defaultCompletionModelName ]
 ]
 
 { #category : 'tests' }

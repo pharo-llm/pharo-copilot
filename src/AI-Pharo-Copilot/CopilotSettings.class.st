@@ -283,6 +283,12 @@ CopilotSettings class >> dictionaryValueAt: aKey from: aDictionary default: aDef
 ]
 
 { #category : 'accessing' }
+CopilotSettings class >> defaultCompletionModelName [
+
+	^ CoPCOllamaClient defaultModelFullName
+]
+
+{ #category : 'accessing' }
 CopilotSettings class >> ensureModelMetadataDirectoryFor: modelNameString [
 	"Ensure the per-model metadata directory exists; answer the directory or nil on failure."
 
@@ -304,6 +310,17 @@ CopilotSettings class >> ensureModelMetadataDirectoryFor: modelNameString [
 	].
 
 	^ modelDirectory
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> ensureDefaultCompletionModelSelected [
+	"Use the quantized default model when no real model has been selected yet."
+
+	| previousModel |
+	previousModel := modelName.
+	self useDefaultCompletionModelWhenSavedModelIsMissingOrNull.
+	previousModel ~= modelName ifTrue: [ self autoSaveSettings ].
+	^ self modelName
 ]
 
 { #category : 'accessing' }
@@ -575,7 +592,7 @@ CopilotSettings class >> initializeDefaults [
 
 	enabled := true.
 	provider := #ollama.
-	modelName := CoPCOllamaClient defaultModelFullName.
+	modelName := self defaultCompletionModelName.
 	host := '127.0.0.1'.
 	port := 11434.
 	autoInstallModelScriptEnabled := true.
@@ -819,6 +836,20 @@ CopilotSettings class >> isCopilotEngineSelected [
 				or: [ currentEngine name includesSubstring: 'Copilot' ]
 		]
 	] on: Error do: [ false ]
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> installCompletionEngineIfAvailable [
+	"Select the Pharo Copilot completion engine when the host image supports it."
+
+	| editorClass engineClass |
+	editorClass := Smalltalk globals at: #RubSmalltalkEditor ifAbsent: [ nil ].
+	engineClass := Smalltalk globals at: #CoPharoCopilotCompletionEngine ifAbsent: [ nil ].
+	(editorClass isNil or: [ engineClass isNil ]) ifTrue: [ ^ false ].
+	(editorClass respondsTo: #completionEngineClass:) ifFalse: [ ^ false ].
+
+	editorClass completionEngineClass: engineClass.
+	^ true
 ]
 
 { #category : 'accessing' }
@@ -1195,7 +1226,7 @@ CopilotSettings class >> modelMetadata [
 CopilotSettings class >> modelName [
 	"Answer the configured model name; default to Ollama's default model."
 
-	^ modelName ifNil: [ modelName := CoPCOllamaClient defaultModelFullName ]
+	^ modelName ifNil: [ modelName := self defaultCompletionModelName ]
 ]
 
 { #category : 'accessing' }
@@ -1710,7 +1741,8 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	(aDictionary at: #contextMode ifAbsent: [ nil ])
 		ifNotNil: [ :savedMode | CoPCContextSettings mode: savedMode ].
 	(aDictionary at: #navigationHistoryEnabled ifAbsent: [ nil ])
-		ifNotNil: [ :savedFlag | CoPCContextNavigationHistory enabled: savedFlag ]
+		ifNotNil: [ :savedFlag | CoPCContextNavigationHistory enabled: savedFlag ].
+	self ensureDefaultCompletionModelSelected
 ]
 
 { #category : 'accessing' }
@@ -1756,6 +1788,7 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ aDictionary at: #CompletionSuggestionsCount ifAbsent: [ nil ] ].
 backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ aDictionary at: #BackgroundColor ifAbsent: [ nil ] ].
 installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ aDictionary at: #InstallModelUserConsent ifAbsent: [ nil ] ].
+self useDefaultCompletionModelWhenSavedModelIsMissingOrNull
 ]
 
 { #category : 'accessing' }
@@ -2227,6 +2260,17 @@ CopilotSettings class >> temperature: aNumber [
 
 	temperature := aNumber.
 	self autoSaveSettings
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> useDefaultCompletionModelWhenSavedModelIsMissingOrNull [
+
+	(modelName isNil or: [
+		modelName asString trimBoth isEmpty or: [
+			self isNullModelName: modelName ] ])
+		ifTrue: [
+			modelName := self defaultCompletionModelName.
+			modelMetadata := nil ]
 ]
 
 { #category : 'accessing' }

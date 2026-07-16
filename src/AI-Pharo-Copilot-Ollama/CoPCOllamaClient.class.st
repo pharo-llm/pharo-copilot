@@ -21,7 +21,11 @@ Class {
 { #category : 'accessing' }
 CoPCOllamaClient class >> defaultModelFullName [
 
-	^ defaultModelFullName ifNil: [ defaultModelFullName := self nullModelFullName  ]
+	(defaultModelFullName isNil or: [
+		defaultModelFullName isEmpty or: [
+			defaultModelFullName = self nullModelFullName ] ])
+		ifTrue: [ defaultModelFullName := self quantizedDefaultModelFullName ].
+	^ defaultModelFullName
 ]
 
 { #category : 'accessing' }
@@ -42,6 +46,12 @@ CoPCOllamaClient class >> fimStopSequences [
 CoPCOllamaClient class >> nullModelFullName [
 
   ^ 'pharo-copilot-null'
+]
+
+{ #category : 'accessing' }
+CoPCOllamaClient class >> quantizedDefaultModelFullName [
+
+	^ 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
 ]
 
 { #category : 'accessing' }
