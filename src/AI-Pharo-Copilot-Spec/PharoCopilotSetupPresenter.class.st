@@ -166,6 +166,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 
 	missingModels doWithIndex: [ :modelName :index |
 
+		| installed verified |
 		self deferUI: [
 			progressBar fixedPercentage: (((index - 1) / missingModels size) * 100) rounded.
 			statusLabel label:
@@ -173,19 +174,21 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 					format: { modelName. index. missingModels size })
 		].
 
-		((CopilotSettings
+		installed := CopilotSettings
 			installModelNamedForSetup: modelName
 			progress: [ :event |
 				self
 					showPullEvent: event
 					forModel: modelName
 					index: index
-					total: missingModels size ])
-			and: [
+					total: missingModels size ].
+
+		verified := installed and: [
 				CopilotSettings
 					refreshModelsAfterInstallOf: modelName
-					usingInitialResponse: response ])
-			ifFalse: [ failedModels add: modelName ].
+					usingInitialResponse: response ].
+
+		installed ifFalse: [ failedModels add: modelName ].
 
 		self deferUI: [
 			progressBar fixedPercentage:
@@ -193,7 +196,10 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 			statusLabel label:
 				((failedModels includes: modelName)
 					ifTrue: [ 'Failed: ' , modelName ]
-					ifFalse: [ 'Installed: ' , modelName ])
+					ifFalse: [
+						verified
+							ifTrue: [ 'Installed: ' , modelName ]
+							ifFalse: [ 'Downloaded: ' , modelName , ' (Ollama list will refresh shortly)' ] ])
 		]
 	].
 

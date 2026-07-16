@@ -362,7 +362,7 @@ CopilotSettings class >> ensurePredefinedModelsDownloadedUsingInitialResponse: i
 
 	availableModels := self modelNamesFromResponse: initialResponse.
 	missingModels := self predefinedDownloadableModelNames
-		reject: [ :each | availableModels includes: each ].
+		reject: [ :each | self installedModelNames: availableModels includesModelNamed: each ].
 
 	missingModels isEmpty ifTrue: [ ^ true ].
 
@@ -408,7 +408,7 @@ CopilotSettings class >> ensureSelectedModelAvailable [
 	availableModels := self modelNamesFromResponse: response.
 	self logValidatedModelAvailability: selectedModelName availableModels: availableModels.
 
-	(availableModels includes: selectedModelName) ifTrue: [ ^ true ].
+	(self installedModelNames: availableModels includesModelNamed: selectedModelName) ifTrue: [ ^ true ].
 	self autoInstallModelScriptEnabled ifFalse: [ ^ false ].
 
 	(self attemptAutoInstallForModelNamed: selectedModelName usingInitialResponse: response) ifTrue: [ ^ true ].
@@ -763,7 +763,7 @@ CopilotSettings class >> installSelectedModelNow [
 	response ifNil: [ ^ self handleMissingOllamaForModelNamed: selectedModelName ].
 
 	availableModels := self modelNamesFromResponse: response.
-	(availableModels includes: selectedModelName) ifTrue: [
+	(self installedModelNames: availableModels includesModelNamed: selectedModelName) ifTrue: [
 		self notifyUser: ('The model "{1}" is already installed.' format: { selectedModelName }).
 		^ true
 	].
@@ -829,10 +829,41 @@ CopilotSettings class >> isNullModelName: aString [
 ]
 
 { #category : 'accessing' }
+CopilotSettings class >> canonicalModelNameForComparison: aModelName [
+	"Normalize model identifiers for comparison. Ollama may report repository/model
+	names in canonical lowercase form even when the requested pull used mixed case."
+
+	aModelName ifNil: [ ^ '' ].
+	^ aModelName asString trimBoth asLowercase
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> installedModelNames: modelNames includesModelNamed: aModelName [
+
+	^ modelNames anySatisfy: [ :each |
+		self modelName: aModelName matchesInstalledModelName: each ]
+]
+
+{ #category : 'accessing' }
 CopilotSettings class >> isPredefinedDownloadableModelName: aModelName [
 
 	aModelName ifNil: [ ^ false ].
-	^ self predefinedDownloadableModelNames includes: aModelName asString
+	^ self
+		installedModelNames: self predefinedDownloadableModelNames
+		includesModelNamed: aModelName
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> modelName: requestedModelName matchesInstalledModelName: installedModelName [
+
+	| requested installed |
+	requested := self canonicalModelNameForComparison: requestedModelName.
+	installed := self canonicalModelNameForComparison: installedModelName.
+
+	requested = installed ifTrue: [ ^ true ].
+	(requested includesSubstring: ':') ifFalse: [
+		^ installed = (requested , ':latest') ].
+	^ false
 ]
 
 { #category : 'accessing' }
@@ -1120,7 +1151,7 @@ CopilotSettings class >> missingSetupModelNamesFrom: listModelsResponse [
 	installedModels := self modelNamesFromResponse: listModelsResponse.
 
 	^ self predefinedSetupModelNames
-		reject: [ :each | installedModels includes: each ]
+		reject: [ :each | self installedModelNames: installedModels includesModelNamed: each ]
 ]
 
 { #category : 'accessing' }
@@ -1556,28 +1587,36 @@ CopilotSettings class >> recordPrivacyPolicyUserConsentAccepted: aBoolean [
 CopilotSettings class >> refreshModelsAfterInstallOf: aModelName usingInitialResponse: initialResponse [
 	"Re-list models after an install and verify the target model is present; answer true if found."
 
-	[
-		| refreshedResponse refreshedModels |
-		refreshedResponse := self newOllamaClient listModels.
-		refreshedModels := self modelNamesFromResponse: refreshedResponse.
+	| refreshedModels attempts |
+	refreshedModels := #().
+	attempts := 5.
 
-		(refreshedModels includes: aModelName)
-			ifTrue: [
-				self logDetectedInstalledModel: aModelName before: initialResponse after: refreshedModels.
-				[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
-				^ true
-			].
+	1 to: attempts do: [ :attempt |
+		[
+			| refreshedResponse |
+			refreshedResponse := self newOllamaClient listModels.
+			refreshedModels := self modelNamesFromResponse: refreshedResponse.
 
-		self logInstallDidNotExposeModel: aModelName before: initialResponse after: refreshedModels
-	] on: Error do: [ :ex |
-		CoPharoCopilotLogger
-			logError: 'Failed to refresh Ollama models after install'
-			origin: #CopilotSettings
-			exception: ex
-			payload: (Dictionary new
-				at: #model put: aModelName;
-				yourself)
-	].
+			(self installedModelNames: refreshedModels includesModelNamed: aModelName)
+				ifTrue: [
+					self logDetectedInstalledModel: aModelName before: initialResponse after: refreshedModels.
+					[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
+					^ true ].
+
+			attempt < attempts ifTrue: [ (Delay forMilliseconds: 500) wait ]
+		] on: Error do: [ :ex |
+			attempt = attempts
+				ifTrue: [
+					CoPharoCopilotLogger
+						logError: 'Failed to refresh Ollama models after install'
+						origin: #CopilotSettings
+						exception: ex
+						payload: (Dictionary new
+							at: #model put: aModelName;
+							yourself) ]
+				ifFalse: [ (Delay forMilliseconds: 500) wait ] ] ].
+
+	self logInstallDidNotExposeModel: aModelName before: initialResponse after: refreshedModels.
 
 	^ false
 ]

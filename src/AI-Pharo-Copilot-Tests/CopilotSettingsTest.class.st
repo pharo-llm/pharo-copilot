@@ -458,6 +458,50 @@ CopilotSettingsTest >> testNullModelGeneratesMetadataFiles [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testMissingSetupModelNamesMatchesOllamaCanonicalLowercaseNames [
+
+	| response |
+	response := Dictionary new
+		at: #models put: {
+			Dictionary new
+				at: #name put: 'pharo-llm/qwen2.5-coder-sft:3b';
+				yourself.
+			Dictionary new
+				at: #name put: 'pharo-llm/qwen2.5-coder-sft:7b';
+				yourself.
+			Dictionary new
+				at: #name put: 'pharo-llm/qwen2.5-coder-sft:q4_k_m';
+				yourself };
+		yourself.
+
+	self assert: (CopilotSettings missingSetupModelNamesFrom: response) isEmpty
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRefreshModelsAfterInstallMatchesOllamaCanonicalLowercaseName [
+
+	| stub oldFactory initialResponse |
+	stub := OllamaClientStub new
+		withModelsResponse: (Dictionary new
+			at: #models put: {
+				Dictionary new
+					at: #name put: 'pharo-llm/qwen2.5-coder-sft:3b';
+					yourself };
+			yourself).
+	oldFactory := CopilotSettings ollamaClientFactory.
+	initialResponse := Dictionary new at: #models put: #(); yourself.
+
+	[
+		CopilotSettings ollamaClientFactory: [ stub ].
+		self assert: (CopilotSettings
+			refreshModelsAfterInstallOf: 'pharo-llm/Qwen2.5-Coder-SFT:3b'
+			usingInitialResponse: initialResponse)
+	] ensure: [
+		CopilotSettings ollamaClientFactory: oldFactory.
+		CopilotSettings clearCachedModelMetadata ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testPortAccessor [
     | old |
     old := CopilotSettings port.
