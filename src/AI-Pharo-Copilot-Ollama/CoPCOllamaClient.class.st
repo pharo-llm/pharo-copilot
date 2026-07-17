@@ -24,8 +24,14 @@ CoPCOllamaClient class >> defaultModelFullName [
 	(defaultModelFullName isNil or: [
 		defaultModelFullName isEmpty or: [
 			defaultModelFullName = self nullModelFullName ] ])
-		ifTrue: [ defaultModelFullName := self quantizedDefaultModelFullName ].
+		ifTrue: [ defaultModelFullName := self availableDefaultModelFullName ].
 	^ defaultModelFullName
+]
+
+{ #category : 'accessing' }
+CoPCOllamaClient class >> availableDefaultModelFullName [
+
+	^ 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
 ]
 
 { #category : 'accessing' }
@@ -50,8 +56,9 @@ CoPCOllamaClient class >> nullModelFullName [
 
 { #category : 'accessing' }
 CoPCOllamaClient class >> quantizedDefaultModelFullName [
+	"Compatibility alias for older callers."
 
-	^ 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
+	^ self availableDefaultModelFullName
 ]
 
 { #category : 'accessing' }

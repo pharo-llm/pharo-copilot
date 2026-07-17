@@ -165,7 +165,7 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 
 		self deferUI: [
 			statusLabel label:
-				('Downloading {1} ({2}/{3})...'
+				('Downloading {2}/{3}: {1}'
 					format: { modelName. index. models size }).
 			self progressPercentage: self completedPercentage.
 			self renderStatusBoard
@@ -189,7 +189,7 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 				ifTrue: [ 'installed' ]
 				ifFalse: [
 					installed
-						ifTrue: [ 'FAILED - not visible in ollama list' ]
+						ifTrue: [ 'FAILED - not available in Ollama' ]
 						ifFalse: [ 'FAILED - check internet connection and Ollama logs' ] ]).
 
 		self deferUI: [
@@ -205,7 +205,7 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 			ifTrue: [ statusLabel label: 'All models installed.' ]
 			ifFalse: [
 				statusLabel label:
-					('Finished with {1} model(s) not installed in Ollama. Check the status board, Ollama logs, and ''ollama list''.'
+					('Finished with {1} model(s) not available in Ollama. Check the status board, Ollama logs, and ''ollama list''.'
 						format: { failed size }) ].
 
 		self progressPercentage: 100
@@ -253,8 +253,8 @@ CoPCModelDownloadProgressPresenter >> handlePullEvent: event forModel: modelName
 		statusByModel at: modelName put: status.
 		^ self deferUI: [
 			statusLabel label:
-				('Downloading {1} ({2}/{3}) - {4}'
-					format: { modelName. completed + 1. models size. status }).
+				('Downloading {2}/{3}: {1}'
+					format: { modelName. completed + 1. models size }).
 			self renderStatusBoard ] ].
 
 	total := self class pullEventNumberAt: #total from: event.
@@ -276,8 +276,8 @@ CoPCModelDownloadProgressPresenter >> handlePullEvent: event forModel: modelName
 
 	self deferUI: [
 		statusLabel label:
-			('Downloading {1} ({2}/{3}) - {4}%'
-				format: { modelName. completed + 1. models size. percent }).
+			('Downloading {2}/{3}: {1}'
+				format: { modelName. completed + 1. models size }).
 		self progressPercentage: (self overallPercentageWithCurrent: percent).
 		self renderStatusBoard
 	]

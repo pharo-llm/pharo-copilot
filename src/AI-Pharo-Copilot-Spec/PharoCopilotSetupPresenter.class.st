@@ -161,10 +161,10 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 
 	self deferUI: [
 		descriptionLabel label:
-			('{1} model(s) will be downloaded:'
+			('Downloading {1} model(s):'
 				format: { missingModels size }).
 		statusLabel label:
-			('Ready to download 1/{1}: {2}'
+			('Downloading 1/{1}: {2}'
 				format: { missingModels size. missingModels first })
 	].
 
@@ -239,7 +239,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 				self window close ]
 			ifFalse: [
 				statusLabel label:
-					('Download finished with {1}/{2} model(s) not installed in Ollama. Check the message above and the Ollama logs, then verify with ''ollama list''.'
+					('Setup finished with {1}/{2} model(s) not available in Ollama. Check the message above, Ollama logs, and ''ollama list''.'
 						format: { failedModels size. missingModels size }) ]
 	]
 ]
@@ -327,9 +327,7 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 				nextModel: nil
 				verified: true ]
 		ifFalse: [
-			(self setupDownloadingMessageFor: modelName index: index total: totalModels)
-				, String cr
-				, status ].
+			self setupDownloadingMessageFor: modelName index: index total: totalModels ].
 
 	self deferUI: [
 		percent ifNotNil: [
@@ -350,11 +348,11 @@ PharoCopilotSetupPresenter >> setupProgressPercentage: aNumber [
 PharoCopilotSetupPresenter >> setupDownloadedMessageFor: modelName index: index total: totalModels nextModel: nextModel verified: verified [
 
 	| message |
-	message := 'Downloaded ', index asString, '/', totalModels asString, ': ', modelName.
+	message := 'Done ', index asString, '/', totalModels asString, ': ', modelName.
 	verified ifFalse: [
 		message := message , String cr , 'Ollama list will refresh shortly.' ].
 	nextModel ifNotNil: [
-		message := message , String cr , 'Next: downloading ', (index + 1) asString, '/', totalModels asString, ': ', nextModel ].
+		message := message , String cr , 'Downloading ', (index + 1) asString, '/', totalModels asString, ': ', nextModel ].
 	^ message
 ]
 
@@ -366,19 +364,19 @@ PharoCopilotSetupPresenter >> setupDownloadingMessageFor: modelName index: index
 
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> setupNotVisibleMessageFor: modelName index: index total: totalModels nextModel: nextModel [
-	"The pull finished but the model never appeared in Ollama's model list, so the user
-	will not see it in 'ollama list'. This usually means another Ollama instance with a
-	different model store answers on the configured host and port."
+	"The pull finished but Ollama did not confirm the model through list/show. This
+	usually means another Ollama instance with a different model store answers on the
+	configured host and port."
 
 	| message |
-	message := 'Downloaded ', index asString, '/', totalModels asString, ': ', modelName,
+	message := 'Done ', index asString, '/', totalModels asString, ': ', modelName,
 		String cr,
-		'but Ollama does not list it. Run ''ollama list'' in a terminal to verify;',
+		'but Ollama did not confirm it. Run ''ollama list'' in a terminal to verify;',
 		String cr,
 		'another Ollama instance may be serving ',
 		CopilotSettings host asString, ':', CopilotSettings port asString, '.'.
 	nextModel ifNotNil: [
-		message := message , String cr , 'Continuing with ', (index + 1) asString, '/', totalModels asString, ': ', nextModel ].
+		message := message , String cr , 'Downloading ', (index + 1) asString, '/', totalModels asString, ': ', nextModel ].
 	^ message
 ]
 
@@ -388,7 +386,7 @@ PharoCopilotSetupPresenter >> setupFailedMessageFor: modelName index: index tota
 	| message |
 	message := 'Failed ', index asString, '/', totalModels asString, ': ', modelName.
 	nextModel ifNotNil: [
-		message := message , String cr , 'Continuing with ', (index + 1) asString, '/', totalModels asString, ': ', nextModel ].
+		message := message , String cr , 'Downloading ', (index + 1) asString, '/', totalModels asString, ': ', nextModel ].
 	^ message
 ]
 

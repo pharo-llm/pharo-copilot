@@ -531,9 +531,6 @@ CopilotSettingsTest >> testMissingSetupModelNamesMatchesOllamaCanonicalLowercase
 				at: #name put: 'pharo-llm/qwen2.5-coder-sft:3b';
 				yourself.
 			Dictionary new
-				at: #name put: 'pharo-llm/qwen2.5-coder-sft:7b';
-				yourself.
-			Dictionary new
 				at: #name put: 'pharo-llm/qwen2.5-coder-sft:q4_k_m';
 				yourself };
 		yourself.
@@ -566,6 +563,30 @@ CopilotSettingsTest >> testRefreshModelsAfterInstallMatchesOllamaCanonicalLowerc
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testRefreshModelsAfterInstallFallsBackToShowModel [
+
+	| stub oldFactory initialResponse modelName |
+	modelName := 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'.
+	stub := OllamaClientStub new
+		withModelsResponse: (Dictionary new at: #models put: #(); yourself);
+		withResponse: (Dictionary new
+			at: #model put: modelName;
+			yourself).
+	oldFactory := CopilotSettings ollamaClientFactory.
+	initialResponse := Dictionary new at: #models put: #(); yourself.
+
+	[
+		CopilotSettings ollamaClientFactory: [ stub ].
+		self assert: (CopilotSettings
+			refreshModelsAfterInstallOf: modelName
+			usingInitialResponse: initialResponse).
+		self assert: stub lastRequestedModel equals: modelName
+	] ensure: [
+		CopilotSettings ollamaClientFactory: oldFactory.
+		CopilotSettings clearCachedModelMetadata ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testPortAccessor [
     | old |
     old := CopilotSettings port.
@@ -582,12 +603,12 @@ CopilotSettingsTest >> testPredefinedDownloadableModelNamesUsePharoQwenSFTModels
 	modelNames := CopilotSettings predefinedDownloadableModelNames.
 	expectedModels := #(
 		'pharo-llm/Qwen2.5-Coder-SFT:3b'
-		'pharo-llm/Qwen2.5-Coder-SFT:7b'
 		'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
 	).
 
 	expectedModels do: [ :each |
 		self assert: (modelNames includes: each) ].
+	self assert: modelNames size equals: expectedModels size.
 	self assert: (modelNames allSatisfy: [ :each |
 		each beginsWith: 'pharo-llm/Qwen2.5-Coder-SFT:' ])
 ]

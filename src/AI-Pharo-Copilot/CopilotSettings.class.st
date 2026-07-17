@@ -314,7 +314,7 @@ CopilotSettings class >> ensureModelMetadataDirectoryFor: modelNameString [
 
 { #category : 'settings' }
 CopilotSettings class >> ensureDefaultCompletionModelSelected [
-	"Use the quantized default model when no real model has been selected yet."
+	"Use the default completion model when no real model has been selected yet."
 
 	| previousModel |
 	previousModel := modelName.
@@ -1020,7 +1020,7 @@ CopilotSettings class >> logGeneratedNullModelMetadata: metadata modelName: aMod
 
 { #category : 'private' }
 CopilotSettings class >> logInstallDidNotExposeModel: aModelName before: initialResponse after: refreshedModels [
-	"Log when an install completed but the model is still not visible."
+	"Log when an install completed but the model is still unavailable."
 ]
 
 { #category : 'accessing' }
@@ -1555,7 +1555,6 @@ CopilotSettings class >> predefinedDownloadableModelNames [
 
 	^ #(
 		'pharo-llm/Qwen2.5-Coder-SFT:3b'
-		'pharo-llm/Qwen2.5-Coder-SFT:7b'
 		'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
 	)
 ]
@@ -1646,15 +1645,22 @@ CopilotSettings class >> refreshModelsAfterInstallOf: aModelName usingInitialRes
 
 	| refreshedModels attempts |
 	refreshedModels := #().
-	attempts := 5.
+	attempts := 10.
 
 	1 to: attempts do: [ :attempt |
 		[
-			| refreshedResponse |
-			refreshedResponse := self newOllamaClient listModels.
+			| client refreshedResponse |
+			client := self newOllamaClient.
+			refreshedResponse := client listModels.
 			refreshedModels := self modelNamesFromResponse: refreshedResponse.
 
 			(self installedModelNames: refreshedModels includesModelNamed: aModelName)
+				ifTrue: [
+					self logDetectedInstalledModel: aModelName before: initialResponse after: refreshedModels.
+					[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
+					^ true ].
+
+			(self showModelConfirmsInstalled: aModelName usingClient: client)
 				ifTrue: [
 					self logDetectedInstalledModel: aModelName before: initialResponse after: refreshedModels.
 					[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
@@ -1676,6 +1682,22 @@ CopilotSettings class >> refreshModelsAfterInstallOf: aModelName usingInitialRes
 	self logInstallDidNotExposeModel: aModelName before: initialResponse after: refreshedModels.
 
 	^ false
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> showModelConfirmsInstalled: aModelName usingClient: client [
+	"Answer whether Ollama can resolve the model directly. This avoids reporting a
+	completed pull as failed when the list endpoint lags behind the model store."
+
+	| response |
+	(client respondsTo: #showModelNamed:) ifFalse: [ ^ false ].
+
+	response := [
+		client showModelNamed: aModelName
+	] on: Error do: [ ^ false ].
+
+	response ifNil: [ ^ false ].
+	^ (self pullResultIndicatesFailure: response) not
 ]
 
 { #category : 'accessing' }
