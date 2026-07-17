@@ -360,9 +360,10 @@ CoPCOllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds [
 CoPCOllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds progress: aProgressBlock [
 	"Pull a model with streaming progress. The block receives a dictionary per status line
 	(keys: status, total, completed when Ollama provides them). Falls back to the blocking
-	pull when streaming is unavailable."
+	pull when streaming is unavailable. Answers true only when Ollama reported the final
+	'success' status; an error status line signals an Error."
 
-	| payload |
+	| payload sawSuccess |
 	aProgressBlock ifNil: [ ^ self pullModelNamed: aString timeoutSeconds: timeoutSeconds ].
 	(transport respondsTo: #postStreamingAt:body:timeoutSeconds:linesDo:) ifFalse: [
 		^ self pullModelNamed: aString timeoutSeconds: timeoutSeconds ].
@@ -372,14 +373,19 @@ CoPCOllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds progr
 		           at: #stream put: true;
 		           yourself.
 
+	sawSuccess := false.
 	transport
 		postStreamingAt: 'api/pull'
 		body: payload
 		timeoutSeconds: timeoutSeconds
 		linesDo: [ :line |
-			| parsed |
+			| parsed errorText |
 			parsed := self parseJsonSafely: line.
 			(parsed isKindOf: Dictionary) ifTrue: [
+				errorText := parsed at: #error ifAbsent: [ parsed at: 'error' ifAbsent: [ nil ] ].
+				(errorText notNil and: [ errorText asString trimBoth isEmpty not ]) ifTrue: [
+					self error: 'Ollama pull of ' , aString , ' failed: ' , errorText asString ].
+				(self pullEventIndicatesSuccess: parsed) ifTrue: [ sawSuccess := true ].
 				[ aProgressBlock value: parsed ]
 					on: Error
 					do: [ :ex |
@@ -391,7 +397,16 @@ CoPCOllamaClient >> pullModelNamed: aString timeoutSeconds: timeoutSeconds progr
 								at: #error put: ex description;
 								yourself) ] ] ].
 
-	^ true
+	^ sawSuccess
+]
+
+{ #category : 'ollama' }
+CoPCOllamaClient >> pullEventIndicatesSuccess: aDictionary [
+	"Answer whether a streamed pull status line reports the final success state."
+
+	| status |
+	status := aDictionary at: #status ifAbsent: [ aDictionary at: 'status' ifAbsent: [ '' ] ].
+	^ status asString trimBoth asLowercase = 'success'
 ]
 
 { #category : 'ollama' }

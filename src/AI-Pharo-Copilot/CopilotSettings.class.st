@@ -624,7 +624,7 @@ CopilotSettings class >> initializeDefaults [
 { #category : 'accessing' }
 CopilotSettings class >> installModelNamed: aModelName [
 	
-	| client |
+	| client pullResult |
 
 	(self isPredefinedDownloadableModelName: aModelName) ifFalse: [
 		self notifyUser:
@@ -642,13 +642,16 @@ CopilotSettings class >> installModelNamed: aModelName [
 			at: #model put: aModelName;
 			yourself).
 
-		(client respondsTo: #pullModelNamed:timeoutSeconds:)
+		pullResult := (client respondsTo: #pullModelNamed:timeoutSeconds:)
 			ifTrue: [
 				client
 					pullModelNamed: aModelName
 					timeoutSeconds: self modelInstallTimeoutSeconds ]
 			ifFalse: [
 				client pullModelNamed: aModelName ].
+
+		(self pullResultIndicatesFailure: pullResult) ifTrue: [
+			self error: 'Ollama reported pull failure for ', aModelName ].
 
 		CoPharoCopilotLogger logBackEndEvent: 'Ollama model install script completed' details: (Dictionary new
 			at: #model put: aModelName;
@@ -675,7 +678,7 @@ CopilotSettings class >> installModelNamedForSetup: aModelName progress: aProgre
 	"Pull a predefined model, reporting streaming download progress to the optional
 	block (a dictionary per Ollama status line: status, total, completed)."
 
-	| client |
+	| client pullResult |
 
 	(self isPredefinedDownloadableModelName: aModelName) ifFalse: [
 		CoPharoCopilotLogger logBackEndEvent: 'Setup refused non-predefined model install' details: (Dictionary new
@@ -690,7 +693,7 @@ CopilotSettings class >> installModelNamedForSetup: aModelName progress: aProgre
 			at: #model put: aModelName;
 			yourself).
 
-		(aProgressBlockOrNil notNil and: [ client respondsTo: #pullModelNamed:timeoutSeconds:progress: ])
+		pullResult := (aProgressBlockOrNil notNil and: [ client respondsTo: #pullModelNamed:timeoutSeconds:progress: ])
 			ifTrue: [
 				client
 					pullModelNamed: aModelName
@@ -704,6 +707,9 @@ CopilotSettings class >> installModelNamedForSetup: aModelName progress: aProgre
 							timeoutSeconds: self modelInstallTimeoutSeconds ]
 					ifFalse: [
 						client pullModelNamed: aModelName ] ].
+
+		(self pullResultIndicatesFailure: pullResult) ifTrue: [
+			self error: 'Ollama reported pull failure for ', aModelName ].
 
 		CoPharoCopilotLogger logBackEndEvent: 'Setup Ollama model install script completed' details: (Dictionary new
 			at: #model put: aModelName;
@@ -1473,6 +1479,26 @@ CopilotSettings class >> performInstallOfModelNamed: aModelName usingInitialResp
 
 	^ (self installModelNamed: aModelName)
 		and: [ self refreshModelsAfterInstallOf: aModelName usingInitialResponse: response ]
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> pullResultIndicatesFailure: pullResult [
+	"Answer whether an Ollama pull response explicitly reports failure."
+
+	| errorText parsedResponse |
+	pullResult == false ifTrue: [ ^ true ].
+	pullResult isNil ifTrue: [ ^ true ].
+
+	pullResult isString ifTrue: [
+		parsedResponse := [ STONJSON fromString: pullResult ] on: Error do: [ nil ].
+		parsedResponse ifNil: [ ^ false ].
+		^ self pullResultIndicatesFailure: parsedResponse ].
+
+	(pullResult isKindOf: Dictionary) ifFalse: [ ^ false ].
+
+	errorText := pullResult at: #error ifAbsent: [ pullResult at: 'error' ifAbsent: [ nil ] ].
+	errorText ifNil: [ ^ false ].
+	^ errorText asString trimBoth isEmpty not
 ]
 
 { #category : 'accessing' }

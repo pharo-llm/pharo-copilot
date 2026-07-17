@@ -294,6 +294,68 @@ OllamaClientTest >> testOptionsSetterStoresDictionary [
 ]
 
 { #category : 'tests' }
+OllamaClientTest >> testPullModelWithProgressRaisesOnErrorEvent [
+
+	| client mock |
+	client := CoPCOllamaClient new.
+	mock := OAHttpTransportMockExtended new.
+	mock streamingLines: { '{"error":"model not found"}' }.
+	client instVarNamed: 'transport' put: mock.
+
+	self
+		should: [
+			client
+				pullModelNamed: OTestModelSupport mockModelName
+				timeoutSeconds: 42
+				progress: [ :event | event ] ]
+		raise: Error
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testPullModelWithProgressReturnsFalseWithoutSuccess [
+
+	| client mock result events |
+	client := CoPCOllamaClient new.
+	mock := OAHttpTransportMockExtended new.
+	mock streamingLines: { '{"status":"pulling manifest"}' }.
+	client instVarNamed: 'transport' put: mock.
+	events := OrderedCollection new.
+
+	result := client
+		pullModelNamed: OTestModelSupport mockModelName
+		timeoutSeconds: 42
+		progress: [ :event | events add: event ].
+
+	self deny: result.
+	self assert: events size equals: 1.
+	self assert: mock lastPath equals: 'api/pull'.
+	self assert: (mock lastBody at: #name) equals: OTestModelSupport mockModelName.
+	self assert: (mock lastBody at: #stream) equals: true.
+	self assert: mock lastTimeoutSeconds equals: 42
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testPullModelWithProgressReturnsTrueOnSuccess [
+
+	| client mock result events |
+	client := CoPCOllamaClient new.
+	mock := OAHttpTransportMockExtended new.
+	mock streamingLines: {
+		'{"status":"pulling manifest"}'.
+		'{"status":"success"}' }.
+	client instVarNamed: 'transport' put: mock.
+	events := OrderedCollection new.
+
+	result := client
+		pullModelNamed: OTestModelSupport mockModelName
+		timeoutSeconds: 42
+		progress: [ :event | events add: event ].
+
+	self assert: result.
+	self assert: events size equals: 2
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testShowModelUsesApiShow [
 
 	| client mock response |

@@ -22,10 +22,19 @@ Metacello new
   load.
 ```
 
+## Troubleshooting Ollama model downloads
+
+If setup downloads a model but it does not appear in `ollama list`, verify that Pharo-Copilot and your terminal are talking to the same Ollama server and model store. On Linux, the system service often runs as the `ollama` user and stores models under `/usr/share/ollama/.ollama/models`, while an `ollama serve` process launched from Pharo can use your user account's `~/.ollama/models`. Also check whether `OLLAMA_HOST` or `OLLAMA_MODELS` differs between Pharo and your shell.
+
+You can install the default quantized model manually with:
+
+```sh
+ollama pull pharo-llm/Qwen2.5-Coder-SFT:q4_K_M
+```
+
 
 # Example
 
 https://github.com/user-attachments/assets/dc33edb3-6e3c-4d1d-a6f8-550f03c17631
-
 
 

@@ -182,32 +182,47 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 					total: missingModels size)
 		].
 
-		installed := CopilotSettings installModelNamedForSetup: modelName.
+		installed := CopilotSettings
+			installModelNamedForSetup: modelName
+			progress: [ :event |
+				self
+					showPullEvent: event
+					forModel: modelName
+					index: index
+					total: missingModels size ].
 
 		verified := installed and: [
 				CopilotSettings
 					refreshModelsAfterInstallOf: modelName
 					usingInitialResponse: response ].
 
-		installed ifFalse: [ failedModels add: modelName ].
+		verified ifFalse: [ failedModels add: modelName ].
 
 		self deferUI: [
 			self setupProgressPercentage: ((index / missingModels size) * 100) rounded.
 			statusLabel label:
-				((failedModels includes: modelName)
+				(verified
 					ifTrue: [
-						self
-							setupFailedMessageFor: modelName
-							index: index
-							total: missingModels size
-							nextModel: (missingModels at: index + 1 ifAbsent: [ nil ]) ]
-					ifFalse: [
 						self
 							setupDownloadedMessageFor: modelName
 							index: index
 							total: missingModels size
 							nextModel: (missingModels at: index + 1 ifAbsent: [ nil ])
-							verified: verified ])
+							verified: verified ]
+					ifFalse: [
+						installed
+							ifTrue: [
+								self
+									setupNotVisibleMessageFor: modelName
+									index: index
+									total: missingModels size
+									nextModel: (missingModels at: index + 1 ifAbsent: [ nil ]) ]
+							ifFalse: [
+								self
+									setupFailedMessageFor: modelName
+									index: index
+									total: missingModels size
+									nextModel: (missingModels at: index + 1 ifAbsent: [ nil ]) ] ])
 		]
 	].
 
@@ -224,7 +239,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 				self window close ]
 			ifFalse: [
 				statusLabel label:
-					('Download finished with {1}/{2} failed model(s). Check Ollama logs for the failed pull.'
+					('Download finished with {1}/{2} model(s) not installed in Ollama. Check the message above and the Ollama logs, then verify with ''ollama list''.'
 						format: { failedModels size. missingModels size }) ]
 	]
 ]
@@ -288,9 +303,20 @@ PharoCopilotSetupPresenter >> showMissingOllamaStep [
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: index total: totalModels [
 
-	| status message |
+	| status message percent overall |
 	status := CoPCModelDownloadProgressPresenter pullEventStatusFrom: event.
-	status isEmpty ifTrue: [ ^ self ].
+	percent := CoPCModelDownloadProgressPresenter pullEventPercentFrom: event.
+	percent ifNotNil: [
+		overall := CoPCModelDownloadProgressPresenter
+			overallPercentageForCompleted: index - 1
+			total: totalModels
+			currentPercent: percent ].
+
+	status isEmpty ifTrue: [
+		percent ifNotNil: [
+			self deferUI: [
+				self setupProgressPercentage: overall ] ].
+		^ self ].
 
 	message := (CoPCModelDownloadProgressPresenter pullEventStatusIsSuccess: event)
 		ifTrue: [
@@ -306,6 +332,8 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 				, status ].
 
 	self deferUI: [
+		percent ifNotNil: [
+			self setupProgressPercentage: overall ].
 		statusLabel label: message ]
 ]
 
@@ -334,6 +362,24 @@ PharoCopilotSetupPresenter >> setupDownloadedMessageFor: modelName index: index 
 PharoCopilotSetupPresenter >> setupDownloadingMessageFor: modelName index: index total: totalModels [
 
 	^ 'Downloading ', index asString, '/', totalModels asString, ': ', modelName
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> setupNotVisibleMessageFor: modelName index: index total: totalModels nextModel: nextModel [
+	"The pull finished but the model never appeared in Ollama's model list, so the user
+	will not see it in 'ollama list'. This usually means another Ollama instance with a
+	different model store answers on the configured host and port."
+
+	| message |
+	message := 'Downloaded ', index asString, '/', totalModels asString, ': ', modelName,
+		String cr,
+		'but Ollama does not list it. Run ''ollama list'' in a terminal to verify;',
+		String cr,
+		'another Ollama instance may be serving ',
+		CopilotSettings host asString, ':', CopilotSettings port asString, '.'.
+	nextModel ifNotNil: [
+		message := message , String cr , 'Continuing with ', (index + 1) asString, '/', totalModels asString, ': ', nextModel ].
+	^ message
 ]
 
 { #category : 'initialization' }

@@ -49,6 +49,46 @@ CopilotSettingsTest >> testAvailableProvidersIncludesOllama [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testInstallModelNamedForSetupReturnsFalseWhenPullReportsError [
+
+	| stub oldFactory modelName |
+	modelName := CopilotSettings predefinedDownloadableModelNames first.
+	stub := OllamaClientStub new
+		withPullBlock: [ :requestedModel |
+			Dictionary new
+				at: #error put: 'model not found';
+				yourself ].
+	oldFactory := CopilotSettings ollamaClientFactory.
+
+	[
+		CopilotSettings ollamaClientFactory: [ stub ].
+		self deny: (CopilotSettings installModelNamedForSetup: modelName)
+	] ensure: [
+		CopilotSettings ollamaClientFactory: oldFactory.
+		CopilotSettings clearCachedModelMetadata ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testInstallModelNamedReturnsFalseWhenPullReportsError [
+
+	| stub oldFactory modelName |
+	modelName := CopilotSettings predefinedDownloadableModelNames first.
+	stub := OllamaClientStub new
+		withPullBlock: [ :requestedModel |
+			Dictionary new
+				at: 'error' put: 'model not found';
+				yourself ].
+	oldFactory := CopilotSettings ollamaClientFactory.
+
+	[
+		CopilotSettings ollamaClientFactory: [ stub ].
+		self deny: (CopilotSettings installModelNamed: modelName)
+	] ensure: [
+		CopilotSettings ollamaClientFactory: oldFactory.
+		CopilotSettings clearCachedModelMetadata ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testClearCachedModelMetadataForcesNextFetch [
     | stub oldFactory first second |
     stub := OllamaClientStub new withResponse: (Dictionary new

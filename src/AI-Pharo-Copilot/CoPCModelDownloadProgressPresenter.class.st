@@ -159,7 +159,7 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 	self deferUI: [ self renderStatusBoard ].
 
 	models doWithIndex: [ :modelName :index |
-		| installed |
+		| installed verified |
 		lastPercent := -1.
 		statusByModel at: modelName put: 'downloading...'.
 
@@ -176,11 +176,21 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 			progress: [ :event |
 				self handlePullEvent: event forModel: modelName ].
 
-		installed ifFalse: [ failed add: modelName ].
+		verified := installed and: [
+			CopilotSettings
+				refreshModelsAfterInstallOf: modelName
+				usingInitialResponse: (Dictionary new at: #models put: #(); yourself) ].
+
+		verified ifFalse: [ failed add: modelName ].
 		completed := completed + 1.
 		statusByModel
 			at: modelName
-			put: (installed ifTrue: [ 'installed' ] ifFalse: [ 'FAILED — check internet connection and Ollama logs' ]).
+			put: (verified
+				ifTrue: [ 'installed' ]
+				ifFalse: [
+					installed
+						ifTrue: [ 'FAILED - not visible in ollama list' ]
+						ifFalse: [ 'FAILED - check internet connection and Ollama logs' ] ]).
 
 		self deferUI: [
 			self progressPercentage: self completedPercentage.
@@ -195,7 +205,7 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 			ifTrue: [ statusLabel label: 'All models installed.' ]
 			ifFalse: [
 				statusLabel label:
-					('Finished with {1} failed model(s). Check your internet connection and Ollama logs.'
+					('Finished with {1} model(s) not installed in Ollama. Check the status board, Ollama logs, and ''ollama list''.'
 						format: { failed size }) ].
 
 		self progressPercentage: 100
