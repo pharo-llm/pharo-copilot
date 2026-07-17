@@ -172,6 +172,11 @@ CoPCOAHttpTransport >> postStreamingAt: aPath body: aDictionary timeoutSeconds: 
 
 	self applyDefaultHeadersTo: client.
 	client entity: (ZnEntity json: (jsonWriter toString: aDictionary)).
+	"ZnEasy client is one-shot (Connection: close, socket closed after one cycle), which
+	ZnClient refuses to combine with streaming ('I cannot do streaming when #isOneShot
+	is true'). Clear the one-shot option so the response body stream stays open long
+	enough to read the streamed pull progress. We close the client ourselves below."
+	client optionAt: #oneShot put: false.
 	client streaming: true.
 
 	[
