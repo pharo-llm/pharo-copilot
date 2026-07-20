@@ -749,13 +749,33 @@ CopilotSettings class >> dataSharingTaskOrSurveyId: aStringOrSymbol [
 ]
 
 { #category : 'data sharing' }
+CopilotSettings class >> dataSharingEndpointUrlFromEnvironment [
+
+	| environmentClass environment value |
+	environmentClass := Smalltalk globals at: #OSEnvironment ifAbsent: [ ^ nil ].
+	environment := [ environmentClass current ]
+		on: Error
+		do: [ :ignored | ^ nil ].
+	value := [
+		environment
+			at: 'PHARO_COPILOT_COLLECTOR_URL'
+			ifAbsent: [ nil ] ]
+		on: Error
+		do: [ :ignored | nil ].
+	(value isNil or: [ value asString trimBoth isEmpty ]) ifTrue: [ ^ nil ].
+	^ value asString trimBoth
+]
+
+{ #category : 'data sharing' }
 CopilotSettings class >> defaultDataSharingEndpointUrl [
 
-	"Use the hosted collector route for released images. During local
-	development, override with:
-		CopilotSettings dataSharingEndpointUrl: 'http://127.0.0.1:9091/complishon'"
+	"Released images must use a public collector URL, not localhost. The packager
+	can override with PHARO_COPILOT_COLLECTOR_URL before startup or save
+	CopilotSettings dataSharingEndpointUrl: 'https://collector.example/' in the
+	image."
 
-	^ 'https://rmod-xp.lille.inria.fr/complishon'
+	^ self dataSharingEndpointUrlFromEnvironment
+		  ifNil: [ 'https://rmod-xp.lille.inria.fr/' ]
 ]
 
 { #category : 'accessing' }
@@ -2247,7 +2267,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #dataSharingEndpointUrl;
 					setSelector: #dataSharingEndpointUrl:;
 					default: self dataSharingEndpointUrl;
-					description: 'HTTP endpoint of the deployed pharo-copilot-collector, for example https://your-domain.example/complishon or http://127.0.0.1:9091/complishon.'.
+					description: 'HTTP endpoint of the deployed pharo-copilot-collector, for example https://rmod-xp.lille.inria.fr/ or http://127.0.0.1:9093/ for local development.'.
 
 				(aBuilder setting: #dataSharingParticipantUUID)
 					order: 0.33;

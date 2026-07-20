@@ -47,25 +47,36 @@ For local development with the Python collector:
 
 ```sh
 cd /home/oabedelk/pharo-copilot-collector
-./start.sh --port 9091
+./start.sh --port 9093 --routes / --data-dir /home/oabedelk/pharo-copilot-collector/data
 ```
 
 Then configure the Pharo image before running setup:
 
 ```smalltalk
-CopilotSettings dataSharingEndpointUrl: 'http://127.0.0.1:9091/complishon'.
+CopilotSettings dataSharingEndpointUrl: 'http://127.0.0.1:9093/'.
 ```
 
-For released images, deploy the Python collector behind a public HTTPS URL and
-set that URL instead:
+For released images, do not use `127.0.0.1`: that would point to the user's
+own computer. Deploy the Python collector on the server machine, expose it with
+a public HTTPS URL, and set that URL instead:
 
 ```smalltalk
-CopilotSettings dataSharingEndpointUrl: 'https://your-domain.example/complishon'.
+CopilotSettings dataSharingEndpointUrl: 'https://rmod-xp.lille.inria.fr/'.
 ```
 
-The current default endpoint is `https://rmod-xp.lille.inria.fr/complishon`.
-Change it in `CopilotSettings class >> defaultDataSharingEndpointUrl` if the
-production collector moves.
+You can also provide the URL when the image starts:
+
+```sh
+PHARO_COPILOT_COLLECTOR_URL='https://rmod-xp.lille.inria.fr/' pharo Pharo.image
+```
+
+The default production endpoint is `https://rmod-xp.lille.inria.fr/`.
+`PHARO_COPILOT_COLLECTOR_URL` or a saved
+`CopilotSettings dataSharingEndpointUrl:` value can override it.
+
+The public domain must forward `PUT /` requests to the Python collector. For
+example, a reverse proxy can terminate HTTPS on port 443 and forward to the
+collector running locally on `127.0.0.1:9093`.
 
 The collector metadata path is:
 
