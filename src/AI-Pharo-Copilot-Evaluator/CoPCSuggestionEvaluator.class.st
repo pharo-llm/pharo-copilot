@@ -314,6 +314,7 @@ CoPCSuggestionEvaluator >> recordSuggestionAccepted: aCopilotEntry context: aCom
 	
 	acceptedEntries add: evaluationEntry.
 	self updateStats: evaluationEntry.
+	self recordTelemetryForEvaluationEntry: evaluationEntry.
 	self savePersistentStats.
 	
 	"Notify for potential model improvement"
@@ -333,6 +334,7 @@ CoPCSuggestionEvaluator >> recordSuggestionIgnored: aCopilotEntry context: aComp
 	
 	"For ignored suggestions, we don't add to either collection but update stats"
 	self updateStats: evaluationEntry.
+	self recordTelemetryForEvaluationEntry: evaluationEntry.
 ]
 
 { #category : 'initialization' }
@@ -348,8 +350,19 @@ CoPCSuggestionEvaluator >> recordSuggestionRejected: aCopilotEntry context: aCom
 		yourself.
 	rejectedEntries add: evaluationEntry.
 	self updateStats: evaluationEntry.
+	self recordTelemetryForEvaluationEntry: evaluationEntry.
 	self savePersistentStats.
 	self announceEvaluation: evaluationEntry.
+]
+
+{ #category : 'initialization' }
+CoPCSuggestionEvaluator >> recordTelemetryForEvaluationEntry: anEvaluationEntry [
+
+	[
+		CoPharoCopilotTelemetry
+			recordEvent: 'suggestion-evaluated'
+			details: (self telemetryDetailsForEvaluationEntry: anEvaluationEntry)
+	] on: Error do: [ :ignored | ]
 ]
 
 { #category : 'initialization' }
@@ -400,6 +413,30 @@ CoPCSuggestionEvaluator >> savePersistentStats [
 { #category : 'initialization' }
 CoPCSuggestionEvaluator >> sessionStats [
 	^ sessionStats
+]
+
+{ #category : 'initialization' }
+CoPCSuggestionEvaluator >> telemetryDetailsForEvaluationEntry: anEvaluationEntry [
+	"Answer sanitized telemetry. Do not include source code, prompts, generated
+	completions, or the raw suggestion text."
+
+	| suggestion suggestionLength |
+	suggestion := anEvaluationEntry suggestion.
+	suggestionLength := suggestion
+		ifNil: [ 0 ]
+		ifNotNil: [
+			[ (suggestion contents ifNil: [ '' ]) size ]
+				on: Error
+				do: [ :ignored | 0 ] ].
+
+	^ Dictionary new
+		at: #timestamp put: anEvaluationEntry timestamp asString;
+		at: #action put: anEvaluationEntry action asString;
+		at: #contextType put: (self determineContextType: anEvaluationEntry context) asString;
+		at: #modelName put: CopilotSettings modelName;
+		at: #suggestionLength put: suggestionLength;
+		at: #rejectionReason put: anEvaluationEntry rejectionReason;
+		yourself
 ]
 
 { #category : 'initialization' }

@@ -117,6 +117,20 @@ CopilotSettingsTest >> testDefaultCompletionModelIsQuantizedPharoQwen [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testDataSharingDefaultsAreOptIn [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self deny: CopilotSettings dataSharingEnabled.
+		self assert: CopilotSettings dataSharingConsent isNil.
+		self
+			assert: CopilotSettings dataSharingEndpointUrl
+			equals: CopilotSettings defaultDataSharingEndpointUrl.
+		self
+			assert: CopilotSettings dataSharingCategory
+			equals: 'pharo-copilot' ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
 
 	CopilotSettings withDefaultSettingsDo: [
@@ -618,6 +632,59 @@ CopilotSettingsTest >> testRecordPrivacyPolicyConsentWritesEvaluationJsonEntr [
 			tempDir exists ifTrue: [ tempDir ensureDelete ].
 			CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
 			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRecordDataSharingConsentStoresDecisionAndWritesEvaluationJson [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| tempDir tempEvalFile originalDirRef originalEvalRef jsonLine parsed snapshot consent |
+		tempDir := FileLocator temp / ('copilot-data-sharing-consent-test-' , UUID new asString).
+		tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
+		originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
+		originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
+		[
+			CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
+			CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
+			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+			CopilotSettings dataSharingEndpointUrl: ''.
+
+			CopilotSettings recordDataSharingUserConsentAccepted: true.
+
+			self assert: CopilotSettings dataSharingEnabled.
+			snapshot := CopilotSettings serializableSettingsSnapshot.
+			consent := snapshot at: #dataSharingConsent.
+			self assert: (consent at: #accepted) equals: true.
+			self assert: ((snapshot at: #dataSharingParticipantUUID) isNil not).
+
+			jsonLine := tempEvalFile readStreamDo: [ :stream | stream nextLine ].
+			parsed := STONJSON fromString: jsonLine.
+			self assert: (parsed at: #event) equals: 'data-sharing-consent'.
+			self assert: ((parsed at: #data) at: #accepted) equals: true.
+			self assert: ((parsed at: #data) includesKey: #timestamp)
+		] ensure: [
+			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+			tempDir exists ifTrue: [ tempDir ensureDelete ].
+			CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testTelemetryCategoryFieldValueMatchesCollectorMetadata [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| metadata |
+		CopilotSettings dataSharingCategory: 'pharo-copilot'.
+		CopilotSettings dataSharingExperienceId: 'pharo-copilot'.
+		CopilotSettings dataSharingParticipantUUID: 'participant-01'.
+		CopilotSettings dataSharingTaskOrSurveyId: 'session-1'.
+
+		metadata := STON fromString: CoPharoCopilotTelemetry categoryFieldValue.
+
+		self assert: (metadata at: 'category') equals: 'pharo-copilot'.
+		self assert: (metadata at: 'experienceId') equals: 'pharo-copilot'.
+		self assert: (metadata at: 'participantUUID') equals: 'participant-01'.
+		self assert: (metadata at: 'taskOrSurveyId') equals: 'session-1' ]
 ]
 
 { #category : 'tests' }

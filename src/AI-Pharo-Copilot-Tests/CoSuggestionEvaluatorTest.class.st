@@ -146,6 +146,33 @@ CoSuggestionEvaluatorTest >> testRecordSuggestionIgnored [
 ]
 
 { #category : 'running' }
+CoSuggestionEvaluatorTest >> testTelemetryDetailsDoNotIncludeSuggestionText [
+
+	| context entry evaluationEntry details |
+	context := CoPCContext new.
+	context source: 'methodName { #category : ''accessing'' }'.
+	entry := CoCopilotEntry contents: 'secret generated completion'.
+	evaluationEntry := CoPCEvaluationEntry new
+		suggestion: entry;
+		context: context;
+		timestamp: DateAndTime now;
+		action: #rejected;
+		rejectionReason: 'not useful';
+		yourself.
+
+	details := evaluator telemetryDetailsForEvaluationEntry: evaluationEntry.
+
+	self assert: (details at: #action) equals: 'rejected'.
+	self assert: (details at: #contextType) equals: 'method'.
+	self
+		assert: (details at: #suggestionLength)
+		equals: 'secret generated completion' size.
+	self assert: (details at: #rejectionReason) equals: 'not useful'.
+	self deny: (details includesKey: #suggestion).
+	self deny: (details values includes: 'secret generated completion')
+]
+
+{ #category : 'running' }
 CoSuggestionEvaluatorTest >> testRejectionRateCalculation [
 
 	| context |

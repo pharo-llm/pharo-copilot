@@ -37,7 +37,14 @@ Class {
 		'minimumPrefixLength',
 		'completionSuggestionsCount',
 		'backgroundColor',
-		'installModelUserConsent'
+		'installModelUserConsent',
+		'dataSharingConsent',
+		'dataSharingEnabled',
+		'dataSharingEndpointUrl',
+		'dataSharingCategory',
+		'dataSharingExperienceId',
+		'dataSharingParticipantUUID',
+		'dataSharingTaskOrSurveyId'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -617,8 +624,138 @@ CopilotSettings class >> initializeDefaults [
 	completionSuggestionsCount := 1.
 	backgroundColor := self defaultBackgroundColor.
 	installModelUserConsent := false.
+	dataSharingConsent := nil.
+	dataSharingEnabled := false.
+	dataSharingEndpointUrl := self defaultDataSharingEndpointUrl.
+	dataSharingCategory := 'pharo-copilot'.
+	dataSharingExperienceId := 'pharo-copilot'.
+	dataSharingParticipantUUID := nil.
+	dataSharingTaskOrSurveyId := 'usage'.
 	ollamaClientFactory := [ CoPCOllamaClient new ].
 	modelMetadata := nil
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingCategory [
+
+	^ dataSharingCategory ifNil: [ dataSharingCategory := 'pharo-copilot' ]
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingCategory: aStringOrSymbol [
+
+	dataSharingCategory := aStringOrSymbol asString.
+	self autoSaveSettings
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingConsent [
+
+	^ dataSharingConsent
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingEnabled [
+
+	^ dataSharingEnabled ifNil: [ dataSharingEnabled := false ]
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingEnabled: aBoolean [
+
+	dataSharingEnabled := aBoolean.
+	self autoSaveSettings
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingEndpointUrl [
+
+	^ dataSharingEndpointUrl ifNil: [
+		  dataSharingEndpointUrl := self defaultDataSharingEndpointUrl ]
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingEndpointUrl: aStringOrNil [
+
+	dataSharingEndpointUrl := aStringOrNil ifNotNil: [ aStringOrNil asString ].
+	self autoSaveSettings
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingExperienceId [
+
+	^ dataSharingExperienceId ifNil: [ dataSharingExperienceId := 'pharo-copilot' ]
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingExperienceId: aStringOrSymbol [
+
+	dataSharingExperienceId := aStringOrSymbol asString.
+	self autoSaveSettings
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingParticipantUUID [
+
+	^ dataSharingParticipantUUID ifNil: [
+		  dataSharingParticipantUUID := UUID new asString36.
+		  self autoSaveSettings.
+		  dataSharingParticipantUUID ]
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingParticipantUUIDForSettings [
+
+	^ dataSharingParticipantUUID ifNil: [ '' ]
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingParticipantUUID: aStringOrNil [
+
+	| string |
+	aStringOrNil ifNil: [
+		dataSharingParticipantUUID := nil.
+		self autoSaveSettings.
+		^ self ].
+
+	string := aStringOrNil asString trimBoth.
+	dataSharingParticipantUUID := string isEmpty
+		ifTrue: [ nil ]
+		ifFalse: [ string ].
+	self autoSaveSettings
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingPromptMessage [
+
+	^ 'Do you want to send anonymous Pharo-Copilot usage data to help us improve Pharo-Copilot?'
+	  , String cr , String cr
+	  , 'Pharo-Copilot will not send your source code, prompts, or generated completions.'
+	  , String cr
+	  , 'You can change this later from CopilotSettings.'
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingTaskOrSurveyId [
+
+	^ dataSharingTaskOrSurveyId ifNil: [ dataSharingTaskOrSurveyId := 'usage' ]
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> dataSharingTaskOrSurveyId: aStringOrSymbol [
+
+	dataSharingTaskOrSurveyId := aStringOrSymbol asString.
+	self autoSaveSettings
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> defaultDataSharingEndpointUrl [
+
+	"Use the hosted collector route for released images. During local
+	development, override with:
+		CopilotSettings dataSharingEndpointUrl: 'http://127.0.0.1:9091/complishon'"
+
+	^ 'https://rmod-xp.lille.inria.fr/complishon'
 ]
 
 { #category : 'accessing' }
@@ -1588,6 +1725,65 @@ CopilotSettings class >> promptToInstallMissingModelNamed: aModelName availableM
 	^ confirmation
 ]
 
+{ #category : 'data sharing' }
+CopilotSettings class >> promptForDataSharingConsentAfterSetupIfNeeded [
+	"Ask once, after setup has made the local models available, whether the user
+	agrees to send anonymous telemetry. Answer the accepted boolean, or nil if no
+	UI confirmation facility is available."
+
+	| confirmation |
+	dataSharingConsent ifNotNil: [ ^ dataSharingEnabled ].
+
+	confirmation := self confirmViaUIManager: self dataSharingPromptMessage.
+	confirmation ifNil: [ ^ nil ].
+
+	self recordDataSharingUserConsentAccepted: confirmation.
+	^ confirmation
+]
+
+{ #category : 'data sharing' }
+CopilotSettings class >> recordDataSharingUserConsentAccepted: aBoolean [
+	"Persist the data sharing decision and append an audit entry to the local
+	evaluation log. Remote telemetry starts only when the user accepted."
+
+	| consentRecord evalFile |
+	consentRecord := Dictionary new
+		at: #accepted put: aBoolean;
+		at: #timestamp put: DateAndTime now asString;
+		at: #endpointUrl put: self dataSharingEndpointUrl;
+		at: #category put: self dataSharingCategory;
+		at: #experienceId put: self dataSharingExperienceId;
+		at: #participantUUID put: (aBoolean
+			ifTrue: [ self dataSharingParticipantUUID ]
+			ifFalse: [ dataSharingParticipantUUID ]);
+		at: #taskOrSurveyId put: self dataSharingTaskOrSurveyId;
+		yourself.
+
+	dataSharingConsent := consentRecord.
+	dataSharingEnabled := aBoolean.
+	self autoSaveSettings.
+
+	[
+		CoPharoCopilotLogger ensureEvaluationLogFileInitialized.
+		evalFile := CoPharoCopilotLogger evaluationLogFileReference.
+		evalFile writeStreamDo: [ :stream |
+			stream setToEnd.
+			stream
+				nextPutAll: (STONJSON toString: (Dictionary new
+					at: #event put: 'data-sharing-consent';
+					at: #data put: consentRecord;
+					yourself));
+				nextPut: Character lf ]
+	] on: Error do: [ :ignored | ].
+
+	(aBoolean and: [ self dataSharingEndpointUrl asString trimBoth isEmpty not ]) ifTrue: [
+		[
+			CoPharoCopilotTelemetry
+				recordEvent: 'data-sharing-enabled'
+				details: consentRecord
+		] on: Error do: [ :ignored | ] ]
+]
+
 { #category : 'settings' }
 CopilotSettings class >> recordInstallModelUserConsentForModelNamed: aModelName accepted: aBoolean [
 	"Persist the most recent user consent decision and append it to the evaluation log."
@@ -1781,6 +1977,13 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	completionSuggestionsCount := self valueAt: #completionSuggestionsCount from: aDictionary default: completionSuggestionsCount.
 	backgroundColor := self valueAt: #backgroundColor from: aDictionary default: backgroundColor.
 	installModelUserConsent := self valueAt: #installModelUserConsent from: aDictionary default: installModelUserConsent.
+	dataSharingConsent := self valueAt: #dataSharingConsent from: aDictionary default: dataSharingConsent.
+	dataSharingEnabled := self valueAt: #dataSharingEnabled from: aDictionary default: dataSharingEnabled.
+	dataSharingEndpointUrl := self valueAt: #dataSharingEndpointUrl from: aDictionary default: dataSharingEndpointUrl.
+	dataSharingCategory := self valueAt: #dataSharingCategory from: aDictionary default: dataSharingCategory.
+	dataSharingExperienceId := self valueAt: #dataSharingExperienceId from: aDictionary default: dataSharingExperienceId.
+	dataSharingParticipantUUID := self valueAt: #dataSharingParticipantUUID from: aDictionary default: dataSharingParticipantUUID.
+	dataSharingTaskOrSurveyId := self valueAt: #dataSharingTaskOrSurveyId from: aDictionary default: dataSharingTaskOrSurveyId.
 
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
 	templatesPath = nil ifFalse: [
@@ -1837,6 +2040,13 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ aDictionary at: #CompletionSuggestionsCount ifAbsent: [ nil ] ].
 backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ aDictionary at: #BackgroundColor ifAbsent: [ nil ] ].
 installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ aDictionary at: #InstallModelUserConsent ifAbsent: [ nil ] ].
+dataSharingConsent := aDictionary at: #dataSharingConsent ifAbsent: [ aDictionary at: #DataSharingConsent ifAbsent: [ nil ] ].
+dataSharingEnabled := aDictionary at: #dataSharingEnabled ifAbsent: [ aDictionary at: #DataSharingEnabled ifAbsent: [ false ] ].
+dataSharingEndpointUrl := aDictionary at: #dataSharingEndpointUrl ifAbsent: [ aDictionary at: #DataSharingEndpointUrl ifAbsent: [ self defaultDataSharingEndpointUrl ] ].
+dataSharingCategory := aDictionary at: #dataSharingCategory ifAbsent: [ aDictionary at: #DataSharingCategory ifAbsent: [ 'pharo-copilot' ] ].
+dataSharingExperienceId := aDictionary at: #dataSharingExperienceId ifAbsent: [ aDictionary at: #DataSharingExperienceId ifAbsent: [ 'pharo-copilot' ] ].
+dataSharingParticipantUUID := aDictionary at: #dataSharingParticipantUUID ifAbsent: [ aDictionary at: #DataSharingParticipantUUID ifAbsent: [ nil ] ].
+dataSharingTaskOrSurveyId := aDictionary at: #dataSharingTaskOrSurveyId ifAbsent: [ aDictionary at: #DataSharingTaskOrSurveyId ifAbsent: [ 'usage' ] ].
 self useDefaultCompletionModelWhenSavedModelIsMissingOrNull
 ]
 
@@ -1947,6 +2157,13 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #completionSuggestionsCount put: completionSuggestionsCount;
 		            at: #backgroundColor put: backgroundColor;
 		at: #installModelUserConsent put: installModelUserConsent;
+		at: #dataSharingConsent put: dataSharingConsent;
+		at: #dataSharingEnabled put: dataSharingEnabled;
+		at: #dataSharingEndpointUrl put: dataSharingEndpointUrl;
+		at: #dataSharingCategory put: dataSharingCategory;
+		at: #dataSharingExperienceId put: dataSharingExperienceId;
+		at: #dataSharingParticipantUUID put: dataSharingParticipantUUID;
+		at: #dataSharingTaskOrSurveyId put: dataSharingTaskOrSurveyId;
 		            yourself.
 	templatesDirectory ifNotNil: [
 			templatesPath := [ templatesDirectory pathString ]
@@ -2013,6 +2230,33 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #loggingEnabled:;
 					default: self loggingEnabled;
 					description: 'When disabled, Copilot will not record activity or evaluation logs.'.
+
+				(aBuilder setting: #dataSharingEnabled)
+					order: 0.31;
+					label: 'Send anonymous usage data';
+					target: self;
+					getSelector: #dataSharingEnabled;
+					setSelector: #dataSharingEnabled:;
+					default: self dataSharingEnabled;
+					description: 'When enabled, Pharo-Copilot sends anonymous telemetry to the configured collector. Source code, prompts, and generated completions are not sent.'.
+
+				(aBuilder setting: #dataSharingEndpointUrl)
+					order: 0.32;
+					label: 'Usage data collector URL';
+					target: self;
+					getSelector: #dataSharingEndpointUrl;
+					setSelector: #dataSharingEndpointUrl:;
+					default: self dataSharingEndpointUrl;
+					description: 'HTTP endpoint of the deployed pharo-copilot-collector, for example https://your-domain.example/complishon or http://127.0.0.1:9091/complishon.'.
+
+				(aBuilder setting: #dataSharingParticipantUUID)
+					order: 0.33;
+					label: 'Anonymous participant id';
+					target: self;
+					getSelector: #dataSharingParticipantUUIDForSettings;
+					setSelector: #dataSharingParticipantUUID:;
+					default: self dataSharingParticipantUUIDForSettings;
+					description: 'Random local identifier used to group telemetry from this image without using a real user name.'.
 
 				(aBuilder setting: #autoInstallModelScriptEnabled)
 					order: 0.4;
@@ -2254,6 +2498,13 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #completionSuggestionsCount put: completionSuggestionsCount;
 		  at: #backgroundColor put: backgroundColor;
 		at: #installModelUserConsent put: installModelUserConsent;
+		  at: #dataSharingConsent put: dataSharingConsent;
+		  at: #dataSharingEnabled put: dataSharingEnabled;
+		  at: #dataSharingEndpointUrl put: dataSharingEndpointUrl;
+		  at: #dataSharingCategory put: dataSharingCategory;
+		  at: #dataSharingExperienceId put: dataSharingExperienceId;
+		  at: #dataSharingParticipantUUID put: dataSharingParticipantUUID;
+		  at: #dataSharingTaskOrSurveyId put: dataSharingTaskOrSurveyId;
 		  yourself
 ]
 

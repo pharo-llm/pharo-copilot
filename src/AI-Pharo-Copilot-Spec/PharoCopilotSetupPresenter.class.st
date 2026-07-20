@@ -37,6 +37,16 @@ PharoCopilotSetupPresenter >> contentContainer: anObject [
 	contentContainer := anObject
 ]
 
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> completeSuccessfulSetupWithMessage: messageString [
+
+	statusLabel label: messageString.
+	CopilotSettings notifyUser: messageString.
+	CopilotSettings promptForDataSharingConsentAfterSetupIfNeeded.
+	CoPharoCopilotTelemetry recordSetupCompleted.
+	self window close
+]
+
 { #category : 'layout' }
 PharoCopilotSetupPresenter >> defaultLayout [
 
@@ -153,9 +163,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		CopilotSettings installCompletionEngineIfAvailable.
 		self setupProgressPercentage: 100.
 		^ self deferUI: [
-			statusLabel label: 'OKAY! Pharo-Copilot setup is complete.'.
-			CopilotSettings notifyUser: 'OKAY! Pharo-Copilot setup is complete.'.
-			self window close
+			self completeSuccessfulSetupWithMessage: 'OKAY! Pharo-Copilot setup is complete.'
 		]
 	].
 
@@ -234,9 +242,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 				CopilotSettings ensureDefaultCompletionModelSelected.
 				CopilotSettings installCompletionEngineIfAvailable.
 				self setupProgressPercentage: 100.
-				statusLabel label: 'Pharo-Copilot setup is complete.'.
-				CopilotSettings notifyUser: 'Pharo-Copilot setup is complete.'.
-				self window close ]
+				self completeSuccessfulSetupWithMessage: 'Pharo-Copilot setup is complete.' ]
 			ifFalse: [
 				statusLabel label:
 					('Setup finished with {1}/{2} model(s) not available in Ollama. Check the message above, Ollama logs, and ''ollama list''.'

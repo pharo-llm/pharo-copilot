@@ -32,6 +32,50 @@ You can install the default model manually with:
 ollama pull pharo-llm/Qwen2.5-Coder-SFT:q4_K_M
 ```
 
+## Optional Usage Data Collection
+
+After setup finishes downloading/verifying the required models, Pharo-Copilot
+asks whether the user wants to send anonymous usage data to help improve
+Pharo-Copilot. The default is opt-in only: if the user answers No, no remote
+telemetry is sent.
+
+User images cannot write directly to a server filesystem path such as
+`/home/oabedelk/pharo-copilot-collector`. They must send HTTP to a deployed
+collector URL. The Python collector stores received data on the server side.
+
+For local development with the Python collector:
+
+```sh
+cd /home/oabedelk/pharo-copilot-collector
+./start.sh --port 9091
+```
+
+Then configure the Pharo image before running setup:
+
+```smalltalk
+CopilotSettings dataSharingEndpointUrl: 'http://127.0.0.1:9091/complishon'.
+```
+
+For released images, deploy the Python collector behind a public HTTPS URL and
+set that URL instead:
+
+```smalltalk
+CopilotSettings dataSharingEndpointUrl: 'https://your-domain.example/complishon'.
+```
+
+The current default endpoint is `https://rmod-xp.lille.inria.fr/complishon`.
+Change it in `CopilotSettings class >> defaultDataSharingEndpointUrl` if the
+production collector moves.
+
+The collector metadata path is:
+
+```text
+data/pharo-copilot/pharo-copilot/<anonymous-participant-id>/usage/
+```
+
+Telemetry payloads intentionally avoid source code, prompts, and generated
+completions.
+
 
 # Example
 
