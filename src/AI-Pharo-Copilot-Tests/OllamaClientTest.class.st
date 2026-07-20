@@ -32,34 +32,6 @@ OllamaClientTest >> testGenerateBuildsCorrectPayload [
 ]
 
 { #category : 'tests' }
-OllamaClientTest >> testGenerateIncludesFormatWhenSet [
-	| client mock payload |
-	client := CoPCOllamaClient new.
-	client instVarNamed: 'format' put: 'json'.
-	mock := OAHttpTransportMockExtended new.
-	client instVarNamed: 'transport' put: mock.
-	
-	client generate: 'test'.
-	
-	payload := mock lastBody.
-	self assert: (payload at: #format) equals: 'json'
-]
-
-{ #category : 'tests' }
-OllamaClientTest >> testGenerateIncludesOptionsWhenNotEmpty [
-        | client mock payload |
-        client := CoPCOllamaClient new.
-        client optionAt: #temperature put: 0.7.
-        mock := OAHttpTransportMockExtended new.
-        client instVarNamed: 'transport' put: mock.
-
-        client generate: 'test'.
-
-        payload := mock lastBody.
-        self assert: ((payload at: #options) at: #temperature) equals: 0.7
-]
-
-{ #category : 'tests' }
 OllamaClientTest >> testGenerateForPrefixPlacesInteractionHistoryBeforeFimPrompt [
 
 	| client mock payload prompt context historyIndex fimIndex middleIndex oldFactory stub |
@@ -129,6 +101,34 @@ OllamaClientTest >> testGenerateForPrefixReusesFimTemplateWithinClient [
 	] ensure: [
 		CopilotSettings ollamaClientFactory: oldFactory.
 		CopilotSettings clearCachedModelMetadata ]
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testGenerateIncludesFormatWhenSet [
+	| client mock payload |
+	client := CoPCOllamaClient new.
+	client instVarNamed: 'format' put: 'json'.
+	mock := OAHttpTransportMockExtended new.
+	client instVarNamed: 'transport' put: mock.
+	
+	client generate: 'test'.
+	
+	payload := mock lastBody.
+	self assert: (payload at: #format) equals: 'json'
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testGenerateIncludesOptionsWhenNotEmpty [
+        | client mock payload |
+        client := CoPCOllamaClient new.
+        client optionAt: #temperature put: 0.7.
+        mock := OAHttpTransportMockExtended new.
+        client instVarNamed: 'transport' put: mock.
+
+        client generate: 'test'.
+
+        payload := mock lastBody.
+        self assert: ((payload at: #options) at: #temperature) equals: 0.7
 ]
 
 { #category : 'tests' }

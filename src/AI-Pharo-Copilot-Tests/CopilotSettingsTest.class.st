@@ -49,46 +49,6 @@ CopilotSettingsTest >> testAvailableProvidersIncludesOllama [
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testInstallModelNamedForSetupReturnsFalseWhenPullReportsError [
-
-	| stub oldFactory modelName |
-	modelName := CopilotSettings predefinedDownloadableModelNames first.
-	stub := OllamaClientStub new
-		withPullBlock: [ :requestedModel |
-			Dictionary new
-				at: #error put: 'model not found';
-				yourself ].
-	oldFactory := CopilotSettings ollamaClientFactory.
-
-	[
-		CopilotSettings ollamaClientFactory: [ stub ].
-		self deny: (CopilotSettings installModelNamedForSetup: modelName)
-	] ensure: [
-		CopilotSettings ollamaClientFactory: oldFactory.
-		CopilotSettings clearCachedModelMetadata ]
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testInstallModelNamedReturnsFalseWhenPullReportsError [
-
-	| stub oldFactory modelName |
-	modelName := CopilotSettings predefinedDownloadableModelNames first.
-	stub := OllamaClientStub new
-		withPullBlock: [ :requestedModel |
-			Dictionary new
-				at: 'error' put: 'model not found';
-				yourself ].
-	oldFactory := CopilotSettings ollamaClientFactory.
-
-	[
-		CopilotSettings ollamaClientFactory: [ stub ].
-		self deny: (CopilotSettings installModelNamed: modelName)
-	] ensure: [
-		CopilotSettings ollamaClientFactory: oldFactory.
-		CopilotSettings clearCachedModelMetadata ]
-]
-
-{ #category : 'tests' }
 CopilotSettingsTest >> testClearCachedModelMetadataForcesNextFetch [
     | stub oldFactory first second |
     stub := OllamaClientStub new withResponse: (Dictionary new
@@ -108,30 +68,6 @@ CopilotSettingsTest >> testClearCachedModelMetadataForcesNextFetch [
         CopilotSettings ollamaClientFactory: oldFactory.
         CopilotSettings clearCachedModelMetadata.
     ].
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testDefaultCompletionModelIsQuantizedPharoQwen [
-
-	self
-		assert: CopilotSettings defaultCompletionModelName
-		equals: 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'.
-	self
-		assert: CoPCOllamaClient defaultModelFullName
-		equals: 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testEnsureDefaultCompletionModelSelectedReplacesNullModel [
-
-	CopilotSettings withDefaultSettingsDo: [
-		CopilotSettings modelName: CopilotSettings nullModelFullName.
-		self
-			assert: CopilotSettings ensureDefaultCompletionModelSelected
-			equals: CopilotSettings defaultCompletionModelName.
-		self
-			assert: CopilotSettings modelName
-			equals: CopilotSettings defaultCompletionModelName ]
 ]
 
 { #category : 'tests' }
@@ -170,6 +106,17 @@ CopilotSettingsTest >> testCopilotProviderAccessor [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testDefaultCompletionModelIsQuantizedPharoQwen [
+
+	self
+		assert: CopilotSettings defaultCompletionModelName
+		equals: 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'.
+	self
+		assert: CoPCOllamaClient defaultModelFullName
+		equals: 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
 
 	CopilotSettings withDefaultSettingsDo: [
@@ -203,6 +150,19 @@ CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testEnsureDefaultCompletionModelSelectedReplacesNullModel [
+
+	CopilotSettings withDefaultSettingsDo: [
+		CopilotSettings modelName: CopilotSettings nullModelFullName.
+		self
+			assert: CopilotSettings ensureDefaultCompletionModelSelected
+			equals: CopilotSettings defaultCompletionModelName.
+		self
+			assert: CopilotSettings modelName
+			equals: CopilotSettings defaultCompletionModelName ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testEnsureSelectedModelAvailableShortCircuitsForNullModel [
 
     CopilotSettings withDefaultSettingsDo: [
@@ -210,6 +170,16 @@ CopilotSettingsTest >> testEnsureSelectedModelAvailableShortCircuitsForNullModel
         CopilotSettings modelName: CopilotSettings nullModelFullName.
         self assert: CopilotSettings ensureSelectedModelAvailable.
     ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testFastCompletionDefaults [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self assert: CopilotSettings completionDebounceMilliseconds equals: 0.
+		self assert: CopilotSettings completionIdleMilliseconds equals: 75.
+		self assert: CopilotSettings numPredict equals: 32.
+	]
 ]
 
 { #category : 'tests' }
@@ -235,16 +205,6 @@ CopilotSettingsTest >> testFimTemplateUsesMetadataTemplateWhenAvailable [
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testFastCompletionDefaults [
-
-	CopilotSettings withDefaultSettingsDo: [
-		self assert: CopilotSettings completionDebounceMilliseconds equals: 0.
-		self assert: CopilotSettings completionIdleMilliseconds equals: 75.
-		self assert: CopilotSettings numPredict equals: 32.
-	]
-]
-
-{ #category : 'tests' }
 CopilotSettingsTest >> testHostAccessor [
     | old |
     old := CopilotSettings host.
@@ -252,6 +212,46 @@ CopilotSettingsTest >> testHostAccessor [
         CopilotSettings host: 'localhost'.
         self assert: CopilotSettings host equals: 'localhost'
     ] ensure: [ CopilotSettings host: old ].
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testInstallModelNamedForSetupReturnsFalseWhenPullReportsError [
+
+	| stub oldFactory modelName |
+	modelName := CopilotSettings predefinedDownloadableModelNames first.
+	stub := OllamaClientStub new
+		withPullBlock: [ :requestedModel |
+			Dictionary new
+				at: #error put: 'model not found';
+				yourself ].
+	oldFactory := CopilotSettings ollamaClientFactory.
+
+	[
+		CopilotSettings ollamaClientFactory: [ stub ].
+		self deny: (CopilotSettings installModelNamedForSetup: modelName)
+	] ensure: [
+		CopilotSettings ollamaClientFactory: oldFactory.
+		CopilotSettings clearCachedModelMetadata ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testInstallModelNamedReturnsFalseWhenPullReportsError [
+
+	| stub oldFactory modelName |
+	modelName := CopilotSettings predefinedDownloadableModelNames first.
+	stub := OllamaClientStub new
+		withPullBlock: [ :requestedModel |
+			Dictionary new
+				at: 'error' put: 'model not found';
+				yourself ].
+	oldFactory := CopilotSettings ollamaClientFactory.
+
+	[
+		CopilotSettings ollamaClientFactory: [ stub ].
+		self deny: (CopilotSettings installModelNamed: modelName)
+	] ensure: [
+		CopilotSettings ollamaClientFactory: oldFactory.
+		CopilotSettings clearCachedModelMetadata ]
 ]
 
 { #category : 'tests' }
@@ -303,6 +303,23 @@ CopilotSettingsTest >> testMissingDefaultFimTemplateSignalsError [
             self should: [ CopilotSettings defaultFimTemplate ] raise: Error
         ] ensure: [ CoPharoCopilotLogger rawLogsDirectoryReference: originalLogsDir ]
     ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testMissingSetupModelNamesMatchesOllamaCanonicalLowercaseNames [
+
+	| response |
+	response := Dictionary new
+		at: #models put: {
+			Dictionary new
+				at: #name put: 'pharo-llm/qwen2.5-coder-sft:3b';
+				yourself.
+			Dictionary new
+				at: #name put: 'pharo-llm/qwen2.5-coder-sft:q4_k_m';
+				yourself };
+		yourself.
+
+	self assert: (CopilotSettings missingSetupModelNamesFrom: response) isEmpty
 ]
 
 { #category : 'tests' }
@@ -532,71 +549,6 @@ CopilotSettingsTest >> testNullModelGeneratesMetadataFiles [
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testMissingSetupModelNamesMatchesOllamaCanonicalLowercaseNames [
-
-	| response |
-	response := Dictionary new
-		at: #models put: {
-			Dictionary new
-				at: #name put: 'pharo-llm/qwen2.5-coder-sft:3b';
-				yourself.
-			Dictionary new
-				at: #name put: 'pharo-llm/qwen2.5-coder-sft:q4_k_m';
-				yourself };
-		yourself.
-
-	self assert: (CopilotSettings missingSetupModelNamesFrom: response) isEmpty
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testRefreshModelsAfterInstallMatchesOllamaCanonicalLowercaseName [
-
-	| stub oldFactory initialResponse |
-	stub := OllamaClientStub new
-		withModelsResponse: (Dictionary new
-			at: #models put: {
-				Dictionary new
-					at: #name put: 'pharo-llm/qwen2.5-coder-sft:3b';
-					yourself };
-			yourself).
-	oldFactory := CopilotSettings ollamaClientFactory.
-	initialResponse := Dictionary new at: #models put: #(); yourself.
-
-	[
-		CopilotSettings ollamaClientFactory: [ stub ].
-		self assert: (CopilotSettings
-			refreshModelsAfterInstallOf: 'pharo-llm/Qwen2.5-Coder-SFT:3b'
-			usingInitialResponse: initialResponse)
-	] ensure: [
-		CopilotSettings ollamaClientFactory: oldFactory.
-		CopilotSettings clearCachedModelMetadata ]
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testRefreshModelsAfterInstallFallsBackToShowModel [
-
-	| stub oldFactory initialResponse modelName |
-	modelName := 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'.
-	stub := OllamaClientStub new
-		withModelsResponse: (Dictionary new at: #models put: #(); yourself);
-		withResponse: (Dictionary new
-			at: #model put: modelName;
-			yourself).
-	oldFactory := CopilotSettings ollamaClientFactory.
-	initialResponse := Dictionary new at: #models put: #(); yourself.
-
-	[
-		CopilotSettings ollamaClientFactory: [ stub ].
-		self assert: (CopilotSettings
-			refreshModelsAfterInstallOf: modelName
-			usingInitialResponse: initialResponse).
-		self assert: stub lastRequestedModel equals: modelName
-	] ensure: [
-		CopilotSettings ollamaClientFactory: oldFactory.
-		CopilotSettings clearCachedModelMetadata ]
-]
-
-{ #category : 'tests' }
 CopilotSettingsTest >> testPortAccessor [
     | old |
     old := CopilotSettings port.
@@ -640,57 +592,6 @@ CopilotSettingsTest >> testRecordInstallModelConsentIsStoredInSnapshot [
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testRestoreSettingsMigratesNullModelToDefaultCompletionModel [
-
-	CopilotSettings withDefaultSettingsDo: [
-		| snapshot |
-		snapshot := CopilotSettings settingsSnapshot.
-		snapshot at: #modelName put: CopilotSettings nullModelFullName.
-		CopilotSettings restoreSettingsFromSnapshot: snapshot.
-		self
-			assert: CopilotSettings modelName
-			equals: CopilotSettings defaultCompletionModelName ]
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testRestoreSerializableSettingsUpgradesLegacyCompletionDefaults [
-
-	CopilotSettings withDefaultSettingsDo: [
-		| snapshot |
-		snapshot := CopilotSettings serializableSettingsSnapshot.
-		snapshot
-			at: #completionDebounceMilliseconds put: 100;
-			at: #completionIdleMilliseconds put: 300;
-			at: #numPredict put: 64.
-
-		CopilotSettings restoreSettingsFromSerializableSnapshot: snapshot.
-
-		self assert: CopilotSettings completionDebounceMilliseconds equals: 0.
-		self assert: CopilotSettings completionIdleMilliseconds equals: 75.
-		self assert: CopilotSettings numPredict equals: 32
-	]
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testRestoreSerializableSettingsKeepsCustomCompletionDefaults [
-
-	CopilotSettings withDefaultSettingsDo: [
-		| snapshot |
-		snapshot := CopilotSettings serializableSettingsSnapshot.
-		snapshot
-			at: #completionDebounceMilliseconds put: 25;
-			at: #completionIdleMilliseconds put: 150;
-			at: #numPredict put: 48.
-
-		CopilotSettings restoreSettingsFromSerializableSnapshot: snapshot.
-
-		self assert: CopilotSettings completionDebounceMilliseconds equals: 25.
-		self assert: CopilotSettings completionIdleMilliseconds equals: 150.
-		self assert: CopilotSettings numPredict equals: 48
-	]
-]
-
-{ #category : 'tests' }
 CopilotSettingsTest >> testRecordPrivacyPolicyConsentWritesEvaluationJsonEntr [
 
 
@@ -720,6 +621,54 @@ CopilotSettingsTest >> testRecordPrivacyPolicyConsentWritesEvaluationJsonEntr [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testRefreshModelsAfterInstallFallsBackToShowModel [
+
+	| stub oldFactory initialResponse modelName |
+	modelName := 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'.
+	stub := OllamaClientStub new
+		withModelsResponse: (Dictionary new at: #models put: #(); yourself);
+		withResponse: (Dictionary new
+			at: #model put: modelName;
+			yourself).
+	oldFactory := CopilotSettings ollamaClientFactory.
+	initialResponse := Dictionary new at: #models put: #(); yourself.
+
+	[
+		CopilotSettings ollamaClientFactory: [ stub ].
+		self assert: (CopilotSettings
+			refreshModelsAfterInstallOf: modelName
+			usingInitialResponse: initialResponse).
+		self assert: stub lastRequestedModel equals: modelName
+	] ensure: [
+		CopilotSettings ollamaClientFactory: oldFactory.
+		CopilotSettings clearCachedModelMetadata ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRefreshModelsAfterInstallMatchesOllamaCanonicalLowercaseName [
+
+	| stub oldFactory initialResponse |
+	stub := OllamaClientStub new
+		withModelsResponse: (Dictionary new
+			at: #models put: {
+				Dictionary new
+					at: #name put: 'pharo-llm/qwen2.5-coder-sft:3b';
+					yourself };
+			yourself).
+	oldFactory := CopilotSettings ollamaClientFactory.
+	initialResponse := Dictionary new at: #models put: #(); yourself.
+
+	[
+		CopilotSettings ollamaClientFactory: [ stub ].
+		self assert: (CopilotSettings
+			refreshModelsAfterInstallOf: 'pharo-llm/Qwen2.5-Coder-SFT:3b'
+			usingInitialResponse: initialResponse)
+	] ensure: [
+		CopilotSettings ollamaClientFactory: oldFactory.
+		CopilotSettings clearCachedModelMetadata ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testRequestTimeoutSecondsNormalization [
     CopilotSettings withDefaultSettingsDo: [
         CopilotSettings requestTimeoutSeconds: 100.
@@ -729,6 +678,57 @@ CopilotSettingsTest >> testRequestTimeoutSecondsNormalization [
         CopilotSettings requestTimeoutSeconds: 15.
         self assert: CopilotSettings requestTimeoutSeconds equals: 15.
     ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRestoreSerializableSettingsKeepsCustomCompletionDefaults [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		snapshot := CopilotSettings serializableSettingsSnapshot.
+		snapshot
+			at: #completionDebounceMilliseconds put: 25;
+			at: #completionIdleMilliseconds put: 150;
+			at: #numPredict put: 48.
+
+		CopilotSettings restoreSettingsFromSerializableSnapshot: snapshot.
+
+		self assert: CopilotSettings completionDebounceMilliseconds equals: 25.
+		self assert: CopilotSettings completionIdleMilliseconds equals: 150.
+		self assert: CopilotSettings numPredict equals: 48
+	]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRestoreSerializableSettingsUpgradesLegacyCompletionDefaults [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		snapshot := CopilotSettings serializableSettingsSnapshot.
+		snapshot
+			at: #completionDebounceMilliseconds put: 100;
+			at: #completionIdleMilliseconds put: 300;
+			at: #numPredict put: 64.
+
+		CopilotSettings restoreSettingsFromSerializableSnapshot: snapshot.
+
+		self assert: CopilotSettings completionDebounceMilliseconds equals: 0.
+		self assert: CopilotSettings completionIdleMilliseconds equals: 75.
+		self assert: CopilotSettings numPredict equals: 32
+	]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRestoreSettingsMigratesNullModelToDefaultCompletionModel [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		snapshot := CopilotSettings settingsSnapshot.
+		snapshot at: #modelName put: CopilotSettings nullModelFullName.
+		CopilotSettings restoreSettingsFromSnapshot: snapshot.
+		self
+			assert: CopilotSettings modelName
+			equals: CopilotSettings defaultCompletionModelName ]
 ]
 
 { #category : 'tests' }

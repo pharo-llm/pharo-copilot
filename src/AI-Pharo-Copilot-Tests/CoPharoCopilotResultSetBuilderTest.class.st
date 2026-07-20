@@ -76,46 +76,6 @@ CoPharoCopilotResultSetBuilderTest >> testClassContextIsCached [
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testInteractionHistoryIsFinalContextSection [
-
-	| builder base history result historyIndex sampleIndex |
-	builder := CoPharoCopilotResultSetBuilder new.
-	base := '<|repo_name|>Sample', String lf,
-		'<|file_sep|>Sample', String lf,
-		'Class { #name : #Sample }', String lf.
-	history := 'Browser navigation history (Calypso):', String lf,
-		'Current selection:', String lf,
-		'  pane 1: Sample'.
-
-	result := builder appendInteractionHistory: history toContext: base.
-
-	historyIndex := result findString: '<|file_sep|>IDE interaction history' startingAt: 1.
-	sampleIndex := result findString: '<|file_sep|>Sample' startingAt: 1.
-
-	self assert: (result beginsWith: base).
-	self assert: historyIndex > 0.
-	self assert: sampleIndex > 0.
-	self assert: historyIndex > sampleIndex.
-	self assert: (result includesSubstring: history).
-	self assert: (result endsWith: String lf)
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testInteractionHistoryUsesContextSectionWhenBaseIsEmpty [
-
-	| builder result |
-	builder := CoPharoCopilotResultSetBuilder new.
-
-	result := builder
-		appendInteractionHistory: 'Current selection: Sample'
-		toContext: ''.
-
-	self assert: (result beginsWith: '<|file_sep|>IDE interaction history').
-	self assert: (result includesSubstring: 'Current selection: Sample').
-	self assert: (result endsWith: String lf)
-]
-
-{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromEmptyResponse [
 	| builder context |
 	context := CoPCContext new.
@@ -281,6 +241,55 @@ CoPharoCopilotResultSetBuilderTest >> testDelayIsIdleWhenNoBoundaryTyped [
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testInitializeOnContextSetsCompletionContext [
+
+	| builder context |
+	context := CoPCContext new.
+	builder := CoPharoCopilotResultSetBuilder initializeOnContext: context.
+	self assert: builder completionContext identicalTo: context
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testInteractionHistoryIsFinalContextSection [
+
+	| builder base history result historyIndex sampleIndex |
+	builder := CoPharoCopilotResultSetBuilder new.
+	base := '<|repo_name|>Sample', String lf,
+		'<|file_sep|>Sample', String lf,
+		'Class { #name : #Sample }', String lf.
+	history := 'Browser navigation history (Calypso):', String lf,
+		'Current selection:', String lf,
+		'  pane 1: Sample'.
+
+	result := builder appendInteractionHistory: history toContext: base.
+
+	historyIndex := result findString: '<|file_sep|>IDE interaction history' startingAt: 1.
+	sampleIndex := result findString: '<|file_sep|>Sample' startingAt: 1.
+
+	self assert: (result beginsWith: base).
+	self assert: historyIndex > 0.
+	self assert: sampleIndex > 0.
+	self assert: historyIndex > sampleIndex.
+	self assert: (result includesSubstring: history).
+	self assert: (result endsWith: String lf)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testInteractionHistoryUsesContextSectionWhenBaseIsEmpty [
+
+	| builder result |
+	builder := CoPharoCopilotResultSetBuilder new.
+
+	result := builder
+		appendInteractionHistory: 'Current selection: Sample'
+		toContext: ''.
+
+	self assert: (result beginsWith: '<|file_sep|>IDE interaction history').
+	self assert: (result includesSubstring: 'Current selection: Sample').
+	self assert: (result endsWith: String lf)
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testScheduleCompletionRunsImmediatelyWhenDelayIsZero [
 
 	| builder context |
@@ -299,15 +308,6 @@ CoPharoCopilotResultSetBuilderTest >> testScheduleCompletionRunsImmediatelyWhenD
 
 	(Delay forMilliseconds: 100) wait.
 	self assert: builder processedPrefix equals: 'self '
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testInitializeOnContextSetsCompletionContext [
-
-	| builder context |
-	context := CoPCContext new.
-	builder := CoPharoCopilotResultSetBuilder initializeOnContext: context.
-	self assert: builder completionContext identicalTo: context
 ]
 
 { #category : 'tests' }

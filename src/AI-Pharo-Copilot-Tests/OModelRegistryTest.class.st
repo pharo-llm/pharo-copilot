@@ -116,8 +116,8 @@ OModelRegistryTest >> testRebuildWithoutRemoteModelsDoesNotIncludeCatalogEntries
                                 yourself ].
         CoPCModelRegistry refresh.
         registry := CoPCModelRegistry current.
-        self assert: registry byFullName size equals: 1.
-    self assert: registry byLabel size equals: 1.
+        self assert: registry byFullName size equals: 4.
+    self assert: registry byLabel size equals: 4.
     self assert: (registry specByFullName: CopilotSettings nullModelFullName) notNil.
         CoPCModelRegistry modelsFetcher: [ self defaultModelsResponse ].
         CoPCModelRegistry refresh

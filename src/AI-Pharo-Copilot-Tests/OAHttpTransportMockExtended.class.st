@@ -43,14 +43,14 @@ OAHttpTransportMockExtended >> initialize [
 ]
 
 { #category : 'accessing' }
-OAHttpTransportMockExtended >> mockResponse: aDictionary [
-	mockResponse := aDictionary
-]
-
-{ #category : 'accessing' }
 OAHttpTransportMockExtended >> lastTimeoutSeconds [
 
 	^ lastTimeoutSeconds
+]
+
+{ #category : 'accessing' }
+OAHttpTransportMockExtended >> mockResponse: aDictionary [
+	mockResponse := aDictionary
 ]
 
 { #category : 'accessing' }
