@@ -42,6 +42,7 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 	| combined fallback |
 	combined := OrderedCollection new.
 	combined addAll: entryCollection.
+	combined isEmpty ifFalse: [ ^ combined asArray ].
 
 	fallback := self
 		fallbackCompletionEntriesFor: aContext
@@ -1521,10 +1522,11 @@ CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefix
 CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo delayMilliseconds: delayMs [
 	"Debounce: cancel pending, schedule only latest."
 
-	| token priority |
+	| token priority delay |
 	debounceToken ifNil: [ debounceToken := 0 ].
 	debounceToken := debounceToken + 1.
 	token := debounceToken.
+	delay := delayMs ifNil: [ 0 ].
 
 	debounceProcess ifNotNil: [ debounceProcess terminate ].
 
@@ -1533,7 +1535,8 @@ CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefix
 		ifFalse: [ Processor userBackgroundPriority ].
 
 	debounceProcess := [
-		(Delay forMilliseconds: delayMs) wait.
+		delay > 0 ifTrue: [
+			(Delay forMilliseconds: delay) wait ].
 		token = debounceToken ifTrue: [
 			self
 				processCompletionFor: aContext

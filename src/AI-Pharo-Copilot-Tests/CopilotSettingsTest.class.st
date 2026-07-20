@@ -235,6 +235,16 @@ CopilotSettingsTest >> testFimTemplateUsesMetadataTemplateWhenAvailable [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testFastCompletionDefaults [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self assert: CopilotSettings completionDebounceMilliseconds equals: 0.
+		self assert: CopilotSettings completionIdleMilliseconds equals: 75.
+		self assert: CopilotSettings numPredict equals: 32.
+	]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testHostAccessor [
     | old |
     old := CopilotSettings host.
@@ -640,6 +650,44 @@ CopilotSettingsTest >> testRestoreSettingsMigratesNullModelToDefaultCompletionMo
 		self
 			assert: CopilotSettings modelName
 			equals: CopilotSettings defaultCompletionModelName ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRestoreSerializableSettingsUpgradesLegacyCompletionDefaults [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		snapshot := CopilotSettings serializableSettingsSnapshot.
+		snapshot
+			at: #completionDebounceMilliseconds put: 100;
+			at: #completionIdleMilliseconds put: 300;
+			at: #numPredict put: 64.
+
+		CopilotSettings restoreSettingsFromSerializableSnapshot: snapshot.
+
+		self assert: CopilotSettings completionDebounceMilliseconds equals: 0.
+		self assert: CopilotSettings completionIdleMilliseconds equals: 75.
+		self assert: CopilotSettings numPredict equals: 32
+	]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRestoreSerializableSettingsKeepsCustomCompletionDefaults [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		snapshot := CopilotSettings serializableSettingsSnapshot.
+		snapshot
+			at: #completionDebounceMilliseconds put: 25;
+			at: #completionIdleMilliseconds put: 150;
+			at: #numPredict put: 48.
+
+		CopilotSettings restoreSettingsFromSerializableSnapshot: snapshot.
+
+		self assert: CopilotSettings completionDebounceMilliseconds equals: 25.
+		self assert: CopilotSettings completionIdleMilliseconds equals: 150.
+		self assert: CopilotSettings numPredict equals: 48
+	]
 ]
 
 { #category : 'tests' }

@@ -206,6 +206,38 @@ CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromWithTextInput [
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSkipFallbackWhenAISuggestionExists [
+
+	| builder context entries |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new.
+
+	entries := builder
+		completionEntriesFrom: { 'aiCompletion' }
+		inContext: context
+		contextInfo: Dictionary new.
+
+	self assert: entries size equals: 1.
+	self assert: builder fallbackCallCount equals: 0
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISuggestionExists [
+
+	| builder context entries |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new.
+
+	entries := builder
+		completionEntriesFrom: { '' }
+		inContext: context
+		contextInfo: Dictionary new.
+
+	self assert: entries size equals: 1.
+	self assert: builder fallbackCallCount equals: 1
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testContextSnapshotIncludesPrefixAndSuffix [
 
         | builder context snapshot |
@@ -246,6 +278,27 @@ CoPharoCopilotResultSetBuilderTest >> testDelayIsIdleWhenNoBoundaryTyped [
 	source := 'self'.
 	pos := source size. "caret after 'f' (letter), not boundary"
 	self assert: (b requestDelayForSource: source position: pos) equals: 2000
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testScheduleCompletionRunsImmediatelyWhenDelayIsZero [
+
+	| builder context |
+	builder := CopilotDebounceTestBuilder new.
+	context := CoCopilotContextMock new
+		source: 'self ';
+		position: 5;
+		yourself.
+
+	builder
+		scheduleCompletionFor: context
+		prefix: 'self '
+		suffix: ''
+		contextInfo: Dictionary new
+		delayMilliseconds: 0.
+
+	(Delay forMilliseconds: 100) wait.
+	self assert: builder processedPrefix equals: 'self '
 ]
 
 { #category : 'tests' }

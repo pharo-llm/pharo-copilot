@@ -142,7 +142,7 @@ CopilotSettings class >> clearCachedModelMetadata [
 { #category : 'settings' }
 CopilotSettings class >> completionDebounceMilliseconds [
 
-	^ completionDebounceMilliseconds ifNil: [ completionDebounceMilliseconds := 100 ]
+	^ completionDebounceMilliseconds ifNil: [ completionDebounceMilliseconds := 0 ]
 ]
 
 { #category : 'settings' }
@@ -155,7 +155,7 @@ CopilotSettings class >> completionDebounceMilliseconds: anObject [
 { #category : 'settings' }
 CopilotSettings class >> completionIdleMilliseconds [
 
-	^ completionIdleMilliseconds ifNil: [ completionIdleMilliseconds := 300 ]
+	^ completionIdleMilliseconds ifNil: [ completionIdleMilliseconds := 75 ]
 ]
 
 { #category : 'settings' }
@@ -598,14 +598,14 @@ CopilotSettings class >> initializeDefaults [
 	autoInstallModelScriptEnabled := true.
 	loggingEnabled := true.
 	templatesDirectory := (FileLocator imageDirectory / 'pharo-copilot' / 'templates') asFileReference.
-	completionDebounceMilliseconds := 100.
-	completionIdleMilliseconds := 300.
+	completionDebounceMilliseconds := 0.
+	completionIdleMilliseconds := 75.
 	requestTimeoutSeconds := 60.
 	modelInstallTimeoutSeconds := 600.
 	temperature := 0.2.
 	topP := 0.9.
 	topK := 40.
-	numPredict := 64.
+	numPredict := 32.
 	repeatPenalty := 1.1.
 	numCtx := 4096.
 	seed := 0.
@@ -1440,9 +1440,9 @@ CopilotSettings class >> numCtx: anIntegerOrNil [
 
 { #category : 'ollama' }
 CopilotSettings class >> numPredict [
-	"Answer the num_predict parameter for Ollama (max tokens to generate). Default: 64 — keeps completions snappy while still covering several lines"
+	"Answer the num_predict parameter for Ollama (max tokens to generate). Default: 32 keeps inline completions fast."
 
-	^ numPredict ifNil: [ numPredict := 64 ]
+	^ numPredict ifNil: [ numPredict := 32 ]
 ]
 
 { #category : 'ollama' }
@@ -1790,6 +1790,7 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 		ifNotNil: [ :savedMode | CoPCContextSettings mode: savedMode ].
 	(aDictionary at: #navigationHistoryEnabled ifAbsent: [ nil ])
 		ifNotNil: [ :savedFlag | CoPCContextNavigationHistory enabled: savedFlag ].
+	self upgradeLegacyCompletionDefaults.
 	self ensureDefaultCompletionModelSelected
 ]
 
@@ -1837,6 +1838,19 @@ completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbse
 backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ aDictionary at: #BackgroundColor ifAbsent: [ nil ] ].
 installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ aDictionary at: #InstallModelUserConsent ifAbsent: [ nil ] ].
 self useDefaultCompletionModelWhenSavedModelIsMissingOrNull
+]
+
+{ #category : 'persistence' }
+CopilotSettings class >> upgradeLegacyCompletionDefaults [
+	"Move persisted settings from old slow default values to the current fast defaults.
+	Non-matching user tuning is left untouched."
+
+	completionDebounceMilliseconds = 100 ifTrue: [
+		completionDebounceMilliseconds := 0 ].
+	completionIdleMilliseconds = 300 ifTrue: [
+		completionIdleMilliseconds := 75 ].
+	numPredict = 64 ifTrue: [
+		numPredict := 32 ]
 ]
 
 { #category : 'accessing' }
@@ -2025,7 +2039,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #completionDebounceMilliseconds;
 					setSelector: #completionDebounceMilliseconds:;
 					default: self completionDebounceMilliseconds;
-					description: 'Milliseconds to wait after a boundary before requesting completions (1-60000).'.
+					description: 'Milliseconds to wait after a boundary before requesting completions (0-60000).'.
 
 				(aBuilder setting: #completionIdleMilliseconds)
 					order: 0.6;
@@ -2034,7 +2048,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #completionIdleMilliseconds;
 					setSelector: #completionIdleMilliseconds:;
 					default: self completionIdleMilliseconds;
-					description: 'Milliseconds to wait after typing stops before requesting completions (1-60000).'.
+					description: 'Milliseconds to wait after typing stops before requesting completions (0-60000).'.
 
 				(aBuilder pickOne: #contextMode)
 					order: 0.65;
@@ -2176,7 +2190,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 								getSelector: #numPredict;
 								setSelector: #numPredict:;
 								default: self numPredict;
-								description: 'Maximum number of tokens to generate (1 to 2048). Default: 64 — lower values respond faster.'.
+								description: 'Maximum number of tokens to generate (1 to 2048). Default: 32. Lower values respond faster.'.
 
 							(aBuilder setting: #repeatPenalty)
 								order: 5;

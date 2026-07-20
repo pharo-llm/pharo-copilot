@@ -104,6 +104,34 @@ OllamaClientTest >> testGenerateForPrefixPlacesInteractionHistoryBeforeFimPrompt
 ]
 
 { #category : 'tests' }
+OllamaClientTest >> testGenerateForPrefixReusesFimTemplateWithinClient [
+
+	| client mock oldFactory stub |
+	oldFactory := CopilotSettings ollamaClientFactory.
+	[
+		stub := OllamaClientStub new
+			withResponse: (Dictionary new
+				at: #template put: CoPCOllamaClient defaultFimGenerationTemplate;
+				yourself).
+		CopilotSettings ollamaClientFactory: [ stub ].
+		CopilotSettings clearCachedModelMetadata.
+
+		client := CoPCOllamaClient new.
+		mock := OAHttpTransportMockExtended new.
+		mock mockResponse: (Dictionary new at: #response put: 'completion'; yourself).
+		client instVarNamed: 'transport' put: mock.
+
+		client generateForPrefix: 'self ' suffix: '' context: ''.
+		CopilotSettings clearCachedModelMetadata.
+		client generateForPrefix: 'self ' suffix: '' context: ''.
+
+		self assert: stub callCount equals: 1
+	] ensure: [
+		CopilotSettings ollamaClientFactory: oldFactory.
+		CopilotSettings clearCachedModelMetadata ]
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testGenerateReturnsNullModelMessageWhenNullSelected [
 
         | client mock oldModel response |

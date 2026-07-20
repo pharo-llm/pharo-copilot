@@ -6,7 +6,8 @@ Class {
 		'snapshotCalled',
 		'scheduledDelay',
 		'scheduledPrefix',
-		'scheduledSuffix'
+		'scheduledSuffix',
+		'fallbackCallCount'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -71,6 +72,19 @@ CopilotTestableBuilder >> deferUI: aBlock [
 
 	"Run immediately in tests."
 	^ aBlock value
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> fallbackCallCount [
+
+	^ fallbackCallCount ifNil: [ 0 ]
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> fallbackCompletionEntriesFor: aContext excluding: existingEntries [
+
+	fallbackCallCount := self fallbackCallCount + 1.
+	^ { CoCopilotEntry contents: 'fallbackCompletion' }
 ]
 
 { #category : 'accessing' }

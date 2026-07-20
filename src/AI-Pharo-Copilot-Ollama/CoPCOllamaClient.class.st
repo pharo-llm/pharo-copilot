@@ -9,7 +9,8 @@ Class {
 		'modelSpec',
 		'stream',
 		'format',
-		'options'
+		'options',
+		'fimTemplate'
 	],
 	#classInstVars : [
 		'defaultModelFullName'
@@ -176,9 +177,10 @@ CoPCOllamaClient >> fimTemplateForGeneration [
 	"Answer the FIM template used to assemble the raw prompt, falling back to the
 	standard Qwen2.5-Coder template when model metadata is unavailable."
 
-	^ [ CopilotSettings fimTemplate ]
-		on: Error
-		do: [ self class defaultFimGenerationTemplate ]
+	^ fimTemplate ifNil: [
+		fimTemplate := [ CopilotSettings fimTemplate ]
+			on: Error
+			do: [ self class defaultFimGenerationTemplate ] ]
 ]
 
 { #category : 'generation-operations' }
@@ -468,6 +470,7 @@ CoPCOllamaClient >> useModelNamed: aString [
 
 	| tokens family tag |
 
+	fimTemplate := nil.
 	modelSpec := CoPCModelRegistry current specByFullName: aString.
 	modelSpec ifNil: [
 			tokens := aString findTokens: ':'.
