@@ -69,6 +69,13 @@ CoCopilotEntry >> activateOn: aCoCompletionContext [
 			applied := true ].
 
 	applied ifTrue: [
+			self sessionId ifNotNil: [
+					[ CoPharoCopilotLogger
+						updateCompletionSession: self sessionId
+						withAccepted: self contents ]
+						on: Error
+						do: [ :ex |  ] ].
+
 			evaluatorClass := Smalltalk globals at: #CoPCSuggestionEvaluator ifAbsent: [ nil ].
 
 			evaluatorClass ifNotNil: [
