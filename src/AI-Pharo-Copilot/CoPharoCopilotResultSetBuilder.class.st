@@ -180,9 +180,21 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		          classContext: classContext
 		          contextInfo: contextInfo.
 	cached ifNotNil: [
-			| entries position |
+			| entries position sessionId sessionPayload |
 			entries := self completionEntriesFrom: cached inContext: context contextInfo: contextInfo.
 			entries isEmpty ifFalse: [
+					self isLoggingEnabled ifTrue: [
+						sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
+						sessionId ifNotNil: [
+							sessionPayload := CoPharoCopilotLogger
+								initialCompletionPayloadForContextInfo: contextInfo
+								prefix: prefix
+								suffix: suffix
+								classContext: classContext
+								cacheStats: self completionCache statisticsDictionary.
+							CoPharoCopilotLogger
+								writeCompletionSession: sessionPayload
+								sessionId: sessionId ] ].
 					position := self menuPositionForContextOrDefault: context.
 					self openCompletionMenuFor: context entries: entries position: position.
 					^ self emptyResultSet ] ].

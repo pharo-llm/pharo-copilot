@@ -194,6 +194,10 @@ CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInf
 			at: #context put: classContext;
 			yourself);
 		at: #accepted put: nil;
+		at: #acceptedAt put: nil;
+		at: #nullCompletion put: false;
+		at: #nullCompletionReason put: nil;
+		at: #closedAt put: nil;
 		at: #rejected put: ((contextInfo at: #rejected ifAbsent: [ #() ]) asArray);
 		yourself
 ]
@@ -375,6 +379,30 @@ CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withAccepted: 
 	file exists ifFalse: [ ^ self ].
 	payload := STONJSON fromString: file contents.
 	payload at: #accepted put: acceptedString.
+	payload at: #acceptedAt put: DateAndTime now asString.
+	payload at: #nullCompletion put: false.
+	payload at: #nullCompletionReason put: nil.
+	file writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: payload) ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withNullCompletionReason: aReason [
+	| file payload accepted reason |
+	self loggingEnabled ifFalse: [ ^ self ].
+	file := self completionFileReferenceFor: aSessionId.
+	file exists ifFalse: [ ^ self ].
+	payload := STONJSON fromString: file contents.
+	accepted := payload at: #accepted ifAbsent: [ nil ].
+	(accepted isString
+		ifTrue: [ accepted trimBoth isEmpty not ]
+		ifFalse: [ accepted notNil ]) ifTrue: [ ^ self ].
+	reason := aReason
+		ifNil: [ 'closed' ]
+		ifNotNil: [ aReason asString ].
+	payload at: #nullCompletion put: true.
+	payload at: #nullCompletionReason put: reason.
+	payload at: #closedAt put: DateAndTime now asString.
 	file writeStreamDo: [ :stream |
 		stream nextPutAll: (STONJSON toString: payload) ]
 ]

@@ -13,7 +13,10 @@ Class {
 		'builder',
 		'detailMorph',
 		'detailPosition',
-		'isDetailMorphVisible'
+		'isDetailMorphVisible',
+		'completionAccepted',
+		'completionOutcomeRecorded',
+		'closeReason'
 	],
 	#category : 'AI-Pharo-Copilot-Spec',
 	#package : 'AI-Pharo-Copilot-Spec'
@@ -113,7 +116,31 @@ CopilotMenuMorph >> clampPosition: aPoint [
 { #category : 'private' }
 CopilotMenuMorph >> close [
 
+	self closeWithoutCompletionBecause: #closed
+]
+
+{ #category : 'private' }
+CopilotMenuMorph >> closeReason [
+
+	^ closeReason ifNil: [ #closed ]
+]
+
+{ #category : 'private' }
+CopilotMenuMorph >> closeWithoutCompletionBecause: aSymbol [
+
+	closeReason := aSymbol.
 	self delete
+]
+
+{ #category : 'private' }
+CopilotMenuMorph >> completionSessionId [
+
+	entries do: [ :each |
+		(each respondsTo: #sessionId) ifTrue: [
+			| sessionId |
+			sessionId := [ each sessionId ] on: Error do: [ nil ].
+			sessionId ifNotNil: [ ^ sessionId ] ] ].
+	^ nil
 ]
 
 { #category : 'private' }
@@ -131,6 +158,7 @@ CopilotMenuMorph >> defaultColor [
 CopilotMenuMorph >> delete [ 
 
 	| engine |
+	self recordNullCompletionIfNeeded.
 	super delete.
 
 	builder ifNotNil: [ builder menuClosed ].
@@ -288,6 +316,9 @@ CopilotMenuMorph >> initialize [
 	isDetailMorphVisible := false.
 	selectedIndex := 1.
 	firstVisible := 1.
+	completionAccepted := false.
+	completionOutcomeRecorded := false.
+	closeReason := #closed.
 	entries := #()
 ]
 
@@ -300,6 +331,8 @@ CopilotMenuMorph >> insertSelected [
 	self itemsCount isZero ifTrue: [ ^ false ].
 
 	selectedEntry := entries at: selectedIndex.
+	completionAccepted := true.
+	completionOutcomeRecorded := true.
 	self delete.
 
 	"Apply the selected entry to the context"
@@ -363,7 +396,7 @@ CopilotMenuMorph >> keyDown: anEvent [
 	].
 
 	key = KeyboardKey escape ifTrue: [
-		self close.
+		self closeWithoutCompletionBecause: #escape.
 		^ true
 	].
 
@@ -405,7 +438,7 @@ CopilotMenuMorph >> mouseDown: evt [
 	].
 
 	"Click outside closes the menu"
-	self close
+	self closeWithoutCompletionBecause: #outsideClick
 ]
 
 { #category : 'private' }
@@ -489,6 +522,36 @@ CopilotMenuMorph >> refreshSelection [
 	self resize.
 	self changed.
 	^ true
+]
+
+{ #category : 'private' }
+CopilotMenuMorph >> recordNullCompletionIfNeeded [
+
+	| sessionId evaluatorClass selectedEntry |
+	completionOutcomeRecorded = true ifTrue: [ ^ self ].
+	completionAccepted = true ifTrue: [ ^ self ].
+	self itemsCount isZero ifTrue: [ ^ self ].
+
+	completionOutcomeRecorded := true.
+
+	sessionId := self completionSessionId.
+	sessionId ifNotNil: [
+		[ CoPharoCopilotLogger
+			updateCompletionSession: sessionId
+			withNullCompletionReason: self closeReason ]
+			on: Error
+			do: [ :ex |  ] ].
+
+	selectedEntry := [ self selectedEntry ] on: Error do: [ nil ].
+	selectedEntry ifNil: [ ^ self ].
+
+	evaluatorClass := Smalltalk globals at: #CoPCSuggestionEvaluator ifAbsent: [ nil ].
+	evaluatorClass ifNotNil: [
+		[ evaluatorClass default
+			recordSuggestionIgnored: selectedEntry
+			context: context ]
+			on: Error
+			do: [ :ex |  ] ]
 ]
 
 { #category : 'private' }

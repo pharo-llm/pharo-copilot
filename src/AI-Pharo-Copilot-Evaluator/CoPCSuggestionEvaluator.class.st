@@ -333,6 +333,7 @@ CoPCSuggestionEvaluator >> recordSuggestionIgnored: aCopilotEntry context: aComp
 	
 	"For ignored suggestions, we don't add to either collection but update stats"
 	self updateStats: evaluationEntry.
+	self savePersistentStats.
 ]
 
 { #category : 'initialization' }
