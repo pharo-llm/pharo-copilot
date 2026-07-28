@@ -150,6 +150,18 @@ CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testDoesNotLaunchOllamaFromNonInteractiveImage [
+	"Regression guard for a CI hang: starting Ollama goes through LibC>>#system:, which
+	blocks the entire VM until the command returns. On Windows that command does not
+	reliably return, so a non-interactive image must never attempt the launch."
+
+	Smalltalk isInteractive ifTrue: [ ^ self skip ].
+
+	self deny: CopilotSettings canLaunchLocalOllamaService.
+	self deny: CopilotSettings launchLocalOllamaServiceSilentlyIfPossible
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testEnsureDefaultCompletionModelSelectedReplacesNullModel [
 
 	CopilotSettings withDefaultSettingsDo: [
@@ -274,10 +286,21 @@ CopilotSettingsTest >> testLoggingEnabledDefaultsToTrue [
 
 { #category : 'tests' }
 CopilotSettingsTest >> testMetadataStringForKeyDefaultWhenMissing [
-    | value |
-    CopilotSettings clearCachedModelMetadata.
-    value := CopilotSettings metadataStringForKey: #unknown default: 'Missing'.
-    self assert: value equals: 'Missing'.
+    | value oldFactory stub |
+    oldFactory := CopilotSettings ollamaClientFactory.
+    [
+        stub := OllamaClientStub new
+            withResponse: (Dictionary new
+                at: #model put: CopilotSettings modelName;
+                yourself).
+        CopilotSettings ollamaClientFactory: [ stub ].
+        CopilotSettings clearCachedModelMetadata.
+
+        value := CopilotSettings metadataStringForKey: #unknown default: 'Missing'.
+        self assert: value equals: 'Missing'
+    ] ensure: [
+        CopilotSettings ollamaClientFactory: oldFactory.
+        CopilotSettings clearCachedModelMetadata ]
 ]
 
 { #category : 'tests' }

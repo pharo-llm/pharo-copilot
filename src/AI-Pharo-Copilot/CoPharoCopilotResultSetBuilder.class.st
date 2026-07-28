@@ -54,6 +54,38 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 ]
 
 { #category : 'new' }
+CoPharoCopilotResultSetBuilder >> appendInteractionHistory: historyString toContext: contextString [
+	"Append IDE/user interaction history as the final repo-style context section.
+	The FIM tail is added later by the Ollama client, so this section lands immediately
+	before <|fim_prefix|> without appearing after <|fim_middle|>."
+
+	| history base lf |
+	history := historyString ifNil: [ '' ] ifNotNil: [ historyString asString ].
+	base := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
+	history isEmpty ifTrue: [ ^ base ].
+
+	lf := Character lf.
+	^ String streamContents: [ :s |
+		base isEmpty ifFalse: [
+			s nextPutAll: base.
+			base last = lf ifFalse: [ s nextPut: lf ] ].
+		s
+			nextPutAll: '<|file_sep|>IDE interaction history';
+			nextPut: lf;
+			nextPutAll: history.
+		history last = lf ifFalse: [ s nextPut: lf ] ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> appendInteractionHistoryToContext: contextString [
+
+	CoPCContextNavigationHistory enabled ifFalse: [ ^ contextString ifNil: [ '' ] ].
+	^ self
+		appendInteractionHistory: self interactionHistoryForPrompt
+		toContext: contextString
+]
+
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [ 
 
 	self
@@ -120,67 +152,6 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 		definition: classDefinition
 		instanceMethods: instanceSide
 		classMethods: classSide
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> contextMethodSectionFor: aBehavior around: aSelector limit: limitInteger [
-	"Render the methods section honoring the configured context mode: full sources
-	(windowed around the current selector) or a lightweight selectors-only overview."
-
-	aBehavior ifNil: [ ^ '' ].
-
-	CoPCContextSettings mode = #selectors ifTrue: [
-		^ String streamContents: [ :s |
-			(self sortedSelectorsFor: aBehavior)
-				do: [ :sel | s nextPutAll: sel asString ]
-				separatedBy: [ s nextPut: Character lf ] ] ].
-
-	^ self methodSourcesFor: aBehavior around: aSelector limit: limitInteger
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> repoContextForClass: aClass definition: classDefinitionString instanceMethods: instanceMethodsString classMethods: classMethodsString [
-	"Format the class context in the repo-level marker layout the completion models were
-	fine-tuned on (<|repo_name|> / <|file_sep|> sections), instead of English prose
-	headers the models never saw during training."
-
-	| hasDefinition hasInstance hasClass lf |
-	hasDefinition := classDefinitionString isEmpty not.
-	hasInstance := instanceMethodsString isEmpty not.
-	hasClass := classMethodsString isEmpty not.
-
-	(hasDefinition or: [ hasInstance or: hasClass ]) ifFalse: [ ^ '' ].
-
-	lf := Character lf.
-	^ String streamContents: [ :stream |
-		stream
-			nextPutAll: '<|repo_name|>';
-			nextPutAll: aClass name;
-			nextPut: lf.
-
-		hasDefinition ifTrue: [
-			stream
-				nextPutAll: '<|file_sep|>';
-				nextPutAll: aClass name;
-				nextPut: lf;
-				nextPutAll: classDefinitionString;
-				nextPut: lf ].
-
-		hasInstance ifTrue: [
-			stream
-				nextPutAll: '<|file_sep|>';
-				nextPutAll: aClass name , ' (instance side)';
-				nextPut: lf;
-				nextPutAll: instanceMethodsString;
-				nextPut: lf ].
-
-		hasClass ifTrue: [
-			stream
-				nextPutAll: '<|file_sep|>';
-				nextPutAll: aClass name , ' (class side)';
-				nextPut: lf;
-				nextPutAll: classMethodsString;
-				nextPut: lf ] ]
 ]
 
 { #category : 'new' }
@@ -318,38 +289,6 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 
 	"Comment the next line to disconnect IDE interaction history from the model context."
 	^ self appendInteractionHistoryToContext: classContext
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> appendInteractionHistory: historyString toContext: contextString [
-	"Append IDE/user interaction history as the final repo-style context section.
-	The FIM tail is added later by the Ollama client, so this section lands immediately
-	before <|fim_prefix|> without appearing after <|fim_middle|>."
-
-	| history base lf |
-	history := historyString ifNil: [ '' ] ifNotNil: [ historyString asString ].
-	base := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
-	history isEmpty ifTrue: [ ^ base ].
-
-	lf := Character lf.
-	^ String streamContents: [ :s |
-		base isEmpty ifFalse: [
-			s nextPutAll: base.
-			base last = lf ifFalse: [ s nextPut: lf ] ].
-		s
-			nextPutAll: '<|file_sep|>IDE interaction history';
-			nextPut: lf;
-			nextPutAll: history.
-		history last = lf ifFalse: [ s nextPut: lf ] ]
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> appendInteractionHistoryToContext: contextString [
-
-	CoPCContextNavigationHistory enabled ifFalse: [ ^ contextString ifNil: [ '' ] ].
-	^ self
-		appendInteractionHistory: self interactionHistoryForPrompt
-		toContext: contextString
 ]
 
 { #category : 'initialization' }
@@ -578,6 +517,22 @@ CoPharoCopilotResultSetBuilder >> contextInfoFor: aContext prefix: prefixString 
 			at: #sourceSize put: aContext source size;
 			at: #fullSource put: aContext source ].
 	^ info
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> contextMethodSectionFor: aBehavior around: aSelector limit: limitInteger [
+	"Render the methods section honoring the configured context mode: full sources
+	(windowed around the current selector) or a lightweight selectors-only overview."
+
+	aBehavior ifNil: [ ^ '' ].
+
+	CoPCContextSettings mode = #selectors ifTrue: [
+		^ String streamContents: [ :s |
+			(self sortedSelectorsFor: aBehavior)
+				do: [ :sel | s nextPutAll: sel asString ]
+				separatedBy: [ s nextPut: Character lf ] ] ].
+
+	^ self methodSourcesFor: aBehavior around: aSelector limit: limitInteger
 ]
 
 { #category : 'private' }
@@ -941,6 +896,12 @@ CoPharoCopilotResultSetBuilder >> insertAtCaretIfPossibleIn: aContext text: aStr
 
 	^ false
 
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> interactionHistoryForPrompt [
+
+	^ CoPCContextNavigationHistory new gather
 ]
 
 { #category : 'initialization' }
@@ -1374,12 +1335,6 @@ CoPharoCopilotResultSetBuilder >> prependNavigationHistoryTo: contextString [
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> interactionHistoryForPrompt [
-
-	^ CoPCContextNavigationHistory new gather
-]
-
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
 	[
@@ -1451,6 +1406,51 @@ CoPharoCopilotResultSetBuilder >> removeEchoedPrefix: contentString prefix: pref
 			^ unfenced allButFirst: prefix size ] ].
 
 	^ content
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> repoContextForClass: aClass definition: classDefinitionString instanceMethods: instanceMethodsString classMethods: classMethodsString [
+	"Format the class context in the repo-level marker layout the completion models were
+	fine-tuned on (<|repo_name|> / <|file_sep|> sections), instead of English prose
+	headers the models never saw during training."
+
+	| hasDefinition hasInstance hasClass lf |
+	hasDefinition := classDefinitionString isEmpty not.
+	hasInstance := instanceMethodsString isEmpty not.
+	hasClass := classMethodsString isEmpty not.
+
+	(hasDefinition or: [ hasInstance or: hasClass ]) ifFalse: [ ^ '' ].
+
+	lf := Character lf.
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: '<|repo_name|>';
+			nextPutAll: aClass name;
+			nextPut: lf.
+
+		hasDefinition ifTrue: [
+			stream
+				nextPutAll: '<|file_sep|>';
+				nextPutAll: aClass name;
+				nextPut: lf;
+				nextPutAll: classDefinitionString;
+				nextPut: lf ].
+
+		hasInstance ifTrue: [
+			stream
+				nextPutAll: '<|file_sep|>';
+				nextPutAll: aClass name , ' (instance side)';
+				nextPut: lf;
+				nextPutAll: instanceMethodsString;
+				nextPut: lf ].
+
+		hasClass ifTrue: [
+			stream
+				nextPutAll: '<|file_sep|>';
+				nextPutAll: aClass name , ' (class side)';
+				nextPut: lf;
+				nextPutAll: classMethodsString;
+				nextPut: lf ] ]
 ]
 
 { #category : 'new' }

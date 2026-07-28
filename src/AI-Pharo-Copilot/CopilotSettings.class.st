@@ -132,6 +132,31 @@ CopilotSettings class >> backgroundColor: aColor [
 	self autoSaveSettings
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> canLaunchLocalOllamaService [ 
+	"Answer whether it is safe for us to start Ollama ourselves.
+
+	The launch goes through LibC>>#system:, a blocking FFI call: the whole VM is frozen
+	until the spawned command returns, so no other Pharo process runs meanwhile — not even
+	SUnit's per-test timeout watchdog. On Windows the spawned 'cmd /c start ... ollama
+	serve' does not reliably return when Ollama is absent, which hangs the image outright.
+	A non-interactive image (CI, scripts) has nobody to benefit from the service anyway, so
+	never shell out from one."
+
+	^ (Smalltalk respondsTo: #isInteractive)
+		ifTrue: [ Smalltalk isInteractive ]
+		ifFalse: [ true ]
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> canonicalModelNameForComparison: aModelName [
+	"Normalize model identifiers for comparison. Ollama may report repository/model
+	names in canonical lowercase form even when the requested pull used mixed case."
+
+	aModelName ifNil: [ ^ '' ].
+	^ aModelName asString trimBoth asLowercase
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> clearCachedModelMetadata [
 	"Drop the in-memory cached model metadata so it will be recomputed."
@@ -253,6 +278,12 @@ CopilotSettings class >> defaultBackgroundColor [
 ]
 
 { #category : 'accessing' }
+CopilotSettings class >> defaultCompletionModelName [
+
+	^ CoPCOllamaClient defaultModelFullName
+]
+
+{ #category : 'accessing' }
 CopilotSettings class >> defaultFimTemplate [
 	"Return the best available FIM template (cached from logs, bundled templates, or fail)."
 
@@ -282,10 +313,15 @@ CopilotSettings class >> dictionaryValueAt: aKey from: aDictionary default: aDef
 		ifFalse: [ Dictionary new ]
 ]
 
-{ #category : 'accessing' }
-CopilotSettings class >> defaultCompletionModelName [
+{ #category : 'settings' }
+CopilotSettings class >> ensureDefaultCompletionModelSelected [
+	"Use the default completion model when no real model has been selected yet."
 
-	^ CoPCOllamaClient defaultModelFullName
+	| previousModel |
+	previousModel := modelName.
+	self useDefaultCompletionModelWhenSavedModelIsMissingOrNull.
+	previousModel ~= modelName ifTrue: [ self autoSaveSettings ].
+	^ self modelName
 ]
 
 { #category : 'accessing' }
@@ -310,17 +346,6 @@ CopilotSettings class >> ensureModelMetadataDirectoryFor: modelNameString [
 	].
 
 	^ modelDirectory
-]
-
-{ #category : 'settings' }
-CopilotSettings class >> ensureDefaultCompletionModelSelected [
-	"Use the default completion model when no real model has been selected yet."
-
-	| previousModel |
-	previousModel := modelName.
-	self useDefaultCompletionModelWhenSavedModelIsMissingOrNull.
-	previousModel ~= modelName ifTrue: [ self autoSaveSettings ].
-	^ self modelName
 ]
 
 { #category : 'accessing' }
@@ -621,6 +646,20 @@ CopilotSettings class >> initializeDefaults [
 	modelMetadata := nil
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> installCompletionEngineIfAvailable [
+	"Select the Pharo Copilot completion engine when the host image supports it."
+
+	| editorClass engineClass |
+	editorClass := Smalltalk globals at: #RubSmalltalkEditor ifAbsent: [ nil ].
+	engineClass := Smalltalk globals at: #CoPharoCopilotCompletionEngine ifAbsent: [ nil ].
+	(editorClass isNil or: [ engineClass isNil ]) ifTrue: [ ^ false ].
+	(editorClass respondsTo: #completionEngineClass:) ifFalse: [ ^ false ].
+
+	editorClass completionEngineClass: engineClass.
+	^ true
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> installModelNamed: aModelName [
 	
@@ -815,6 +854,13 @@ CopilotSettings class >> installSelectedModelNowSetting: aBoolean [
 	aBoolean ifTrue: [ self installSelectedModelNow ]
 ]
 
+{ #category : 'accessing' }
+CopilotSettings class >> installedModelNames: modelNames includesModelNamed: aModelName [
+
+	^ modelNames anySatisfy: [ :each |
+		self modelName: aModelName matchesInstalledModelName: each ]
+]
+
 { #category : 'settings' }
 CopilotSettings class >> internetConnectionAvailable [
 
@@ -844,41 +890,11 @@ CopilotSettings class >> isCopilotEngineSelected [
 	] on: Error do: [ false ]
 ]
 
-{ #category : 'settings' }
-CopilotSettings class >> installCompletionEngineIfAvailable [
-	"Select the Pharo Copilot completion engine when the host image supports it."
-
-	| editorClass engineClass |
-	editorClass := Smalltalk globals at: #RubSmalltalkEditor ifAbsent: [ nil ].
-	engineClass := Smalltalk globals at: #CoPharoCopilotCompletionEngine ifAbsent: [ nil ].
-	(editorClass isNil or: [ engineClass isNil ]) ifTrue: [ ^ false ].
-	(editorClass respondsTo: #completionEngineClass:) ifFalse: [ ^ false ].
-
-	editorClass completionEngineClass: engineClass.
-	^ true
-]
-
 { #category : 'accessing' }
 CopilotSettings class >> isNullModelName: aString [
 	"Answer whether the given model name is the configured null model name."
 
 	^ aString = self nullModelFullName
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> canonicalModelNameForComparison: aModelName [
-	"Normalize model identifiers for comparison. Ollama may report repository/model
-	names in canonical lowercase form even when the requested pull used mixed case."
-
-	aModelName ifNil: [ ^ '' ].
-	^ aModelName asString trimBoth asLowercase
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> installedModelNames: modelNames includesModelNamed: aModelName [
-
-	^ modelNames anySatisfy: [ :each |
-		self modelName: aModelName matchesInstalledModelName: each ]
 ]
 
 { #category : 'accessing' }
@@ -888,19 +904,6 @@ CopilotSettings class >> isPredefinedDownloadableModelName: aModelName [
 	^ self
 		installedModelNames: self predefinedDownloadableModelNames
 		includesModelNamed: aModelName
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> modelName: requestedModelName matchesInstalledModelName: installedModelName [
-
-	| requested installed |
-	requested := self canonicalModelNameForComparison: requestedModelName.
-	installed := self canonicalModelNameForComparison: installedModelName.
-
-	requested = installed ifTrue: [ ^ true ].
-	(requested includesSubstring: ':') ifFalse: [
-		^ installed = (requested , ':latest') ].
-	^ false
 ]
 
 { #category : 'accessing' }
@@ -1244,6 +1247,19 @@ CopilotSettings class >> modelName: aString [
 	self autoSaveSettings
 ]
 
+{ #category : 'accessing' }
+CopilotSettings class >> modelName: requestedModelName matchesInstalledModelName: installedModelName [
+
+	| requested installed |
+	requested := self canonicalModelNameForComparison: requestedModelName.
+	installed := self canonicalModelNameForComparison: installedModelName.
+
+	requested = installed ifTrue: [ ^ true ].
+	(requested includesSubstring: ':') ifFalse: [
+		^ installed = (requested , ':latest') ].
+	^ false
+]
+
 { #category : 'private' }
 CopilotSettings class >> modelNameFromModelEntry: each [
 	"Extract the name from a model entry (dictionary-like or plain string)."
@@ -1286,6 +1302,19 @@ CopilotSettings class >> modelNamesFromResponse: response [
 	].
 
 	^ names asArray
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> modelNamesTextFor: modelNames [
+	"Answer a bullet list text for the given model names."
+
+	^ String streamContents: [ :stream |
+		modelNames
+			do: [ :each |
+				stream
+					nextPutAll: '- ';
+					nextPutAll: each asString ]
+			separatedBy: [ stream cr ] ]
 ]
 
 { #category : 'accessing' }
@@ -1339,19 +1368,6 @@ CopilotSettings class >> newOllamaClient [
 	"Create a new client instance using the configured factory."
 
 	^ self ollamaClientFactory value
-]
-
-{ #category : 'accessing' }
-CopilotSettings class >> modelNamesTextFor: modelNames [
-	"Answer a bullet list text for the given model names."
-
-	^ String streamContents: [ :stream |
-		modelNames
-			do: [ :each |
-				stream
-					nextPutAll: '- ';
-					nextPutAll: each asString ]
-			separatedBy: [ stream cr ] ]
 ]
 
 { #category : 'settings' }
@@ -1481,26 +1497,6 @@ CopilotSettings class >> performInstallOfModelNamed: aModelName usingInitialResp
 		and: [ self refreshModelsAfterInstallOf: aModelName usingInitialResponse: response ]
 ]
 
-{ #category : 'settings' }
-CopilotSettings class >> pullResultIndicatesFailure: pullResult [
-	"Answer whether an Ollama pull response explicitly reports failure."
-
-	| errorText parsedResponse |
-	pullResult == false ifTrue: [ ^ true ].
-	pullResult isNil ifTrue: [ ^ true ].
-
-	pullResult isString ifTrue: [
-		parsedResponse := [ STONJSON fromString: pullResult ] on: Error do: [ nil ].
-		parsedResponse ifNil: [ ^ false ].
-		^ self pullResultIndicatesFailure: parsedResponse ].
-
-	(pullResult isKindOf: Dictionary) ifFalse: [ ^ false ].
-
-	errorText := pullResult at: #error ifAbsent: [ pullResult at: 'error' ifAbsent: [ nil ] ].
-	errorText ifNil: [ ^ false ].
-	^ errorText asString trimBoth isEmpty not
-]
-
 { #category : 'accessing' }
 CopilotSettings class >> populateMetadata: metadata fromResponse: response [
 	"Parse and copy key fields from an Ollama showModel response into the given dictionary."
@@ -1586,6 +1582,26 @@ CopilotSettings class >> promptToInstallMissingModelNamed: aModelName availableM
 	].
 
 	^ confirmation
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> pullResultIndicatesFailure: pullResult [
+	"Answer whether an Ollama pull response explicitly reports failure."
+
+	| errorText parsedResponse |
+	pullResult == false ifTrue: [ ^ true ].
+	pullResult isNil ifTrue: [ ^ true ].
+
+	pullResult isString ifTrue: [
+		parsedResponse := [ STONJSON fromString: pullResult ] on: Error do: [ nil ].
+		parsedResponse ifNil: [ ^ false ].
+		^ self pullResultIndicatesFailure: parsedResponse ].
+
+	(pullResult isKindOf: Dictionary) ifFalse: [ ^ false ].
+
+	errorText := pullResult at: #error ifAbsent: [ pullResult at: 'error' ifAbsent: [ nil ] ].
+	errorText ifNil: [ ^ false ].
+	^ errorText asString trimBoth isEmpty not
 ]
 
 { #category : 'settings' }
@@ -1682,22 +1698,6 @@ CopilotSettings class >> refreshModelsAfterInstallOf: aModelName usingInitialRes
 	self logInstallDidNotExposeModel: aModelName before: initialResponse after: refreshedModels.
 
 	^ false
-]
-
-{ #category : 'settings' }
-CopilotSettings class >> showModelConfirmsInstalled: aModelName usingClient: client [
-	"Answer whether Ollama can resolve the model directly. This avoids reporting a
-	completed pull as failed when the list endpoint lags behind the model store."
-
-	| response |
-	(client respondsTo: #showModelNamed:) ifFalse: [ ^ false ].
-
-	response := [
-		client showModelNamed: aModelName
-	] on: Error do: [ ^ false ].
-
-	response ifNil: [ ^ false ].
-	^ (self pullResultIndicatesFailure: response) not
 ]
 
 { #category : 'accessing' }
@@ -1838,19 +1838,6 @@ completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbse
 backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ aDictionary at: #BackgroundColor ifAbsent: [ nil ] ].
 installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ aDictionary at: #InstallModelUserConsent ifAbsent: [ nil ] ].
 self useDefaultCompletionModelWhenSavedModelIsMissingOrNull
-]
-
-{ #category : 'persistence' }
-CopilotSettings class >> upgradeLegacyCompletionDefaults [
-	"Move persisted settings from old slow default values to the current fast defaults.
-	Non-matching user tuning is left untouched."
-
-	completionDebounceMilliseconds = 100 ifTrue: [
-		completionDebounceMilliseconds := 0 ].
-	completionIdleMilliseconds = 300 ifTrue: [
-		completionIdleMilliseconds := 75 ].
-	numPredict = 64 ifTrue: [
-		numPredict := 32 ]
 ]
 
 { #category : 'accessing' }
@@ -2304,6 +2291,22 @@ CopilotSettings class >> showInstallCompletionDialog [
 ]
 
 { #category : 'settings' }
+CopilotSettings class >> showModelConfirmsInstalled: aModelName usingClient: client [
+	"Answer whether Ollama can resolve the model directly. This avoids reporting a
+	completed pull as failed when the list endpoint lags behind the model store."
+
+	| response |
+	(client respondsTo: #showModelNamed:) ifFalse: [ ^ false ].
+
+	response := [
+		client showModelNamed: aModelName
+	] on: Error do: [ ^ false ].
+
+	response ifNil: [ ^ false ].
+	^ (self pullResultIndicatesFailure: response) not
+]
+
+{ #category : 'settings' }
 CopilotSettings class >> switchToNullModelDueToMissingOllamaFor: selectedModelName [
 
 	self modelName: self nullModelFullName.
@@ -2322,17 +2325,6 @@ CopilotSettings class >> temperature: aNumber [
 
 	temperature := aNumber.
 	self autoSaveSettings
-]
-
-{ #category : 'settings' }
-CopilotSettings class >> useDefaultCompletionModelWhenSavedModelIsMissingOrNull [
-
-	(modelName isNil or: [
-		modelName asString trimBoth isEmpty or: [
-			self isNullModelName: modelName ] ])
-		ifTrue: [
-			modelName := self defaultCompletionModelName.
-			modelMetadata := nil ]
 ]
 
 { #category : 'accessing' }
@@ -2389,6 +2381,30 @@ CopilotSettings class >> topP [
 CopilotSettings class >> topP: aNumber [
 	topP := aNumber.
 	self autoSaveSettings
+]
+
+{ #category : 'persistence' }
+CopilotSettings class >> upgradeLegacyCompletionDefaults [
+	"Move persisted settings from old slow default values to the current fast defaults.
+	Non-matching user tuning is left untouched."
+
+	completionDebounceMilliseconds = 100 ifTrue: [
+		completionDebounceMilliseconds := 0 ].
+	completionIdleMilliseconds = 300 ifTrue: [
+		completionIdleMilliseconds := 75 ].
+	numPredict = 64 ifTrue: [
+		numPredict := 32 ]
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> useDefaultCompletionModelWhenSavedModelIsMissingOrNull [
+
+	(modelName isNil or: [
+		modelName asString trimBoth isEmpty or: [
+			self isNullModelName: modelName ] ])
+		ifTrue: [
+			modelName := self defaultCompletionModelName.
+			modelMetadata := nil ]
 ]
 
 { #category : 'persistence' }

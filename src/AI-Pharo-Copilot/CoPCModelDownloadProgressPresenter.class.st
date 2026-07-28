@@ -22,17 +22,6 @@ Class {
 	#package : 'AI-Pharo-Copilot'
 }
 
-{ #category : 'instance creation' }
-CoPCModelDownloadProgressPresenter class >> openOn: modelNames [
-
-	| presenter |
-	presenter := self new.
-	presenter models: modelNames asArray.
-	presenter open.
-	presenter startDownload.
-	^ presenter
-]
-
 { #category : 'progress' }
 CoPCModelDownloadProgressPresenter class >> formatBytes: aNumber [
 
@@ -56,6 +45,17 @@ CoPCModelDownloadProgressPresenter class >> numberFromPullEventValue: value [
 	string := value asString trimBoth.
 	string isEmpty ifTrue: [ ^ nil ].
 	^ [ Number readFrom: string readStream ] on: Error do: [ nil ]
+]
+
+{ #category : 'instance creation' }
+CoPCModelDownloadProgressPresenter class >> openOn: modelNames [
+
+	| presenter |
+	presenter := self new.
+	presenter models: modelNames asArray.
+	presenter open.
+	presenter startDownload.
+	^ presenter
 ]
 
 { #category : 'progress' }
