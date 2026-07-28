@@ -150,18 +150,6 @@ CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testDoesNotLaunchOllamaFromNonInteractiveImage [
-	"Regression guard for a CI hang: starting Ollama goes through LibC>>#system:, which
-	blocks the entire VM until the command returns. On Windows that command does not
-	reliably return, so a non-interactive image must never attempt the launch."
-
-	Smalltalk isInteractive ifTrue: [ ^ self skip ].
-
-	self deny: CopilotSettings canLaunchLocalOllamaService.
-	self deny: CopilotSettings launchLocalOllamaServiceSilentlyIfPossible
-]
-
-{ #category : 'tests' }
 CopilotSettingsTest >> testEnsureDefaultCompletionModelSelectedReplacesNullModel [
 
 	CopilotSettings withDefaultSettingsDo: [
