@@ -48,10 +48,10 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: { 4. 3. 5. 4. #codeCompletion. #debugging. #done }.
+			ui ratings: { 4. 3. 5. 4. #codeCompletion }.
 			ratings := CoPCImageCloseSurvey promptAndRecordUsing: ui.
 
-			self assert: ui requests size equals: CoPCImageCloseSurvey surveyQuestions size + 3.
+			self assert: ui requests size equals: CoPCImageCloseSurvey surveyQuestions size + 1.
 			self assert: (ratings at: #overall) equals: 4.
 			self assert: (ratings at: #suggestionQuality) equals: 3.
 
@@ -67,8 +67,7 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 			self assert: (storedRatings at: #speed) equals: 5.
 			self assert: (storedRatings at: #usefulness) equals: 4.
 			self assert: (storedTasks includes: #codeCompletion).
-			self assert: (storedTasks includes: #debugging).
-			self assert: storedTasks size equals: 2.
+			self assert: storedTasks size equals: 1.
 			self assert: ((data at: #availableTasks) includesKey: #codeCompletion).
 			self assert: ((data at: #questions) includesKey: #overall).
 			self assert: (data includesKey: #timestamp).
@@ -96,7 +95,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitWritesOnceAndSkipsShutdownF
 			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: { 5. 5. 4. 5. #done }.
+			ui ratings: { 5. 5. 4. 5. #codeCompletion }.
 			CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 			CoPCImageCloseSurvey shutDown: true.
 
@@ -160,11 +159,18 @@ CoPCImageCloseSurveyTest >> testValidatedRatingAcceptsOnlyOneToFive [
 ]
 
 { #category : 'tests' }
-CoPCImageCloseSurveyTest >> testValidatedTaskAcceptsOnlyAvailableTasksAndDone [
+CoPCImageCloseSurveyTest >> testTaskLabelsDoNotIncludeDone [
+
+	self deny: (CoPCImageCloseSurvey taskLabels includes: 'Done').
+	self deny: (CoPCImageCloseSurvey taskValues includes: #done)
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testValidatedTaskAcceptsOnlyAvailableTasks [
 
 	self assert: (CoPCImageCloseSurvey validatedTask: #codeCompletion) equals: #codeCompletion.
 	self assert: (CoPCImageCloseSurvey validatedTask: 'debugging') equals: #debugging.
-	self assert: (CoPCImageCloseSurvey validatedTask: #done) equals: #done.
-	self assert: (CoPCImageCloseSurvey validatedTask: #unknown) equals: #done.
-	self assert: (CoPCImageCloseSurvey validatedTask: nil) equals: #done
+	self assert: (CoPCImageCloseSurvey validatedTask: #done) isNil.
+	self assert: (CoPCImageCloseSurvey validatedTask: #unknown) isNil.
+	self assert: (CoPCImageCloseSurvey validatedTask: nil) isNil
 ]

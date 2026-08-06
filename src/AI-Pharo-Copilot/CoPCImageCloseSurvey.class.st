@@ -29,16 +29,16 @@ CoPCImageCloseSurvey class >> askQuestion: anAssociation using: uiManager [
 ]
 
 { #category : 'survey' }
-CoPCImageCloseSurvey class >> askTaskUsing: uiManager selectedTasks: selectedTasks [
+CoPCImageCloseSurvey class >> askTaskUsing: uiManager [
 
 	| task |
-	uiManager ifNil: [ ^ self taskSelectionDoneValue ].
-	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ self taskSelectionDoneValue ].
+	uiManager ifNil: [ ^ nil ].
+	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ nil ].
 
 	task := uiManager
 		chooseFrom: self taskLabels
 		values: self taskValues
-		title: (self taskQuestionTitleFor: selectedTasks).
+		title: self taskQuestionTitle.
 
 	^ self validatedTask: task
 ]
@@ -68,14 +68,11 @@ CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> collectTasksUsing: uiManager [
 
-	| selected task |
-	selected := OrderedCollection new.
-	[
-		task := self askTaskUsing: uiManager selectedTasks: selected.
-		task notNil and: [ task ~= self taskSelectionDoneValue ]
-	] whileTrue: [
-		(selected includes: task) ifFalse: [ selected add: task ] ].
-	^ selected asArray
+	| task |
+	task := self askTaskUsing: uiManager.
+	^ task
+		ifNil: [ #() ]
+		ifNotNil: [ { task } ]
 ]
 
 { #category : 'private' }
@@ -297,7 +294,7 @@ CoPCImageCloseSurvey class >> taskChoices [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> taskLabels [
 
-	^ (self taskChoices collect: [ :task | task value ]) , { 'Done' }
+	^ self taskChoices collect: [ :task | task value ]
 ]
 
 { #category : 'survey' }
@@ -309,32 +306,15 @@ CoPCImageCloseSurvey class >> taskLabelFor: aSymbol [
 ]
 
 { #category : 'survey' }
-CoPCImageCloseSurvey class >> taskQuestionTitleFor: selectedTasks [
+CoPCImageCloseSurvey class >> taskQuestionTitle [
 
-	| selectedLabels |
-	selectedTasks isEmpty ifTrue: [
-		^ 'Which tasks did you perform this session? Select one task at a time, then choose Done.' ].
-
-	selectedLabels := String streamContents: [ :stream |
-		(selectedTasks collect: [ :task | self taskLabelFor: task ])
-			do: [ :label | stream nextPutAll: label ]
-			separatedBy: [ stream nextPutAll: ', ' ] ].
-
-	^ 'Which tasks did you perform this session?' , String cr ,
-		'Selected: ' , selectedLabels , String cr ,
-		'Choose another task, or choose Done.'
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> taskSelectionDoneValue [
-
-	^ #done
+	^ 'Which task did you perform this session?'
 ]
 
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> taskValues [
 
-	^ (self taskChoices collect: [ :task | task key ]) , { self taskSelectionDoneValue }
+	^ self taskChoices collect: [ :task | task key ]
 ]
 
 { #category : 'session management' }
@@ -382,15 +362,15 @@ CoPCImageCloseSurvey class >> validatedRating: anObject [
 CoPCImageCloseSurvey class >> validatedTask: anObject [
 
 	| task |
-	anObject ifNil: [ ^ self taskSelectionDoneValue ].
+	anObject ifNil: [ ^ nil ].
 	task := anObject isSymbol
 		ifTrue: [ anObject ]
 		ifFalse: [
 			(anObject respondsTo: #asString)
 				ifTrue: [ anObject asString asSymbol ]
-				ifFalse: [ self taskSelectionDoneValue ] ].
+				ifFalse: [ nil ] ].
 
 	^ (self taskValues includes: task)
 		ifTrue: [ task ]
-		ifFalse: [ self taskSelectionDoneValue ]
+		ifFalse: [ nil ]
 ]
