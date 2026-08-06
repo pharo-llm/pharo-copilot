@@ -76,6 +76,41 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 ]
 
 { #category : 'tests' }
+CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitWritesOnceAndSkipsShutdownFallback [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| tempDir tempEvalFile originalDirRef originalEvalRef ui firstLine secondLine |
+		tempDir := FileLocator temp / ('copilot-image-close-prequit-test-' , UUID new asString).
+		tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
+		originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
+		originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
+		[
+			CoPCImageCloseSurvey resetPromptState.
+			CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
+			CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
+			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+
+			ui := CoPCImageCloseSurveyUIManagerDouble new.
+			ui ratings: #(5 5 4 5).
+			CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
+			CoPCImageCloseSurvey shutDown: true.
+
+			tempEvalFile readStreamDo: [ :stream |
+				firstLine := stream nextLine.
+				secondLine := stream nextLine ].
+
+			self assert: firstLine isNotNil.
+			self assert: secondLine isNil.
+			self assert: (ui requests size) equals: CoPCImageCloseSurvey surveyQuestions size
+		] ensure: [
+			CoPCImageCloseSurvey resetPromptState.
+			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+			tempDir exists ifTrue: [ tempDir ensureDelete ].
+			CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+]
+
+{ #category : 'tests' }
 CoPCImageCloseSurveyTest >> testSurveyEnabledSettingIsPersistedInSnapshots [
 
 	CopilotSettings withDefaultSettingsDo: [

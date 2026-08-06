@@ -6,7 +6,8 @@ Class {
 	#name : 'CoPCImageCloseSurvey',
 	#superclass : 'Object',
 	#classInstVars : [
-		'promptInProgress'
+		'promptInProgress',
+		'promptedForCurrentQuit'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -85,6 +86,31 @@ CoPCImageCloseSurvey class >> promptAndRecordUsing: uiManager [
 ]
 
 { #category : 'survey' }
+CoPCImageCloseSurvey class >> promptBeforeImageQuit [
+
+	(self shouldPromptBeforeImageQuit) ifFalse: [ ^ nil ].
+	^ self promptBeforeImageQuitUsing: self uiManager
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> promptBeforeImageQuitUsing: uiManager [
+
+	promptInProgress = true ifTrue: [ ^ nil ].
+	promptedForCurrentQuit = true ifTrue: [ ^ nil ].
+
+	promptedForCurrentQuit := true.
+	promptInProgress := true.
+	[
+		[
+			^ self promptAndRecordUsing: uiManager
+		] on: Error do: [ :ex |
+			self logSurveyError: ex.
+			^ nil ]
+	] ensure: [
+		promptInProgress := false ]
+]
+
+{ #category : 'survey' }
 CoPCImageCloseSurvey class >> questionLabelsByKey [
 
 	| labels |
@@ -137,6 +163,13 @@ CoPCImageCloseSurvey class >> registerSessionHandler [
 CoPCImageCloseSurvey class >> shouldPromptForImageQuitting: aBoolean [
 
 	aBoolean ifFalse: [ ^ false ].
+	promptedForCurrentQuit = true ifTrue: [ ^ false ].
+	^ self shouldPromptBeforeImageQuit
+]
+
+{ #category : 'session management' }
+CoPCImageCloseSurvey class >> shouldPromptBeforeImageQuit [
+
 	CopilotSettings loggingEnabled ifFalse: [ ^ false ].
 	CopilotSettings imageCloseSurveyEnabled ifFalse: [ ^ false ].
 	^ self hasInteractiveUI
@@ -161,7 +194,14 @@ CoPCImageCloseSurvey class >> shutDown: isImageQuitting [
 { #category : 'session management' }
 CoPCImageCloseSurvey class >> startUp: isImageStarting [
 
-	promptInProgress := false
+	self resetPromptState
+]
+
+{ #category : 'private' }
+CoPCImageCloseSurvey class >> resetPromptState [
+
+	promptInProgress := false.
+	promptedForCurrentQuit := false
 ]
 
 { #category : 'survey' }
