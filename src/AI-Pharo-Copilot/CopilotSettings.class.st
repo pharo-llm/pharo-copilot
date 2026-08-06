@@ -37,7 +37,8 @@ Class {
 		'minimumPrefixLength',
 		'completionSuggestionsCount',
 		'backgroundColor',
-		'installModelUserConsent'
+		'installModelUserConsent',
+		'imageCloseSurveyEnabled'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -604,6 +605,20 @@ CopilotSettings class >> host: aString [
 	self autoSaveSettings
 ]
 
+{ #category : 'accessing' }
+CopilotSettings class >> imageCloseSurveyEnabled [
+	"Answer whether Copilot asks for a short rating survey when the Pharo image quits."
+
+	^ imageCloseSurveyEnabled ifNil: [ imageCloseSurveyEnabled := true ]
+]
+
+{ #category : 'accessing' }
+CopilotSettings class >> imageCloseSurveyEnabled: aBoolean [
+
+	imageCloseSurveyEnabled := aBoolean.
+	self autoSaveSettings
+]
+
 { #category : 'class initialization' }
 CopilotSettings class >> initialize [
 
@@ -642,6 +657,7 @@ CopilotSettings class >> initializeDefaults [
 	completionSuggestionsCount := 1.
 	backgroundColor := self defaultBackgroundColor.
 	installModelUserConsent := false.
+	imageCloseSurveyEnabled := true.
 	ollamaClientFactory := [ CoPCOllamaClient new ].
 	modelMetadata := nil
 ]
@@ -1781,6 +1797,7 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	completionSuggestionsCount := self valueAt: #completionSuggestionsCount from: aDictionary default: completionSuggestionsCount.
 	backgroundColor := self valueAt: #backgroundColor from: aDictionary default: backgroundColor.
 	installModelUserConsent := self valueAt: #installModelUserConsent from: aDictionary default: installModelUserConsent.
+	imageCloseSurveyEnabled := self valueAt: #imageCloseSurveyEnabled from: aDictionary default: imageCloseSurveyEnabled.
 
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
 	templatesPath = nil ifFalse: [
@@ -1837,6 +1854,7 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ aDictionary at: #CompletionSuggestionsCount ifAbsent: [ nil ] ].
 backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ aDictionary at: #BackgroundColor ifAbsent: [ nil ] ].
 installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ aDictionary at: #InstallModelUserConsent ifAbsent: [ nil ] ].
+imageCloseSurveyEnabled := aDictionary at: #imageCloseSurveyEnabled ifAbsent: [ aDictionary at: #ImageCloseSurveyEnabled ifAbsent: [ nil ] ].
 self useDefaultCompletionModelWhenSavedModelIsMissingOrNull
 ]
 
@@ -1934,6 +1952,7 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #completionSuggestionsCount put: completionSuggestionsCount;
 		            at: #backgroundColor put: backgroundColor;
 		at: #installModelUserConsent put: installModelUserConsent;
+		at: #imageCloseSurveyEnabled put: imageCloseSurveyEnabled;
 		            yourself.
 	templatesDirectory ifNotNil: [
 			templatesPath := [ templatesDirectory pathString ]
@@ -2000,6 +2019,15 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #loggingEnabled:;
 					default: self loggingEnabled;
 					description: 'When disabled, Copilot will not record activity or evaluation logs.'.
+
+				(aBuilder setting: #imageCloseSurveyEnabled)
+					order: 0.35;
+					label: 'Ask for feedback on image close';
+					target: self;
+					getSelector: #imageCloseSurveyEnabled;
+					setSelector: #imageCloseSurveyEnabled:;
+					default: self imageCloseSurveyEnabled;
+					description: 'When enabled, Copilot asks a short star-rating survey before the Pharo image quits.'.
 
 				(aBuilder setting: #autoInstallModelScriptEnabled)
 					order: 0.4;
@@ -2241,6 +2269,7 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #completionSuggestionsCount put: completionSuggestionsCount;
 		  at: #backgroundColor put: backgroundColor;
 		at: #installModelUserConsent put: installModelUserConsent;
+		at: #imageCloseSurveyEnabled put: imageCloseSurveyEnabled;
 		  yourself
 ]
 
