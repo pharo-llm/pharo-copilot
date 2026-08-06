@@ -9,7 +9,9 @@ Class {
 		'replaceCount',
 		'lastReplacement',
 		'behavior',
-		'method'
+		'method',
+		'doItRequestor',
+		'doItContext'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -25,6 +27,30 @@ CoCopilotContextMock >> behavior [
 CoCopilotContextMock >> behavior: aBehavior [ 
 
 	behavior := aBehavior
+]
+
+{ #category : 'accessing' }
+CoCopilotContextMock >> doItContext [
+
+	^ doItContext
+]
+
+{ #category : 'accessing' }
+CoCopilotContextMock >> doItContext: anObject [
+
+	doItContext := anObject
+]
+
+{ #category : 'accessing' }
+CoCopilotContextMock >> doItRequestor [
+
+	^ doItRequestor
+]
+
+{ #category : 'accessing' }
+CoCopilotContextMock >> doItRequestor: anObject [
+
+	doItRequestor := anObject
 ]
 
 { #category : 'accessing' }

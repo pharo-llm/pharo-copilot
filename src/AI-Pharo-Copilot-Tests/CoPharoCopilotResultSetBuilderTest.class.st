@@ -290,6 +290,101 @@ CoPharoCopilotResultSetBuilderTest >> testInteractionHistoryUsesContextSectionWh
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticContextAppendsAfterStaticContext [
+
+	| builder context base source result |
+	builder := CoPharoCopilotResultSetBuilder new.
+	source := 'semanticContextExample', String lf, String tab, 'self as'.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: source;
+		position: source size;
+		yourself.
+	base := '<|repo_name|>Object', String lf.
+
+	result := builder
+		appendSemanticCompletionContextFor: context
+		prefix: source
+		toContext: base.
+
+	self assert: (result beginsWith: base).
+	self assert: (result includesSubstring: '<|file_sep|>Semantic completion context').
+	self assert: (result includesSubstring: 'Completion class: Object')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticContextIncludesSelfReceiverType [
+
+	| builder context source semantic |
+	builder := CoPharoCopilotResultSetBuilder new.
+	source := 'semanticContextExample', String lf, String tab, 'self as'.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: source;
+		position: source size;
+		yourself.
+
+	semantic := builder semanticCompletionContextFor: context prefix: source.
+
+	self assert: (semantic includesSubstring: 'Completion class: Object').
+	self assert: (semantic includesSubstring: 'Typed token: as').
+	self assert: (semantic includesSubstring: 'Current receiver: self').
+	self assert: (semantic includesSubstring: 'Receiver type: Object')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticContextUsesLiveBindingValueType [
+
+	| builder context requestor source semantic |
+	builder := CoPharoCopilotResultSetBuilder new.
+	requestor := CoPCBindingRequestorDouble new.
+	requestor bind: 'items' to: OrderedCollection new.
+	source := 'items add'.
+	context := CoCopilotContextMock new
+		doItRequestor: requestor;
+		source: source;
+		position: source size;
+		yourself.
+
+	semantic := builder semanticCompletionContextFor: context prefix: source.
+
+	self assert: (semantic includesSubstring: 'Typed token: add').
+	self assert: (semantic includesSubstring: 'Current receiver: items').
+	self assert: (semantic includesSubstring: 'Receiver type: OrderedCollection').
+	self assert: (semantic includesSubstring: 'items -> OrderedCollection')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorHintsAreLimitedAndFiltered [
+
+	| builder hints |
+	builder := CoPharoCopilotResultSetBuilder new.
+
+	hints := builder
+		semanticSelectorHintsForTypes: { Object }
+		token: 'as'
+		limit: 5.
+
+	self assert: hints size <= 5.
+	self assert: (hints allSatisfy: [ :each | each beginsWith: 'as' ])
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testVariableNameTypeHeuristicUsesAOrAnPrefix [
+
+	| builder types names |
+	builder := CoPharoCopilotResultSetBuilder new.
+
+	types := builder
+		semanticTypesForReceiverName: 'aCollection'
+		inContext: nil
+		behavior: nil.
+	names := builder typeNamesStringFor: types.
+
+	self assert: (names includesSubstring: 'Collection')
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testScheduleCompletionRunsImmediatelyWhenDelayIsZero [
 
 	| builder context |
