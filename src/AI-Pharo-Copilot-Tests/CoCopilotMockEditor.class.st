@@ -5,7 +5,9 @@ Class {
 		'inserted',
 		'startIndex',
 		'selectionStart',
-		'selectionStop'
+		'selectionStop',
+		'text',
+		'caret'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -21,6 +23,19 @@ CoCopilotMockEditor >> addString: aString [
 	startIndex := startIndex + aString size
 ]
 
+{ #category : 'accessing' }
+CoCopilotMockEditor >> caret [
+
+	^ caret ifNil: [ startIndex ]
+]
+
+{ #category : 'accessing' }
+CoCopilotMockEditor >> caret: anInteger [
+
+	caret := anInteger.
+	self startIndex: anInteger
+]
+
 { #category : 'initialization' }
 CoCopilotMockEditor >> initialize [
 
@@ -28,7 +43,9 @@ CoCopilotMockEditor >> initialize [
 	inserted := ''.
 	startIndex := 1.
 	selectionStart := 1.
-	selectionStop := 0
+	selectionStop := 0.
+	text := ''.
+	caret := 1
 ]
 
 { #category : 'initialization' }
@@ -83,4 +100,16 @@ CoCopilotMockEditor >> startIndex: anInteger [
 	startIndex := anInteger.
 	selectionStart := anInteger.
 	selectionStop := anInteger - 1
+]
+
+{ #category : 'accessing' }
+CoCopilotMockEditor >> text [
+
+	^ text ifNil: [ '' ]
+]
+
+{ #category : 'accessing' }
+CoCopilotMockEditor >> text: aString [
+
+	text := aString
 ]

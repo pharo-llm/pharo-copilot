@@ -104,6 +104,24 @@ OllamaClientTest >> testGenerateForPrefixReusesFimTemplateWithinClient [
 ]
 
 { #category : 'tests' }
+OllamaClientTest >> testGenerateForPrefixRequestsLogprobs [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| client mock payload |
+		client := CoPCOllamaClient new.
+		client instVarNamed: 'fimTemplate' put: CoPCOllamaClient defaultFimGenerationTemplate.
+		mock := OAHttpTransportMockExtended new.
+		mock mockResponse: (Dictionary new at: #response put: 'completion'; yourself).
+		client instVarNamed: 'transport' put: mock.
+
+		client generateForPrefix: 'self ' suffix: '' context: ''.
+
+		payload := mock lastBody.
+		self assert: (payload at: #logprobs) equals: true.
+		self assert: (payload at: #top_logprobs) equals: CopilotSettings completionTopLogprobs ]
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testGenerateIncludesFormatWhenSet [
 	| client mock payload |
 	client := CoPCOllamaClient new.
@@ -129,6 +147,74 @@ OllamaClientTest >> testGenerateIncludesOptionsWhenNotEmpty [
 
         payload := mock lastBody.
         self assert: ((payload at: #options) at: #temperature) equals: 0.7
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testGenerateIncludesLogprobsWhenEnabled [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| client mock payload |
+		client := CoPCOllamaClient new.
+		mock := OAHttpTransportMockExtended new.
+		client instVarNamed: 'transport' put: mock.
+
+		client generate: 'test'.
+
+		payload := mock lastBody.
+		self assert: (payload at: #logprobs) equals: true.
+		self assert: (payload at: #top_logprobs) equals: CopilotSettings completionTopLogprobs ]
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testGenerateOmitsLogprobsWhenDisabled [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| client mock payload |
+		CopilotSettings completionLogprobsEnabled: false.
+		client := CoPCOllamaClient new.
+		mock := OAHttpTransportMockExtended new.
+		client instVarNamed: 'transport' put: mock.
+
+		client generate: 'test'.
+
+		payload := mock lastBody.
+		self deny: (payload includesKey: #logprobs).
+		self deny: (payload includesKey: #top_logprobs) ]
+]
+
+{ #category : 'tests' }
+OllamaClientTest >> testGenerateWithMetadataIncludesResponseLogprobs [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| client mock logprobs metadata responseMetadata requestMetadata |
+		client := CoPCOllamaClient new.
+		mock := OAHttpTransportMockExtended new.
+		logprobs := {
+			Dictionary new
+				at: #token put: 'self';
+				at: #logprob put: -0.2;
+				at: #top_logprobs put: {
+					Dictionary new
+						at: #token put: 'self';
+						at: #logprob put: -0.2;
+						yourself };
+				yourself }.
+		mock mockResponse: (Dictionary new
+			at: #response put: 'self';
+			at: #logprobs put: logprobs;
+			at: #eval_count put: 1;
+			yourself).
+		client instVarNamed: 'transport' put: mock.
+
+		metadata := client generateWithMetadata: 'test'.
+
+		self assert: (metadata at: #content) equals: 'self'.
+		responseMetadata := metadata at: #response.
+		self assert: (responseMetadata at: #logprobs) equals: logprobs.
+		self assert: (responseMetadata at: #eval_count) equals: 1.
+		requestMetadata := metadata at: #request.
+		self assert: (requestMetadata at: #logprobs) equals: true.
+		self assert: (requestMetadata at: #top_logprobs) equals: CopilotSettings completionTopLogprobs ]
 ]
 
 { #category : 'tests' }

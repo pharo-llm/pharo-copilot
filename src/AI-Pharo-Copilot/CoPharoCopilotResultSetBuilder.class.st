@@ -85,6 +85,26 @@ CoPharoCopilotResultSetBuilder >> appendInteractionHistoryToContext: contextStri
 		toContext: contextString
 ]
 
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> appendSemanticCompletionContextFor: aContext prefix: prefixString toContext: contextString [
+
+	| semantic base lf |
+	semantic := self semanticCompletionContextFor: aContext prefix: prefixString.
+	semantic isEmpty ifTrue: [ ^ contextString ifNil: [ '' ] ].
+
+	base := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
+	lf := Character lf.
+	^ String streamContents: [ :stream |
+		base isEmpty ifFalse: [
+			stream nextPutAll: base.
+			base last = lf ifFalse: [ stream nextPut: lf ] ].
+		stream
+			nextPutAll: '<|file_sep|>Semantic completion context';
+			nextPut: lf;
+			nextPutAll: semantic.
+		semantic last = lf ifFalse: [ stream nextPut: lf ] ]
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [ 
 
@@ -99,16 +119,24 @@ CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContex
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
 
-	| entries position |
+	| adjustedContents entries position typedAhead |
 
 	(self hasStaleContextFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix)
 		ifTrue: [ ^ self logStaleContextForExpectedPrefix: expectedPrefix suffix: expectedSuffix context: aContext ].
 
+	typedAhead := self
+		typedAheadIn: aContext
+		expectedPrefix: expectedPrefix
+		suffix: expectedSuffix.
+	adjustedContents := self
+		stripAlreadyTyped: typedAhead
+		fromSuggestions: contentCollection.
+
 	entries := self
-		completionEntriesFrom: contentCollection
+		completionEntriesFrom: adjustedContents
 		inContext: aContext
 		contextInfo: contextInfo.
-	entries isEmpty ifTrue: [ ^ self logNoEntriesAfterCleaningFor: contentCollection ].
+	entries isEmpty ifTrue: [ ^ self logNoEntriesAfterCleaningFor: adjustedContents ].
 
 	position := self menuPositionForContextOrDefault: aContext.
 
@@ -286,18 +314,24 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 
 	| behavior selector methodClass cachedContext builtContext classContext |
 	behavior := self behaviorFor: aContext.
-	behavior ifNil: [ ^ '' ].
+	classContext := ''.
 
-	selector := self selectorFromPrefix: prefixString.
-	methodClass := self methodClassForBehavior: behavior selector: selector.
+	behavior ifNotNil: [
+		selector := self selectorFromPrefix: prefixString.
+		methodClass := self methodClassForBehavior: behavior selector: selector.
 
-	cachedContext := self cachedClassContextFor: methodClass.
-	classContext := cachedContext
-		ifNotNil: [ cachedContext ]
-		ifNil: [
-			builtContext := self buildClassContextFor: methodClass selector: selector prefix: prefixString.
-			self cacheClassContext: builtContext for: methodClass.
-			builtContext ].
+		cachedContext := self cachedClassContextFor: methodClass.
+		classContext := cachedContext
+			ifNotNil: [ cachedContext ]
+			ifNil: [
+				builtContext := self buildClassContextFor: methodClass selector: selector prefix: prefixString.
+				self cacheClassContext: builtContext for: methodClass.
+				builtContext ] ].
+
+	classContext := self
+		appendSemanticCompletionContextFor: aContext
+		prefix: prefixString
+		toContext: classContext.
 
 	"Comment the next line to disconnect IDE interaction history from the model context."
 	^ self appendInteractionHistoryToContext: classContext
@@ -814,11 +848,14 @@ CoPharoCopilotResultSetBuilder >> finalizeCollectedSuggestions: collected contex
 CoPharoCopilotResultSetBuilder >> hasStaleContextFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix [
 
 	| snapshot currentPrefix currentSuffix |
-	snapshot := self contextSnapshotFor: aContext.
+	snapshot := self liveContextSnapshotFor: aContext.
 	currentPrefix := snapshot at: #prefix.
 	currentSuffix := snapshot at: #suffix.
 
-	^ (currentPrefix = expectedPrefix and: [ currentSuffix = expectedSuffix ]) not
+	(currentPrefix = expectedPrefix and: [ currentSuffix = expectedSuffix ]) ifTrue: [ ^ false ].
+
+	^ (currentPrefix beginsWith: expectedPrefix) not
+		or: [ currentSuffix ~= expectedSuffix ]
 ]
 
 { #category : 'initialization' }
@@ -914,6 +951,66 @@ CoPharoCopilotResultSetBuilder >> insertAtCaretIfPossibleIn: aContext text: aStr
 CoPharoCopilotResultSetBuilder >> interactionHistoryForPrompt [
 
 	^ CoPCContextNavigationHistory new gather
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> liveContextSnapshotFor: aContext [
+
+	| pair source position prefix suffix |
+	pair := self liveSourceAndPositionFor: aContext.
+	pair ifNil: [ ^ self contextSnapshotFor: aContext ].
+
+	source := pair first.
+	position := pair second.
+	prefix := position > 0
+		ifTrue: [ source copyFrom: 1 to: position ]
+		ifFalse: [ '' ].
+	suffix := position < source size
+		ifTrue: [ source copyFrom: position + 1 to: source size ]
+		ifFalse: [ '' ].
+
+	^ Dictionary new
+		at: #prefix put: prefix;
+		at: #suffix put: suffix;
+		at: #position put: position;
+		at: #sourceLength put: source size;
+		yourself
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> liveEditorFor: aContext [
+
+	| engine editor |
+	aContext ifNil: [ ^ nil ].
+
+	engine := [ aContext engine ] on: Error do: [ nil ].
+	editor := engine
+		ifNotNil: [ [ engine editor ] on: Error do: [ nil ] ]
+		ifNil: [ nil ].
+	editor ifNotNil: [ ^ editor ].
+
+	^ (aContext respondsTo: #editor)
+		ifTrue: [ [ aContext editor ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> liveSourceAndPositionFor: aContext [
+
+	| editor source caret position |
+	editor := self liveEditorFor: aContext.
+	editor ifNil: [ ^ nil ].
+	((editor respondsTo: #text) and: [ editor respondsTo: #caret ]) ifFalse: [ ^ nil ].
+
+	source := [ editor text ifNil: [ nil ] ] on: Error do: [ nil ].
+	source ifNil: [ ^ nil ].
+	source := source asString.
+
+	caret := [ editor caret ] on: Error do: [ nil ].
+	caret ifNil: [ ^ nil ].
+	position := (caret - 1 max: 0) min: source size.
+
+	^ { source. position }
 ]
 
 { #category : 'initialization' }
@@ -1085,7 +1182,7 @@ CoPharoCopilotResultSetBuilder >> logStaleContextForExpectedPrefix: expectedPref
 
 	| snapshot currentPrefix currentSuffix |
 	self isLoggingEnabled ifFalse: [ ^ self ].
-	snapshot := self contextSnapshotFor: aContext.
+	snapshot := self liveContextSnapshotFor: aContext.
 	currentPrefix := snapshot at: #prefix ifAbsent: [ '' ].
 	currentSuffix := snapshot at: #suffix ifAbsent: [ '' ].
 
@@ -1286,9 +1383,20 @@ CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefi
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefixString suffix: suffixString context: classContext attempt: attempt contextInfo: contextInfo [
 
-	| rawResponse content |
-	rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
+	| metadata rawResponse content |
+	metadata := (client respondsTo: #generateWithMetadataForPrefix:suffix:context:)
+		ifTrue: [
+			client
+				generateWithMetadataForPrefix: prefixString
+				suffix: suffixString
+				context: classContext ]
+		ifFalse: [
+			Dictionary new
+				at: #content put: (client generateForPrefix: prefixString suffix: suffixString context: classContext);
+				yourself ].
+	rawResponse := metadata at: #content ifAbsent: [ '' ].
 	content := self normalizeSuggestion: rawResponse forPrefix: prefixString.
+	self recordGenerationAttempt: attempt metadata: metadata normalizedSuggestion: content contextInfo: contextInfo.
 
 	(content isEmpty and: [ rawResponse asString trimBoth isEmpty not ]) ifTrue: [
 		self
@@ -1305,6 +1413,23 @@ CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefi
 CoPharoCopilotResultSetBuilder >> ollamaClient [ 
 
 	^ cachedClient ifNil: [ cachedClient := CoPCOllamaClient new ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> recordGenerationAttempt: attempt metadata: metadata normalizedSuggestion: content contextInfo: contextInfo [
+
+	| attempts attemptPayload |
+	self isLoggingEnabled ifFalse: [ ^ self ].
+	contextInfo ifNil: [ ^ self ].
+
+	attempts := contextInfo at: #generationAttempts ifAbsentPut: [ OrderedCollection new ].
+	attemptPayload := Dictionary new
+		at: #attempt put: attempt;
+		at: #suggestion put: content;
+		at: #request put: (metadata at: #request ifAbsent: [ Dictionary new ]);
+		at: #response put: (metadata at: #response ifAbsent: [ Dictionary new ]);
+		yourself.
+	attempts add: attemptPayload
 ]
 
 { #category : 'new' }
@@ -1520,6 +1645,188 @@ CoPharoCopilotResultSetBuilder >> scanClassContextOldestKey [
 	^ bestKey
 ]
 
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> annotatedSemanticAstFor: aContext source: sourceString [
+
+	| behavior compiler ast visitorClass |
+	behavior := self behaviorFor: aContext.
+	behavior ifNil: [ ^ nil ].
+	(behavior respondsTo: #compiler) ifFalse: [ ^ nil ].
+
+	ast := [
+		compiler := behavior compiler.
+		compiler source: sourceString.
+		(compiler respondsTo: #isScripting:) ifTrue: [
+			compiler isScripting: (self isScriptingContext: aContext) ].
+		compiler parse ]
+		on: Error
+		do: [ nil ].
+	ast ifNil: [ ^ nil ].
+
+	visitorClass := self typeAnnotationVisitorClass.
+	visitorClass ifNotNil: [
+		[ visitorClass new visit: ast ]
+			on: Error
+			do: [ ] ].
+
+	^ ast
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> completionTokenFor: aContext prefix: prefixString [
+
+	| token |
+	token := (aContext notNil and: [ aContext respondsTo: #completionToken ])
+		ifTrue: [ [ aContext completionToken ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+
+	(token isNil or: [ token asString isEmpty ]) ifFalse: [ ^ token asString ].
+	^ self trailingWordFragmentIn: prefixString
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> environmentValueNamed: variableName inContext: aContext ifPresent: aBlock [
+
+	| symbol value found |
+	variableName ifNil: [ ^ self ].
+	variableName asString isEmpty ifTrue: [ ^ self ].
+	symbol := variableName asString asSymbol.
+
+	(aContext notNil and: [ aContext respondsTo: #environmentAt:ifPresent: ]) ifTrue: [
+		found := false.
+		[
+			aContext
+				environmentAt: symbol
+				ifPresent: [ :global |
+					value := global.
+					found := true ] ]
+			on: Error
+			do: [ ].
+		found ifTrue: [ ^ aBlock value: value ] ].
+
+	value := [ Smalltalk globals at: symbol ifAbsent: [ nil ] ]
+		on: Error
+		do: [ nil ].
+	value ifNotNil: [ ^ aBlock value: value ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> inferredInstanceVariableTypesNamed: variableName inBehavior: aBehavior [
+
+	| inferencerClass variables |
+	(aBehavior isNil or: [ variableName isNil ]) ifTrue: [ ^ #() ].
+
+	inferencerClass := Smalltalk globals
+		at: #CoTypeInferencer
+		ifAbsent: [ nil ].
+	inferencerClass ifNil: [ ^ #() ].
+
+	variables := [
+		inferencerClass new
+			inferFrom: aBehavior;
+			variables ]
+		on: Error
+		do: [ nil ].
+	variables ifNil: [ ^ #() ].
+
+	^ variables at: variableName asString ifAbsent: [ #() ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> isClassOrTrait: anObject [
+
+	anObject ifNil: [ ^ false ].
+	((anObject respondsTo: #isClassOrTrait) and: [
+		[ anObject isClassOrTrait ] on: Error do: [ false ] ])
+			ifTrue: [ ^ true ].
+	^ [ anObject isBehavior ] on: Error do: [ false ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> isScriptingContext: aContext [
+
+	^ (aContext notNil and: [ aContext respondsTo: #isScripting ])
+		and: [ [ aContext isScripting ] on: Error do: [ false ] ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> isSemanticMessageNode: aNode [
+
+	aNode ifNil: [ ^ false ].
+	((aNode respondsTo: #isMessage) and: [
+		[ aNode isMessage ] on: Error do: [ false ] ])
+			ifTrue: [ ^ true ].
+	^ (aNode respondsTo: #receiver) and: [ aNode respondsTo: #selector ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> isUnknownSemanticType: aType [
+
+	aType ifNil: [ ^ true ].
+	aType class name = #CoUnknownType ifTrue: [ ^ true ].
+	^ (self typeNameFor: aType) = 'CoUnknownType'
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> liveVariableValueNamed: variableName inContext: aContext ifPresent: aBlock [
+
+	| name doItContext variable requestor binding |
+	(aContext isNil or: [ variableName isNil ]) ifTrue: [ ^ self ].
+	name := variableName asString.
+	name isEmpty ifTrue: [ ^ self ].
+
+	doItContext := (aContext respondsTo: #doItContext)
+		ifTrue: [ [ aContext doItContext ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+	doItContext ifNotNil: [
+		variable := [
+			(doItContext respondsTo: #lookupVar:)
+				ifTrue: [ doItContext lookupVar: name ]
+				ifFalse: [ nil ] ]
+			on: Error
+			do: [ nil ].
+		variable ifNotNil: [
+			^ aBlock value: ([ variable readInContext: doItContext ] on: Error do: [ nil ]) ] ].
+
+	requestor := (aContext respondsTo: #doItRequestor)
+		ifTrue: [ [ aContext doItRequestor ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+	requestor ifNil: [ ^ self ].
+
+	((requestor respondsTo: #hasBindingOf:) and: [
+		[ requestor hasBindingOf: name ] on: Error do: [ false ] ])
+			ifFalse: [ ^ self ].
+
+	binding := [
+		(requestor respondsTo: #bindingOf:)
+			ifTrue: [ requestor bindingOf: name ]
+			ifFalse: [ nil ] ]
+		on: Error
+		do: [ nil ].
+	binding ifNil: [ ^ self ].
+
+	^ aBlock value: ([ binding value ] on: Error do: [ nil ])
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> normalizeSemanticTypes: typeCollection [
+
+	| normalized seen |
+	normalized := OrderedCollection new.
+	seen := Set new.
+	typeCollection ifNil: [ ^ #() ].
+
+	typeCollection do: [ :type |
+		| name |
+		(self isUnknownSemanticType: type) ifFalse: [
+			name := self typeNameFor: type.
+			(name isEmpty or: [ seen includes: name ]) ifFalse: [
+				seen add: name.
+				normalized add: type ] ] ].
+
+	^ normalized asArray
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 	^ self
@@ -1555,6 +1862,327 @@ CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefix
 				prefix: prefixString
 				suffix: suffixString
 				contextInfo: contextInfo ] ] forkAt: priority
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> receiverNameForNode: aNode source: sourceString [
+
+	| sourceName |
+	aNode ifNil: [ ^ '' ].
+
+	sourceName := self sourceSubstringForNode: aNode in: sourceString.
+	sourceName isEmpty ifFalse: [ ^ sourceName ].
+
+	((aNode respondsTo: #isSelfVariable) and: [
+		[ aNode isSelfVariable ] on: Error do: [ false ] ])
+			ifTrue: [ ^ 'self' ].
+	((aNode respondsTo: #isSuperVariable) and: [
+		[ aNode isSuperVariable ] on: Error do: [ false ] ])
+			ifTrue: [ ^ 'super' ].
+	(aNode respondsTo: #name) ifTrue: [
+		^ [ aNode name asString ] on: Error do: [ '' ] ].
+	(aNode respondsTo: #value) ifTrue: [
+		^ [ aNode value printString ] on: Error do: [ '' ] ].
+
+	^ ''
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> receiverNodeForSemanticNode: aNode [
+
+	aNode ifNil: [ ^ nil ].
+	(self isSemanticMessageNode: aNode) ifTrue: [
+		^ [ aNode receiver ] on: Error do: [ nil ] ].
+
+	((aNode respondsTo: #propertyAt:ifAbsent:) or: [
+		(aNode respondsTo: #name) or: [ aNode respondsTo: #value ] ])
+			ifTrue: [ ^ aNode ].
+
+	^ nil
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> semanticAstNodeFor: aContext source: sourceString position: positionInteger [
+
+	| ast position |
+	ast := self annotatedSemanticAstFor: aContext source: sourceString.
+	ast ifNil: [ ^ nil ].
+
+	position := (positionInteger ifNil: [ 0 ]) max: 0.
+	^ [
+		(ast nodeBeforeOffset: position)
+			ifNil: [ ast ] ]
+		on: Error
+		do: [ ast ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> semanticCompletionContextFor: aContext prefix: prefixString [
+
+	| lines behavior token receiverInfo receiverName receiverTypes selectorHints bindings lf |
+	aContext ifNil: [ ^ '' ].
+
+	lines := OrderedCollection new.
+	behavior := self behaviorFor: aContext.
+	behavior ifNotNil: [
+		lines add: 'Completion class: ' , (self typeNameFor: behavior) ].
+
+	token := self completionTokenFor: aContext prefix: prefixString.
+	token isEmpty ifFalse: [
+		lines add: 'Typed token: ' , token ].
+
+	receiverInfo := self semanticReceiverInfoFor: aContext prefix: prefixString.
+	receiverName := receiverInfo at: #receiver ifAbsent: [ '' ].
+	receiverTypes := receiverInfo at: #types ifAbsent: [ #() ].
+
+	receiverName isEmpty ifFalse: [
+		lines add: 'Current receiver: ' , receiverName ].
+	receiverTypes isEmpty ifFalse: [
+		lines add: 'Receiver type: ' , (self typeNamesStringFor: receiverTypes) ].
+
+	selectorHints := self
+		semanticSelectorHintsForTypes: receiverTypes
+		token: token
+		limit: 30.
+	selectorHints isEmpty ifFalse: [
+		lines add: (token isEmpty
+			ifTrue: [ 'Receiver selector samples:' ]
+			ifFalse: [ 'Receiver selectors matching ' , token printString , ':' ]).
+		selectorHints do: [ :selector |
+			lines add: '  ' , selector ] ].
+
+	bindings := self visibleBindingTypeDescriptionsFor: aContext limit: 12.
+	bindings isEmpty ifFalse: [
+		lines add: 'Visible binding types:'.
+		bindings do: [ :bindingDescription |
+			lines add: '  ' , bindingDescription ] ].
+
+	lines isEmpty ifTrue: [ ^ '' ].
+	lf := Character lf.
+	^ String streamContents: [ :stream |
+		lines
+			do: [ :line | stream nextPutAll: line ]
+			separatedBy: [ stream nextPut: lf ] ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> semanticReceiverInfoFor: aContext prefix: prefixString [
+
+	| source position behavior node receiverNode receiverName receiverTypes token |
+	source := [ aContext source ifNil: [ prefixString ifNil: [ '' ] ] ]
+		on: Error
+		do: [ prefixString ifNil: [ '' ] ].
+	position := [ aContext position ifNil: [ source size ] ]
+		on: Error
+		do: [ source size ].
+	position := (position max: 0) min: source size.
+	behavior := self behaviorFor: aContext.
+
+	node := self
+		semanticAstNodeFor: aContext
+		source: source
+		position: position.
+	receiverNode := self receiverNodeForSemanticNode: node.
+
+	receiverName := receiverNode
+		ifNil: [ '' ]
+		ifNotNil: [ self receiverNameForNode: receiverNode source: source ].
+	receiverName isEmpty ifTrue: [
+		receiverName := self textualReceiverBeforeCompletionIn: prefixString ].
+
+	receiverTypes := receiverNode
+		ifNil: [ #() ]
+		ifNotNil: [
+			self
+				semanticTypesForReceiverNode: receiverNode
+				inContext: aContext
+				behavior: behavior
+				source: source ].
+
+	token := self completionTokenFor: aContext prefix: prefixString.
+	(receiverTypes isEmpty and: [
+		token isEmpty not and: [ receiverName = token ] ]) ifTrue: [
+			receiverName := self textualReceiverBeforeCompletionIn: prefixString.
+			receiverTypes := self
+				semanticTypesForReceiverName: receiverName
+				inContext: aContext
+				behavior: behavior ].
+
+	(receiverTypes isEmpty and: [ receiverName isEmpty not ]) ifTrue: [
+		receiverTypes := self
+			semanticTypesForReceiverName: receiverName
+			inContext: aContext
+			behavior: behavior ].
+
+	^ Dictionary new
+		at: #receiver put: receiverName;
+		at: #types put: receiverTypes;
+		yourself
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> semanticSelectorHintsForTypes: typeCollection token: tokenString limit: limitInteger [
+
+	| selectors token limit sorted |
+	selectors := Set new.
+	token := tokenString ifNil: [ '' ] ifNotNil: [ tokenString asString ].
+	limit := limitInteger ifNil: [ 30 ].
+
+	(self normalizeSemanticTypes: typeCollection) do: [ :type |
+		| current |
+		current := type.
+		[ current notNil ] whileTrue: [
+			[
+				current selectorsDo: [ :selector |
+					| selectorString |
+					selectorString := selector asString.
+					(token isEmpty or: [ selectorString beginsWith: token ])
+						ifTrue: [ selectors add: selectorString ] ] ]
+				on: Error
+				do: [ ].
+			current := [ current superclass ] on: Error do: [ nil ] ] ].
+
+	sorted := selectors asArray asSortedCollection asArray.
+	sorted size <= limit ifTrue: [ ^ sorted ].
+	^ sorted copyFrom: 1 to: limit
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> semanticTypesForReceiverName: receiverName inContext: aContext behavior: aBehavior [
+
+	| name types inferred |
+	receiverName ifNil: [ ^ #() ].
+	name := receiverName asString trimBoth.
+	name isEmpty ifTrue: [ ^ #() ].
+	types := OrderedCollection new.
+
+	self
+		liveVariableValueNamed: name
+		inContext: aContext
+		ifPresent: [ :value | types add: value class ].
+
+	name = 'self' ifTrue: [
+		aBehavior ifNotNil: [ types add: aBehavior ].
+		^ self normalizeSemanticTypes: types ].
+
+	name = 'super' ifTrue: [
+		aBehavior ifNotNil: [
+			([ aBehavior superclass ] on: Error do: [ nil ])
+				ifNotNil: [ :superclass | types add: superclass ] ].
+		^ self normalizeSemanticTypes: types ].
+
+	self
+		environmentValueNamed: name
+		inContext: aContext
+		ifPresent: [ :global |
+			(self isClassOrTrait: global)
+				ifTrue: [ types add: global classSide ]
+				ifFalse: [ types add: global class ] ].
+
+	name size > 1 ifTrue: [
+		self
+			environmentValueNamed: name allButFirst
+			inContext: aContext
+			ifPresent: [ :global |
+				(self isClassOrTrait: global)
+					ifTrue: [ types add: global instanceSide ]
+					ifFalse: [ types add: global class ] ] ].
+
+	name size > 2 ifTrue: [
+		self
+			environmentValueNamed: (name allButFirst: 2)
+			inContext: aContext
+			ifPresent: [ :global |
+				(self isClassOrTrait: global)
+					ifTrue: [ types add: global instanceSide ]
+					ifFalse: [ types add: global class ] ] ].
+
+	inferred := self
+		inferredInstanceVariableTypesNamed: name
+		inBehavior: aBehavior.
+	types addAll: inferred.
+
+	^ self normalizeSemanticTypes: types
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> semanticTypesForReceiverNode: receiverNode inContext: aContext behavior: aBehavior source: sourceString [
+
+	| types annotatedType receiverName |
+	types := OrderedCollection new.
+	annotatedType := self typePropertyOfNode: receiverNode.
+	annotatedType ifNotNil: [ types add: annotatedType ].
+
+	types isEmpty ifTrue: [
+		((receiverNode respondsTo: #isLiteralNode) and: [
+			[ receiverNode isLiteralNode ] on: Error do: [ false ] ])
+				ifTrue: [
+					[ types add: receiverNode value class ]
+						on: Error
+						do: [ ] ] ].
+
+	receiverName := self receiverNameForNode: receiverNode source: sourceString.
+	(types isEmpty and: [ receiverName isEmpty not ]) ifTrue: [
+		types addAll: (self
+			semanticTypesForReceiverName: receiverName
+			inContext: aContext
+			behavior: aBehavior) ].
+
+	^ self normalizeSemanticTypes: types
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> sourceSubstringForNode: aNode in: sourceString [
+
+	| source start stop |
+	(aNode isNil or: [ sourceString isNil ]) ifTrue: [ ^ '' ].
+	source := sourceString asString.
+	source isEmpty ifTrue: [ ^ '' ].
+
+	start := [ aNode start ] on: Error do: [ nil ].
+	stop := [
+		(aNode respondsTo: #stopWithoutParentheses)
+			ifTrue: [ aNode stopWithoutParentheses ]
+			ifFalse: [ aNode stop ] ]
+		on: Error
+		do: [ nil ].
+
+	(start isNil or: [ stop isNil ]) ifTrue: [ ^ '' ].
+	start := start max: 1.
+	stop := stop min: source size.
+	start > stop ifTrue: [ ^ '' ].
+
+	^ (source copyFrom: start to: stop) trimBoth
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> textualReceiverBeforeCompletionIn: prefixString [
+
+	| prefix fragment base end start |
+	prefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
+	prefix isEmpty ifTrue: [ ^ '' ].
+
+	fragment := self trailingWordFragmentIn: prefix.
+	base := prefix.
+	(fragment isEmpty not and: [ base size >= fragment size ]) ifTrue: [
+		((base copyFrom: base size - fragment size + 1 to: base size) = fragment)
+			ifTrue: [
+				base := base size = fragment size
+					ifTrue: [ '' ]
+					ifFalse: [ base copyFrom: 1 to: base size - fragment size ] ] ].
+	base := base trimRight.
+	base isEmpty ifTrue: [ ^ '' ].
+
+	end := base size.
+	[ end > 0 and: [ (self isWordChar: (base at: end)) not ] ] whileTrue: [
+		end := end - 1 ].
+	end = 0 ifTrue: [ ^ '' ].
+
+	start := end.
+	[ start > 0 and: [ self isWordChar: (base at: start) ] ] whileTrue: [
+		start := start - 1 ].
+
+	^ base copyFrom: start + 1 to: end
 ]
 
 { #category : 'new' }
@@ -1648,6 +2276,42 @@ CoPharoCopilotResultSetBuilder >> sourceFromSnapshot: snapshot [
 ]
 
 { #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> stripAlreadyTyped: typedAheadString fromSuggestion: suggestionString [
+
+	| suggestion typed maxOverlap overlap |
+	suggestion := (suggestionString ifNil: [ '' ]) asString.
+	typed := (typedAheadString ifNil: [ '' ]) asString.
+	(suggestion isEmpty or: [ typed isEmpty ]) ifTrue: [ ^ suggestion ].
+
+	(suggestion beginsWith: typed) ifTrue: [
+		^ suggestion allButFirst: typed size ].
+
+	(typed beginsWith: suggestion) ifTrue: [ ^ '' ].
+
+	maxOverlap := suggestion size min: typed size.
+	overlap := maxOverlap.
+	[ overlap > 1 ] whileTrue: [
+		((typed copyFrom: typed size - overlap + 1 to: typed size)
+			= (suggestion copyFrom: 1 to: overlap))
+				ifTrue: [ ^ suggestion allButFirst: overlap ].
+		overlap := overlap - 1 ].
+
+	^ suggestion
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> stripAlreadyTyped: typedAheadString fromSuggestions: contentCollection [
+
+	typedAheadString isNil ifTrue: [ ^ contentCollection ].
+	typedAheadString isEmpty ifTrue: [ ^ contentCollection ].
+
+	^ contentCollection collect: [ :each |
+		self
+			stripAlreadyTyped: typedAheadString
+			fromSuggestion: (self cleanedContentFrom: each) ]
+]
+
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> stripTypedFragment: typedFragment fromSuggestion: suggestionString [
 
 	| suggestion fragment trimmed |
@@ -1667,6 +2331,20 @@ CoPharoCopilotResultSetBuilder >> stripTypedFragment: typedFragment fromSuggesti
 	^ suggestion
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> typedAheadIn: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix [
+
+	| snapshot currentPrefix currentSuffix |
+	snapshot := self liveContextSnapshotFor: aContext.
+	currentPrefix := snapshot at: #prefix ifAbsent: [ '' ].
+	currentSuffix := snapshot at: #suffix ifAbsent: [ '' ].
+
+	((currentPrefix beginsWith: expectedPrefix) and: [ currentSuffix = expectedSuffix ])
+		ifFalse: [ ^ nil ].
+
+	^ currentPrefix allButFirst: expectedPrefix size
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> trailingWordFragmentIn: aString [
 
@@ -1682,10 +2360,106 @@ CoPharoCopilotResultSetBuilder >> trailingWordFragmentIn: aString [
 	^ text copyFrom: i + 1 to: text size
 ]
 
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> typeAnnotationVisitorClass [
+
+	^ Smalltalk globals
+		at: #OCTypingVisitor
+		ifAbsent: [
+			Smalltalk globals
+				at: #CoTypingVisitor
+				ifAbsent: [ nil ] ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> typeNameFor: aType [
+
+	aType ifNil: [ ^ '' ].
+	(aType respondsTo: #name) ifTrue: [
+		^ [ aType name asString ] on: Error do: [ aType asString ] ].
+	^ [ aType asString ] on: Error do: [ '' ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> typeNamesStringFor: typeCollection [
+
+	| types |
+	types := self normalizeSemanticTypes: typeCollection.
+	^ String streamContents: [ :stream |
+		types
+			do: [ :type | stream nextPutAll: (self typeNameFor: type) ]
+			separatedBy: [ stream nextPutAll: ', ' ] ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> typePropertyOfNode: aNode [
+
+	aNode ifNil: [ ^ nil ].
+	(aNode respondsTo: #propertyAt:ifAbsent:) ifTrue: [
+		^ [ aNode propertyAt: #type ifAbsent: [ nil ] ]
+			on: Error
+			do: [ nil ] ].
+	^ nil
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> updateContextInfo: contextInfo withClassContext: classContext [
 
 	contextInfo
 		at: #classContextLength put: classContext size;
 		at: #classContextPresent put: classContext isEmpty not
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> variableBindingNamesFor: aContext [
+
+	| names seen addName requestor model bindings |
+	names := OrderedCollection new.
+	seen := Set new.
+	addName := [ :name |
+		| text |
+		name ifNotNil: [
+			text := name asString.
+			(text isEmpty or: [ seen includes: text ]) ifFalse: [
+				seen add: text.
+				names add: text ] ] ].
+
+	(aContext notNil and: [ aContext respondsTo: #variableBindingNames ]) ifTrue: [
+		[ aContext variableBindingNames do: addName ]
+			on: Error
+			do: [ ] ].
+
+	requestor := (aContext notNil and: [ aContext respondsTo: #doItRequestor ])
+		ifTrue: [ [ aContext doItRequestor ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+	requestor ifNotNil: [
+		model := (requestor respondsTo: #model)
+			ifTrue: [ [ requestor model ] on: Error do: [ requestor ] ]
+			ifFalse: [ requestor ].
+		bindings := (model respondsTo: #variableBindings)
+			ifTrue: [ [ model variableBindings ] on: Error do: [ nil ] ]
+			ifFalse: [ nil ].
+		(bindings notNil and: [ bindings respondsTo: #keys ]) ifTrue: [
+			bindings keys do: addName ] ].
+
+	addName value: 'self'.
+	^ names asArray
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> visibleBindingTypeDescriptionsFor: aContext limit: limitInteger [
+
+	| descriptions limit |
+	descriptions := OrderedCollection new.
+	limit := limitInteger ifNil: [ 12 ].
+
+	(self variableBindingNamesFor: aContext) do: [ :name |
+		descriptions size >= limit ifTrue: [ ^ descriptions asArray ].
+		self
+			liveVariableValueNamed: name
+			inContext: aContext
+			ifPresent: [ :value |
+				descriptions add: name , ' -> ' , (self typeNameFor: value class) ] ].
+
+	^ descriptions asArray
 ]

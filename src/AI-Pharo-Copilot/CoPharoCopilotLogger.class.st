@@ -219,6 +219,10 @@ CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInf
 			at: #suffix put: suffixString;
 			at: #context put: classContext;
 			yourself);
+		at: #generated put: (Dictionary new
+			at: #suggestions put: ((contextInfo at: #rawSuggestions ifAbsent: [ #() ]) asArray);
+			at: #attempts put: ((contextInfo at: #generationAttempts ifAbsent: [ #() ]) asArray);
+			yourself);
 		at: #accepted put: nil;
 		at: #acceptedAt put: nil;
 		at: #nullCompletion put: false;

@@ -198,6 +198,68 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISu
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetadata [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| builder client mock logprobs contextInfo suggestions attempts attempt request response payload generated |
+		CopilotSettings loggingEnabled: true.
+		builder := CoPharoCopilotResultSetBuilder new.
+		mock := OAHttpTransportMockExtended new.
+		logprobs := {
+			Dictionary new
+				at: #token put: 'assert';
+				at: #logprob put: -0.05;
+				at: #top_logprobs put: {
+					Dictionary new
+						at: #token put: 'assert';
+						at: #logprob put: -0.05;
+						yourself };
+				yourself }.
+		mock mockResponse: (Dictionary new
+			at: #response put: 'assert: true';
+			at: #logprobs put: logprobs;
+			at: #eval_count put: 2;
+			yourself).
+
+		client := CoPCOllamaClient basicNew.
+		client instVarNamed: 'transport' put: mock.
+		client instVarNamed: 'modelSpec' put: (CoPCModelSpec family: 'test-model' tag: nil label: 'test-model').
+		client instVarNamed: 'stream' put: false.
+		client instVarNamed: 'options' put: Dictionary new.
+		client instVarNamed: 'fimTemplate' put: CoPCOllamaClient defaultFimGenerationTemplate.
+
+		contextInfo := Dictionary new.
+		suggestions := builder
+			collectNormalizedSuggestionsFor: client
+			prefix: 'self '
+			suffix: ''
+			context: ''
+			contextInfo: contextInfo.
+
+		self assert: suggestions equals: { 'assert: true' }.
+		attempts := contextInfo at: #generationAttempts.
+		self assert: attempts size equals: 1.
+		attempt := attempts first.
+		self assert: (attempt at: #suggestion) equals: 'assert: true'.
+		request := attempt at: #request.
+		self assert: (request at: #logprobs) equals: true.
+		self assert: (request at: #top_logprobs) equals: CopilotSettings completionTopLogprobs.
+		response := attempt at: #response.
+		self assert: (response at: #logprobs) equals: logprobs.
+		self assert: (response at: #eval_count) equals: 2.
+
+		payload := CoPharoCopilotLogger
+			initialCompletionPayloadForContextInfo: contextInfo
+			prefix: 'self '
+			suffix: ''
+			classContext: ''
+			cacheStats: Dictionary new.
+		generated := payload at: #generated.
+		self assert: (generated at: #suggestions) equals: { 'assert: true' }.
+		self assert: (generated at: #attempts) equals: attempts asArray ]
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testContextSnapshotIncludesPrefixAndSuffix [
 
         | builder context snapshot |
@@ -287,6 +349,137 @@ CoPharoCopilotResultSetBuilderTest >> testInteractionHistoryUsesContextSectionWh
 	self assert: (result beginsWith: '<|file_sep|>IDE interaction history').
 	self assert: (result includesSubstring: 'Current selection: Sample').
 	self assert: (result endsWith: String lf)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testLiveEditorTypedAheadDoesNotCountAsStale [
+
+	| builder context editor |
+	builder := CoPharoCopilotResultSetBuilder new.
+	editor := CoCopilotMockEditor new.
+	editor
+		text: 'self asStr';
+		caret: 'self asStr' size + 1.
+	context := CoCopilotContextMock new
+		source: 'self as';
+		position: 'self as' size;
+		editor: editor;
+		yourself.
+
+	self deny: (builder
+		hasStaleContextFor: context
+		expectedPrefix: 'self as'
+		suffix: '').
+	self assert: (builder
+		typedAheadIn: context
+		expectedPrefix: 'self as'
+		suffix: '') equals: 'Str'
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticContextAppendsAfterStaticContext [
+
+	| builder context base source result |
+	builder := CoPharoCopilotResultSetBuilder new.
+	source := 'semanticContextExample', String lf, String tab, 'self as'.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: source;
+		position: source size;
+		yourself.
+	base := '<|repo_name|>Object', String lf.
+
+	result := builder
+		appendSemanticCompletionContextFor: context
+		prefix: source
+		toContext: base.
+
+	self assert: (result beginsWith: base).
+	self assert: (result includesSubstring: '<|file_sep|>Semantic completion context').
+	self assert: (result includesSubstring: 'Completion class: Object')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticContextIncludesSelfReceiverType [
+
+	| builder context source semantic |
+	builder := CoPharoCopilotResultSetBuilder new.
+	source := 'semanticContextExample', String lf, String tab, 'self as'.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: source;
+		position: source size;
+		yourself.
+
+	semantic := builder semanticCompletionContextFor: context prefix: source.
+
+	self assert: (semantic includesSubstring: 'Completion class: Object').
+	self assert: (semantic includesSubstring: 'Typed token: as').
+	self assert: (semantic includesSubstring: 'Current receiver: self').
+	self assert: (semantic includesSubstring: 'Receiver type: Object')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticContextUsesLiveBindingValueType [
+
+	| builder context requestor source semantic |
+	builder := CoPharoCopilotResultSetBuilder new.
+	requestor := CoPCBindingRequestorDouble new.
+	requestor bind: 'items' to: OrderedCollection new.
+	source := 'items add'.
+	context := CoCopilotContextMock new
+		doItRequestor: requestor;
+		source: source;
+		position: source size;
+		yourself.
+
+	semantic := builder semanticCompletionContextFor: context prefix: source.
+
+	self assert: (semantic includesSubstring: 'Typed token: add').
+	self assert: (semantic includesSubstring: 'Current receiver: items').
+	self assert: (semantic includesSubstring: 'Receiver type: OrderedCollection').
+	self assert: (semantic includesSubstring: 'items -> OrderedCollection')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorHintsAreLimitedAndFiltered [
+
+	| builder hints |
+	builder := CoPharoCopilotResultSetBuilder new.
+
+	hints := builder
+		semanticSelectorHintsForTypes: { Object }
+		token: 'as'
+		limit: 5.
+
+	self assert: hints size <= 5.
+	self assert: (hints allSatisfy: [ :each | each beginsWith: 'as' ])
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testVariableNameTypeHeuristicUsesAOrAnPrefix [
+
+	| builder types names |
+	builder := CoPharoCopilotResultSetBuilder new.
+
+	types := builder
+		semanticTypesForReceiverName: 'aCollection'
+		inContext: nil
+		behavior: nil.
+	names := builder typeNamesStringFor: types.
+
+	self assert: (names includesSubstring: 'Collection')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testStripAlreadyTypedHandlesPartialOverlap [
+
+	| builder |
+	builder := CoPharoCopilotResultSetBuilder new.
+
+	self assert: (builder stripAlreadyTyped: 'Str' fromSuggestion: 'String') equals: 'ing'.
+	self assert: (builder stripAlreadyTyped: 'String' fromSuggestion: 'String') equals: ''.
+	self assert: (builder stripAlreadyTyped: 'Str' fromSuggestion: 'ing') equals: 'ing'
 ]
 
 { #category : 'tests' }
