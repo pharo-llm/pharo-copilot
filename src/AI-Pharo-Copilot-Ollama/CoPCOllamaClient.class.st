@@ -82,6 +82,14 @@ CoPCOllamaClient >> coerceResponseValueToString: value default: fallbackString [
 	^ fallbackString
 ]
 
+{ #category : 'generation-operations' }
+CoPCOllamaClient >> addLogprobsOptionsToPayload: payload [
+
+	CopilotSettings completionLogprobsEnabled ifFalse: [ ^ self ].
+	payload at: #logprobs put: true.
+	payload at: #top_logprobs put: CopilotSettings completionTopLogprobs
+]
+
 { #category : 'response-normalization' }
 CoPCOllamaClient >> ensureStringFromResponse: container fallback: fallbackString [
 
@@ -155,8 +163,15 @@ CoPCOllamaClient >> expandFimTemplate: templateString prefix: prefixString suffi
 
 { #category : 'generation-operations' }
 CoPCOllamaClient >> generate: aPromptString [
+
+	^ (self generateWithMetadata: aPromptString) at: #content
+]
+
+{ #category : 'generation-operations' }
+CoPCOllamaClient >> generateWithMetadata: aPromptString [
 	| payload response normalized |
-	self isNullModel ifTrue: [ ^ self class nullModelResponseString ].
+	self isNullModel ifTrue: [
+		^ self metadataForResponse: nil normalizedContent: self class nullModelResponseString requestPayload: Dictionary new ].
 
 	payload := Dictionary new
 		           at: #model put: modelSpec fullName;
@@ -166,10 +181,11 @@ CoPCOllamaClient >> generate: aPromptString [
 		           yourself.
 	format ifNotNil: [ payload at: #format put: format ].
 	(options notNil and: [ options isEmpty not ]) ifTrue: [ payload at: #options put: options ].
+	self addLogprobsOptionsToPayload: payload.
 	response := transport postJsonAt: 'api/generate' body: payload.
 	normalized := self normalizeResponse: response.
 
-	^ normalized
+	^ self metadataForResponse: response normalizedContent: normalized requestPayload: payload
 ]
 
 { #category : 'generation-operations' }
@@ -191,8 +207,19 @@ CoPCOllamaClient >> generateForPrefix: prefixString suffix: suffixString context
 	The class context must NOT be sent as a system prompt: the FIM model templates have
 	no {{ .System }} slot, so Ollama silently drops system content."
 
-	| safePrefix safeSuffix safeContext prompt payload requestOptions response |
-	self isNullModel ifTrue: [ ^ self class nullModelResponseString ].
+	^ (self
+		generateWithMetadataForPrefix: prefixString
+		suffix: suffixString
+		context: contextString) at: #content
+]
+
+{ #category : 'generation-operations' }
+CoPCOllamaClient >> generateWithMetadataForPrefix: prefixString suffix: suffixString context: contextString [
+	"Generate a fill-in-the-middle completion and preserve response metadata for logging."
+
+	| safePrefix safeSuffix safeContext prompt payload requestOptions response normalized |
+	self isNullModel ifTrue: [
+		^ self metadataForResponse: nil normalizedContent: self class nullModelResponseString requestPayload: Dictionary new ].
 
 	safePrefix := self normalizeLineEndings: prefixString.
 	safeSuffix := self normalizeLineEndings: suffixString.
@@ -220,9 +247,12 @@ CoPCOllamaClient >> generateForPrefix: prefixString suffix: suffixString context
 		ifNotNil: [ options copy ].
 	requestOptions at: #stop ifAbsentPut: [ self class fimStopSequences ].
 	payload at: #options put: requestOptions.
+	self addLogprobsOptionsToPayload: payload.
 
 	response := transport postJsonAt: 'api/generate' body: payload.
-	^ self normalizeResponse: response
+	normalized := self normalizeResponse: response.
+
+	^ self metadataForResponse: response normalizedContent: normalized requestPayload: payload
 ]
 
 { #category : 'generation-operations' }
@@ -268,6 +298,24 @@ CoPCOllamaClient >> loadOptionsFromSettings [
 	| settingsOptions |
 	settingsOptions := CopilotSettings allOllamaOptions.
 	settingsOptions keysAndValuesDo: [ :key :value | options at: key put: value ].
+]
+
+{ #category : 'generation-operations' }
+CoPCOllamaClient >> metadataForResponse: response normalizedContent: contentString requestPayload: payload [
+
+	| metadata responseDictionary responseMetadata |
+	metadata := Dictionary new
+		at: #content put: contentString;
+		at: #request put: (self requestMetadataFromPayload: payload);
+		yourself.
+
+	responseDictionary := self responseDictionaryFrom: response.
+	responseDictionary ifNil: [ ^ metadata ].
+
+	responseMetadata := self responseMetadataFromDictionary: responseDictionary.
+	responseMetadata isEmpty ifFalse: [ metadata at: #response put: responseMetadata ].
+
+	^ metadata
 ]
 
 { #category : 'response-normalization' }
@@ -450,6 +498,51 @@ CoPCOllamaClient >> systemPromptPrefixedContextFor: contextString [
 						  cr;
 						  cr ].
 			  safeContext isEmpty ifFalse: [ stream nextPutAll: safeContext ] ]
+]
+
+{ #category : 'generation-operations' }
+CoPCOllamaClient >> requestMetadataFromPayload: payload [
+
+	| metadata |
+	metadata := Dictionary new.
+	#( #model #stream #raw #keep_alive #logprobs #top_logprobs )
+		do: [ :key |
+			(payload includesKey: key) ifTrue: [
+				metadata at: key put: (payload at: key) ] ].
+	(payload includesKey: #options) ifTrue: [
+		metadata at: #options put: (payload at: #options) ].
+	^ metadata
+]
+
+{ #category : 'response-normalization' }
+CoPCOllamaClient >> responseDictionaryFrom: response [
+
+	| parsed |
+	(response isKindOf: Dictionary) ifTrue: [ ^ response ].
+	response isString ifFalse: [ ^ nil ].
+	parsed := self parseJsonSafely: response.
+	^ (parsed isKindOf: Dictionary)
+		ifTrue: [ parsed ]
+		ifFalse: [ nil ]
+]
+
+{ #category : 'generation-operations' }
+CoPCOllamaClient >> responseMetadataFromDictionary: responseDictionary [
+
+	| metadata value |
+	metadata := Dictionary new.
+	#( #model #created_at #done #done_reason #total_duration #load_duration #prompt_eval_count #prompt_eval_duration #eval_count #eval_duration #logprobs )
+		do: [ :key |
+			value := self responseValueAt: key fromDictionary: responseDictionary.
+			value ifNotNil: [ metadata at: key put: value ] ].
+	^ metadata
+]
+
+{ #category : 'response-normalization' }
+CoPCOllamaClient >> responseValueAt: aKey fromDictionary: aDictionary [
+
+	^ aDictionary at: aKey ifAbsent: [
+		aDictionary at: aKey asString ifAbsent: [ nil ] ]
 ]
 
 { #category : 'accessing' }

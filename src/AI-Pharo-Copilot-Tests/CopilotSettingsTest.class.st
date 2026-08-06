@@ -84,6 +84,21 @@ CopilotSettingsTest >> testCompletionSuggestionsCountSnapshotRestore [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testCompletionLogprobsSettingsSnapshotRestore [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		CopilotSettings completionLogprobsEnabled: false.
+		CopilotSettings completionTopLogprobs: 3.
+		snapshot := CopilotSettings settingsSnapshot.
+		CopilotSettings completionLogprobsEnabled: true.
+		CopilotSettings completionTopLogprobs: 5.
+		CopilotSettings restoreSettingsFromSnapshot: snapshot.
+		self deny: CopilotSettings completionLogprobsEnabled.
+		self assert: CopilotSettings completionTopLogprobs equals: 3 ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testCopilotEnabledAccessor [
     | old |
     old := CopilotSettings copilotEnabled.

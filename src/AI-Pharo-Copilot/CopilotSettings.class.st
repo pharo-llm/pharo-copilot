@@ -36,6 +36,8 @@ Class {
 		'maxClassMethods',
 		'minimumPrefixLength',
 		'completionSuggestionsCount',
+		'completionLogprobsEnabled',
+		'completionTopLogprobs',
 		'backgroundColor',
 		'installModelUserConsent',
 		'imageCloseSurveyEnabled'
@@ -192,6 +194,20 @@ CopilotSettings class >> completionIdleMilliseconds: anObject [
 ]
 
 { #category : 'settings' }
+CopilotSettings class >> completionLogprobsEnabled [
+	"Answer whether completion requests should ask Ollama for output token log probabilities."
+
+	^ completionLogprobsEnabled ifNil: [ completionLogprobsEnabled := true ]
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> completionLogprobsEnabled: aBoolean [
+
+	completionLogprobsEnabled := aBoolean = true.
+	self autoSaveSettings
+]
+
+{ #category : 'settings' }
 CopilotSettings class >> completionSuggestionsCount [
 
 	^ completionSuggestionsCount ifNil: [ completionSuggestionsCount := 1 ]
@@ -201,6 +217,22 @@ CopilotSettings class >> completionSuggestionsCount [
 CopilotSettings class >> completionSuggestionsCount: anObject [
 
 	completionSuggestionsCount := anObject.
+	self autoSaveSettings
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> completionTopLogprobs [
+	"Answer how many likely tokens Ollama should return at each generated token position."
+
+	^ completionTopLogprobs ifNil: [ completionTopLogprobs := 5 ]
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> completionTopLogprobs: anInteger [
+
+	| value |
+	value := anInteger ifNil: [ 0 ] ifNotNil: [ anInteger asInteger ].
+	completionTopLogprobs := (value max: 0) min: 20.
 	self autoSaveSettings
 ]
 
@@ -655,6 +687,8 @@ CopilotSettings class >> initializeDefaults [
 	maxClassMethods := 5.
 	minimumPrefixLength := 3.
 	completionSuggestionsCount := 1.
+	completionLogprobsEnabled := true.
+	completionTopLogprobs := 5.
 	backgroundColor := self defaultBackgroundColor.
 	installModelUserConsent := false.
 	imageCloseSurveyEnabled := true.
@@ -1795,6 +1829,8 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	maxClassMethods := self valueAt: #maxClassMethods from: aDictionary default: maxClassMethods.
 	minimumPrefixLength := self valueAt: #minimumPrefixLength from: aDictionary default: minimumPrefixLength.
 	completionSuggestionsCount := self valueAt: #completionSuggestionsCount from: aDictionary default: completionSuggestionsCount.
+	completionLogprobsEnabled := self valueAt: #completionLogprobsEnabled from: aDictionary default: completionLogprobsEnabled.
+	completionTopLogprobs := self valueAt: #completionTopLogprobs from: aDictionary default: completionTopLogprobs.
 	backgroundColor := self valueAt: #backgroundColor from: aDictionary default: backgroundColor.
 	installModelUserConsent := self valueAt: #installModelUserConsent from: aDictionary default: installModelUserConsent.
 	imageCloseSurveyEnabled := self valueAt: #imageCloseSurveyEnabled from: aDictionary default: imageCloseSurveyEnabled.
@@ -1852,6 +1888,8 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	maxClassMethods := aDictionary at: #maxClassMethods ifAbsent: [ aDictionary at: #MaxClassMethods ifAbsent: [ nil ] ].
 	minimumPrefixLength := aDictionary at: #minimumPrefixLength ifAbsent: [ aDictionary at: #MinimumPrefixLength ifAbsent: [ nil ] ].
 completionSuggestionsCount := aDictionary at: #completionSuggestionsCount ifAbsent: [ aDictionary at: #CompletionSuggestionsCount ifAbsent: [ nil ] ].
+completionLogprobsEnabled := aDictionary at: #completionLogprobsEnabled ifAbsent: [ aDictionary at: #CompletionLogprobsEnabled ifAbsent: [ nil ] ].
+completionTopLogprobs := aDictionary at: #completionTopLogprobs ifAbsent: [ aDictionary at: #CompletionTopLogprobs ifAbsent: [ nil ] ].
 backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ aDictionary at: #BackgroundColor ifAbsent: [ nil ] ].
 installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ aDictionary at: #InstallModelUserConsent ifAbsent: [ nil ] ].
 imageCloseSurveyEnabled := aDictionary at: #imageCloseSurveyEnabled ifAbsent: [ aDictionary at: #ImageCloseSurveyEnabled ifAbsent: [ nil ] ].
@@ -1950,6 +1988,8 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #contextMode put: CoPCContextSettings mode;
 		at: #navigationHistoryEnabled put: CoPCContextNavigationHistory enabled;
 		            at: #completionSuggestionsCount put: completionSuggestionsCount;
+		            at: #completionLogprobsEnabled put: completionLogprobsEnabled;
+		            at: #completionTopLogprobs put: completionTopLogprobs;
 		            at: #backgroundColor put: backgroundColor;
 		at: #installModelUserConsent put: installModelUserConsent;
 		at: #imageCloseSurveyEnabled put: imageCloseSurveyEnabled;
@@ -2267,6 +2307,8 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #maxClassMethods put: maxClassMethods;
 		  at: #minimumPrefixLength put: minimumPrefixLength;
 		  at: #completionSuggestionsCount put: completionSuggestionsCount;
+		  at: #completionLogprobsEnabled put: completionLogprobsEnabled;
+		  at: #completionTopLogprobs put: completionTopLogprobs;
 		  at: #backgroundColor put: backgroundColor;
 		at: #installModelUserConsent put: installModelUserConsent;
 		at: #imageCloseSurveyEnabled put: imageCloseSurveyEnabled;

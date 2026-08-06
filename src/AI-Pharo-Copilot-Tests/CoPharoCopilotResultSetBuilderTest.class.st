@@ -198,6 +198,68 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISu
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetadata [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| builder client mock logprobs contextInfo suggestions attempts attempt request response payload generated |
+		CopilotSettings loggingEnabled: true.
+		builder := CoPharoCopilotResultSetBuilder new.
+		mock := OAHttpTransportMockExtended new.
+		logprobs := {
+			Dictionary new
+				at: #token put: 'assert';
+				at: #logprob put: -0.05;
+				at: #top_logprobs put: {
+					Dictionary new
+						at: #token put: 'assert';
+						at: #logprob put: -0.05;
+						yourself };
+				yourself }.
+		mock mockResponse: (Dictionary new
+			at: #response put: 'assert: true';
+			at: #logprobs put: logprobs;
+			at: #eval_count put: 2;
+			yourself).
+
+		client := CoPCOllamaClient basicNew.
+		client instVarNamed: 'transport' put: mock.
+		client instVarNamed: 'modelSpec' put: (CoPCModelSpec family: 'test-model' tag: nil label: 'test-model').
+		client instVarNamed: 'stream' put: false.
+		client instVarNamed: 'options' put: Dictionary new.
+		client instVarNamed: 'fimTemplate' put: CoPCOllamaClient defaultFimGenerationTemplate.
+
+		contextInfo := Dictionary new.
+		suggestions := builder
+			collectNormalizedSuggestionsFor: client
+			prefix: 'self '
+			suffix: ''
+			context: ''
+			contextInfo: contextInfo.
+
+		self assert: suggestions equals: { 'assert: true' }.
+		attempts := contextInfo at: #generationAttempts.
+		self assert: attempts size equals: 1.
+		attempt := attempts first.
+		self assert: (attempt at: #suggestion) equals: 'assert: true'.
+		request := attempt at: #request.
+		self assert: (request at: #logprobs) equals: true.
+		self assert: (request at: #top_logprobs) equals: CopilotSettings completionTopLogprobs.
+		response := attempt at: #response.
+		self assert: (response at: #logprobs) equals: logprobs.
+		self assert: (response at: #eval_count) equals: 2.
+
+		payload := CoPharoCopilotLogger
+			initialCompletionPayloadForContextInfo: contextInfo
+			prefix: 'self '
+			suffix: ''
+			classContext: ''
+			cacheStats: Dictionary new.
+		generated := payload at: #generated.
+		self assert: (generated at: #suggestions) equals: { 'assert: true' }.
+		self assert: (generated at: #attempts) equals: attempts asArray ]
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testContextSnapshotIncludesPrefixAndSuffix [
 
         | builder context snapshot |

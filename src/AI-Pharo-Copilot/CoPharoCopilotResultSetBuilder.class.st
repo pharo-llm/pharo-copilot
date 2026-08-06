@@ -1383,9 +1383,20 @@ CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefi
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefixString suffix: suffixString context: classContext attempt: attempt contextInfo: contextInfo [
 
-	| rawResponse content |
-	rawResponse := client generateForPrefix: prefixString suffix: suffixString context: classContext.
+	| metadata rawResponse content |
+	metadata := (client respondsTo: #generateWithMetadataForPrefix:suffix:context:)
+		ifTrue: [
+			client
+				generateWithMetadataForPrefix: prefixString
+				suffix: suffixString
+				context: classContext ]
+		ifFalse: [
+			Dictionary new
+				at: #content put: (client generateForPrefix: prefixString suffix: suffixString context: classContext);
+				yourself ].
+	rawResponse := metadata at: #content ifAbsent: [ '' ].
 	content := self normalizeSuggestion: rawResponse forPrefix: prefixString.
+	self recordGenerationAttempt: attempt metadata: metadata normalizedSuggestion: content contextInfo: contextInfo.
 
 	(content isEmpty and: [ rawResponse asString trimBoth isEmpty not ]) ifTrue: [
 		self
@@ -1402,6 +1413,23 @@ CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefi
 CoPharoCopilotResultSetBuilder >> ollamaClient [ 
 
 	^ cachedClient ifNil: [ cachedClient := CoPCOllamaClient new ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> recordGenerationAttempt: attempt metadata: metadata normalizedSuggestion: content contextInfo: contextInfo [
+
+	| attempts attemptPayload |
+	self isLoggingEnabled ifFalse: [ ^ self ].
+	contextInfo ifNil: [ ^ self ].
+
+	attempts := contextInfo at: #generationAttempts ifAbsentPut: [ OrderedCollection new ].
+	attemptPayload := Dictionary new
+		at: #attempt put: attempt;
+		at: #suggestion put: content;
+		at: #request put: (metadata at: #request ifAbsent: [ Dictionary new ]);
+		at: #response put: (metadata at: #response ifAbsent: [ Dictionary new ]);
+		yourself.
+	attempts add: attemptPayload
 ]
 
 { #category : 'new' }
