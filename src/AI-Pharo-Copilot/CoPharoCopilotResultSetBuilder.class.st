@@ -119,16 +119,24 @@ CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContex
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
 
-	| entries position |
+	| adjustedContents entries position typedAhead |
 
 	(self hasStaleContextFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix)
 		ifTrue: [ ^ self logStaleContextForExpectedPrefix: expectedPrefix suffix: expectedSuffix context: aContext ].
 
+	typedAhead := self
+		typedAheadIn: aContext
+		expectedPrefix: expectedPrefix
+		suffix: expectedSuffix.
+	adjustedContents := self
+		stripAlreadyTyped: typedAhead
+		fromSuggestions: contentCollection.
+
 	entries := self
-		completionEntriesFrom: contentCollection
+		completionEntriesFrom: adjustedContents
 		inContext: aContext
 		contextInfo: contextInfo.
-	entries isEmpty ifTrue: [ ^ self logNoEntriesAfterCleaningFor: contentCollection ].
+	entries isEmpty ifTrue: [ ^ self logNoEntriesAfterCleaningFor: adjustedContents ].
 
 	position := self menuPositionForContextOrDefault: aContext.
 
@@ -840,11 +848,14 @@ CoPharoCopilotResultSetBuilder >> finalizeCollectedSuggestions: collected contex
 CoPharoCopilotResultSetBuilder >> hasStaleContextFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix [
 
 	| snapshot currentPrefix currentSuffix |
-	snapshot := self contextSnapshotFor: aContext.
+	snapshot := self liveContextSnapshotFor: aContext.
 	currentPrefix := snapshot at: #prefix.
 	currentSuffix := snapshot at: #suffix.
 
-	^ (currentPrefix = expectedPrefix and: [ currentSuffix = expectedSuffix ]) not
+	(currentPrefix = expectedPrefix and: [ currentSuffix = expectedSuffix ]) ifTrue: [ ^ false ].
+
+	^ (currentPrefix beginsWith: expectedPrefix) not
+		or: [ currentSuffix ~= expectedSuffix ]
 ]
 
 { #category : 'initialization' }
@@ -940,6 +951,66 @@ CoPharoCopilotResultSetBuilder >> insertAtCaretIfPossibleIn: aContext text: aStr
 CoPharoCopilotResultSetBuilder >> interactionHistoryForPrompt [
 
 	^ CoPCContextNavigationHistory new gather
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> liveContextSnapshotFor: aContext [
+
+	| pair source position prefix suffix |
+	pair := self liveSourceAndPositionFor: aContext.
+	pair ifNil: [ ^ self contextSnapshotFor: aContext ].
+
+	source := pair first.
+	position := pair second.
+	prefix := position > 0
+		ifTrue: [ source copyFrom: 1 to: position ]
+		ifFalse: [ '' ].
+	suffix := position < source size
+		ifTrue: [ source copyFrom: position + 1 to: source size ]
+		ifFalse: [ '' ].
+
+	^ Dictionary new
+		at: #prefix put: prefix;
+		at: #suffix put: suffix;
+		at: #position put: position;
+		at: #sourceLength put: source size;
+		yourself
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> liveEditorFor: aContext [
+
+	| engine editor |
+	aContext ifNil: [ ^ nil ].
+
+	engine := [ aContext engine ] on: Error do: [ nil ].
+	editor := engine
+		ifNotNil: [ [ engine editor ] on: Error do: [ nil ] ]
+		ifNil: [ nil ].
+	editor ifNotNil: [ ^ editor ].
+
+	^ (aContext respondsTo: #editor)
+		ifTrue: [ [ aContext editor ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> liveSourceAndPositionFor: aContext [
+
+	| editor source caret position |
+	editor := self liveEditorFor: aContext.
+	editor ifNil: [ ^ nil ].
+	((editor respondsTo: #text) and: [ editor respondsTo: #caret ]) ifFalse: [ ^ nil ].
+
+	source := [ editor text ifNil: [ nil ] ] on: Error do: [ nil ].
+	source ifNil: [ ^ nil ].
+	source := source asString.
+
+	caret := [ editor caret ] on: Error do: [ nil ].
+	caret ifNil: [ ^ nil ].
+	position := (caret - 1 max: 0) min: source size.
+
+	^ { source. position }
 ]
 
 { #category : 'initialization' }
@@ -1111,7 +1182,7 @@ CoPharoCopilotResultSetBuilder >> logStaleContextForExpectedPrefix: expectedPref
 
 	| snapshot currentPrefix currentSuffix |
 	self isLoggingEnabled ifFalse: [ ^ self ].
-	snapshot := self contextSnapshotFor: aContext.
+	snapshot := self liveContextSnapshotFor: aContext.
 	currentPrefix := snapshot at: #prefix ifAbsent: [ '' ].
 	currentSuffix := snapshot at: #suffix ifAbsent: [ '' ].
 
@@ -2177,6 +2248,42 @@ CoPharoCopilotResultSetBuilder >> sourceFromSnapshot: snapshot [
 ]
 
 { #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> stripAlreadyTyped: typedAheadString fromSuggestion: suggestionString [
+
+	| suggestion typed maxOverlap overlap |
+	suggestion := (suggestionString ifNil: [ '' ]) asString.
+	typed := (typedAheadString ifNil: [ '' ]) asString.
+	(suggestion isEmpty or: [ typed isEmpty ]) ifTrue: [ ^ suggestion ].
+
+	(suggestion beginsWith: typed) ifTrue: [
+		^ suggestion allButFirst: typed size ].
+
+	(typed beginsWith: suggestion) ifTrue: [ ^ '' ].
+
+	maxOverlap := suggestion size min: typed size.
+	overlap := maxOverlap.
+	[ overlap > 1 ] whileTrue: [
+		((typed copyFrom: typed size - overlap + 1 to: typed size)
+			= (suggestion copyFrom: 1 to: overlap))
+				ifTrue: [ ^ suggestion allButFirst: overlap ].
+		overlap := overlap - 1 ].
+
+	^ suggestion
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> stripAlreadyTyped: typedAheadString fromSuggestions: contentCollection [
+
+	typedAheadString isNil ifTrue: [ ^ contentCollection ].
+	typedAheadString isEmpty ifTrue: [ ^ contentCollection ].
+
+	^ contentCollection collect: [ :each |
+		self
+			stripAlreadyTyped: typedAheadString
+			fromSuggestion: (self cleanedContentFrom: each) ]
+]
+
+{ #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> stripTypedFragment: typedFragment fromSuggestion: suggestionString [
 
 	| suggestion fragment trimmed |
@@ -2194,6 +2301,20 @@ CoPharoCopilotResultSetBuilder >> stripTypedFragment: typedFragment fromSuggesti
 		^ (trimmed allButFirst: fragment size) trimLeft ].
 
 	^ suggestion
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> typedAheadIn: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix [
+
+	| snapshot currentPrefix currentSuffix |
+	snapshot := self liveContextSnapshotFor: aContext.
+	currentPrefix := snapshot at: #prefix ifAbsent: [ '' ].
+	currentSuffix := snapshot at: #suffix ifAbsent: [ '' ].
+
+	((currentPrefix beginsWith: expectedPrefix) and: [ currentSuffix = expectedSuffix ])
+		ifFalse: [ ^ nil ].
+
+	^ currentPrefix allButFirst: expectedPrefix size
 ]
 
 { #category : 'initialization' }

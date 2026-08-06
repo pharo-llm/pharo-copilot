@@ -290,6 +290,31 @@ CoPharoCopilotResultSetBuilderTest >> testInteractionHistoryUsesContextSectionWh
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testLiveEditorTypedAheadDoesNotCountAsStale [
+
+	| builder context editor |
+	builder := CoPharoCopilotResultSetBuilder new.
+	editor := CoCopilotMockEditor new.
+	editor
+		text: 'self asStr';
+		caret: 'self asStr' size + 1.
+	context := CoCopilotContextMock new
+		source: 'self as';
+		position: 'self as' size;
+		editor: editor;
+		yourself.
+
+	self deny: (builder
+		hasStaleContextFor: context
+		expectedPrefix: 'self as'
+		suffix: '').
+	self assert: (builder
+		typedAheadIn: context
+		expectedPrefix: 'self as'
+		suffix: '') equals: 'Str'
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testSemanticContextAppendsAfterStaticContext [
 
 	| builder context base source result |
@@ -382,6 +407,17 @@ CoPharoCopilotResultSetBuilderTest >> testVariableNameTypeHeuristicUsesAOrAnPref
 	names := builder typeNamesStringFor: types.
 
 	self assert: (names includesSubstring: 'Collection')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testStripAlreadyTypedHandlesPartialOverlap [
+
+	| builder |
+	builder := CoPharoCopilotResultSetBuilder new.
+
+	self assert: (builder stripAlreadyTyped: 'Str' fromSuggestion: 'String') equals: 'ing'.
+	self assert: (builder stripAlreadyTyped: 'String' fromSuggestion: 'String') equals: ''.
+	self assert: (builder stripAlreadyTyped: 'Str' fromSuggestion: 'ing') equals: 'ing'
 ]
 
 { #category : 'tests' }
