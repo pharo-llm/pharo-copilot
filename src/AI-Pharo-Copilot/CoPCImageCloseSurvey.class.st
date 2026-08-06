@@ -29,6 +29,31 @@ CoPCImageCloseSurvey class >> askQuestion: anAssociation using: uiManager [
 ]
 
 { #category : 'survey' }
+CoPCImageCloseSurvey class >> askTaskUsing: uiManager selectedTasks: selectedTasks [
+
+	| task |
+	uiManager ifNil: [ ^ self taskSelectionDoneValue ].
+	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ self taskSelectionDoneValue ].
+
+	task := uiManager
+		chooseFrom: self taskLabels
+		values: self taskValues
+		title: (self taskQuestionTitleFor: selectedTasks).
+
+	^ self validatedTask: task
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> availableTaskLabelsByKey [
+
+	| labels |
+	labels := Dictionary new.
+	self taskChoices do: [ :task |
+		labels at: task key put: task value ].
+	^ labels
+]
+
+{ #category : 'survey' }
 CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 
 	| ratings rating |
@@ -38,6 +63,19 @@ CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 		rating ifNil: [ ^ nil ].
 		ratings at: question key put: rating ].
 	^ ratings
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> collectTasksUsing: uiManager [
+
+	| selected task |
+	selected := OrderedCollection new.
+	[
+		task := self askTaskUsing: uiManager selectedTasks: selected.
+		task notNil and: [ task ~= self taskSelectionDoneValue ]
+	] whileTrue: [
+		(selected includes: task) ifFalse: [ selected add: task ] ].
+	^ selected asArray
 ]
 
 { #category : 'private' }
@@ -78,10 +116,11 @@ CoPCImageCloseSurvey class >> logSurveyError: anException [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> promptAndRecordUsing: uiManager [
 
-	| ratings |
+	| ratings tasks |
 	ratings := self collectRatingsUsing: uiManager.
 	ratings ifNil: [ ^ nil ].
-	self recordRatings: ratings.
+	tasks := self collectTasksUsing: uiManager.
+	self recordRatings: ratings tasks: tasks.
 	^ ratings
 ]
 
@@ -141,9 +180,15 @@ CoPCImageCloseSurvey class >> ratingValues [
 { #category : 'logging' }
 CoPCImageCloseSurvey class >> recordRatings: aDictionary [
 
+	self recordRatings: aDictionary tasks: #()
+]
+
+{ #category : 'logging' }
+CoPCImageCloseSurvey class >> recordRatings: ratingsDictionary tasks: taskCollection [
+
 	CoPharoCopilotLogger
 		appendEvaluationEvent: 'image-close-survey'
-		data: (self surveyPayloadForRatings: aDictionary)
+		data: (self surveyPayloadForRatings: ratingsDictionary tasks: taskCollection)
 ]
 
 { #category : 'session management' }
@@ -207,11 +252,19 @@ CoPCImageCloseSurvey class >> resetPromptState [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary [
 
+	^ self surveyPayloadForRatings: aDictionary tasks: #()
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary tasks: taskCollection [
+
 	^ Dictionary new
 		at: #timestamp put: DateAndTime now asString;
 		at: #modelName put: CopilotSettings modelName;
 		at: #questions put: self questionLabelsByKey;
 		at: #ratings put: aDictionary;
+		at: #availableTasks put: self availableTaskLabelsByKey;
+		at: #tasks put: taskCollection asArray;
 		yourself
 ]
 
@@ -224,6 +277,64 @@ CoPCImageCloseSurvey class >> surveyQuestions [
 		#speed -> 'How would you rate Copilot response speed?'.
 		#usefulness -> 'How useful was Copilot for your coding this session?'
 	}
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> taskChoices [
+
+	^ {
+		#codeCompletion -> 'Writing code with completions'.
+		#debugging -> 'Debugging or fixing errors'.
+		#refactoring -> 'Refactoring existing code'.
+		#tests -> 'Writing or updating tests'.
+		#codeReview -> 'Reviewing or understanding code'.
+		#documentation -> 'Writing comments or documentation'.
+		#setup -> 'Configuring Copilot or models'.
+		#learning -> 'Learning Pharo or APIs'
+	}
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> taskLabels [
+
+	^ (self taskChoices collect: [ :task | task value ]) , { 'Done' }
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> taskLabelFor: aSymbol [
+
+	^ self availableTaskLabelsByKey
+		at: aSymbol
+		ifAbsent: [ aSymbol asString ]
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> taskQuestionTitleFor: selectedTasks [
+
+	| selectedLabels |
+	selectedTasks isEmpty ifTrue: [
+		^ 'Which tasks did you perform this session? Select one task at a time, then choose Done.' ].
+
+	selectedLabels := String streamContents: [ :stream |
+		(selectedTasks collect: [ :task | self taskLabelFor: task ])
+			do: [ :label | stream nextPutAll: label ]
+			separatedBy: [ stream nextPutAll: ', ' ] ].
+
+	^ 'Which tasks did you perform this session?' , String cr ,
+		'Selected: ' , selectedLabels , String cr ,
+		'Choose another task, or choose Done.'
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> taskSelectionDoneValue [
+
+	^ #done
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> taskValues [
+
+	^ (self taskChoices collect: [ :task | task key ]) , { self taskSelectionDoneValue }
 ]
 
 { #category : 'session management' }
@@ -265,4 +376,21 @@ CoPCImageCloseSurvey class >> validatedRating: anObject [
 	^ (self ratingValues includes: rating)
 		ifTrue: [ rating ]
 		ifFalse: [ nil ]
+]
+
+{ #category : 'private' }
+CoPCImageCloseSurvey class >> validatedTask: anObject [
+
+	| task |
+	anObject ifNil: [ ^ self taskSelectionDoneValue ].
+	task := anObject isSymbol
+		ifTrue: [ anObject ]
+		ifFalse: [
+			(anObject respondsTo: #asString)
+				ifTrue: [ anObject asString asSymbol ]
+				ifFalse: [ self taskSelectionDoneValue ] ].
+
+	^ (self taskValues includes: task)
+		ifTrue: [ task ]
+		ifFalse: [ self taskSelectionDoneValue ]
 ]

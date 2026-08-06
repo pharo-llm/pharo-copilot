@@ -37,7 +37,7 @@ CoPCImageCloseSurveyTest >> testCancellingSurveyDoesNotWriteEvaluationEvent [
 CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 
 	CopilotSettings withDefaultSettingsDo: [
-		| tempDir tempEvalFile originalDirRef originalEvalRef ui ratings jsonLine parsed data storedRatings |
+		| tempDir tempEvalFile originalDirRef originalEvalRef ui ratings jsonLine parsed data storedRatings storedTasks |
 		tempDir := FileLocator temp / ('copilot-image-close-survey-test-' , UUID new asString).
 		tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
 		originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
@@ -48,10 +48,10 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: #(4 3 5 4).
+			ui ratings: { 4. 3. 5. 4. #codeCompletion. #debugging. #done }.
 			ratings := CoPCImageCloseSurvey promptAndRecordUsing: ui.
 
-			self assert: ui requests size equals: CoPCImageCloseSurvey surveyQuestions size.
+			self assert: ui requests size equals: CoPCImageCloseSurvey surveyQuestions size + 3.
 			self assert: (ratings at: #overall) equals: 4.
 			self assert: (ratings at: #suggestionQuality) equals: 3.
 
@@ -59,12 +59,17 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 			parsed := STONJSON fromString: jsonLine.
 			data := parsed at: #data.
 			storedRatings := data at: #ratings.
+			storedTasks := data at: #tasks.
 
 			self assert: (parsed at: #event) equals: 'image-close-survey'.
 			self assert: (storedRatings at: #overall) equals: 4.
 			self assert: (storedRatings at: #suggestionQuality) equals: 3.
 			self assert: (storedRatings at: #speed) equals: 5.
 			self assert: (storedRatings at: #usefulness) equals: 4.
+			self assert: (storedTasks includes: #codeCompletion).
+			self assert: (storedTasks includes: #debugging).
+			self assert: storedTasks size equals: 2.
+			self assert: ((data at: #availableTasks) includesKey: #codeCompletion).
 			self assert: ((data at: #questions) includesKey: #overall).
 			self assert: (data includesKey: #timestamp).
 			self assert: (data includesKey: #modelName)
@@ -91,7 +96,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitWritesOnceAndSkipsShutdownF
 			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: #(5 5 4 5).
+			ui ratings: { 5. 5. 4. 5. #done }.
 			CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 			CoPCImageCloseSurvey shutDown: true.
 
@@ -101,7 +106,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitWritesOnceAndSkipsShutdownF
 
 			self assert: firstLine isNotNil.
 			self assert: secondLine isNil.
-			self assert: (ui requests size) equals: CoPCImageCloseSurvey surveyQuestions size
+			self assert: (ui requests size) equals: CoPCImageCloseSurvey surveyQuestions size + 1
 		] ensure: [
 			CoPCImageCloseSurvey resetPromptState.
 			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
@@ -152,4 +157,14 @@ CoPCImageCloseSurveyTest >> testValidatedRatingAcceptsOnlyOneToFive [
 	self assert: (CoPCImageCloseSurvey validatedRating: 0) isNil.
 	self assert: (CoPCImageCloseSurvey validatedRating: 6) isNil.
 	self assert: (CoPCImageCloseSurvey validatedRating: 'bad') isNil
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testValidatedTaskAcceptsOnlyAvailableTasksAndDone [
+
+	self assert: (CoPCImageCloseSurvey validatedTask: #codeCompletion) equals: #codeCompletion.
+	self assert: (CoPCImageCloseSurvey validatedTask: 'debugging') equals: #debugging.
+	self assert: (CoPCImageCloseSurvey validatedTask: #done) equals: #done.
+	self assert: (CoPCImageCloseSurvey validatedTask: #unknown) equals: #done.
+	self assert: (CoPCImageCloseSurvey validatedTask: nil) equals: #done
 ]
