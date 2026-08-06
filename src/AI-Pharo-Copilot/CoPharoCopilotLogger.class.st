@@ -55,6 +55,32 @@ CoPharoCopilotLogger class >> appendLines: lines [
 ]
 
 { #category : 'class initialization' }
+CoPharoCopilotLogger class >> appendEvaluationEvent: eventName data: aDictionary [
+	"Append a structured event to the evaluation JSONL file synchronously."
+
+	| event file |
+	self loggingEnabled ifFalse: [ ^ self ].
+
+	event := Dictionary new
+		at: #event put: eventName;
+		at: #data put: (aDictionary ifNil: [ Dictionary new ]);
+		yourself.
+
+	[
+		self ensureEvaluationLogFileInitialized.
+		file := self evaluationLogFileReference.
+		file writeStreamDo: [ :stream |
+			stream setToEnd.
+			stream
+				nextPutAll: (STONJSON toString: event);
+				nextPut: Character lf ]
+	] on: Error do: [ :ex |
+		Transcript
+			show: 'Could not append Copilot evaluation event: ', ex messageText;
+			cr ]
+]
+
+{ #category : 'class initialization' }
 CoPharoCopilotLogger class >> completionFileReferenceFor: aSessionId [
 	^ self ensureCompletionsDirectory / ('completion-', aSessionId, '.json')
 ]
