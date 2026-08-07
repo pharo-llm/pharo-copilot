@@ -350,6 +350,7 @@ PharoCopilotSetupPresenter >> showDownloadStep [
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
+		add: progressBar expand: false;
 		add: SpNullPresenter new expand: true;
 		yourself).
 
