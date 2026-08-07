@@ -132,7 +132,6 @@ CoPCImageCloseSurvey class >> promptBeforeImageQuit [
 CoPCImageCloseSurvey class >> promptBeforeImageQuitUsing: uiManager [
 
 	promptInProgress = true ifTrue: [ ^ nil ].
-	promptedForCurrentQuit = true ifTrue: [ ^ nil ].
 
 	promptedForCurrentQuit := true.
 	promptInProgress := true.
@@ -205,7 +204,9 @@ CoPCImageCloseSurvey class >> registerSessionHandler [
 CoPCImageCloseSurvey class >> shouldPromptForImageQuitting: aBoolean [
 
 	aBoolean ifFalse: [ ^ false ].
-	promptedForCurrentQuit = true ifTrue: [ ^ false ].
+	promptedForCurrentQuit = true ifTrue: [
+		promptedForCurrentQuit := false.
+		^ false ].
 	^ self shouldPromptBeforeImageQuit
 ]
 
@@ -223,6 +224,7 @@ CoPCImageCloseSurvey class >> shutDown: isImageQuitting [
 	(self shouldPromptForImageQuitting: isImageQuitting) ifFalse: [ ^ self ].
 	promptInProgress = true ifTrue: [ ^ self ].
 
+	promptedForCurrentQuit := true.
 	promptInProgress := true.
 	[
 		[
