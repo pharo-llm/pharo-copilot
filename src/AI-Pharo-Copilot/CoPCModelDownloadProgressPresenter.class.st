@@ -16,7 +16,8 @@ Class {
 		'process',
 		'statusByModel',
 		'lastPercent',
-		'currentProgress'
+		'currentProgress',
+		'progressIsIndeterminate'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -32,6 +33,20 @@ CoPCModelDownloadProgressPresenter class >> formatBytes: aNumber [
 	bytes >= 1e6 ifTrue: [ ^ ((bytes / 1e6) printShowingDecimalPlaces: 1) , ' MB' ].
 	bytes >= 1e3 ifTrue: [ ^ ((bytes / 1e3) printShowingDecimalPlaces: 0) , ' KB' ].
 	^ (bytes printShowingDecimalPlaces: 0) , ' B'
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter class >> indeterminateProgressFrom: current start: start end: end step: step [
+
+	| boundedStart boundedEnd boundedCurrent next |
+	boundedStart := ((start ifNil: [ 0 ]) max: 0) min: 1.
+	boundedEnd := ((end ifNil: [ 1 ]) max: boundedStart) min: 1.
+	boundedStart = boundedEnd ifTrue: [ ^ boundedStart ].
+
+	boundedCurrent := ((current ifNil: [ boundedStart ]) max: boundedStart) min: boundedEnd.
+	next := boundedCurrent + (step ifNil: [ 0.004 ]).
+	next >= boundedEnd ifTrue: [ ^ boundedStart ].
+	^ next
 ]
 
 { #category : 'progress' }
@@ -119,6 +134,14 @@ CoPCModelDownloadProgressPresenter >> appendLog: aString [
 			, String cr)
 ]
 
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter >> beginIndeterminateProgress [
+
+	currentProgress ifNil: [
+		currentProgress := self indeterminateProgressStart ].
+	progressIsIndeterminate := true
+]
+
 { #category : 'layout' }
 CoPCModelDownloadProgressPresenter >> completedPercentage [
 
@@ -167,7 +190,7 @@ CoPCModelDownloadProgressPresenter >> downloadModels [
 			statusLabel label:
 				('Downloading {2}/{3}: {1}'
 					format: { modelName. index. models size }).
-			self progressPercentage: self completedPercentage.
+			self beginIndeterminateProgress.
 			self renderStatusBoard
 		].
 
@@ -252,6 +275,7 @@ CoPCModelDownloadProgressPresenter >> handlePullEvent: event forModel: modelName
 		(statusByModel at: modelName ifAbsent: [ '' ]) = status ifTrue: [ ^ self ].
 		statusByModel at: modelName put: status.
 		^ self deferUI: [
+			self beginIndeterminateProgress.
 			statusLabel label:
 				('Downloading {2}/{3}: {1}'
 					format: { modelName. completed + 1. models size }).
@@ -290,10 +314,11 @@ CoPCModelDownloadProgressPresenter >> initializePresenters [
 	statusLabel label: 'Preparing Ollama model installation...'.
 
 	currentProgress := 0.
+	progressIsIndeterminate := false.
 	progressBar := self newProgressBar.
 	progressBar
-		progress: [ currentProgress ifNil: [ 0 ] ]
-		every: 0.5 second.
+		progress: [ self progressBarValue ]
+		every: 0.1 second.
 
 	logText := self newText.
 	logText beNotEditable.
@@ -302,6 +327,20 @@ CoPCModelDownloadProgressPresenter >> initializePresenters [
 	failed := OrderedCollection new.
 	statusByModel := Dictionary new.
 	lastPercent := -1
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter >> indeterminateProgressEnd [
+
+	models isEmptyOrNil ifTrue: [ ^ 1 ].
+	^ (((completed + 1) asFloat / models size) min: 1) max: 0
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter >> indeterminateProgressStart [
+
+	models isEmptyOrNil ifTrue: [ ^ 0 ].
+	^ ((completed asFloat / models size) min: 1) max: 0
 ]
 
 { #category : 'initialization' }
@@ -332,10 +371,24 @@ CoPCModelDownloadProgressPresenter >> overallPercentageWithCurrent: currentModel
 		currentPercent: currentModelPercent
 ]
 
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter >> progressBarValue [
+
+	progressIsIndeterminate ifTrue: [
+		currentProgress := self class
+			indeterminateProgressFrom: currentProgress
+			start: self indeterminateProgressStart
+			end: self indeterminateProgressEnd
+			step: 0.004 ].
+
+	^ currentProgress ifNil: [ 0 ]
+]
+
 { #category : 'layout' }
 CoPCModelDownloadProgressPresenter >> progressPercentage: aNumber [
 
 	| bounded |
+	progressIsIndeterminate := false.
 	bounded := (aNumber ifNil: [ 0 ]) max: 0.
 	bounded := bounded min: 100.
 	currentProgress := bounded / 100.0

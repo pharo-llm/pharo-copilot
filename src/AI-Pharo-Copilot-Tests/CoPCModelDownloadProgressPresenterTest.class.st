@@ -7,6 +7,32 @@ Class {
 }
 
 { #category : 'tests' }
+CoPCModelDownloadProgressPresenterTest >> testIndeterminateProgressAdvancesWithinBounds [
+
+	| next |
+	next := CoPCModelDownloadProgressPresenter
+		indeterminateProgressFrom: 0.25
+		start: 0.25
+		end: 0.5
+		step: 0.004.
+
+	self assert: next > 0.25.
+	self assert: next < 0.5
+]
+
+{ #category : 'tests' }
+CoPCModelDownloadProgressPresenterTest >> testIndeterminateProgressWrapsToStart [
+
+	self
+		assert: (CoPCModelDownloadProgressPresenter
+			indeterminateProgressFrom: 0.499
+			start: 0.25
+			end: 0.5
+			step: 0.004)
+		equals: 0.25
+]
+
+{ #category : 'tests' }
 CoPCModelDownloadProgressPresenterTest >> testOverallPercentageCombinesCompletedModelsAndCurrentPercent [
 
 	self

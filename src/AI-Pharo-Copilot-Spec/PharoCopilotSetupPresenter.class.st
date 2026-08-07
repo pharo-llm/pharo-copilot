@@ -12,7 +12,10 @@ Class {
 		'privacyConsentCheckbox',
 		'progressBar',
 		'downloadProcess',
-		'setupProgress'
+		'setupProgress',
+		'progressIsIndeterminate',
+		'indeterminateProgressStart',
+		'indeterminateProgressEnd'
 	],
 	#category : 'AI-Pharo-Copilot-Spec',
 	#package : 'AI-Pharo-Copilot-Spec'
@@ -35,6 +38,21 @@ PharoCopilotSetupPresenter >> contentContainer [
 PharoCopilotSetupPresenter >> contentContainer: anObject [
 
 	contentContainer := anObject
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> beginIndeterminateProgressForIndex: index total: totalModels [
+
+	| start end |
+	totalModels <= 0 ifTrue: [ ^ self setupProgressPercentage: 0 ].
+
+	start := (((index - 1) asFloat / totalModels) max: 0) min: 1.
+	end := ((index asFloat / totalModels) max: start) min: 1.
+
+	indeterminateProgressStart := start.
+	indeterminateProgressEnd := end.
+	setupProgress ifNil: [ setupProgress := start ].
+	progressIsIndeterminate := true
 ]
 
 { #category : 'layout' }
@@ -105,10 +123,13 @@ PharoCopilotSetupPresenter >> initializePresenters [
 		yourself.
 
 	setupProgress := 0.
+	progressIsIndeterminate := false.
+	indeterminateProgressStart := 0.
+	indeterminateProgressEnd := 1.
 	progressBar := self newProgressBar.
 	progressBar
-		progress: [ setupProgress ifNil: [ 0 ] ]
-		every: 0.5 second.
+		progress: [ self progressBarValue ]
+		every: 0.1 second.
 
 	contentContainer := SpPresenter new.
 
@@ -160,6 +181,9 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 	].
 
 	self deferUI: [
+		self
+			beginIndeterminateProgressForIndex: 1
+			total: missingModels size.
 		descriptionLabel label:
 			('Downloading {1} model(s):'
 				format: { missingModels size }).
@@ -173,8 +197,10 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 	missingModels doWithIndex: [ :modelName :index |
 
 		| installed verified |
-		self setupProgressPercentage: (((index - 1) / missingModels size) * 100) rounded.
 		self deferUI: [
+			self
+				beginIndeterminateProgressForIndex: index
+				total: missingModels size.
 			statusLabel label:
 				(self
 					setupDownloadingMessageFor: modelName
@@ -245,6 +271,19 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 ]
 
 { #category : 'initialization' }
+PharoCopilotSetupPresenter >> progressBarValue [
+
+	progressIsIndeterminate ifTrue: [
+		setupProgress := CoPCModelDownloadProgressPresenter
+			indeterminateProgressFrom: setupProgress
+			start: indeterminateProgressStart
+			end: indeterminateProgressEnd
+			step: 0.004 ].
+
+	^ setupProgress ifNil: [ 0 ]
+]
+
+{ #category : 'initialization' }
 PharoCopilotSetupPresenter >> setupDownloadedMessageFor: modelName index: index total: totalModels nextModel: nextModel verified: verified [
 
 	| message |
@@ -294,6 +333,7 @@ PharoCopilotSetupPresenter >> setupNotVisibleMessageFor: modelName index: index 
 PharoCopilotSetupPresenter >> setupProgressPercentage: aNumber [
 
 	| bounded |
+	progressIsIndeterminate := false.
 	bounded := (aNumber ifNil: [ 0 ]) max: 0.
 	bounded := bounded min: 100.
 	setupProgress := bounded / 100.0
@@ -310,6 +350,7 @@ PharoCopilotSetupPresenter >> showDownloadStep [
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
+		add: progressBar expand: false;
 		add: SpNullPresenter new expand: true;
 		yourself).
 
@@ -385,6 +426,10 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 			self setupDownloadingMessageFor: modelName index: index total: totalModels ].
 
 	self deferUI: [
+		percent ifNil: [
+			self
+				beginIndeterminateProgressForIndex: index
+				total: totalModels ].
 		percent ifNotNil: [
 			self setupProgressPercentage: overall ].
 		statusLabel label: message ]
