@@ -513,17 +513,22 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext contextInfo: contextInfo [
 
-	| cleaned sessionId copilotEntries |
+	| cleaned safeContextInfo sessionId copilotEntries |
 	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
 		select: [ :each | each isEmpty not ].
 
-	(contextInfo includesKey: #completion) ifFalse: [
-		self
-			recordCompletionTypesFor: cleaned
-			inContext: aContext
-			contextInfo: contextInfo ].
+	safeContextInfo := contextInfo ifNil: [ Dictionary new ].
 
-	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
+	(self isLoggingEnabled and: [ (safeContextInfo includesKey: #completion) not ]) ifTrue: [
+		[
+			self
+				recordCompletionTypesFor: cleaned
+				inContext: aContext
+				contextInfo: safeContextInfo ]
+			on: Error
+			do: [ ] ].
+
+	sessionId := safeContextInfo at: #sessionId ifAbsent: [ nil ].
 
 	copilotEntries := cleaned collect: [ :each |
 		| entry |
@@ -531,7 +536,7 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 			contents: each
 			description: (self descriptionForSuggestion: each inContext: aContext).
 
-		entry label: (self menuLabelForSuggestion: each contextInfo: contextInfo).
+		entry label: (self menuLabelForSuggestion: each contextInfo: safeContextInfo).
 
 		(entry respondsTo: #sessionId:) ifTrue: [
 			entry sessionId: sessionId ].
@@ -572,8 +577,14 @@ CoPharoCopilotResultSetBuilder >> completionTypeInfoForSuggestion: suggestionStr
 
 	| suggestion prefix suffix combined position node astType heuristicType type basis nodeSource directReceiver |
 	suggestion := suggestionString ifNil: [ '' ] ifNotNil: [ suggestionString asString ].
-	prefix := prefixString ifNil: [ contextInfo at: #prefix ifAbsent: [ '' ] ].
-	suffix := suffixString ifNil: [ contextInfo at: #suffix ifAbsent: [ '' ] ].
+	prefix := prefixString ifNil: [
+		contextInfo
+			ifNil: [ '' ]
+			ifNotNil: [ contextInfo at: #prefix ifAbsent: [ '' ] ] ].
+	suffix := suffixString ifNil: [
+		contextInfo
+			ifNil: [ '' ]
+			ifNotNil: [ contextInfo at: #suffix ifAbsent: [ '' ] ] ].
 	combined := prefix , suggestion , suffix.
 	position := prefix size + suggestion size.
 
@@ -605,6 +616,47 @@ CoPharoCopilotResultSetBuilder >> completionTypeInfoForSuggestion: suggestionStr
 		at: #directReceiver put: directReceiver;
 		at: #directReceiverIsSelf put: (directReceiver at: #isSelf ifAbsent: [ false ]);
 		at: #suggestionPreview put: (self loggingPreviewForSuggestion: suggestion);
+		yourself
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> emptyDirectReceiverInfo [
+
+	^ Dictionary new
+		at: #name put: '';
+		at: #isSelf put: false;
+		at: #basis put: #none;
+		at: #astNodeClass put: nil;
+		at: #astNodeSource put: '';
+		yourself
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> fallbackCompletionTypeInfoForSuggestion: suggestionString prefix: prefixString [
+
+	| suggestion type directReceiver |
+	suggestion := suggestionString ifNil: [ '' ] ifNotNil: [ suggestionString asString ].
+	type := [ self heuristicCompletionTypeForSuggestion: suggestion ]
+		on: Error
+		do: [ #unknown ].
+	directReceiver := [
+		self
+			directReceiverInfoForLoggingNode: nil
+			source: ''
+			prefix: prefixString ]
+		on: Error
+		do: [ self emptyDirectReceiverInfo ].
+
+	^ Dictionary new
+		at: #type put: type;
+		at: #basis put: #heuristic;
+		at: #astNodeClass put: nil;
+		at: #astNodeSource put: '';
+		at: #directReceiver put: directReceiver;
+		at: #directReceiverIsSelf put: (directReceiver at: #isSelf ifAbsent: [ false ]);
+		at: #suggestionPreview put: (([ self loggingPreviewForSuggestion: suggestion ]
+			on: Error
+			do: [ '' ]));
 		yourself
 ]
 
@@ -1659,37 +1711,50 @@ CoPharoCopilotResultSetBuilder >> recordCompletionTypesFor: contentCollection in
 		[ aContext source copyFrom: aContext position + 1 to: aContext source size ] on: Error do: [ '' ] ].
 
 	contentCollection do: [ :suggestion |
-		self
-			recordCompletionTypeInfo: (self
-				completionTypeInfoForSuggestion: suggestion
-				prefix: prefix
-				suffix: suffix
-				contextInfo: contextInfo)
-			contextInfo: contextInfo ]
+		[
+			self
+				recordCompletionTypeInfo: (self
+					safeCompletionTypeInfoForSuggestion: suggestion
+					prefix: prefix
+					suffix: suffix
+					contextInfo: contextInfo)
+				contextInfo: contextInfo ]
+			on: Error
+			do: [ ] ]
 ]
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> recordGenerationAttempt: attempt metadata: metadata normalizedSuggestion: content prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
-	| attempts response completionInfo attemptPayload |
+	| attempts request response tokens completionInfo attemptPayload |
 	self isLoggingEnabled ifFalse: [ ^ self ].
 	contextInfo ifNil: [ ^ self ].
 
-	response := metadata at: #response ifAbsent: [ Dictionary new ].
+	request := (metadata respondsTo: #at:ifAbsent:)
+		ifTrue: [ metadata at: #request ifAbsent: [ Dictionary new ] ]
+		ifFalse: [ Dictionary new ].
+	response := (metadata respondsTo: #at:ifAbsent:)
+		ifTrue: [ metadata at: #response ifAbsent: [ Dictionary new ] ]
+		ifFalse: [ Dictionary new ].
+	tokens := [ CoPharoCopilotLogger tokenUsageForResponseMetadata: response ]
+		on: Error
+		do: [ Dictionary new ].
 	completionInfo := self
-		completionTypeInfoForSuggestion: content
+		safeCompletionTypeInfoForSuggestion: content
 		prefix: prefixString
 		suffix: suffixString
 		contextInfo: contextInfo.
-	self recordCompletionTypeInfo: completionInfo contextInfo: contextInfo.
+	[ self recordCompletionTypeInfo: completionInfo contextInfo: contextInfo ]
+		on: Error
+		do: [ ].
 
 	attempts := contextInfo at: #generationAttempts ifAbsentPut: [ OrderedCollection new ].
 	attemptPayload := Dictionary new
 		at: #attempt put: attempt;
 		at: #suggestion put: content;
-		at: #request put: (metadata at: #request ifAbsent: [ Dictionary new ]);
+		at: #request put: request;
 		at: #response put: response;
-		at: #tokens put: (CoPharoCopilotLogger tokenUsageForResponseMetadata: response);
+		at: #tokens put: tokens;
 		at: #completion put: completionInfo;
 		yourself.
 	attempts add: attemptPayload
@@ -2098,6 +2163,22 @@ CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefix
 		suffix: suffixString
 		contextInfo: contextInfo
 		delayMilliseconds: self debounceMilliseconds
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> safeCompletionTypeInfoForSuggestion: suggestionString prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+
+	^ [
+		self
+			completionTypeInfoForSuggestion: suggestionString
+			prefix: prefixString
+			suffix: suffixString
+			contextInfo: contextInfo ]
+		on: Error
+		do: [
+			self
+				fallbackCompletionTypeInfoForSuggestion: suggestionString
+				prefix: prefixString ]
 ]
 
 { #category : 'API - building' }

@@ -182,6 +182,32 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSkipFallbackWhenAISug
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSurviveLoggingMetadataFailure [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| builder context contextInfo entries |
+		CopilotSettings loggingEnabled: true.
+		builder := CopilotLoggingFailureBuilder new.
+		context := CoCopilotContextMock new
+			source: 'self ';
+			position: 5;
+			yourself.
+		contextInfo := Dictionary new
+			at: #prefix put: 'self ';
+			at: #suffix put: '';
+			yourself.
+
+		self shouldnt: [
+			entries := builder
+				completionEntriesFrom: { 'assert: true' }
+				inContext: context
+				contextInfo: contextInfo ]
+			raise: Error.
+
+		self assert: entries isEmpty not ]
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISuggestionExists [
 
 	| builder context entries |
@@ -273,6 +299,40 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetada
 		self assert: ((payloadCompletion at: #directReceiver) at: #name) equals: 'self'.
 		self assert: (generated at: #suggestions) equals: { 'assert: true' }.
 		self assert: (generated at: #attempts) equals: attempts asArray ]
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingFailureDoesNotDropGenerationAttempt [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| builder contextInfo attempts attempt completion |
+		CopilotSettings loggingEnabled: true.
+		builder := CopilotLoggingFailureBuilder new.
+		contextInfo := Dictionary new.
+
+		self shouldnt: [
+			builder
+				recordGenerationAttempt: 1
+				metadata: (Dictionary new
+					at: #request put: Dictionary new;
+					at: #response put: (Dictionary new
+						at: #prompt_eval_count put: 3;
+						at: #eval_count put: 1;
+						yourself);
+					yourself)
+				normalizedSuggestion: 'assert: true'
+				prefix: 'self '
+				suffix: ''
+				contextInfo: contextInfo ]
+			raise: Error.
+
+		attempts := contextInfo at: #generationAttempts.
+		self assert: attempts size equals: 1.
+		attempt := attempts first.
+		self assert: (attempt at: #suggestion) equals: 'assert: true'.
+		completion := attempt at: #completion.
+		self assert: (completion at: #type) equals: #messageSend.
+		self assert: (completion at: #directReceiverIsSelf) ]
 ]
 
 { #category : 'tests' }
