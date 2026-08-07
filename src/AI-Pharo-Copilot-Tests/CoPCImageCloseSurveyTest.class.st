@@ -34,6 +34,50 @@ CoPCImageCloseSurveyTest >> testCancellingSurveyDoesNotWriteEvaluationEvent [
 ]
 
 { #category : 'tests' }
+CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitAppendsEveryCloseAttempt [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| tempDir tempEvalFile originalDirRef originalEvalRef ui firstLine secondLine thirdLine firstEvent secondEvent |
+		tempDir := FileLocator temp / ('copilot-image-close-repeat-test-' , UUID new asString).
+		tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
+		originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
+		originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
+		[
+			CoPCImageCloseSurvey resetPromptState.
+			CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
+			CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
+			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+
+			ui := CoPCImageCloseSurveyUIManagerDouble new.
+			ui ratings: {
+				5. 5. 4. 5. #codeCompletion.
+				4. 4. 4. 4. #debugging }.
+			CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
+			CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
+
+			tempEvalFile readStreamDo: [ :stream |
+				firstLine := stream nextLine.
+				secondLine := stream nextLine.
+				thirdLine := stream nextLine ].
+
+			firstEvent := STONJSON fromString: firstLine.
+			secondEvent := STONJSON fromString: secondLine.
+
+			self assert: firstLine isNotNil.
+			self assert: secondLine isNotNil.
+			self assert: thirdLine isNil.
+			self assert: (firstEvent at: #event) equals: 'image-close-survey'.
+			self assert: (secondEvent at: #event) equals: 'image-close-survey'.
+			self assert: (ui requests size) equals: (CoPCImageCloseSurvey surveyQuestions size + 1) * 2
+		] ensure: [
+			CoPCImageCloseSurvey resetPromptState.
+			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+			tempDir exists ifTrue: [ tempDir ensureDelete ].
+			CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+]
+
+{ #category : 'tests' }
 CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 
 	CopilotSettings withDefaultSettingsDo: [

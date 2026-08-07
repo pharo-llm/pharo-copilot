@@ -41,5 +41,6 @@ BaselineOfAIPharoCopilot >> postLoad [
 
 	CopilotSettings ensureDefaultCompletionModelSelected.
 	CopilotSettings installCompletionEngineIfAvailable.
+	[ CoPCImageCloseSurvey registerSessionHandler ] on: Error do: [ :ignored | ].
 	self class showFirstLaunchSetupIfNeeded
 ]
