@@ -202,8 +202,11 @@ CoPharoCopilotLogger class >> formatValue: anObject [
 	^ anObject printString
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'class initialization' }
 CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInfo prefix: prefixString suffix: suffixString classContext: classContext cacheStats: cacheStats [
+
+	| attempts |
+	attempts := contextInfo at: #generationAttempts ifAbsent: [ #() ].
 
 	^ Dictionary new
 		at: #timestamp put: (contextInfo at: #timestamp ifAbsent: [ DateAndTime now asString ]);
@@ -219,9 +222,11 @@ CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInf
 			at: #suffix put: suffixString;
 			at: #context put: classContext;
 			yourself);
+		at: #tokens put: (self tokenUsageForGenerationAttempts: attempts);
+		at: #completion put: (contextInfo at: #completion ifAbsent: [ Dictionary new ]);
 		at: #generated put: (Dictionary new
 			at: #suggestions put: ((contextInfo at: #rawSuggestions ifAbsent: [ #() ]) asArray);
-			at: #attempts put: ((contextInfo at: #generationAttempts ifAbsent: [ #() ]) asArray);
+			at: #attempts put: attempts asArray;
 			yourself);
 		at: #accepted put: nil;
 		at: #acceptedAt put: nil;
@@ -385,6 +390,75 @@ CoPharoCopilotLogger class >> rawLogsDirectoryReference [
 CoPharoCopilotLogger class >> rawLogsDirectoryReference: aDirectoryReference [
 
 	logsDirectoryReference := aDirectoryReference
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> numberFromMetadataValue: value [
+
+	| string |
+	value ifNil: [ ^ nil ].
+	value isNumber ifTrue: [ ^ value ].
+	(value respondsTo: #asString) ifFalse: [ ^ nil ].
+
+	string := value asString trimBoth.
+	string isEmpty ifTrue: [ ^ nil ].
+	^ [ Number readFrom: string readStream ] on: Error do: [ nil ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> metadataValueAt: key from: dictionary [
+
+	(dictionary respondsTo: #at:ifAbsent:) ifFalse: [ ^ nil ].
+	^ dictionary
+		at: key
+		ifAbsent: [ dictionary at: key asString ifAbsent: [ nil ] ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> tokenUsageForGenerationAttempts: attemptCollection [
+
+	| attempts perAttempt totalPredicted sawPredicted latestContext latestPredicted |
+	attempts := attemptCollection ifNil: [ #() ].
+	perAttempt := OrderedCollection new.
+	totalPredicted := 0.
+	sawPredicted := false.
+
+	attempts do: [ :attempt |
+		| response usage contextTokens predictedTokens |
+		response := self metadataValueAt: #response from: attempt.
+		usage := self tokenUsageForResponseMetadata: response.
+		contextTokens := usage at: #contextTokens ifAbsent: [ nil ].
+		predictedTokens := usage at: #predictedTokens ifAbsent: [ nil ].
+
+		contextTokens ifNotNil: [ latestContext := contextTokens ].
+		predictedTokens ifNotNil: [
+			latestPredicted := predictedTokens.
+			totalPredicted := totalPredicted + predictedTokens.
+			sawPredicted := true ].
+
+		perAttempt add: (Dictionary new
+			at: #attempt put: (self metadataValueAt: #attempt from: attempt);
+			at: #contextTokens put: contextTokens;
+			at: #predictedTokens put: predictedTokens;
+			yourself) ].
+
+	^ Dictionary new
+		at: #contextTokens put: latestContext;
+		at: #predictedTokens put: (sawPredicted ifTrue: [ totalPredicted ] ifFalse: [ nil ]);
+		at: #latestPredictedTokens put: latestPredicted;
+		at: #attempts put: perAttempt asArray;
+		yourself
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> tokenUsageForResponseMetadata: responseMetadata [
+
+	^ Dictionary new
+		at: #contextTokens put: (self numberFromMetadataValue:
+			(self metadataValueAt: #prompt_eval_count from: responseMetadata));
+		at: #predictedTokens put: (self numberFromMetadataValue:
+			(self metadataValueAt: #eval_count from: responseMetadata));
+		yourself
 ]
 
 { #category : 'class initialization' }

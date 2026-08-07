@@ -517,6 +517,12 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
 		select: [ :each | each isEmpty not ].
 
+	(contextInfo includesKey: #completion) ifFalse: [
+		self
+			recordCompletionTypesFor: cleaned
+			inContext: aContext
+			contextInfo: contextInfo ].
+
 	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
 
 	copilotEntries := cleaned collect: [ :each |
@@ -533,6 +539,73 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 		entry ].
 
 	^ self appendFallbackCompletionEntriesTo: copilotEntries inContext: aContext
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> completionTypeForAstNode: aNode [
+
+	| className |
+	aNode ifNil: [ ^ nil ].
+
+	(self node: aNode answersTrueTo: #isAssignment) ifTrue: [ ^ #assignment ].
+	(self node: aNode answersTrueTo: #isReturn) ifTrue: [ ^ #return ].
+	(self node: aNode answersTrueTo: #isMessage) ifTrue: [ ^ #messageSend ].
+	(self node: aNode answersTrueTo: #isVariable) ifTrue: [ ^ #variable ].
+	(self node: aNode answersTrueTo: #isLiteralNode) ifTrue: [ ^ #literal ].
+	(self node: aNode answersTrueTo: #isBlock) ifTrue: [ ^ #block ].
+	(self node: aNode answersTrueTo: #isCascade) ifTrue: [ ^ #cascade ].
+
+	className := aNode class name asString asLowercase.
+	(className includesSubstring: 'assignment') ifTrue: [ ^ #assignment ].
+	(className includesSubstring: 'return') ifTrue: [ ^ #return ].
+	(className includesSubstring: 'message') ifTrue: [ ^ #messageSend ].
+	(className includesSubstring: 'variable') ifTrue: [ ^ #variable ].
+	(className includesSubstring: 'literal') ifTrue: [ ^ #literal ].
+	(className includesSubstring: 'block') ifTrue: [ ^ #block ].
+	(className includesSubstring: 'cascade') ifTrue: [ ^ #cascade ].
+
+	^ nil
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> completionTypeInfoForSuggestion: suggestionString prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+
+	| suggestion prefix suffix combined position node astType heuristicType type basis nodeSource directReceiver |
+	suggestion := suggestionString ifNil: [ '' ] ifNotNil: [ suggestionString asString ].
+	prefix := prefixString ifNil: [ contextInfo at: #prefix ifAbsent: [ '' ] ].
+	suffix := suffixString ifNil: [ contextInfo at: #suffix ifAbsent: [ '' ] ].
+	combined := prefix , suggestion , suffix.
+	position := prefix size + suggestion size.
+
+	node := self loggingAstNodeForSource: combined position: position.
+	astType := self completionTypeForAstNode: node.
+	heuristicType := self heuristicCompletionTypeForSuggestion: suggestion.
+	type := (self shouldPreferHeuristicType: heuristicType overAstType: astType)
+		ifTrue: [ heuristicType ]
+		ifFalse: [ astType ifNil: [ heuristicType ] ].
+	basis := type = astType
+		ifTrue: [ #ast ]
+		ifFalse: [
+			astType
+				ifNil: [ #heuristic ]
+				ifNotNil: [ #heuristicWithAstContext ] ].
+	nodeSource := node
+		ifNil: [ '' ]
+		ifNotNil: [ self sourceSubstringForNode: node in: combined ].
+	directReceiver := self
+		directReceiverInfoForLoggingNode: node
+		source: combined
+		prefix: prefix.
+
+	^ Dictionary new
+		at: #type put: type;
+		at: #basis put: basis;
+		at: #astNodeClass put: (node ifNil: [ nil ] ifNotNil: [ node class name ]);
+		at: #astNodeSource put: nodeSource;
+		at: #directReceiver put: directReceiver;
+		at: #directReceiverIsSelf put: (directReceiver at: #isSelf ifAbsent: [ false ]);
+		at: #suggestionPreview put: (self loggingPreviewForSuggestion: suggestion);
+		yourself
 ]
 
 { #category : 'new' }
@@ -646,6 +719,41 @@ CoPharoCopilotResultSetBuilder >> deferUI: aBlock [
 	].
 
 	^ aBlock value
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> directReceiverInfoForLoggingNode: aNode source: sourceString prefix: prefixString [
+
+	| messageNode receiverNode receiverName basis receiverSource receiverNodeClass |
+	messageNode := self loggingMessageNodeForNode: aNode.
+	receiverNode := messageNode
+		ifNil: [ nil ]
+		ifNotNil: [ [ messageNode receiver ] on: Error do: [ nil ] ].
+	receiverName := receiverNode
+		ifNil: [ '' ]
+		ifNotNil: [ self receiverNameForNode: receiverNode source: sourceString ].
+	basis := receiverName isEmpty
+		ifTrue: [ #textualPrefix ]
+		ifFalse: [ #ast ].
+
+	receiverName isEmpty ifTrue: [
+		receiverName := self textualDirectReceiverBeforeCompletionIn: prefixString ].
+	receiverName isEmpty ifTrue: [ basis := #none ].
+
+	receiverSource := receiverNode
+		ifNil: [ '' ]
+		ifNotNil: [ self sourceSubstringForNode: receiverNode in: sourceString ].
+	receiverNodeClass := receiverNode
+		ifNil: [ nil ]
+		ifNotNil: [ receiverNode class name ].
+
+	^ Dictionary new
+		at: #name put: receiverName;
+		at: #isSelf put: receiverName = 'self';
+		at: #basis put: basis;
+		at: #astNodeClass put: receiverNodeClass;
+		at: #astNodeSource put: receiverSource;
+		yourself
 ]
 
 { #category : 'initialization' }
@@ -1131,6 +1239,34 @@ CoPharoCopilotResultSetBuilder >> isWordChar: ch [
 		or: [ ch = $_ ] ]
 ]
 
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> heuristicCompletionTypeForSuggestion: suggestionString [
+
+	| suggestion first |
+	suggestion := suggestionString ifNil: [ '' ] ifNotNil: [ suggestionString asString trimBoth ].
+	suggestion isEmpty ifTrue: [ ^ #unknown ].
+
+	(suggestion beginsWith: '^') ifTrue: [ ^ #return ].
+	(suggestion includesSubstring: ':=') ifTrue: [ ^ #assignment ].
+	(suggestion includesSubstring: ';') ifTrue: [ ^ #cascade ].
+	(suggestion beginsWith: '[') ifTrue: [ ^ #block ].
+	(suggestion beginsWith: '<') ifTrue: [ ^ #pragma ].
+	(suggestion includesSubstring: 'subclass:') ifTrue: [ ^ #classDefinition ].
+	(suggestion includesSubstring: ':') ifTrue: [ ^ #messageSend ].
+
+	first := suggestion first.
+	((first isDigit)
+		or: [ first = $'
+		or: [ first = $#
+		or: [ #( 'true' 'false' 'nil' ) includes: suggestion ] ] ])
+			ifTrue: [ ^ #literal ].
+
+	(suggestion allSatisfy: [ :each | self isWordChar: each ])
+		ifTrue: [ ^ #variable ].
+
+	^ #expression
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollection [
 
@@ -1140,6 +1276,64 @@ CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollectio
 			at: #rawSuggestionCount put: contentCollection size;
 			yourself
 	)
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> loggingAstNodeForSource: sourceString position: positionInteger [
+
+	| source ast position |
+	source := sourceString ifNil: [ '' ] ifNotNil: [ sourceString asString ].
+	source isEmpty ifTrue: [ ^ nil ].
+
+	ast := [ OCParser parseFaultyMethod: source ]
+		on: Error
+		do: [ nil ].
+	ast ifNil: [ ^ nil ].
+
+	position := ((positionInteger ifNil: [ source size ]) max: 0) min: source size.
+	^ [
+		(ast nodeBeforeOffset: position)
+			ifNil: [ ast ] ]
+		on: Error
+		do: [ ast ]
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> loggingMessageNodeForNode: aNode [
+
+	| current parent |
+	current := aNode.
+	[ current notNil ] whileTrue: [
+		(self isLoggingMessageNode: current) ifTrue: [ ^ current ].
+		parent := (current respondsTo: #parent)
+			ifTrue: [ [ current parent ] on: Error do: [ nil ] ]
+			ifFalse: [ nil ].
+		parent == current ifTrue: [ ^ nil ].
+		current := parent ].
+	^ nil
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> isLoggingMessageNode: aNode [
+
+	| className |
+	aNode ifNil: [ ^ false ].
+	(aNode respondsTo: #receiver) ifFalse: [ ^ false ].
+	(self node: aNode answersTrueTo: #isMessage) ifTrue: [ ^ true ].
+	className := aNode class name asString asLowercase.
+	^ className includesSubstring: 'message'
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> loggingPreviewForSuggestion: suggestionString [
+
+	| suggestion normalized |
+	suggestion := suggestionString ifNil: [ '' ] ifNotNil: [ suggestionString asString ].
+	normalized := suggestion copyReplaceAll: String cr with: String lf.
+	normalized := normalized copyReplaceAll: String lf with: '\n'.
+	^ normalized size > 120
+		ifTrue: [ (normalized copyFrom: 1 to: 117), '...' ]
+		ifFalse: [ normalized ]
 ]
 
 { #category : 'new' }
@@ -1396,7 +1590,13 @@ CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefi
 				yourself ].
 	rawResponse := metadata at: #content ifAbsent: [ '' ].
 	content := self normalizeSuggestion: rawResponse forPrefix: prefixString.
-	self recordGenerationAttempt: attempt metadata: metadata normalizedSuggestion: content contextInfo: contextInfo.
+	self
+		recordGenerationAttempt: attempt
+		metadata: metadata
+		normalizedSuggestion: content
+		prefix: prefixString
+		suffix: suffixString
+		contextInfo: contextInfo.
 
 	(content isEmpty and: [ rawResponse asString trimBoth isEmpty not ]) ifTrue: [
 		self
@@ -1409,25 +1609,88 @@ CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefi
 	^ content
 ]
 
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> node: aNode answersTrueTo: selector [
+
+	(aNode notNil and: [ aNode respondsTo: selector ]) ifFalse: [ ^ false ].
+	^ [ aNode perform: selector ] on: Error do: [ false ]
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> ollamaClient [ 
 
 	^ cachedClient ifNil: [ cachedClient := CoPCOllamaClient new ]
 ]
 
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> recordGenerationAttempt: attempt metadata: metadata normalizedSuggestion: content contextInfo: contextInfo [
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> recordCompletionTypeInfo: completionInfo contextInfo: contextInfo [
 
-	| attempts attemptPayload |
+	| predictions completionType directReceiver |
 	self isLoggingEnabled ifFalse: [ ^ self ].
 	contextInfo ifNil: [ ^ self ].
+	completionInfo ifNil: [ ^ self ].
+
+	predictions := contextInfo
+		at: #completionPredictions
+		ifAbsentPut: [ OrderedCollection new ].
+	predictions add: completionInfo.
+
+	completionType := completionInfo at: #type ifAbsent: [ #unknown ].
+	directReceiver := completionInfo at: #directReceiver ifAbsent: [ Dictionary new ].
+	contextInfo at: #completion put: (Dictionary new
+		at: #type put: completionType;
+		at: #directReceiver put: directReceiver;
+		at: #directReceiverIsSelf put: (completionInfo at: #directReceiverIsSelf ifAbsent: [ false ]);
+		at: #predictions put: predictions asArray;
+		yourself)
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> recordCompletionTypesFor: contentCollection inContext: aContext contextInfo: contextInfo [
+
+	| prefix suffix |
+	self isLoggingEnabled ifFalse: [ ^ self ].
+	contextInfo ifNil: [ ^ self ].
+	contentCollection ifNil: [ ^ self ].
+
+	prefix := contextInfo at: #prefix ifAbsent: [
+		[ aContext source copyFrom: 1 to: aContext position ] on: Error do: [ '' ] ].
+	suffix := contextInfo at: #suffix ifAbsent: [
+		[ aContext source copyFrom: aContext position + 1 to: aContext source size ] on: Error do: [ '' ] ].
+
+	contentCollection do: [ :suggestion |
+		self
+			recordCompletionTypeInfo: (self
+				completionTypeInfoForSuggestion: suggestion
+				prefix: prefix
+				suffix: suffix
+				contextInfo: contextInfo)
+			contextInfo: contextInfo ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> recordGenerationAttempt: attempt metadata: metadata normalizedSuggestion: content prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+
+	| attempts response completionInfo attemptPayload |
+	self isLoggingEnabled ifFalse: [ ^ self ].
+	contextInfo ifNil: [ ^ self ].
+
+	response := metadata at: #response ifAbsent: [ Dictionary new ].
+	completionInfo := self
+		completionTypeInfoForSuggestion: content
+		prefix: prefixString
+		suffix: suffixString
+		contextInfo: contextInfo.
+	self recordCompletionTypeInfo: completionInfo contextInfo: contextInfo.
 
 	attempts := contextInfo at: #generationAttempts ifAbsentPut: [ OrderedCollection new ].
 	attemptPayload := Dictionary new
 		at: #attempt put: attempt;
 		at: #suggestion put: content;
 		at: #request put: (metadata at: #request ifAbsent: [ Dictionary new ]);
-		at: #response put: (metadata at: #response ifAbsent: [ Dictionary new ]);
+		at: #response put: response;
+		at: #tokens put: (CoPharoCopilotLogger tokenUsageForResponseMetadata: response);
+		at: #completion put: completionInfo;
 		yourself.
 	attempts add: attemptPayload
 ]
@@ -2131,6 +2394,16 @@ CoPharoCopilotResultSetBuilder >> semanticTypesForReceiverNode: receiverNode inC
 	^ self normalizeSemanticTypes: types
 ]
 
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> shouldPreferHeuristicType: heuristicType overAstType: astType [
+
+	(#( #assignment #messageSend #return #cascade #block #pragma #classDefinition ) includes: heuristicType)
+		ifFalse: [ ^ false ].
+
+	astType ifNil: [ ^ true ].
+	^ #( #literal #variable #unknown ) includes: astType
+]
+
 { #category : 'semantic context' }
 CoPharoCopilotResultSetBuilder >> sourceSubstringForNode: aNode in: sourceString [
 
@@ -2183,6 +2456,46 @@ CoPharoCopilotResultSetBuilder >> textualReceiverBeforeCompletionIn: prefixStrin
 		start := start - 1 ].
 
 	^ base copyFrom: start + 1 to: end
+]
+
+{ #category : 'logging' }
+CoPharoCopilotResultSetBuilder >> textualDirectReceiverBeforeCompletionIn: prefixString [
+
+	| prefix fragment base statementStart segment end wordStart |
+	prefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
+	prefix isEmpty ifTrue: [ ^ '' ].
+
+	fragment := self trailingWordFragmentIn: prefix.
+	base := prefix.
+	(fragment isEmpty not and: [ base size >= fragment size ]) ifTrue: [
+		((base copyFrom: base size - fragment size + 1 to: base size) = fragment)
+			ifTrue: [
+				base := base size = fragment size
+					ifTrue: [ '' ]
+					ifFalse: [ base copyFrom: 1 to: base size - fragment size ] ] ].
+	base isEmpty ifTrue: [ ^ '' ].
+
+	statementStart := base size.
+	[ statementStart > 0 and: [
+		| ch |
+		ch := base at: statementStart.
+		(ch = $. or: [ ch = Character lf or: [ ch = Character cr ] ]) not ] ] whileTrue: [
+			statementStart := statementStart - 1 ].
+
+	segment := base copyFrom: statementStart + 1 to: base size.
+	segment := segment trimBoth.
+	segment isEmpty ifTrue: [ ^ '' ].
+
+	end := segment size.
+	[ end > 0 and: [ (self isWordChar: (segment at: end)) not ] ] whileTrue: [
+		end := end - 1 ].
+	end = 0 ifTrue: [ ^ '' ].
+
+	wordStart := end.
+	[ wordStart > 0 and: [ self isWordChar: (segment at: wordStart) ] ] whileTrue: [
+		wordStart := wordStart - 1 ].
+
+	^ segment copyFrom: wordStart + 1 to: end
 ]
 
 { #category : 'new' }

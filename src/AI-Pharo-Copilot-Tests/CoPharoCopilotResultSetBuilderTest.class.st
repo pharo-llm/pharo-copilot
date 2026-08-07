@@ -201,7 +201,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISu
 CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetadata [
 
 	CopilotSettings withDefaultSettingsDo: [
-		| builder client mock logprobs contextInfo suggestions attempts attempt request response payload generated |
+		| builder client mock logprobs contextInfo suggestions attempts attempt request response attemptTokens attemptCompletion payload generated payloadTokens payloadCompletion |
 		CopilotSettings loggingEnabled: true.
 		builder := CoPharoCopilotResultSetBuilder new.
 		mock := OAHttpTransportMockExtended new.
@@ -218,6 +218,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetada
 		mock mockResponse: (Dictionary new
 			at: #response put: 'assert: true';
 			at: #logprobs put: logprobs;
+			at: #prompt_eval_count put: 7;
 			at: #eval_count put: 2;
 			yourself).
 
@@ -246,7 +247,15 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetada
 		self assert: (request at: #top_logprobs) equals: CopilotSettings completionTopLogprobs.
 		response := attempt at: #response.
 		self assert: (response at: #logprobs) equals: logprobs.
+		self assert: (response at: #prompt_eval_count) equals: 7.
 		self assert: (response at: #eval_count) equals: 2.
+		attemptTokens := attempt at: #tokens.
+		self assert: (attemptTokens at: #contextTokens) equals: 7.
+		self assert: (attemptTokens at: #predictedTokens) equals: 2.
+		attemptCompletion := attempt at: #completion.
+		self assert: (attemptCompletion at: #type) equals: #messageSend.
+		self assert: (attemptCompletion at: #directReceiverIsSelf).
+		self assert: ((attemptCompletion at: #directReceiver) at: #name) equals: 'self'.
 
 		payload := CoPharoCopilotLogger
 			initialCompletionPayloadForContextInfo: contextInfo
@@ -255,8 +264,75 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetada
 			classContext: ''
 			cacheStats: Dictionary new.
 		generated := payload at: #generated.
+		payloadTokens := payload at: #tokens.
+		payloadCompletion := payload at: #completion.
+		self assert: (payloadTokens at: #contextTokens) equals: 7.
+		self assert: (payloadTokens at: #predictedTokens) equals: 2.
+		self assert: (payloadCompletion at: #type) equals: #messageSend.
+		self assert: (payloadCompletion at: #directReceiverIsSelf).
+		self assert: ((payloadCompletion at: #directReceiver) at: #name) equals: 'self'.
 		self assert: (generated at: #suggestions) equals: { 'assert: true' }.
 		self assert: (generated at: #attempts) equals: attempts asArray ]
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionTypeInfoClassifiesCommonSuggestionShapes [
+
+	| builder methodPrefix assignment message otherMessage variable literal return block |
+	builder := CoPharoCopilotResultSetBuilder new.
+	methodPrefix := 'example', String lf, String tab.
+
+	assignment := builder
+		completionTypeInfoForSuggestion: 'value := 1'
+		prefix: methodPrefix
+		suffix: ''
+		contextInfo: Dictionary new.
+	message := builder
+		completionTypeInfoForSuggestion: 'assert: true'
+		prefix: methodPrefix, 'self '
+		suffix: ''
+		contextInfo: Dictionary new.
+	otherMessage := builder
+		completionTypeInfoForSuggestion: ': value'
+		prefix: methodPrefix, 'items add'
+		suffix: ''
+		contextInfo: Dictionary new.
+	variable := builder
+		completionTypeInfoForSuggestion: 'value'
+		prefix: methodPrefix
+		suffix: ''
+		contextInfo: Dictionary new.
+	literal := builder
+		completionTypeInfoForSuggestion: '42'
+		prefix: methodPrefix
+		suffix: ''
+		contextInfo: Dictionary new.
+	return := builder
+		completionTypeInfoForSuggestion: '^ value'
+		prefix: methodPrefix
+		suffix: ''
+		contextInfo: Dictionary new.
+	block := builder
+		completionTypeInfoForSuggestion: '[ :each | each ]'
+		prefix: methodPrefix
+		suffix: ''
+		contextInfo: Dictionary new.
+
+	self assert: (assignment at: #type) equals: #assignment.
+	self assert: (message at: #type) equals: #messageSend.
+	self assert: (otherMessage at: #type) equals: #messageSend.
+	self assert: (variable at: #type) equals: #variable.
+	self assert: (literal at: #type) equals: #literal.
+	self assert: (return at: #type) equals: #return.
+	self assert: (block at: #type) equals: #block.
+	self assert: (message at: #directReceiverIsSelf).
+	self assert: ((message at: #directReceiver) at: #name) equals: 'self'.
+	self deny: (otherMessage at: #directReceiverIsSelf).
+	self assert: ((otherMessage at: #directReceiver) at: #name) equals: 'items'.
+	self deny: (variable at: #directReceiverIsSelf).
+	self assert: ((variable at: #directReceiver) at: #name) equals: ''.
+	self assert: (message includesKey: #basis).
+	self assert: (message includesKey: #astNodeClass)
 ]
 
 { #category : 'tests' }
