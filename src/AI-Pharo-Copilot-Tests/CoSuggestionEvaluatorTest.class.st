@@ -159,30 +159,53 @@ evaluator recordSuggestionRejected: (CoCopilotEntry contents: 'rejected') contex
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testSavePersistentStatsProducesJson [
 
-    | tempFs tempDir tempFile originalReference originalLoggingEnabled jsonLine parsed |
+    | tempFs tempDir tempFile sessionDir originalReference originalLogRef originalLogsRef originalSessionRef originalArchiveRef originalUserId originalSessionId originalStartedAt originalArchived originalLoggingEnabled jsonLine parsed |
     tempFs := FileSystem memory.
             tempDir := tempFs
             / CoPharoCopilotLogger pharoCopilotDirectoryName.
+    sessionDir := tempDir / 'session-test'.
     tempDir parent ensureCreateDirectory.
     tempDir ensureCreateDirectory.
     tempFile := tempDir / 'copilot-evaluation-log.jsonl'.
 
     originalReference := CoPharoCopilotLogger evaluationLogFileReference.
+    originalLogRef := CoPharoCopilotLogger rawLogFileReference.
+    originalLogsRef := CoPharoCopilotLogger rawLogsDirectoryReference.
+    originalSessionRef := CoPharoCopilotLogger rawSessionDirectoryReference.
+    originalArchiveRef := CoPharoCopilotLogger rawSessionArchiveFileReference.
+    originalUserId := CoPharoCopilotLogger rawUserId.
+    originalSessionId := CoPharoCopilotLogger instVarNamed: #sessionId.
+    originalStartedAt := CoPharoCopilotLogger instVarNamed: #sessionStartedAt.
+    originalArchived := CoPharoCopilotLogger instVarNamed: #sessionArchived.
     originalLoggingEnabled := CopilotSettings loggingEnabled.
 
     [
             CopilotSettings loggingEnabled: true.
+            CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
+            CoPharoCopilotLogger rawSessionDirectoryReference: sessionDir.
             CoPharoCopilotLogger evaluationLogFileReference: tempFile.
+            CoPharoCopilotLogger rawUserId: 'user-test'.
             evaluator savePersistentStats.
             jsonLine := tempFile readStreamDo: [ :stream | stream nextLine ].
             parsed := STONJSON fromString: jsonLine.
+		self assert: (parsed at: 'userId') equals: 'user-test'.
+		self assert: (parsed at: 'sessionId') equals: sessionDir basename.
 		self assert: (parsed at: 'rejectedCount') equals: 0.
 		self assert: ((parsed at: 'sessionStats') isKindOf: Dictionary).
 		self assert: ((parsed at: 'sessionStats') includesKey: 'totalSuggestions').
 		self assert: ((parsed at: 'timestamp') isKindOf: String).
 		self assert: ((parsed at: 'modelName') isKindOf: String) ] ensure: [
-			tempFile ensureDelete.
-			CoPharoCopilotLogger evaluationLogFileReference: originalReference ]
+			tempFile exists ifTrue: [ tempFile ensureDelete ].
+			CoPharoCopilotLogger rawLogsDirectoryReference: originalLogsRef.
+			CoPharoCopilotLogger rawSessionDirectoryReference: originalSessionRef.
+			CoPharoCopilotLogger rawSessionArchiveFileReference: originalArchiveRef.
+			CoPharoCopilotLogger rawLogFileReference: originalLogRef.
+			CoPharoCopilotLogger evaluationLogFileReference: originalReference.
+			CoPharoCopilotLogger rawUserId: originalUserId.
+			CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
+			CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
+			CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived.
+			CopilotSettings loggingEnabled: originalLoggingEnabled ]
 ]
 
 { #category : 'running' }

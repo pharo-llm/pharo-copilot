@@ -1,7 +1,7 @@
 "
 CoCopilotLogger is a small, file-based logger for Pharo Copilot.
-It writes human-readable sections to `copilot.log` and also maintains a JSONL file for evaluation logs
-inside the `pharo-copilot` directory under the image directory, when logging is enabled in CopilotSettings.
+It writes human-readable sections, completion payloads, evaluation JSONL, and session metadata
+inside per-session folders under the `pharo-copilot` directory, when logging is enabled in CopilotSettings.
 "
 Class {
 	#name : 'CoPharoCopilotLogger',
@@ -9,7 +9,13 @@ Class {
 	#classInstVars : [
 		'logFileReference',
 		'logsDirectoryReference',
-		'evaluationLogFileReference'
+		'evaluationLogFileReference',
+		'sessionDirectoryReference',
+		'sessionArchiveFileReference',
+		'sessionId',
+		'sessionStartedAt',
+		'sessionArchived',
+		'userId'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -63,6 +69,8 @@ CoPharoCopilotLogger class >> appendEvaluationEvent: eventName data: aDictionary
 
 	event := Dictionary new
 		at: #event put: eventName;
+		at: #userId put: self userId;
+		at: #sessionId put: self currentSessionId;
 		at: #data put: (aDictionary ifNil: [ Dictionary new ]);
 		yourself.
 
@@ -92,7 +100,7 @@ CoPharoCopilotLogger class >> completionSessionId [
 
 { #category : 'class initialization' }
 CoPharoCopilotLogger class >> completionsDirectoryReference [
-	^ (self ensureLogsDirectory) / 'completions'
+	^ (self ensureSessionDirectory) / 'completions'
 ]
 
 { #category : 'class initialization' }
@@ -160,6 +168,23 @@ CoPharoCopilotLogger class >> ensureLogsDirectory [
 	^ directory
 ]
 
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> ensureSessionDirectory [
+
+	| directory |
+	directory := self sessionDirectoryReference.
+	self loggingEnabled ifFalse: [ ^ directory ].
+
+	[
+		directory ensureCreateDirectory ]
+		on: Error
+		do: [ :ex |
+			Transcript
+				show: 'Copilot session log directory could not be created: ', ex messageText;
+				cr ].
+	^ directory
+]
+
 { #category : 'class initialization' }
 CoPharoCopilotLogger class >> evaluationLogFileName [
 
@@ -170,7 +195,7 @@ CoPharoCopilotLogger class >> evaluationLogFileName [
 CoPharoCopilotLogger class >> evaluationLogFileReference [
 
 	^ evaluationLogFileReference ifNil: [
-		evaluationLogFileReference := (self ensureLogsDirectory) / self evaluationLogFileName ]
+		evaluationLogFileReference := (self ensureSessionDirectory) / self evaluationLogFileName ]
 ]
 
 { #category : 'class initialization' }
@@ -207,6 +232,8 @@ CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInf
 
 	^ Dictionary new
 		at: #timestamp put: (contextInfo at: #timestamp ifAbsent: [ DateAndTime now asString ]);
+		at: #userId put: self userId;
+		at: #loggerSessionId put: self currentSessionId;
 		at: #cache put: cacheStats;
 		at: #context put: (Dictionary new
 			at: #fullSource put: (contextInfo at: #fullSource ifAbsent: [ '' ]);
@@ -222,6 +249,7 @@ CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInf
 		at: #generated put: (Dictionary new
 			at: #suggestions put: ((contextInfo at: #rawSuggestions ifAbsent: [ #() ]) asArray);
 			at: #attempts put: ((contextInfo at: #generationAttempts ifAbsent: [ #() ]) asArray);
+			at: #semanticGate put: (contextInfo at: #semanticGate ifAbsent: [ Dictionary new ]);
 			yourself);
 		at: #accepted put: nil;
 		at: #acceptedAt put: nil;
@@ -238,11 +266,15 @@ CoPharoCopilotLogger class >> initialize [
 	logFileReference := nil.
 	logsDirectoryReference := nil.
 	evaluationLogFileReference := nil.
+	sessionDirectoryReference := nil.
+	sessionArchiveFileReference := nil.
+	sessionId := nil.
+	sessionStartedAt := nil.
+	sessionArchived := false.
+	userId := nil.
 
 	self ensureLogsDirectory.
-	self ensureCompletionsDirectory.
-	self ensureLogFileInitialized.
-	self ensureEvaluationLogFileInitialized
+	self startNewSession
 ]
 
 { #category : 'class initialization' }
@@ -254,6 +286,12 @@ CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol [
 	name = #logFileReference ifTrue: [ ^ logFileReference ].
 	name = #logsDirectoryReference ifTrue: [ ^ logsDirectoryReference ].
 	name = #evaluationLogFileReference ifTrue: [ ^ evaluationLogFileReference ].
+	name = #sessionDirectoryReference ifTrue: [ ^ sessionDirectoryReference ].
+	name = #sessionArchiveFileReference ifTrue: [ ^ sessionArchiveFileReference ].
+	name = #sessionId ifTrue: [ ^ sessionId ].
+	name = #sessionStartedAt ifTrue: [ ^ sessionStartedAt ].
+	name = #sessionArchived ifTrue: [ ^ sessionArchived ].
+	name = #userId ifTrue: [ ^ userId ].
 
 	^ super instVarNamed: aStringOrSymbol
 ]
@@ -267,6 +305,12 @@ CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
 	name = #logFileReference ifTrue: [ logFileReference := aValue. ^ aValue ].
 	name = #logsDirectoryReference ifTrue: [ logsDirectoryReference := aValue. ^ aValue ].
 	name = #evaluationLogFileReference ifTrue: [ evaluationLogFileReference := aValue. ^ aValue ].
+	name = #sessionDirectoryReference ifTrue: [ sessionDirectoryReference := aValue. ^ aValue ].
+	name = #sessionArchiveFileReference ifTrue: [ sessionArchiveFileReference := aValue. ^ aValue ].
+	name = #sessionId ifTrue: [ sessionId := aValue. ^ aValue ].
+	name = #sessionStartedAt ifTrue: [ sessionStartedAt := aValue. ^ aValue ].
+	name = #sessionArchived ifTrue: [ sessionArchived := aValue. ^ aValue ].
+	name = #userId ifTrue: [ userId := aValue. ^ aValue ].
 
 	^ super instVarNamed: name put: aValue
 ]
@@ -287,7 +331,7 @@ CoPharoCopilotLogger class >> logFileName [
 CoPharoCopilotLogger class >> logFileReference [
 
 	^ logFileReference ifNil: [
-		logFileReference := (self ensureLogsDirectory) / self logFileName ]
+		logFileReference := (self ensureSessionDirectory) / self logFileName ]
 ]
 
 { #category : 'class initialization' }
@@ -351,6 +395,75 @@ CoPharoCopilotLogger class >> pharoCopilotDirectoryName [
 	^ 'pharo-copilot'
 ]
 
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> archiveCurrentSession [
+
+	| directory archiveFile archiveClass archive archivedAt |
+	self loggingEnabled ifFalse: [ ^ nil ].
+
+	directory := self ensureSessionDirectory.
+	(directory isNil or: [ directory exists not ]) ifTrue: [ ^ nil ].
+	archiveFile := self sessionArchiveFileReference.
+	archiveFile ifNil: [ ^ nil ].
+	archiveClass := Smalltalk globals at: #ZipArchive ifAbsent: [
+		self
+			logBackEndEvent: 'Could not archive Copilot session'
+			details: (Dictionary new
+				at: #reason put: 'ZipArchive class is not available';
+				at: #sessionDirectory put: directory fullName;
+				yourself).
+		^ nil ].
+
+	archivedAt := DateAndTime now.
+	self
+		writeSessionMetadataClosedAt: archivedAt
+		archivedAt: archivedAt
+		archiveFile: archiveFile.
+
+	^ [
+		archiveFile parent ensureCreateDirectory.
+		archiveFile exists ifTrue: [ archiveFile ensureDelete ].
+		archive := archiveClass new.
+		[
+			archive
+				addTree: directory
+				relativeTo: directory parent
+				match: [ :entry | true ].
+			archive writeToFile: archiveFile.
+			sessionArchived := true.
+			archiveFile
+		] ensure: [
+			archive ifNotNil: [ archive close ] ] ]
+		on: Error
+		do: [ :ex |
+			Transcript
+				show: 'Could not archive Copilot session: ', ex messageText;
+				cr.
+			self
+				logBackEndEvent: 'Could not archive Copilot session'
+				details: (Dictionary new
+					at: #errorClass put: ex class name;
+					at: #error put: ex description;
+					at: #sessionDirectory put: directory fullName;
+					yourself).
+			nil ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> archiveFileReferenceForSessionDirectory: aDirectoryReference [
+
+	aDirectoryReference ifNil: [ ^ nil ].
+	^ aDirectoryReference parent / (aDirectoryReference basename , '.zip')
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> currentSessionId [
+
+	^ sessionId ifNil: [
+		self startNewSession.
+		sessionId ]
+]
+
 { #category : 'class initialization' }
 CoPharoCopilotLogger class >> rawEvaluationLogFileReference [
 
@@ -385,6 +498,242 @@ CoPharoCopilotLogger class >> rawLogsDirectoryReference [
 CoPharoCopilotLogger class >> rawLogsDirectoryReference: aDirectoryReference [
 
 	logsDirectoryReference := aDirectoryReference
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> rawSessionArchiveFileReference [
+
+	^ sessionArchiveFileReference
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> rawSessionArchiveFileReference: aFileReference [
+
+	sessionArchiveFileReference := aFileReference
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> rawSessionDirectoryReference [
+
+	^ sessionDirectoryReference
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> rawSessionDirectoryReference: aDirectoryReference [
+
+	sessionDirectoryReference := aDirectoryReference.
+	sessionArchiveFileReference := nil.
+	logFileReference := nil.
+	evaluationLogFileReference := nil.
+	sessionId := aDirectoryReference
+		ifNil: [ nil ]
+		ifNotNil: [ aDirectoryReference basename ].
+	sessionStartedAt := aDirectoryReference
+		ifNil: [ nil ]
+		ifNotNil: [ DateAndTime now ].
+	sessionArchived := false
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> rawUserId [
+
+	^ userId
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> rawUserId: aString [
+
+	userId := aString
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> registerSessionHandler [
+
+	| sessionManagerClass manager |
+	sessionManagerClass := Smalltalk globals at: #SessionManager ifAbsent: [ ^ false ].
+	(sessionManagerClass respondsTo: #default) ifFalse: [ ^ false ].
+	manager := sessionManagerClass default.
+	(manager respondsTo: #registerUserClassNamed:) ifFalse: [ ^ false ].
+
+	manager registerUserClassNamed: self name.
+	^ true
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> sessionArchiveFileReference [
+
+	^ sessionArchiveFileReference ifNil: [
+		sessionArchiveFileReference := self archiveFileReferenceForSessionDirectory: self sessionDirectoryReference ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> sessionDirectoryNameForId: aSessionId [
+
+	^ aSessionId asString asFileName
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> sessionDirectoryReference [
+
+	sessionDirectoryReference ifNil: [ self startNewSession ].
+	^ sessionDirectoryReference
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> sessionMetadataFileName [
+
+	^ 'session-info.json'
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> sessionMetadataFileReference [
+
+	^ self ensureSessionDirectory / self sessionMetadataFileName
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> sessionsDirectoryName [
+
+	^ 'sessions'
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> sessionsRootDirectoryReference [
+
+	^ self ensureLogsDirectory / self sessionsDirectoryName
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> startNewSession [
+
+	| startedAt newSessionId root |
+	self loggingEnabled ifFalse: [ ^ self ].
+
+	startedAt := DateAndTime now.
+	newSessionId := self newSessionIdAt: startedAt.
+	root := self sessionsRootDirectoryReference.
+	root ensureCreateDirectory.
+
+	sessionId := newSessionId.
+	sessionStartedAt := startedAt.
+	sessionDirectoryReference := root / (self sessionDirectoryNameForId: newSessionId).
+	sessionArchiveFileReference := self archiveFileReferenceForSessionDirectory: sessionDirectoryReference.
+	sessionArchived := false.
+	logFileReference := nil.
+	evaluationLogFileReference := nil.
+
+	self ensureSessionDirectory.
+	self ensureCompletionsDirectory.
+	self ensureLogFileInitialized.
+	self ensureEvaluationLogFileInitialized.
+	self
+		writeSessionMetadataClosedAt: nil
+		archivedAt: nil
+		archiveFile: nil
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> startUp: isImageStarting [
+
+	isImageStarting ifTrue: [ self startNewSession ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> shutDown: isImageQuitting [
+
+	isImageQuitting ifTrue: [ self archiveCurrentSession ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> unregisterSessionHandler [
+
+	| sessionManagerClass manager |
+	sessionManagerClass := Smalltalk globals at: #SessionManager ifAbsent: [ ^ false ].
+	(sessionManagerClass respondsTo: #default) ifFalse: [ ^ false ].
+	manager := sessionManagerClass default.
+	(manager respondsTo: #unregisterClassNamed:) ifFalse: [ ^ false ].
+
+	manager unregisterClassNamed: self name.
+	^ true
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> userId [
+
+	self loggingEnabled ifFalse: [ ^ userId ].
+	^ userId ifNil: [ userId := self userIdFromDiskOrCreate ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> userIdFileName [
+
+	^ 'user-id.txt'
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> userIdFileReference [
+
+	^ self ensureLogsDirectory / self userIdFileName
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> userIdFromDiskOrCreate [
+
+	| file existing created |
+	file := self userIdFileReference.
+	(file exists and: [ file isFile ]) ifTrue: [
+		existing := [ file contents trimBoth ] on: Error do: [ '' ].
+		existing isEmpty ifFalse: [ ^ existing ] ].
+
+	created := self newUserIdAt: DateAndTime now.
+	[
+		self ensureFileExists: file.
+		file writeStreamDo: [ :stream | stream nextPutAll: created ] ]
+		on: Error
+		do: [ :ex |
+			Transcript
+				show: 'Could not persist Copilot user id: ', ex messageText;
+				cr ].
+	^ created
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> newSessionIdAt: aDateAndTime [
+
+	^ 'session-' , aDateAndTime asUnixTime asString , '-' , UUID new asString36
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> newUserIdAt: aDateAndTime [
+
+	^ 'user-' , UUID new asString36 , '-' , aDateAndTime asUnixTime asString
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> writeSessionMetadataClosedAt: closedAt archivedAt: archivedAt archiveFile: archiveFile [
+
+	| payload file |
+	self loggingEnabled ifFalse: [ ^ self ].
+	sessionDirectoryReference ifNil: [ ^ self ].
+
+	payload := Dictionary new
+		at: #userId put: self userId;
+		at: #sessionId put: self currentSessionId;
+		at: #startedAt put: (sessionStartedAt ifNil: [ nil ] ifNotNil: [ sessionStartedAt asString ]);
+		at: #closedAt put: (closedAt ifNil: [ nil ] ifNotNil: [ closedAt asString ]);
+		at: #archivedAt put: (archivedAt ifNil: [ nil ] ifNotNil: [ archivedAt asString ]);
+		at: #archiveFile put: (archiveFile ifNil: [ nil ] ifNotNil: [ archiveFile fullName ]);
+		at: #sessionDirectory put: sessionDirectoryReference fullName;
+		at: #logFile put: self logFileName;
+		at: #evaluationLogFile put: self evaluationLogFileName;
+		at: #completionsDirectory put: 'completions';
+		at: #modelName put: CopilotSettings modelName;
+		yourself.
+
+	file := self sessionMetadataFileReference.
+	self ensureFileExists: file.
+	file writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: payload) ]
 ]
 
 { #category : 'class initialization' }

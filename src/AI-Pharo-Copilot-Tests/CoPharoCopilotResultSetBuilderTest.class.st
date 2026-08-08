@@ -60,6 +60,27 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotSnapshotWhenInsi
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalFastPathForSemanticSelectorTail [
+
+	| b ctx entries |
+	b := CopilotTestableBuilder new.
+	ctx := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	b completionContext: ctx.
+
+	b buildCompletion.
+
+	entries := b openedEntries.
+	self assert: b fallbackCallCount equals: 1.
+	self assert: entries size equals: 1.
+	self assert: entries first contents equals: 'fallbackCompletion'.
+	self assert: b scheduledDelay isNil
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testClassContextIsCached [
 
 	| b ctx first second |
@@ -182,6 +203,56 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSkipFallbackWhenAISug
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSuppressInvalidSemanticSelectorBehindFallback [
+
+	| builder context contextInfo entries |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'self as';
+		yourself.
+
+	entries := builder
+		completionEntriesFrom: { 'DefinitelyNotASelector' }
+		inContext: context
+		contextInfo: contextInfo.
+
+	self assert: builder fallbackCallCount equals: 1.
+	self assert: entries size equals: 1.
+	self assert: entries first contents equals: 'fallbackCompletion'.
+	self assert: ((contextInfo at: #semanticGate) at: #status) equals: #low
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesDoNotFetchFallbackWhenSemanticSelectorIsValid [
+
+	| builder context contextInfo entries |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'self as';
+		yourself.
+
+	entries := builder
+		completionEntriesFrom: { 'String' }
+		inContext: context
+		contextInfo: contextInfo.
+
+	self assert: builder fallbackCallCount equals: 0.
+	self assert: entries size equals: 1.
+	self assert: entries first contents equals: 'String'.
+	self assert: ((contextInfo at: #semanticGate) at: #status) equals: #high
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISuggestionExists [
 
 	| builder context entries |
@@ -195,6 +266,33 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISu
 
 	self assert: entries size equals: 1.
 	self assert: builder fallbackCallCount equals: 1
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionContractAppendsStrictSection [
+
+	| builder context base source result |
+	builder := CoPharoCopilotResultSetBuilder new.
+	source := 'semanticContextExample', String lf, String tab, 'self as'.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: source;
+		position: source size;
+		yourself.
+	base := '<|repo_name|>Object', String lf.
+
+	result := builder
+		appendCompletionContractFor: context
+		prefix: source
+		toContext: base.
+
+	self assert: (result beginsWith: base).
+	self assert: (result includesSubstring: '<|file_sep|>.pharo-completion-contract').
+	self assert: (result includesSubstring: 'completionKind=messageTail').
+	self assert: (result includesSubstring: 'insertOnlyTail=true').
+	self assert: (result includesSubstring: 'forbidden=methodHeader').
+	self assert: (result includesSubstring: 'receiver=self').
+	self assert: (result includesSubstring: 'receiverTypes=Object')
 ]
 
 { #category : 'tests' }
@@ -247,6 +345,8 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetada
 		response := attempt at: #response.
 		self assert: (response at: #logprobs) equals: logprobs.
 		self assert: (response at: #eval_count) equals: 2.
+		self assert: (attempt at: #averageLogprob) equals: -0.05.
+		self deny: (attempt at: #lowConfidence).
 
 		payload := CoPharoCopilotLogger
 			initialCompletionPayloadForContextInfo: contextInfo
@@ -257,6 +357,52 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetada
 		generated := payload at: #generated.
 		self assert: (generated at: #suggestions) equals: { 'assert: true' }.
 		self assert: (generated at: #attempts) equals: attempts asArray ]
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRejectsLowConfidenceLogprobSuggestion [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| builder client mock logprobs contextInfo suggestions attempts attempt |
+		CopilotSettings loggingEnabled: true.
+		builder := CoPharoCopilotResultSetBuilder new.
+		mock := OAHttpTransportMockExtended new.
+		logprobs := {
+			Dictionary new
+				at: #token put: 'assert';
+				at: #logprob put: -5.0;
+				yourself.
+			Dictionary new
+				at: #token put: ':';
+				at: #logprob put: -4.0;
+				yourself }.
+		mock mockResponse: (Dictionary new
+			at: #response put: 'assert: false';
+			at: #logprobs put: logprobs;
+			yourself).
+
+		client := CoPCOllamaClient basicNew.
+		client instVarNamed: 'transport' put: mock.
+		client instVarNamed: 'modelSpec' put: (CoPCModelSpec family: 'test-model' tag: nil label: 'test-model').
+		client instVarNamed: 'stream' put: false.
+		client instVarNamed: 'options' put: Dictionary new.
+		client instVarNamed: 'fimTemplate' put: CoPCOllamaClient defaultFimGenerationTemplate.
+
+		contextInfo := Dictionary new.
+		suggestions := builder
+			collectNormalizedSuggestionsFor: client
+			prefix: 'self '
+			suffix: ''
+			context: ''
+			contextInfo: contextInfo.
+
+		self assert: suggestions isEmpty.
+		attempts := contextInfo at: #generationAttempts.
+		self assert: attempts size equals: 1.
+		attempt := attempts first.
+		self assert: (attempt at: #suggestion) equals: ''.
+		self assert: (attempt at: #averageLogprob) equals: -4.5.
+		self assert: (attempt at: #lowConfidence) ]
 ]
 
 { #category : 'tests' }
@@ -504,6 +650,38 @@ CoPharoCopilotResultSetBuilderTest >> testScheduleCompletionRunsImmediatelyWhenD
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testNormalizeSuggestionRejectsProseAnswer [
+
+	| builder raw |
+	builder := CoPharoCopilotResultSetBuilder new.
+	raw := 'Here is the code:', String lf, 'self assert: true'.
+
+	self assert: (builder normalizeSuggestion: raw forPrefix: 'self ') equals: ''
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testNormalizedCompletionContentsRejectMethodHeaderForMessageTail [
+
+	| builder context contextInfo contents |
+	builder := CoPharoCopilotResultSetBuilder new.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'self as';
+		yourself.
+
+	contents := builder
+		normalizedCompletionContentsFrom: { 'Object >> foo', String lf, '^ 1' }
+		inContext: context
+		contextInfo: contextInfo.
+
+	self assert: contents isEmpty
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerInsideWord [
 
 	| b ctx |
@@ -513,6 +691,26 @@ CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerInsideWord [
 		position: 3;  "as|sert -> before='s' after='s' => inside word"
 		yourself.
 
+	self deny: (b shouldRequestCompletionForContext: ctx)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerInsideStringOrComment [
+
+	| b ctx source |
+	b := CoPharoCopilotResultSetBuilder new.
+	ctx := CoCopilotContextMock new.
+
+	source := (String with: (Character value: 39)) , 'hello wor'.
+	ctx
+		source: source;
+		position: source size.
+	self deny: (b shouldRequestCompletionForContext: ctx).
+
+	source := (String with: (Character value: 34)) , 'comment text'.
+	ctx
+		source: source;
+		position: source size.
 	self deny: (b shouldRequestCompletionForContext: ctx)
 ]
 

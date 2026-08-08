@@ -7,7 +7,8 @@ Class {
 		'scheduledDelay',
 		'scheduledPrefix',
 		'scheduledSuffix',
-		'fallbackCallCount'
+		'fallbackCallCount',
+		'openedEntries'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -34,12 +35,14 @@ CopilotTestableBuilder >> applyContent: contentString toContext: aContext expect
 
 { #category : 'accessing' }
 CopilotTestableBuilder >> completionContext [
-	^ testContext
+
+	^ completionContext
 ]
 
 { #category : 'accessing' }
 CopilotTestableBuilder >> completionContext: aContext [
 
+	completionContext := aContext.
 	^ testContext := aContext
 ]
 
@@ -85,6 +88,18 @@ CopilotTestableBuilder >> fallbackCompletionEntriesFor: aContext excluding: exis
 
 	fallbackCallCount := self fallbackCallCount + 1.
 	^ { CoCopilotEntry contents: 'fallbackCompletion' }
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> openCompletionMenuFor: aContext entries: entries position: position [
+
+	openedEntries := entries
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> openedEntries [
+
+	^ openedEntries
 ]
 
 { #category : 'accessing' }

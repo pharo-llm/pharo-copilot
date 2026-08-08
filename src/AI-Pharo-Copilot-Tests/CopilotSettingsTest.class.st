@@ -622,14 +622,27 @@ CopilotSettingsTest >> testRecordPrivacyPolicyConsentWritesEvaluationJsonEntr [
 
 
 	CopilotSettings withDefaultSettingsDo: [
-		| tempDir tempEvalFile originalDirRef originalEvalRef jsonLine parsed |
+		| tempDir tempEvalFile sessionDir originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUserId originalSessionId originalStartedAt originalArchived jsonLine parsed |
 		tempDir := FileLocator temp / ('copilot-privacy-consent-test-' , UUID new asString).
 		tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
+		sessionDir := tempDir / 'session-test'.
 		originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
+		originalLogRef := CoPharoCopilotLogger rawLogFileReference.
 		originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
+		originalSessionRef := CoPharoCopilotLogger rawSessionDirectoryReference.
+		originalArchiveRef := CoPharoCopilotLogger rawSessionArchiveFileReference.
+		originalUserId := CoPharoCopilotLogger rawUserId.
+		originalSessionId := CoPharoCopilotLogger instVarNamed: #sessionId.
+		originalStartedAt := CoPharoCopilotLogger instVarNamed: #sessionStartedAt.
+		originalArchived := CoPharoCopilotLogger instVarNamed: #sessionArchived.
 		[
+			tempDir exists ifTrue: [ tempDir ensureDeleteAll ].
+			tempDir ensureCreateDirectory.
 			CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
+			CoPharoCopilotLogger rawSessionDirectoryReference: sessionDir.
+			CoPharoCopilotLogger rawSessionArchiveFileReference: tempDir / 'session-test.zip'.
 			CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
+			CoPharoCopilotLogger rawUserId: 'user-test'.
 			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 
 			CopilotSettings recordPrivacyPolicyUserConsentAccepted: true.
@@ -637,13 +650,21 @@ CopilotSettingsTest >> testRecordPrivacyPolicyConsentWritesEvaluationJsonEntr [
 			jsonLine := tempEvalFile readStreamDo: [ :stream | stream nextLine ].
 			parsed := STONJSON fromString: jsonLine.
 			self assert: (parsed at: #event) equals: 'privacy-policy-consent'.
+			self assert: (parsed at: #userId) equals: 'user-test'.
+			self assert: (parsed at: #sessionId) equals: sessionDir basename.
 			self assert: ((parsed at: #data) at: #accepted) equals: true.
 			self assert: ((parsed at: #data) includesKey: #timestamp)
 		] ensure: [
-			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-			tempDir exists ifTrue: [ tempDir ensureDelete ].
+			tempDir exists ifTrue: [ tempDir ensureDeleteAll ].
 			CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
-			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+			CoPharoCopilotLogger rawSessionDirectoryReference: originalSessionRef.
+			CoPharoCopilotLogger rawSessionArchiveFileReference: originalArchiveRef.
+			CoPharoCopilotLogger rawLogFileReference: originalLogRef.
+			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef.
+			CoPharoCopilotLogger rawUserId: originalUserId.
+			CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
+			CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
+			CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived ] ]
 ]
 
 { #category : 'tests' }
