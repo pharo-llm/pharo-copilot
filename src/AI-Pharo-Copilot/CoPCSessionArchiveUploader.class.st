@@ -1,6 +1,6 @@
 "
 CoPCSessionArchiveUploader sends completed Pharo Copilot session zip archives to
-the local receiver. Upload failures are intentionally best-effort and are handled
+the configured receiver. Upload failures are intentionally best-effort and are handled
 by CoPharoCopilotLogger so archiving can still finish when the receiver is down.
 "
 Class {
@@ -15,6 +15,12 @@ Class {
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
 }
+
+{ #category : 'defaults' }
+CoPCSessionArchiveUploader class >> defaultPublicUploadUrl [
+
+	^ 'http://rmod-xp.lille.inria.fr:3000/api/sessions'
+]
 
 { #category : 'defaults' }
 CoPCSessionArchiveUploader class >> defaultTimeoutSeconds [
@@ -166,7 +172,7 @@ CoPCSessionArchiveUploader class >> uploadUrlFromEnvironmentOrDefault [
 		(url notNil and: [ url asString trimBoth isEmpty not ]) ifTrue: [
 			^ url asString trimBoth ] ].
 
-	^ 'http://127.0.0.1:3000/api/sessions'
+	^ self defaultPublicUploadUrl
 ]
 
 { #category : 'private' }

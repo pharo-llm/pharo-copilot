@@ -22,6 +22,17 @@ Metacello new
   load.
 ```
 
+After the setup agreement is accepted, Pharo-Copilot registers this image with
+the public session receiver at `http://rmod-xp.lille.inria.fr:3000/api/sessions`.
+The setup window reports `Connection authorized` or `Connection denied` and then
+continues the normal model setup pipeline.
+
+To point a development image at a different receiver:
+
+```smalltalk
+CoPCSessionArchiveUploader uploadUrl: 'http://YOUR_SERVER_HOST:3000/api/sessions'.
+```
+
 ## Troubleshooting Ollama model downloads
 
 If setup downloads a model but it does not appear in `ollama list`, verify that Pharo-Copilot and your terminal are talking to the same Ollama server and model store. On Linux, the system service often runs as the `ollama` user and stores models under `/usr/share/ollama/.ollama/models`, while an `ollama serve` process launched from Pharo can use your user account's `~/.ollama/models`. Also check whether `OLLAMA_HOST` or `OLLAMA_MODELS` differs between Pharo and your shell.

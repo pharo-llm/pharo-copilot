@@ -290,12 +290,15 @@ PharoCopilotSetupPresenter >> performSetupPipeline [
 		false ].
 
 	authorized ifFalse: [
-		self setupProgressPercentage: 0.
-		^ self deferUI: [
-			statusLabel label: 'Server connection failed. Setup stopped before model installation.'.
-			CopilotSettings notifyUser: 'Server connection failed. Setup stopped before model installation.' ] ].
+		self deferUI: [
+			statusLabel label: 'Connection denied. Continuing setup.'.
+			CopilotSettings notifyUser: 'Connection denied. Continuing setup.' ].
+		(Delay forMilliseconds: 500) wait.
+		^ self performSetupDownloads ].
 
-	self deferUI: [ statusLabel label: 'Connection authorized. Continuing setup.' ].
+	self deferUI: [
+		statusLabel label: 'Connection authorized. Continuing setup.'.
+		CopilotSettings notifyUser: 'Connection authorized. Continuing setup.' ].
 	(Delay forMilliseconds: 500) wait.
 	self performSetupDownloads
 ]
