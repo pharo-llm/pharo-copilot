@@ -9,6 +9,7 @@ Class {
 	#classInstVars : [
 		'enabled',
 		'uploadUrl',
+		'uploadToken',
 		'timeoutSeconds'
 	],
 	#category : 'AI-Pharo-Copilot',
@@ -27,6 +28,25 @@ CoPCSessionArchiveUploader class >> defaultUploadUrl [
 	^ 'http://127.0.0.1:3000/api/sessions'
 ]
 
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> authorizeConnection [
+
+	self enabled ifFalse: [ ^ false ].
+	^ self new authorizeConnection
+]
+
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> connectionPingUrl [
+
+	^ self uploadUrlForEndpoint: '/api/connections/ping'
+]
+
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> connectionRegistrationUrl [
+
+	^ self uploadUrlForEndpoint: '/api/connections/register'
+]
+
 { #category : 'accessing' }
 CoPCSessionArchiveUploader class >> enabled [
 
@@ -40,10 +60,25 @@ CoPCSessionArchiveUploader class >> enabled: aBoolean [
 ]
 
 { #category : 'accessing' }
+CoPCSessionArchiveUploader class >> ensureUploadToken [
+
+	^ self uploadToken ifNil: [
+		self uploadToken: self newUploadToken.
+		uploadToken ]
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> newUploadToken [
+
+	^ 'cpc-' , UUID new asString36 , '-' , UUID new asString36
+]
+
+{ #category : 'accessing' }
 CoPCSessionArchiveUploader class >> resetDefaults [
 
 	enabled := nil.
 	uploadUrl := nil.
+	uploadToken := nil.
 	timeoutSeconds := nil
 ]
 
@@ -73,6 +108,38 @@ CoPCSessionArchiveUploader class >> uploadArchive: archiveFile sessionId: sessio
 ]
 
 { #category : 'accessing' }
+CoPCSessionArchiveUploader class >> uploadToken [
+
+	^ uploadToken ifNil: [ uploadToken := self uploadTokenFromDiskOrNil ]
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> uploadToken: aString [
+
+	uploadToken := aString.
+	(aString notNil and: [ aString asString trimBoth isEmpty not ]) ifTrue: [
+		self saveUploadToken: uploadToken asString trimBoth ]
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> uploadTokenFileReference [
+
+	^ CoPharoCopilotLogger ensureLogsDirectory / 'server-upload-token.txt'
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> uploadTokenFromDiskOrNil [
+
+	| file token |
+	file := self uploadTokenFileReference.
+	(file exists and: [ file isFile ]) ifFalse: [ ^ nil ].
+	token := [ file contents trimBoth ] on: Error do: [ '' ].
+	^ token isEmpty
+		ifTrue: [ nil ]
+		ifFalse: [ token ]
+]
+
+{ #category : 'accessing' }
 CoPCSessionArchiveUploader class >> uploadUrl [
 
 	^ uploadUrl ifNil: [ uploadUrl := self defaultUploadUrl ]
@@ -84,10 +151,75 @@ CoPCSessionArchiveUploader class >> uploadUrl: aString [
 	uploadUrl := aString
 ]
 
+{ #category : 'private' }
+CoPCSessionArchiveUploader class >> uploadUrlForEndpoint: endpointPath [
+
+	| base |
+	base := self uploadUrl asString.
+	(base includesSubstring: '/api/sessions') ifTrue: [
+		^ base copyReplaceAll: '/api/sessions' with: endpointPath ].
+	^ base , endpointPath
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> saveUploadToken: aString [
+
+	| file |
+	file := self uploadTokenFileReference.
+	file parent ifNotNil: [ :parent | parent ensureCreateDirectory ].
+	file ensureCreateFile.
+	file writeStreamDo: [ :stream |
+		stream truncate.
+		stream nextPutAll: aString ]
+]
+
+{ #category : 'connection' }
+CoPCSessionArchiveUploader >> authorizeConnection [
+
+	| token client payload |
+	token := self class ensureUploadToken.
+	client := self newJsonClientForUrl: self class connectionRegistrationUrl.
+	payload := Dictionary new
+		at: #userId put: CoPharoCopilotLogger userId;
+		at: #token put: token;
+		at: #client put: 'pharo-copilot';
+		at: #clientVersion put: 'development';
+		at: #imageVersion put: ([ Smalltalk version asString ] on: Error do: [ 'unknown' ]);
+		at: #timestamp put: DateAndTime now asString;
+		yourself.
+
+	[
+		client entity: (ZnEntity json: (STONJSON toString: payload)).
+		client execute.
+		((client respondsTo: #isSuccess) and: [ client isSuccess not ]) ifTrue: [
+			self error: 'Server rejected Copilot connection registration' ].
+		^ true
+	] ensure: [
+		(client respondsTo: #close) ifTrue: [
+			[ client close ] on: Error do: [ :ignored | ] ] ]
+]
+
+{ #category : 'connection' }
+CoPCSessionArchiveUploader >> newJsonClientForUrl: aUrlString [
+
+	| client |
+	client := ZnClient new
+		url: aUrlString;
+		method: #POST;
+		yourself.
+
+	(client respondsTo: #timeout:) ifTrue: [
+		client timeout: self class timeoutSeconds ].
+
+	client accept: ZnMimeType applicationJson.
+	client headerAt: 'Content-Type' put: 'application/json'.
+	^ client
+]
+
 { #category : 'uploading' }
 CoPCSessionArchiveUploader >> newUploadClientForFile: file sessionId: sessionId userId: userId [
 
-	| client |
+	| client token |
 	client := ZnClient new
 		url: self class uploadUrl;
 		method: #POST;
@@ -98,6 +230,8 @@ CoPCSessionArchiveUploader >> newUploadClientForFile: file sessionId: sessionId 
 
 	client headerAt: 'Content-Type' put: 'application/zip'.
 	client headerAt: 'X-File-Name' put: file basename.
+	token := self class ensureUploadToken.
+	client headerAt: 'Authorization' put: 'Bearer ' , token.
 	sessionId ifNotNil: [
 		client headerAt: 'X-Session-Id' put: sessionId asString ].
 	userId ifNotNil: [

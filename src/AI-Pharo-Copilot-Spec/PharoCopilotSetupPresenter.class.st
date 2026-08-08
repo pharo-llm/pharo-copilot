@@ -101,7 +101,8 @@ PharoCopilotSetupPresenter >> handleOk [
 
 	CopilotSettings recordPrivacyPolicyUserConsentAccepted: true.
 
-self showDownloadStep.
+	self showDownloadStep.
+	statusLabel label: 'Authorizing server connection...'.
 	self startSetupDownloads
 ]
 
@@ -268,6 +269,35 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 					('Setup finished with {1}/{2} model(s) not available in Ollama. Check the message above, Ollama logs, and ''ollama list''.'
 						format: { failedModels size. missingModels size }) ]
 	]
+]
+
+{ #category : 'accessing' }
+PharoCopilotSetupPresenter >> performSetupPipeline [
+
+	| authorized |
+	self setupProgressPercentage: 0.
+	self deferUI: [ statusLabel label: 'Authorizing server connection...' ].
+
+	authorized := [
+		CoPCSessionArchiveUploader authorizeConnection
+	] on: Error do: [ :ex |
+		CoPharoCopilotLogger
+			logBackEndEvent: 'Server connection authorization failed'
+			details: (Dictionary new
+				at: #errorClass put: ex class name;
+				at: #error put: ex description;
+				yourself).
+		false ].
+
+	authorized ifFalse: [
+		self setupProgressPercentage: 0.
+		^ self deferUI: [
+			statusLabel label: 'Server connection failed. Setup stopped before model installation.'.
+			CopilotSettings notifyUser: 'Server connection failed. Setup stopped before model installation.' ] ].
+
+	self deferUI: [ statusLabel label: 'Connection authorized. Continuing setup.' ].
+	(Delay forMilliseconds: 500) wait.
+	self performSetupDownloads
 ]
 
 { #category : 'initialization' }
@@ -493,7 +523,7 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 PharoCopilotSetupPresenter >> startSetupDownloads [
 
 	downloadProcess := [
-		self performSetupDownloads
+		self performSetupPipeline
 	] forkAt: Processor userBackgroundPriority named: 'Pharo Copilot setup download'
 ]
 
