@@ -1658,7 +1658,7 @@ CopilotSettings class >> pullResultIndicatesFailure: pullResult [
 CopilotSettings class >> recordInstallModelUserConsentForModelNamed: aModelName accepted: aBoolean [
 	"Persist the most recent user consent decision and append it to the evaluation log."
 
-	| consentRecord evalFile |
+	| consentRecord |
 	consentRecord := Dictionary new
 		at: #model put: aModelName;
 		at: #accepted put: aBoolean;
@@ -1668,41 +1668,23 @@ CopilotSettings class >> recordInstallModelUserConsentForModelNamed: aModelName 
 	installModelUserConsent := consentRecord.
 	self autoSaveSettings.
 
-	[
-		CoPharoCopilotLogger ensureEvaluationLogFileInitialized.
-		evalFile := CoPharoCopilotLogger evaluationLogFileReference.
-		evalFile writeStreamDo: [ :stream |
-			stream setToEnd.
-			stream
-				nextPutAll: (STONJSON toString: (Dictionary new
-					at: #event put: 'model-install-consent';
-					at: #data put: consentRecord;
-					yourself));
-				nextPut: Character lf ]
-	] on: Error do: [ :ignored | ].
+	CoPharoCopilotLogger
+		appendEvaluationEvent: 'model-install-consent'
+		data: consentRecord
 ]
 
 { #category : 'accessing' }
 CopilotSettings class >> recordPrivacyPolicyUserConsentAccepted: aBoolean [
 
-	| consentRecord evalFile |
+	| consentRecord |
 	consentRecord := Dictionary new
 		at: #accepted put: aBoolean;
 		at: #timestamp put: DateAndTime now asString;
 		yourself.
 
-	[
-		CoPharoCopilotLogger ensureEvaluationLogFileInitialized.
-		evalFile := CoPharoCopilotLogger evaluationLogFileReference.
-		evalFile writeStreamDo: [ :stream |
-			stream setToEnd.
-			stream
-				nextPutAll: (STONJSON toString: (Dictionary new
-					at: #event put: 'privacy-policy-consent';
-					at: #data put: consentRecord;
-					yourself));
-				nextPut: Character lf ]
-	] on: Error do: [ :ignored | ].
+	CoPharoCopilotLogger
+		appendEvaluationEvent: 'privacy-policy-consent'
+		data: consentRecord
 ]
 
 { #category : 'settings' }

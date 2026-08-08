@@ -78,6 +78,8 @@ CoPCSuggestionEvaluator >> appendEvaluationEntry: anEvaluationEntry [
 	evaluationFile := CoPharoCopilotLogger evaluationLogFileReference.
 	data := Dictionary new
 		at: #timestamp put: anEvaluationEntry timestamp;
+		at: #userId put: CoPharoCopilotLogger userId;
+		at: #sessionId put: CoPharoCopilotLogger currentSessionId;
 		at: #action put: anEvaluationEntry action asString;
 		at: #suggestion put: anEvaluationEntry suggestion contents;
 		at: #contextType put: (self determineContextType: anEvaluationEntry context);
@@ -376,6 +378,8 @@ CoPCSuggestionEvaluator >> savePersistentStats [
 
         evaluationFile := CoPharoCopilotLogger evaluationLogFileReference.
         data := Dictionary new
+                        at: #userId put: CoPharoCopilotLogger userId;
+                        at: #sessionId put: CoPharoCopilotLogger currentSessionId;
                         at: #acceptedCount put: acceptedEntries size;
 		        at: #rejectedCount put: rejectedEntries size;
 		        at: #sessionStats put: sessionStats;

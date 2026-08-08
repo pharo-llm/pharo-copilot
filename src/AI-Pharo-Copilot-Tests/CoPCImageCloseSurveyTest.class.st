@@ -6,96 +6,111 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'support' }
+CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
+
+	| tempDir tempEvalFile sessionDir archiveFile originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUserId originalSessionId originalStartedAt originalArchived |
+	tempDir := FileLocator temp / ('copilot-image-close-session-test-' , UUID new asString).
+	sessionDir := tempDir / 'session-test'.
+	tempEvalFile := sessionDir / CoPharoCopilotLogger evaluationLogFileName.
+	archiveFile := tempDir / 'session-test.zip'.
+	originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
+	originalLogRef := CoPharoCopilotLogger rawLogFileReference.
+	originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
+	originalSessionRef := CoPharoCopilotLogger rawSessionDirectoryReference.
+	originalArchiveRef := CoPharoCopilotLogger rawSessionArchiveFileReference.
+	originalUserId := CoPharoCopilotLogger rawUserId.
+	originalSessionId := CoPharoCopilotLogger instVarNamed: #sessionId.
+	originalStartedAt := CoPharoCopilotLogger instVarNamed: #sessionStartedAt.
+	originalArchived := CoPharoCopilotLogger instVarNamed: #sessionArchived.
+
+	[
+		tempDir exists ifTrue: [ tempDir ensureDeleteAll ].
+		tempDir ensureCreateDirectory.
+		CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
+		CoPharoCopilotLogger rawSessionDirectoryReference: sessionDir.
+		CoPharoCopilotLogger rawSessionArchiveFileReference: archiveFile.
+		CoPharoCopilotLogger rawLogFileReference: sessionDir / CoPharoCopilotLogger logFileName.
+		CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
+		CoPharoCopilotLogger rawUserId: 'user-test'.
+		aBlock
+			value: tempDir
+			value: tempEvalFile
+			value: sessionDir
+			value: archiveFile
+	] ensure: [
+		tempDir exists ifTrue: [ tempDir ensureDeleteAll ].
+		CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+		CoPharoCopilotLogger rawSessionDirectoryReference: originalSessionRef.
+		CoPharoCopilotLogger rawSessionArchiveFileReference: originalArchiveRef.
+		CoPharoCopilotLogger rawLogFileReference: originalLogRef.
+		CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef.
+		CoPharoCopilotLogger rawUserId: originalUserId.
+		CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
+		CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
+		CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived ]
+]
+
 { #category : 'tests' }
 CoPCImageCloseSurveyTest >> testCancellingSurveyDoesNotWriteEvaluationEvent [
 
 	CopilotSettings withDefaultSettingsDo: [
-		| tempDir tempEvalFile originalDirRef originalEvalRef ui result |
-		tempDir := FileLocator temp / ('copilot-image-close-survey-cancel-test-' , UUID new asString).
-		tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
-		originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
-		originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
-		[
-			CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
-			CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
-			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-
+		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
+			| ui result |
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
 			ui ratings: #().
 			result := CoPCImageCloseSurvey promptAndRecordUsing: ui.
 
 			self assert: result isNil.
-			self deny: tempEvalFile exists
-		] ensure: [
-			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-			tempDir exists ifTrue: [ tempDir ensureDelete ].
-			CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
-			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+			self deny: tempEvalFile exists ] ]
 ]
 
 { #category : 'tests' }
 CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitAppendsEveryCloseAttempt [
 
 	CopilotSettings withDefaultSettingsDo: [
-		| tempDir tempEvalFile originalDirRef originalEvalRef ui firstLine secondLine thirdLine firstEvent secondEvent |
-		tempDir := FileLocator temp / ('copilot-image-close-repeat-test-' , UUID new asString).
-		tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
-		originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
-		originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
-		[
-			CoPCImageCloseSurvey resetPromptState.
-			CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
-			CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
-			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
+			| ui firstLine secondLine thirdLine firstEvent secondEvent |
+			[
+				CoPCImageCloseSurvey resetPromptState.
 
-			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: {
-				5. 5. 4. 5. #codeCompletion.
-				4. 4. 4. 4. #debugging }.
-			CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
-			CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
+				ui := CoPCImageCloseSurveyUIManagerDouble new.
+				ui ratings: {
+					5. 5. 4. 5. #codeCompletion. #engineer. 3.
+					4. 4. 4. 4. #debugging. #researcher. 8 }.
+				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
+				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 
-			tempEvalFile readStreamDo: [ :stream |
-				firstLine := stream nextLine.
-				secondLine := stream nextLine.
-				thirdLine := stream nextLine ].
+				tempEvalFile readStreamDo: [ :stream |
+					firstLine := stream nextLine.
+					secondLine := stream nextLine.
+					thirdLine := stream nextLine ].
 
-			firstEvent := STONJSON fromString: firstLine.
-			secondEvent := STONJSON fromString: secondLine.
+				firstEvent := STONJSON fromString: firstLine.
+				secondEvent := STONJSON fromString: secondLine.
 
-			self assert: firstLine isNotNil.
-			self assert: secondLine isNotNil.
-			self assert: thirdLine isNil.
-			self assert: (firstEvent at: #event) equals: 'image-close-survey'.
-			self assert: (secondEvent at: #event) equals: 'image-close-survey'.
-			self assert: (ui requests size) equals: (CoPCImageCloseSurvey surveyQuestions size + 1) * 2
-		] ensure: [
-			CoPCImageCloseSurvey resetPromptState.
-			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-			tempDir exists ifTrue: [ tempDir ensureDelete ].
-			CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
-			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+				self assert: firstLine isNotNil.
+				self assert: secondLine isNotNil.
+				self assert: thirdLine isNil.
+				self assert: (firstEvent at: #event) equals: 'image-close-survey'.
+				self assert: (secondEvent at: #event) equals: 'image-close-survey'.
+				self assert: (ui requests size) equals: (CoPCImageCloseSurvey surveyQuestions size + 3) * 2.
+				self assert: archiveFile exists
+			] ensure: [
+			CoPCImageCloseSurvey resetPromptState ] ] ]
 ]
 
 { #category : 'tests' }
 CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 
 	CopilotSettings withDefaultSettingsDo: [
-		| tempDir tempEvalFile originalDirRef originalEvalRef ui ratings jsonLine parsed data storedRatings storedTasks |
-		tempDir := FileLocator temp / ('copilot-image-close-survey-test-' , UUID new asString).
-		tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
-		originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
-		originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
-		[
-			CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
-			CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
-			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-
+		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
+			| ui ratings jsonLine parsed data storedRatings storedTasks userProfile |
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: { 4. 3. 5. 4. #codeCompletion }.
+			ui ratings: { 4. 3. 5. 4. #codeCompletion. #researcher. 3 }.
 			ratings := CoPCImageCloseSurvey promptAndRecordUsing: ui.
 
-			self assert: ui requests size equals: CoPCImageCloseSurvey surveyQuestions size + 1.
+			self assert: ui requests size equals: CoPCImageCloseSurvey surveyQuestions size + 3.
 			self assert: (ratings at: #overall) equals: 4.
 			self assert: (ratings at: #suggestionQuality) equals: 3.
 
@@ -104,58 +119,109 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 			data := parsed at: #data.
 			storedRatings := data at: #ratings.
 			storedTasks := data at: #tasks.
+			userProfile := data at: #userProfile.
 
 			self assert: (parsed at: #event) equals: 'image-close-survey'.
+			self assert: (parsed at: #userId) equals: 'user-test'.
+			self assert: (parsed at: #sessionId) equals: sessionDir basename.
 			self assert: (storedRatings at: #overall) equals: 4.
 			self assert: (storedRatings at: #suggestionQuality) equals: 3.
 			self assert: (storedRatings at: #speed) equals: 5.
 			self assert: (storedRatings at: #usefulness) equals: 4.
 			self assert: (storedTasks includes: #codeCompletion).
 			self assert: storedTasks size equals: 1.
+			self assert: (userProfile at: #role) equals: #researcher.
+			self assert: (userProfile at: #experienceYears) equals: 3.
 			self assert: ((data at: #availableTasks) includesKey: #codeCompletion).
+			self assert: ((data at: #availableUserRoles) includesKey: #researcher).
+			self assert: ((data at: #availableUserExperience) includesKey: '3').
 			self assert: ((data at: #questions) includesKey: #overall).
 			self assert: (data includesKey: #timestamp).
 			self assert: (data includesKey: #modelName)
-		] ensure: [
-			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-			tempDir exists ifTrue: [ tempDir ensureDelete ].
-			CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
-			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+		] ]
 ]
 
 { #category : 'tests' }
 CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitWritesOnceAndSkipsShutdownFallback [
 
 	CopilotSettings withDefaultSettingsDo: [
-		| tempDir tempEvalFile originalDirRef originalEvalRef ui firstLine secondLine |
-		tempDir := FileLocator temp / ('copilot-image-close-prequit-test-' , UUID new asString).
-		tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
-		originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
-		originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
-		[
-			CoPCImageCloseSurvey resetPromptState.
-			CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
-			CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
-			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
+			| ui firstLine secondLine |
+			[
+				CoPCImageCloseSurvey resetPromptState.
 
-			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: { 5. 5. 4. 5. #codeCompletion }.
-			CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
-			CoPCImageCloseSurvey shutDown: true.
+				ui := CoPCImageCloseSurveyUIManagerDouble new.
+				ui ratings: { 5. 5. 4. 5. #codeCompletion. #engineer. 4 }.
+				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
+				CoPCImageCloseSurvey shutDown: true.
 
-			tempEvalFile readStreamDo: [ :stream |
-				firstLine := stream nextLine.
-				secondLine := stream nextLine ].
+				tempEvalFile readStreamDo: [ :stream |
+					firstLine := stream nextLine.
+					secondLine := stream nextLine ].
 
-			self assert: firstLine isNotNil.
-			self assert: secondLine isNil.
-			self assert: (ui requests size) equals: CoPCImageCloseSurvey surveyQuestions size + 1
-		] ensure: [
-			CoPCImageCloseSurvey resetPromptState.
-			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
-			tempDir exists ifTrue: [ tempDir ensureDelete ].
-			CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
-			CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef ] ]
+				self assert: firstLine isNotNil.
+				self assert: secondLine isNil.
+				self assert: (ui requests size) equals: CoPCImageCloseSurvey surveyQuestions size + 3.
+				self assert: archiveFile exists
+			] ensure: [
+			CoPCImageCloseSurvey resetPromptState ] ] ]
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitZipsSessionFolder [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
+			| ui archive memberNames |
+			[
+				CoPCImageCloseSurvey resetPromptState.
+				sessionDir ensureCreateDirectory.
+				(sessionDir / 'marker.txt') writeStreamDo: [ :stream |
+					stream nextPutAll: 'session marker' ].
+
+				ui := CoPCImageCloseSurveyUIManagerDouble new.
+				ui ratings: { 5. 5. 5. 5. #codeCompletion. #student. 1 }.
+				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
+
+				self assert: archiveFile exists.
+				self assert: (ZipArchive isZipArchive: archiveFile).
+				archive := ZipArchive new.
+				[
+					archive readFrom: archiveFile.
+					memberNames := archive memberNames.
+					self assert: (memberNames includes: sessionDir basename , '/marker.txt').
+					self assert: (memberNames includes: sessionDir basename , '/session-info.json').
+					self assert: (memberNames includes: sessionDir basename , '/copilot-evaluation-log.jsonl')
+				] ensure: [
+					archive close ]
+			] ensure: [
+				CoPCImageCloseSurvey resetPromptState ] ] ]
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testLoggerCreatesStableUserIdAndNewSessionIds [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
+			| firstUser firstSession secondUser secondSession userIdFile firstSessionDir secondSessionDir |
+			CoPharoCopilotLogger rawUserId: nil.
+			firstUser := CoPharoCopilotLogger userId.
+			firstSession := CoPharoCopilotLogger currentSessionId.
+			firstSessionDir := CoPharoCopilotLogger rawSessionDirectoryReference.
+
+			CoPharoCopilotLogger startNewSession.
+
+			secondUser := CoPharoCopilotLogger userId.
+			secondSession := CoPharoCopilotLogger currentSessionId.
+			secondSessionDir := CoPharoCopilotLogger rawSessionDirectoryReference.
+			userIdFile := tempDir / CoPharoCopilotLogger userIdFileName.
+
+			self assert: firstUser equals: secondUser.
+			self deny: firstSession equals: secondSession.
+			self deny: firstSessionDir equals: secondSessionDir.
+			self assert: userIdFile exists.
+			self assert: userIdFile contents trimBoth equals: firstUser.
+			self assert: (firstUser beginsWith: 'user-') ] ]
 ]
 
 { #category : 'tests' }
@@ -217,4 +283,25 @@ CoPCImageCloseSurveyTest >> testValidatedTaskAcceptsOnlyAvailableTasks [
 	self assert: (CoPCImageCloseSurvey validatedTask: #done) isNil.
 	self assert: (CoPCImageCloseSurvey validatedTask: #unknown) isNil.
 	self assert: (CoPCImageCloseSurvey validatedTask: nil) isNil
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testValidatedUserExperienceAcceptsConfiguredYears [
+
+	self assert: (CoPCImageCloseSurvey validatedUserExperience: 0) equals: 0.
+	self assert: (CoPCImageCloseSurvey validatedUserExperience: '3') equals: 3.
+	self assert: (CoPCImageCloseSurvey validatedUserExperience: 10) equals: 10.
+	self assert: (CoPCImageCloseSurvey validatedUserExperience: -1) isNil.
+	self assert: (CoPCImageCloseSurvey validatedUserExperience: 11) isNil.
+	self assert: (CoPCImageCloseSurvey validatedUserExperience: 'bad') isNil
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testValidatedUserRoleAcceptsOnlyConfiguredRoles [
+
+	self assert: (CoPCImageCloseSurvey validatedUserRole: #engineer) equals: #engineer.
+	self assert: (CoPCImageCloseSurvey validatedUserRole: 'researcher') equals: #researcher.
+	self assert: (CoPCImageCloseSurvey validatedUserRole: #student) equals: #student.
+	self assert: (CoPCImageCloseSurvey validatedUserRole: #unknown) isNil.
+	self assert: (CoPCImageCloseSurvey validatedUserRole: nil) isNil
 ]

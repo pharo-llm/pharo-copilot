@@ -44,12 +44,62 @@ CoPCImageCloseSurvey class >> askTaskUsing: uiManager [
 ]
 
 { #category : 'survey' }
+CoPCImageCloseSurvey class >> askUserExperienceUsing: uiManager [
+
+	| experience |
+	uiManager ifNil: [ ^ nil ].
+	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ nil ].
+
+	experience := uiManager
+		chooseFrom: self userExperienceLabels
+		values: self userExperienceValues
+		title: self userExperienceQuestionTitle.
+
+	^ self validatedUserExperience: experience
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> askUserRoleUsing: uiManager [
+
+	| role |
+	uiManager ifNil: [ ^ nil ].
+	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ nil ].
+
+	role := uiManager
+		chooseFrom: self userRoleLabels
+		values: self userRoleValues
+		title: self userRoleQuestionTitle.
+
+	^ self validatedUserRole: role
+]
+
+{ #category : 'survey' }
 CoPCImageCloseSurvey class >> availableTaskLabelsByKey [
 
 	| labels |
 	labels := Dictionary new.
 	self taskChoices do: [ :task |
 		labels at: task key put: task value ].
+	^ labels
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> availableUserExperienceLabelsByValue [
+
+	| labels |
+	labels := Dictionary new.
+	self userExperienceChoices do: [ :choice |
+		labels at: choice key asString put: choice value ].
+	^ labels
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> availableUserRoleLabelsByKey [
+
+	| labels |
+	labels := Dictionary new.
+	self userRoleChoices do: [ :role |
+		labels at: role key put: role value ].
 	^ labels
 ]
 
@@ -63,6 +113,18 @@ CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 		rating ifNil: [ ^ nil ].
 		ratings at: question key put: rating ].
 	^ ratings
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> collectUserProfileUsing: uiManager [
+
+	| role experience profile |
+	profile := Dictionary new.
+	role := self askUserRoleUsing: uiManager.
+	role ifNotNil: [ profile at: #role put: role ].
+	experience := self askUserExperienceUsing: uiManager.
+	experience ifNotNil: [ profile at: #experienceYears put: experience ].
+	^ profile
 ]
 
 { #category : 'survey' }
@@ -113,11 +175,12 @@ CoPCImageCloseSurvey class >> logSurveyError: anException [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> promptAndRecordUsing: uiManager [
 
-	| ratings tasks |
+	| ratings tasks userProfile |
 	ratings := self collectRatingsUsing: uiManager.
 	ratings ifNil: [ ^ nil ].
 	tasks := self collectTasksUsing: uiManager.
-	self recordRatings: ratings tasks: tasks.
+	userProfile := self collectUserProfileUsing: uiManager.
+	self recordRatings: ratings tasks: tasks userProfile: userProfile.
 	^ ratings
 ]
 
@@ -142,6 +205,7 @@ CoPCImageCloseSurvey class >> promptBeforeImageQuitUsing: uiManager [
 			self logSurveyError: ex.
 			^ nil ]
 	] ensure: [
+		CoPharoCopilotLogger archiveCurrentSession.
 		promptInProgress := false ]
 ]
 
@@ -182,9 +246,22 @@ CoPCImageCloseSurvey class >> recordRatings: aDictionary [
 { #category : 'logging' }
 CoPCImageCloseSurvey class >> recordRatings: ratingsDictionary tasks: taskCollection [
 
+	self
+		recordRatings: ratingsDictionary
+		tasks: taskCollection
+		userProfile: Dictionary new
+]
+
+{ #category : 'logging' }
+CoPCImageCloseSurvey class >> recordRatings: ratingsDictionary tasks: taskCollection userProfile: userProfileDictionary [
+
+	CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
 	CoPharoCopilotLogger
 		appendEvaluationEvent: 'image-close-survey'
-		data: (self surveyPayloadForRatings: ratingsDictionary tasks: taskCollection)
+		data: (self
+			surveyPayloadForRatings: ratingsDictionary
+			tasks: taskCollection
+			userProfile: userProfileDictionary)
 ]
 
 { #category : 'session management' }
@@ -221,17 +298,16 @@ CoPCImageCloseSurvey class >> shouldPromptBeforeImageQuit [
 { #category : 'session management' }
 CoPCImageCloseSurvey class >> shutDown: isImageQuitting [
 
-	(self shouldPromptForImageQuitting: isImageQuitting) ifFalse: [ ^ self ].
-	promptInProgress = true ifTrue: [ ^ self ].
-
-	promptedForCurrentQuit := true.
-	promptInProgress := true.
 	[
-		[
-			self promptAndRecordUsing: self uiManager
-		] on: Error do: [ :ex |
-			self logSurveyError: ex ]
+		((self shouldPromptForImageQuitting: isImageQuitting) and: [ promptInProgress ~= true ]) ifTrue: [
+			promptedForCurrentQuit := true.
+			promptInProgress := true.
+			[
+				self promptAndRecordUsing: self uiManager
+			] on: Error do: [ :ex |
+				self logSurveyError: ex ] ]
 	] ensure: [
+		isImageQuitting ifTrue: [ CoPharoCopilotLogger archiveCurrentSession ].
 		promptInProgress := false ]
 ]
 
@@ -257,13 +333,27 @@ CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary tasks: taskCollection [
 
+	^ self
+		surveyPayloadForRatings: aDictionary
+		tasks: taskCollection
+		userProfile: Dictionary new
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary tasks: taskCollection userProfile: userProfileDictionary [
+
 	^ Dictionary new
+		at: #userId put: CoPharoCopilotLogger userId;
+		at: #sessionId put: CoPharoCopilotLogger currentSessionId;
 		at: #timestamp put: DateAndTime now asString;
 		at: #modelName put: CopilotSettings modelName;
 		at: #questions put: self questionLabelsByKey;
 		at: #ratings put: aDictionary;
 		at: #availableTasks put: self availableTaskLabelsByKey;
 		at: #tasks put: taskCollection asArray;
+		at: #availableUserRoles put: self availableUserRoleLabelsByKey;
+		at: #availableUserExperience put: self availableUserExperienceLabelsByValue;
+		at: #userProfile put: (userProfileDictionary ifNil: [ Dictionary new ]);
 		yourself
 ]
 
@@ -317,6 +407,71 @@ CoPCImageCloseSurvey class >> taskQuestionTitle [
 CoPCImageCloseSurvey class >> taskValues [
 
 	^ self taskChoices collect: [ :task | task key ]
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> userExperienceChoices [
+
+	^ {
+		0 -> 'Less than 1 year'.
+		1 -> '1 year'.
+		2 -> '2 years'.
+		3 -> '3 years'.
+		4 -> '4 years'.
+		5 -> '5 years'.
+		6 -> '6 years'.
+		7 -> '7 years'.
+		8 -> '8 years'.
+		9 -> '9 years'.
+		10 -> '10+ years'
+	}
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> userExperienceLabels [
+
+	^ self userExperienceChoices collect: [ :choice | choice value ]
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> userExperienceQuestionTitle [
+
+	^ 'How many years of programming experience do you have?'
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> userExperienceValues [
+
+	^ self userExperienceChoices collect: [ :choice | choice key ]
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> userRoleChoices [
+
+	^ {
+		#engineer -> 'Engineer'.
+		#phd -> 'PhD'.
+		#researcher -> 'Researcher'.
+		#student -> 'Student'
+	}
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> userRoleLabels [
+
+	^ self userRoleChoices collect: [ :role | role value ]
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> userRoleQuestionTitle [
+
+	^ 'What best describes you?'
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> userRoleValues [
+
+	^ self userRoleChoices collect: [ :role | role key ]
 ]
 
 { #category : 'session management' }
@@ -374,5 +529,41 @@ CoPCImageCloseSurvey class >> validatedTask: anObject [
 
 	^ (self taskValues includes: task)
 		ifTrue: [ task ]
+		ifFalse: [ nil ]
+]
+
+{ #category : 'private' }
+CoPCImageCloseSurvey class >> validatedUserExperience: anObject [
+
+	| experience |
+	anObject ifNil: [ ^ nil ].
+
+	experience := (anObject isNumber)
+		ifTrue: [ anObject asInteger ]
+		ifFalse: [
+			(anObject respondsTo: #asString)
+				ifTrue: [ Integer readFrom: anObject asString ifFail: [ nil ] ]
+				ifFalse: [ nil ] ].
+
+	experience ifNil: [ ^ nil ].
+	^ (self userExperienceValues includes: experience)
+		ifTrue: [ experience ]
+		ifFalse: [ nil ]
+]
+
+{ #category : 'private' }
+CoPCImageCloseSurvey class >> validatedUserRole: anObject [
+
+	| role |
+	anObject ifNil: [ ^ nil ].
+	role := anObject isSymbol
+		ifTrue: [ anObject ]
+		ifFalse: [
+			(anObject respondsTo: #asString)
+				ifTrue: [ anObject asString asSymbol ]
+				ifFalse: [ nil ] ].
+
+	^ (self userRoleValues includes: role)
+		ifTrue: [ role ]
 		ifFalse: [ nil ]
 ]
