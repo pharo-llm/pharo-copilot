@@ -19,7 +19,7 @@ Class {
 { #category : 'defaults' }
 CoPCSessionArchiveUploader class >> defaultPublicUploadUrl [
 
-	^ 'http://193.49.213.134:9093/api/sessions'
+	^ 'http://193.49.213.134:9092/api/sessions'
 ]
 
 { #category : 'defaults' }
@@ -39,7 +39,36 @@ CoPCSessionArchiveUploader class >> authorizeConnection [
 
 	self enabled ifFalse: [ ^ false ].
 	self ensureInternetUploadUrl.
-	^ self new authorizeConnection
+	^ self authorizeConnectionUsingCandidateUrls
+]
+
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> authorizeConnectionUsingCandidateUrls [
+
+	self candidateUploadUrlsForAuthorization do: [ :candidateUrl |
+		self uploadUrl: candidateUrl.
+		[
+			self new authorizeConnection ifTrue: [ ^ true ]
+		] on: Exception do: [ :ex |
+			self
+				logConnectionAuthorizationError: ex
+				forUrl: candidateUrl ] ].
+
+	self uploadUrl: self defaultPublicUploadUrl.
+	^ false
+]
+
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> candidateUploadUrlsForAuthorization [
+
+	| urls |
+	urls := OrderedCollection new.
+	self addCandidateUploadUrl: self uploadUrl to: urls.
+	self addCandidateUploadUrl: self defaultPublicUploadUrl to: urls.
+	self addCandidateUploadUrl: 'http://rmod-xp.lille.inria.fr:9092/api/sessions' to: urls.
+	self addRawCandidateUploadUrl: 'http://193.49.213.134:9093/api/sessions' to: urls.
+	self addRawCandidateUploadUrl: 'http://193.49.213.134:3000/api/sessions' to: urls.
+	^ urls asArray
 ]
 
 { #category : 'connection' }
@@ -72,6 +101,40 @@ CoPCSessionArchiveUploader class >> ensureUploadToken [
 	^ self uploadToken ifNil: [
 		self uploadToken: self newUploadToken.
 		uploadToken ]
+]
+
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> addCandidateUploadUrl: aString to: urls [
+
+	| value |
+	value := aString ifNil: [ '' ] ifNotNil: [ aString asString trimBoth ].
+	value isEmpty ifTrue: [ ^ self ].
+	(self shouldReplaceUploadUrlForPublicReceiver: value) ifTrue: [
+		value := self defaultPublicUploadUrl ].
+	(urls includes: value) ifFalse: [ urls add: value ]
+]
+
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> addRawCandidateUploadUrl: aString to: urls [
+
+	| value |
+	value := aString ifNil: [ '' ] ifNotNil: [ aString asString trimBoth ].
+	value isEmpty ifTrue: [ ^ self ].
+	(urls includes: value) ifFalse: [ urls add: value ]
+]
+
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> logConnectionAuthorizationError: anException forUrl: aString [
+
+	[
+		CoPharoCopilotLogger
+			logBackEndEvent: 'Server connection authorization failed'
+			details: (Dictionary new
+				at: #uploadUrl put: aString;
+				at: #errorClass put: anException class name;
+				at: #error put: anException description;
+				yourself)
+	] on: Exception do: [ :ignored | ]
 ]
 
 { #category : 'accessing' }
@@ -193,7 +256,8 @@ CoPCSessionArchiveUploader class >> shouldReplaceUploadUrlForPublicReceiver: aSt
 	^ (value includesSubstring: '127.0.0.1:3000')
 		or: [ (value includesSubstring: 'localhost:3000')
 		or: [ (value includesSubstring: 'rmod-xp.lille.inria.fr:3000')
-		or: [ value includesSubstring: '193.49.213.134:3000' ] ] ]
+		or: [ (value includesSubstring: '193.49.213.134:3000')
+		or: [ value includesSubstring: '193.49.213.134:9093' ] ] ] ]
 ]
 
 { #category : 'private' }
@@ -233,15 +297,21 @@ CoPCSessionArchiveUploader >> authorizeConnection [
 		at: #timestamp put: DateAndTime now asString;
 		yourself.
 
-	[
-		client entity: (ZnEntity json: (STONJSON toString: payload)).
-		client execute.
-		((client respondsTo: #isSuccess) and: [ client isSuccess not ]) ifTrue: [
-			self error: 'Server rejected Copilot connection registration' ].
-		^ true
-	] ensure: [
-		(client respondsTo: #close) ifTrue: [
-			[ client close ] on: Error do: [ :ignored | ] ] ]
+	^ [
+		[
+			client entity: (ZnEntity json: (STONJSON toString: payload)).
+			client execute.
+			((client respondsTo: #isSuccess) and: [ client isSuccess not ]) ifTrue: [
+				self error: 'Server rejected Copilot connection registration' ].
+			true
+		] ensure: [
+			(client respondsTo: #close) ifTrue: [
+				[ client close ] on: Exception do: [ :ignored | ] ] ]
+	] on: Exception do: [ :ex |
+		self class
+			logConnectionAuthorizationError: ex
+			forUrl: self class connectionRegistrationUrl.
+		false ]
 ]
 
 { #category : 'connection' }
