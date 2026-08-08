@@ -12,6 +12,7 @@ Class {
 		'evaluationLogFileReference',
 		'sessionDirectoryReference',
 		'sessionArchiveFileReference',
+		'sessionArchiveUploader',
 		'sessionId',
 		'sessionStartedAt',
 		'sessionArchived',
@@ -268,6 +269,7 @@ CoPharoCopilotLogger class >> initialize [
 	evaluationLogFileReference := nil.
 	sessionDirectoryReference := nil.
 	sessionArchiveFileReference := nil.
+	sessionArchiveUploader := nil.
 	sessionId := nil.
 	sessionStartedAt := nil.
 	sessionArchived := false.
@@ -288,6 +290,7 @@ CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol [
 	name = #evaluationLogFileReference ifTrue: [ ^ evaluationLogFileReference ].
 	name = #sessionDirectoryReference ifTrue: [ ^ sessionDirectoryReference ].
 	name = #sessionArchiveFileReference ifTrue: [ ^ sessionArchiveFileReference ].
+	name = #sessionArchiveUploader ifTrue: [ ^ sessionArchiveUploader ].
 	name = #sessionId ifTrue: [ ^ sessionId ].
 	name = #sessionStartedAt ifTrue: [ ^ sessionStartedAt ].
 	name = #sessionArchived ifTrue: [ ^ sessionArchived ].
@@ -307,6 +310,7 @@ CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
 	name = #evaluationLogFileReference ifTrue: [ evaluationLogFileReference := aValue. ^ aValue ].
 	name = #sessionDirectoryReference ifTrue: [ sessionDirectoryReference := aValue. ^ aValue ].
 	name = #sessionArchiveFileReference ifTrue: [ sessionArchiveFileReference := aValue. ^ aValue ].
+	name = #sessionArchiveUploader ifTrue: [ sessionArchiveUploader := aValue. ^ aValue ].
 	name = #sessionId ifTrue: [ sessionId := aValue. ^ aValue ].
 	name = #sessionStartedAt ifTrue: [ sessionStartedAt := aValue. ^ aValue ].
 	name = #sessionArchived ifTrue: [ sessionArchived := aValue. ^ aValue ].
@@ -431,6 +435,7 @@ CoPharoCopilotLogger class >> archiveCurrentSession [
 				match: [ :entry | true ].
 			archive writeToFile: archiveFile.
 			sessionArchived := true.
+			self uploadSessionArchive: archiveFile.
 			archiveFile
 		] ensure: [
 			archive ifNotNil: [ archive close ] ] ]
@@ -513,6 +518,18 @@ CoPharoCopilotLogger class >> rawSessionArchiveFileReference: aFileReference [
 ]
 
 { #category : 'session management' }
+CoPharoCopilotLogger class >> rawSessionArchiveUploader [
+
+	^ sessionArchiveUploader
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> rawSessionArchiveUploader: anObject [
+
+	sessionArchiveUploader := anObject
+]
+
+{ #category : 'session management' }
 CoPharoCopilotLogger class >> rawSessionDirectoryReference [
 
 	^ sessionDirectoryReference
@@ -564,6 +581,18 @@ CoPharoCopilotLogger class >> sessionArchiveFileReference [
 
 	^ sessionArchiveFileReference ifNil: [
 		sessionArchiveFileReference := self archiveFileReferenceForSessionDirectory: self sessionDirectoryReference ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> sessionArchiveUploader [
+
+	^ sessionArchiveUploader ifNil: [ CoPCSessionArchiveUploader ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> sessionArchiveUploader: anObject [
+
+	sessionArchiveUploader := anObject
 ]
 
 { #category : 'session management' }
@@ -655,6 +684,40 @@ CoPharoCopilotLogger class >> unregisterSessionHandler [
 
 	manager unregisterClassNamed: self name.
 	^ true
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> uploadSessionArchive: archiveFile [
+
+	| uploader |
+	archiveFile ifNil: [ ^ self ].
+	uploader := self sessionArchiveUploader.
+	uploader ifNil: [ ^ self ].
+
+	[
+		(uploader respondsTo: #uploadArchive:sessionId:userId:)
+			ifTrue: [
+				uploader
+					uploadArchive: archiveFile
+					sessionId: self currentSessionId
+					userId: self userId ]
+			ifFalse: [
+				uploader
+					cull: archiveFile
+					cull: self currentSessionId
+					cull: self userId ] ]
+		on: Error
+		do: [ :ex |
+			Transcript
+				show: 'Could not upload Copilot session archive: ', ex messageText;
+				cr.
+			self
+				logBackEndEvent: 'Could not upload Copilot session archive'
+				details: (Dictionary new
+					at: #errorClass put: ex class name;
+					at: #error put: ex description;
+					at: #archiveFile put: archiveFile fullName;
+					yourself) ]
 ]
 
 { #category : 'session management' }

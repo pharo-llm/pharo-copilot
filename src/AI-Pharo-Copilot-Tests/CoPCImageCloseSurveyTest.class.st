@@ -9,7 +9,7 @@ Class {
 { #category : 'support' }
 CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 
-	| tempDir tempEvalFile sessionDir archiveFile originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUserId originalSessionId originalStartedAt originalArchived |
+	| tempDir tempEvalFile sessionDir archiveFile originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUploader originalUserId originalSessionId originalStartedAt originalArchived |
 	tempDir := FileLocator temp / ('copilot-image-close-session-test-' , UUID new asString).
 	sessionDir := tempDir / 'session-test'.
 	tempEvalFile := sessionDir / CoPharoCopilotLogger evaluationLogFileName.
@@ -19,6 +19,7 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 	originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
 	originalSessionRef := CoPharoCopilotLogger rawSessionDirectoryReference.
 	originalArchiveRef := CoPharoCopilotLogger rawSessionArchiveFileReference.
+	originalUploader := CoPharoCopilotLogger rawSessionArchiveUploader.
 	originalUserId := CoPharoCopilotLogger rawUserId.
 	originalSessionId := CoPharoCopilotLogger instVarNamed: #sessionId.
 	originalStartedAt := CoPharoCopilotLogger instVarNamed: #sessionStartedAt.
@@ -30,6 +31,7 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 		CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
 		CoPharoCopilotLogger rawSessionDirectoryReference: sessionDir.
 		CoPharoCopilotLogger rawSessionArchiveFileReference: archiveFile.
+		CoPharoCopilotLogger rawSessionArchiveUploader: [ :archive :session :user | nil ].
 		CoPharoCopilotLogger rawLogFileReference: sessionDir / CoPharoCopilotLogger logFileName.
 		CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
 		CoPharoCopilotLogger rawUserId: 'user-test'.
@@ -43,12 +45,38 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 		CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
 		CoPharoCopilotLogger rawSessionDirectoryReference: originalSessionRef.
 		CoPharoCopilotLogger rawSessionArchiveFileReference: originalArchiveRef.
+		CoPharoCopilotLogger rawSessionArchiveUploader: originalUploader.
 		CoPharoCopilotLogger rawLogFileReference: originalLogRef.
 		CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef.
 		CoPharoCopilotLogger rawUserId: originalUserId.
 		CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
 		CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
 		CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived ]
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testArchiveCurrentSessionUploadsZipAfterWritingIt [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
+			| uploadedArchive uploadedSession uploadedUser uploadSawExistingArchive uploadSawZipArchive |
+			sessionDir ensureCreateDirectory.
+			(sessionDir / 'marker.txt') writeStreamDo: [ :stream |
+				stream nextPutAll: 'session marker' ].
+			CoPharoCopilotLogger rawSessionArchiveUploader: [ :archive :session :user |
+				uploadedArchive := archive.
+				uploadedSession := session.
+				uploadedUser := user.
+				uploadSawExistingArchive := archive exists.
+				uploadSawZipArchive := ZipArchive isZipArchive: archive ].
+
+			CoPharoCopilotLogger archiveCurrentSession.
+
+			self assert: uploadedArchive equals: archiveFile.
+			self assert: uploadedSession equals: sessionDir basename.
+			self assert: uploadedUser equals: 'user-test'.
+			self assert: uploadSawExistingArchive.
+			self assert: uploadSawZipArchive ] ]
 ]
 
 { #category : 'tests' }
