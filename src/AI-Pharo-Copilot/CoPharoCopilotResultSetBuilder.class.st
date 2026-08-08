@@ -48,7 +48,7 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext contextInfo: contextInfo [
 
-	| combined fallback reranker |
+	| combined fallback reranker topStatus |
 	combined := OrderedCollection new.
 	entryCollection ifNotNil: [ combined addAll: entryCollection ].
 
@@ -63,6 +63,12 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 		context: aContext
 		contextInfo: contextInfo.
 	(reranker shouldUseSemanticGate) ifFalse: [ ^ combined asArray ].
+
+	topStatus := reranker classificationForEntry: combined first.
+	topStatus = #high ifTrue: [
+		^ reranker
+			rerankModelEntries: combined
+			fallbackEntries: #() ].
 
 	fallback := self
 		fallbackCompletionEntriesFor: aContext
@@ -221,6 +227,14 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		at: #sessionId put: CoPharoCopilotLogger completionSessionId;
 		at: #timestamp put: DateAndTime now asString;
 		at: #rejected put: OrderedCollection new].
+
+	(self shouldOpenSemanticSelectorFastPathFor: context prefix: prefix) ifTrue: [
+		| entries position |
+		entries := self semanticSelectorFastPathEntriesFor: context contextInfo: contextInfo.
+		entries isEmpty ifFalse: [
+			position := self menuPositionForContextOrDefault: context.
+			self openCompletionMenuFor: context entries: entries position: position.
+			^ self emptyResultSet ] ].
 	
 	classContext := self classContextFor: context prefix: prefix.
 	cached := self
@@ -1425,6 +1439,28 @@ CoPharoCopilotResultSetBuilder >> normalizedCompletionContentsFrom: contentColle
 ]
 
 { #category : 'new' }
+CoPharoCopilotResultSetBuilder >> semanticSelectorFastPathEntriesFor: aContext contextInfo: contextInfo [
+
+	| entries gate |
+	entries := self
+		fallbackCompletionEntriesFor: aContext
+		excluding: #().
+
+	contextInfo ifNotNil: [
+		gate := Dictionary new
+			at: #status put: #localFastPath;
+			at: #modelTop put: '';
+			at: #heuristicTop put: (entries isEmpty
+				ifTrue: [ '' ]
+				ifFalse: [ self entryContentsFor: entries first ]);
+			at: #shownOrder put: ((entries collect: [ :each | #heuristic ]) asArray);
+			yourself.
+		contextInfo at: #semanticGate put: gate ].
+
+	^ entries
+]
+
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefixString suffix: suffixString context: classContext attempt: attempt [
 
 	| rawResponse content |
@@ -2295,6 +2331,25 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
 	((self isWordChar: before) and: [ self isWordChar: after ]) ifTrue: [ ^ false ].
 
 	^ true
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> shouldOpenSemanticSelectorFastPathFor: aContext prefix: prefixString [
+
+	| token receiverName behavior receiverTypes |
+	token := self completionTokenFor: aContext prefix: prefixString.
+	token isEmpty ifTrue: [ ^ false ].
+
+	receiverName := self textualReceiverBeforeCompletionIn: prefixString.
+	(receiverName isEmpty or: [ receiverName = token ]) ifTrue: [ ^ false ].
+
+	behavior := self behaviorFor: aContext.
+	receiverTypes := self
+		semanticTypesForReceiverName: receiverName
+		inContext: aContext
+		behavior: behavior.
+
+	^ receiverTypes isEmpty not
 ]
 
 { #category : 'initialization' }

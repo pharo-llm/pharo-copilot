@@ -60,6 +60,27 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotSnapshotWhenInsi
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalFastPathForSemanticSelectorTail [
+
+	| b ctx entries |
+	b := CopilotTestableBuilder new.
+	ctx := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	b completionContext: ctx.
+
+	b buildCompletion.
+
+	entries := b openedEntries.
+	self assert: b fallbackCallCount equals: 1.
+	self assert: entries size equals: 1.
+	self assert: entries first contents equals: 'fallbackCompletion'.
+	self assert: b scheduledDelay isNil
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testClassContextIsCached [
 
 	| b ctx first second |
@@ -207,7 +228,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSuppressInvalidSemant
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseSemanticFallbackFusionWhenSelectorIsValid [
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesDoNotFetchFallbackWhenSemanticSelectorIsValid [
 
 	| builder context contextInfo entries |
 	builder := CopilotTestableBuilder new.
@@ -225,10 +246,9 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseSemanticFallbackFu
 		inContext: context
 		contextInfo: contextInfo.
 
-	self assert: builder fallbackCallCount equals: 1.
-	self assert: entries size equals: 2.
+	self assert: builder fallbackCallCount equals: 0.
+	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'String'.
-	self assert: entries second contents equals: 'fallbackCompletion'.
 	self assert: ((contextInfo at: #semanticGate) at: #status) equals: #high
 ]
 
