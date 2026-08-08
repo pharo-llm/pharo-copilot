@@ -19,7 +19,7 @@ Class {
 { #category : 'defaults' }
 CoPCSessionArchiveUploader class >> defaultPublicUploadUrl [
 
-	^ 'http://193.49.213.134:3000/api/sessions'
+	^ 'http://193.49.213.134:9093/api/sessions'
 ]
 
 { #category : 'defaults' }
@@ -38,6 +38,7 @@ CoPCSessionArchiveUploader class >> defaultUploadUrl [
 CoPCSessionArchiveUploader class >> authorizeConnection [
 
 	self enabled ifFalse: [ ^ false ].
+	self ensureInternetUploadUrl.
 	^ self new authorizeConnection
 ]
 
@@ -191,7 +192,8 @@ CoPCSessionArchiveUploader class >> shouldReplaceUploadUrlForPublicReceiver: aSt
 	value isEmpty ifTrue: [ ^ true ].
 	^ (value includesSubstring: '127.0.0.1:3000')
 		or: [ (value includesSubstring: 'localhost:3000')
-		or: [ value includesSubstring: 'rmod-xp.lille.inria.fr:3000' ] ]
+		or: [ (value includesSubstring: 'rmod-xp.lille.inria.fr:3000')
+		or: [ value includesSubstring: '193.49.213.134:3000' ] ] ]
 ]
 
 { #category : 'private' }

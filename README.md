@@ -23,7 +23,7 @@ Metacello new
 ```
 
 After the setup agreement is accepted, Pharo-Copilot registers this image with
-the public session receiver at `http://193.49.213.134:3000/api/sessions`.
+the public session receiver at `http://193.49.213.134:9093/api/sessions`.
 The setup window reports `Connection authorized` or `Connection denied` and then
 continues the normal model setup pipeline.
 
