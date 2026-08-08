@@ -222,6 +222,7 @@ CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInf
 		at: #generated put: (Dictionary new
 			at: #suggestions put: ((contextInfo at: #rawSuggestions ifAbsent: [ #() ]) asArray);
 			at: #attempts put: ((contextInfo at: #generationAttempts ifAbsent: [ #() ]) asArray);
+			at: #semanticGate put: (contextInfo at: #semanticGate ifAbsent: [ Dictionary new ]);
 			yourself);
 		at: #accepted put: nil;
 		at: #acceptedAt put: nil;

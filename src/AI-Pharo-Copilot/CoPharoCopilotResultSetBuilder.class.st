@@ -39,17 +39,38 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext [
 
-	| combined fallback |
+	^ self
+		appendFallbackCompletionEntriesTo: entryCollection
+		inContext: aContext
+		contextInfo: nil
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext contextInfo: contextInfo [
+
+	| combined fallback reranker |
 	combined := OrderedCollection new.
-	combined addAll: entryCollection.
-	combined isEmpty ifFalse: [ ^ combined asArray ].
+	entryCollection ifNotNil: [ combined addAll: entryCollection ].
+
+	combined isEmpty ifTrue: [
+		fallback := self
+			fallbackCompletionEntriesFor: aContext
+			excluding: combined.
+		^ fallback asArray ].
+
+	reranker := CoPCSemanticReranker
+		builder: self
+		context: aContext
+		contextInfo: contextInfo.
+	(reranker shouldUseSemanticGate) ifFalse: [ ^ combined asArray ].
 
 	fallback := self
 		fallbackCompletionEntriesFor: aContext
 		excluding: combined.
-	combined addAll: fallback.
 
-	^ combined asArray
+	^ reranker
+		rerankModelEntries: combined
+		fallbackEntries: fallback
 
 ]
 
@@ -492,12 +513,16 @@ CoPharoCopilotResultSetBuilder >> completionCache: aCache [
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext [
 
 	| cleaned fakeContextInfo copilotEntries |
-	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
-		select: [ :each | each isEmpty not ].
 
 	fakeContextInfo := Dictionary new
-		at: #prefix put: '';
+		at: #prefix put: (aContext
+			ifNil: [ '' ]
+			ifNotNil: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ]);
 		yourself.
+	cleaned := self
+		normalizedCompletionContentsFrom: contentCollection
+		inContext: aContext
+		contextInfo: fakeContextInfo.
 
 	copilotEntries := cleaned collect: [ :each |
 		| entry |
@@ -507,15 +532,20 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 		entry label: (self menuLabelForSuggestion: each contextInfo: fakeContextInfo).
 		entry ].
 
-	^ self appendFallbackCompletionEntriesTo: copilotEntries inContext: aContext
+	^ self
+		appendFallbackCompletionEntriesTo: copilotEntries
+		inContext: aContext
+		contextInfo: fakeContextInfo
 ]
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext contextInfo: contextInfo [
 
 	| cleaned sessionId copilotEntries |
-	cleaned := (contentCollection collect: [ :each | self cleanedContentFrom: each ])
-		select: [ :each | each isEmpty not ].
+	cleaned := self
+		normalizedCompletionContentsFrom: contentCollection
+		inContext: aContext
+		contextInfo: contextInfo.
 
 	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
 
@@ -532,7 +562,10 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 
 		entry ].
 
-	^ self appendFallbackCompletionEntriesTo: copilotEntries inContext: aContext
+	^ self
+		appendFallbackCompletionEntriesTo: copilotEntries
+		inContext: aContext
+		contextInfo: contextInfo
 ]
 
 { #category : 'new' }
@@ -1364,6 +1397,31 @@ CoPharoCopilotResultSetBuilder >> normalizeSuggestion: rawResponse forPrefix: pr
 	(self isLikelyContextEcho: cleaned forPrefix: prefixString typedFragment: typedFragment) ifTrue: [ ^ '' ].
 
 	^ cleaned trimBoth
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> normalizedCompletionContentsFrom: contentCollection inContext: aContext contextInfo: contextInfo [
+
+	| prefix typedFragment |
+	prefix := contextInfo
+		ifNil: [
+			(aContext isNil)
+				ifTrue: [ '' ]
+				ifFalse: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ] ]
+		ifNotNil: [
+			contextInfo
+				at: #prefix
+				ifAbsent: [
+					(aContext isNil)
+						ifTrue: [ '' ]
+						ifFalse: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ] ] ].
+	typedFragment := self completionTokenFor: aContext prefix: prefix.
+
+	^ ((contentCollection ifNil: [ #() ]) collect: [ :each |
+			self
+				stripTypedFragment: typedFragment
+				fromSuggestion: (self cleanedContentFrom: each) ])
+		select: [ :each | each isEmpty not ]
 ]
 
 { #category : 'new' }

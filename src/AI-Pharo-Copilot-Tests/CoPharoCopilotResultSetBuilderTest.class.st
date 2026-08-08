@@ -182,6 +182,57 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSkipFallbackWhenAISug
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSuppressInvalidSemanticSelectorBehindFallback [
+
+	| builder context contextInfo entries |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'self as';
+		yourself.
+
+	entries := builder
+		completionEntriesFrom: { 'DefinitelyNotASelector' }
+		inContext: context
+		contextInfo: contextInfo.
+
+	self assert: builder fallbackCallCount equals: 1.
+	self assert: entries size equals: 1.
+	self assert: entries first contents equals: 'fallbackCompletion'.
+	self assert: ((contextInfo at: #semanticGate) at: #status) equals: #low
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseSemanticFallbackFusionWhenSelectorIsValid [
+
+	| builder context contextInfo entries |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'self as';
+		yourself.
+
+	entries := builder
+		completionEntriesFrom: { 'String' }
+		inContext: context
+		contextInfo: contextInfo.
+
+	self assert: builder fallbackCallCount equals: 1.
+	self assert: entries size equals: 2.
+	self assert: entries first contents equals: 'String'.
+	self assert: entries second contents equals: 'fallbackCompletion'.
+	self assert: ((contextInfo at: #semanticGate) at: #status) equals: #high
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISuggestionExists [
 
 	| builder context entries |
