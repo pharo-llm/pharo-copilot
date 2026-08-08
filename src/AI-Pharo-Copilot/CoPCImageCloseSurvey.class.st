@@ -59,21 +59,6 @@ CoPCImageCloseSurvey class >> askUserExperienceUsing: uiManager [
 ]
 
 { #category : 'survey' }
-CoPCImageCloseSurvey class >> askUserRoleUsing: uiManager [
-
-	| role |
-	uiManager ifNil: [ ^ nil ].
-	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ nil ].
-
-	role := uiManager
-		chooseFrom: self userRoleLabels
-		values: self userRoleValues
-		title: self userRoleQuestionTitle.
-
-	^ self validatedUserRole: role
-]
-
-{ #category : 'survey' }
 CoPCImageCloseSurvey class >> availableTaskLabelsByKey [
 
 	| labels |
@@ -94,16 +79,6 @@ CoPCImageCloseSurvey class >> availableUserExperienceLabelsByValue [
 ]
 
 { #category : 'survey' }
-CoPCImageCloseSurvey class >> availableUserRoleLabelsByKey [
-
-	| labels |
-	labels := Dictionary new.
-	self userRoleChoices do: [ :role |
-		labels at: role key put: role value ].
-	^ labels
-]
-
-{ #category : 'survey' }
 CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 
 	| ratings rating |
@@ -118,10 +93,8 @@ CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> collectUserProfileUsing: uiManager [
 
-	| role experience profile |
+	| experience profile |
 	profile := Dictionary new.
-	role := self askUserRoleUsing: uiManager.
-	role ifNotNil: [ profile at: #role put: role ].
 	experience := self askUserExperienceUsing: uiManager.
 	experience ifNotNil: [ profile at: #experienceYears put: experience ].
 	^ profile
@@ -351,7 +324,6 @@ CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary tasks: taskCo
 		at: #ratings put: aDictionary;
 		at: #availableTasks put: self availableTaskLabelsByKey;
 		at: #tasks put: taskCollection asArray;
-		at: #availableUserRoles put: self availableUserRoleLabelsByKey;
 		at: #availableUserExperience put: self availableUserExperienceLabelsByValue;
 		at: #userProfile put: (userProfileDictionary ifNil: [ Dictionary new ]);
 		yourself
@@ -413,17 +385,10 @@ CoPCImageCloseSurvey class >> taskValues [
 CoPCImageCloseSurvey class >> userExperienceChoices [
 
 	^ {
-		0 -> 'Less than 1 year'.
-		1 -> '1 year'.
-		2 -> '2 years'.
-		3 -> '3 years'.
-		4 -> '4 years'.
-		5 -> '5 years'.
-		6 -> '6 years'.
-		7 -> '7 years'.
-		8 -> '8 years'.
-		9 -> '9 years'.
-		10 -> '10+ years'
+		0 -> 'Less than 2 years'.
+		2 -> 'Between 2 and 5 years'.
+		5 -> 'Between 5 and 10 years'.
+		10 -> 'More than 10 years'
 	}
 ]
 
@@ -443,35 +408,6 @@ CoPCImageCloseSurvey class >> userExperienceQuestionTitle [
 CoPCImageCloseSurvey class >> userExperienceValues [
 
 	^ self userExperienceChoices collect: [ :choice | choice key ]
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> userRoleChoices [
-
-	^ {
-		#engineer -> 'Engineer'.
-		#phd -> 'PhD'.
-		#researcher -> 'Researcher'.
-		#student -> 'Student'
-	}
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> userRoleLabels [
-
-	^ self userRoleChoices collect: [ :role | role value ]
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> userRoleQuestionTitle [
-
-	^ 'What best describes you?'
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> userRoleValues [
-
-	^ self userRoleChoices collect: [ :role | role key ]
 ]
 
 { #category : 'session management' }
@@ -548,22 +484,5 @@ CoPCImageCloseSurvey class >> validatedUserExperience: anObject [
 	experience ifNil: [ ^ nil ].
 	^ (self userExperienceValues includes: experience)
 		ifTrue: [ experience ]
-		ifFalse: [ nil ]
-]
-
-{ #category : 'private' }
-CoPCImageCloseSurvey class >> validatedUserRole: anObject [
-
-	| role |
-	anObject ifNil: [ ^ nil ].
-	role := anObject isSymbol
-		ifTrue: [ anObject ]
-		ifFalse: [
-			(anObject respondsTo: #asString)
-				ifTrue: [ anObject asString asSymbol ]
-				ifFalse: [ nil ] ].
-
-	^ (self userRoleValues includes: role)
-		ifTrue: [ role ]
 		ifFalse: [ nil ]
 ]

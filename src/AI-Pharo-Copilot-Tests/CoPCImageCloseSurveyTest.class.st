@@ -104,8 +104,8 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitAppendsEveryCloseAttempt [
 
 				ui := CoPCImageCloseSurveyUIManagerDouble new.
 				ui ratings: {
-					5. 5. 4. 5. #codeCompletion. #engineer. 3.
-					4. 4. 4. 4. #debugging. #researcher. 8 }.
+					5. 5. 4. 5. #codeCompletion. 2.
+					4. 4. 4. 4. #debugging. 5 }.
 				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 
@@ -122,7 +122,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitAppendsEveryCloseAttempt [
 				self assert: thirdLine isNil.
 				self assert: (firstEvent at: #event) equals: 'image-close-survey'.
 				self assert: (secondEvent at: #event) equals: 'image-close-survey'.
-				self assert: (ui requests size) equals: (CoPCImageCloseSurvey surveyQuestions size + 3) * 2.
+				self assert: (ui requests size) equals: (CoPCImageCloseSurvey surveyQuestions size + 2) * 2.
 				self assert: archiveFile exists
 			] ensure: [
 			CoPCImageCloseSurvey resetPromptState ] ] ]
@@ -135,10 +135,10 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
 			| ui ratings jsonLine parsed data storedRatings storedTasks userProfile |
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: { 4. 3. 5. 4. #codeCompletion. #researcher. 3 }.
+			ui ratings: { 4. 3. 5. 4. #codeCompletion. 5 }.
 			ratings := CoPCImageCloseSurvey promptAndRecordUsing: ui.
 
-			self assert: ui requests size equals: CoPCImageCloseSurvey surveyQuestions size + 3.
+			self assert: ui requests size equals: CoPCImageCloseSurvey surveyQuestions size + 2.
 			self assert: (ratings at: #overall) equals: 4.
 			self assert: (ratings at: #suggestionQuality) equals: 3.
 
@@ -158,11 +158,11 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 			self assert: (storedRatings at: #usefulness) equals: 4.
 			self assert: (storedTasks includes: #codeCompletion).
 			self assert: storedTasks size equals: 1.
-			self assert: (userProfile at: #role) equals: #researcher.
-			self assert: (userProfile at: #experienceYears) equals: 3.
+			self deny: (userProfile includesKey: #role).
+			self assert: (userProfile at: #experienceYears) equals: 5.
 			self assert: ((data at: #availableTasks) includesKey: #codeCompletion).
-			self assert: ((data at: #availableUserRoles) includesKey: #researcher).
-			self assert: ((data at: #availableUserExperience) includesKey: '3').
+			self deny: (data includesKey: #availableUserRoles).
+			self assert: ((data at: #availableUserExperience) includesKey: '5').
 			self assert: ((data at: #questions) includesKey: #overall).
 			self assert: (data includesKey: #timestamp).
 			self assert: (data includesKey: #modelName)
@@ -179,7 +179,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitWritesOnceAndSkipsShutdownF
 				CoPCImageCloseSurvey resetPromptState.
 
 				ui := CoPCImageCloseSurveyUIManagerDouble new.
-				ui ratings: { 5. 5. 4. 5. #codeCompletion. #engineer. 4 }.
+				ui ratings: { 5. 5. 4. 5. #codeCompletion. 10 }.
 				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 				CoPCImageCloseSurvey shutDown: true.
 
@@ -189,7 +189,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitWritesOnceAndSkipsShutdownF
 
 				self assert: firstLine isNotNil.
 				self assert: secondLine isNil.
-				self assert: (ui requests size) equals: CoPCImageCloseSurvey surveyQuestions size + 3.
+				self assert: (ui requests size) equals: CoPCImageCloseSurvey surveyQuestions size + 2.
 				self assert: archiveFile exists
 			] ensure: [
 			CoPCImageCloseSurvey resetPromptState ] ] ]
@@ -208,7 +208,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitZipsSessionFolder [
 					stream nextPutAll: 'session marker' ].
 
 				ui := CoPCImageCloseSurveyUIManagerDouble new.
-				ui ratings: { 5. 5. 5. 5. #codeCompletion. #student. 1 }.
+				ui ratings: { 5. 5. 5. 5. #codeCompletion. 2 }.
 				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 
 				self assert: archiveFile exists.
@@ -314,22 +314,14 @@ CoPCImageCloseSurveyTest >> testValidatedTaskAcceptsOnlyAvailableTasks [
 ]
 
 { #category : 'tests' }
-CoPCImageCloseSurveyTest >> testValidatedUserExperienceAcceptsConfiguredYears [
+CoPCImageCloseSurveyTest >> testValidatedUserExperienceAcceptsConfiguredBuckets [
 
 	self assert: (CoPCImageCloseSurvey validatedUserExperience: 0) equals: 0.
-	self assert: (CoPCImageCloseSurvey validatedUserExperience: '3') equals: 3.
+	self assert: (CoPCImageCloseSurvey validatedUserExperience: '2') equals: 2.
+	self assert: (CoPCImageCloseSurvey validatedUserExperience: 5) equals: 5.
 	self assert: (CoPCImageCloseSurvey validatedUserExperience: 10) equals: 10.
 	self assert: (CoPCImageCloseSurvey validatedUserExperience: -1) isNil.
+	self assert: (CoPCImageCloseSurvey validatedUserExperience: '3') isNil.
 	self assert: (CoPCImageCloseSurvey validatedUserExperience: 11) isNil.
 	self assert: (CoPCImageCloseSurvey validatedUserExperience: 'bad') isNil
-]
-
-{ #category : 'tests' }
-CoPCImageCloseSurveyTest >> testValidatedUserRoleAcceptsOnlyConfiguredRoles [
-
-	self assert: (CoPCImageCloseSurvey validatedUserRole: #engineer) equals: #engineer.
-	self assert: (CoPCImageCloseSurvey validatedUserRole: 'researcher') equals: #researcher.
-	self assert: (CoPCImageCloseSurvey validatedUserRole: #student) equals: #student.
-	self assert: (CoPCImageCloseSurvey validatedUserRole: #unknown) isNil.
-	self assert: (CoPCImageCloseSurvey validatedUserRole: nil) isNil
 ]
