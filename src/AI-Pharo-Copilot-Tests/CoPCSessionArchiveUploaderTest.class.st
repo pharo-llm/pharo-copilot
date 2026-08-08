@@ -29,6 +29,25 @@ CoPCSessionArchiveUploaderTest >> testDefaultPublicUploadUrlTargetsInternetReach
 
 	self
 		assert: CoPCSessionArchiveUploader defaultPublicUploadUrl
-		equals: 'http://rmod-xp.lille.inria.fr:3000/api/sessions'.
+		equals: 'http://193.49.213.134:3000/api/sessions'.
 	self deny: (CoPCSessionArchiveUploader defaultPublicUploadUrl includesSubstring: '127.0.0.1')
+]
+
+{ #category : 'tests' }
+CoPCSessionArchiveUploaderTest >> testEnsureInternetUploadUrlReplacesKnownLocalOrHostDefaults [
+
+	| originalUrl |
+	originalUrl := CoPCSessionArchiveUploader uploadUrl.
+	[
+		CoPCSessionArchiveUploader uploadUrl: 'http://127.0.0.1:3000/api/sessions'.
+		self
+			assert: CoPCSessionArchiveUploader ensureInternetUploadUrl
+			equals: CoPCSessionArchiveUploader defaultPublicUploadUrl.
+
+		CoPCSessionArchiveUploader uploadUrl: 'http://rmod-xp.lille.inria.fr:3000/api/sessions'.
+		self
+			assert: CoPCSessionArchiveUploader ensureInternetUploadUrl
+			equals: CoPCSessionArchiveUploader defaultPublicUploadUrl
+	] ensure: [
+		CoPCSessionArchiveUploader uploadUrl: originalUrl ]
 ]

@@ -19,7 +19,7 @@ Class {
 { #category : 'defaults' }
 CoPCSessionArchiveUploader class >> defaultPublicUploadUrl [
 
-	^ 'http://rmod-xp.lille.inria.fr:3000/api/sessions'
+	^ 'http://193.49.213.134:3000/api/sessions'
 ]
 
 { #category : 'defaults' }
@@ -71,6 +71,14 @@ CoPCSessionArchiveUploader class >> ensureUploadToken [
 	^ self uploadToken ifNil: [
 		self uploadToken: self newUploadToken.
 		uploadToken ]
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> ensureInternetUploadUrl [
+
+	(self shouldReplaceUploadUrlForPublicReceiver: self uploadUrl) ifTrue: [
+		self uploadUrl: self defaultPublicUploadUrl ].
+	^ self uploadUrl
 ]
 
 { #category : 'accessing' }
@@ -173,6 +181,17 @@ CoPCSessionArchiveUploader class >> uploadUrlFromEnvironmentOrDefault [
 			^ url asString trimBoth ] ].
 
 	^ self defaultPublicUploadUrl
+]
+
+{ #category : 'private' }
+CoPCSessionArchiveUploader class >> shouldReplaceUploadUrlForPublicReceiver: aString [
+
+	| value |
+	value := aString ifNil: [ '' ] ifNotNil: [ aString asString trimBoth ].
+	value isEmpty ifTrue: [ ^ true ].
+	^ (value includesSubstring: '127.0.0.1:3000')
+		or: [ (value includesSubstring: 'localhost:3000')
+		or: [ value includesSubstring: 'rmod-xp.lille.inria.fr:3000' ] ]
 ]
 
 { #category : 'private' }

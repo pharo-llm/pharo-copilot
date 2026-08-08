@@ -279,6 +279,7 @@ PharoCopilotSetupPresenter >> performSetupPipeline [
 	self deferUI: [ statusLabel label: 'Authorizing server connection...' ].
 
 	authorized := [
+		CoPCSessionArchiveUploader ensureInternetUploadUrl.
 		CoPCSessionArchiveUploader authorizeConnection
 	] on: Error do: [ :ex |
 		CoPharoCopilotLogger
