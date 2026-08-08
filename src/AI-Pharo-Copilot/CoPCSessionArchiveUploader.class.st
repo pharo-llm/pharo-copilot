@@ -25,7 +25,7 @@ CoPCSessionArchiveUploader class >> defaultTimeoutSeconds [
 { #category : 'defaults' }
 CoPCSessionArchiveUploader class >> defaultUploadUrl [
 
-	^ 'http://127.0.0.1:3000/api/sessions'
+	^ self uploadUrlFromEnvironmentOrDefault
 ]
 
 { #category : 'connection' }
@@ -149,6 +149,24 @@ CoPCSessionArchiveUploader class >> uploadUrl [
 CoPCSessionArchiveUploader class >> uploadUrl: aString [
 
 	uploadUrl := aString
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> uploadUrlFromEnvironmentOrDefault [
+
+	| environment url |
+	environment := Smalltalk globals at: #OSEnvironment ifAbsent: [ nil ].
+	environment ifNotNil: [
+		url := [
+			environment current
+				at: 'PHARO_COPILOT_RECEIVER_URL'
+				ifAbsent: [ nil ] ]
+			on: Error
+			do: [ nil ].
+		(url notNil and: [ url asString trimBoth isEmpty not ]) ifTrue: [
+			^ url asString trimBoth ] ].
+
+	^ 'http://127.0.0.1:3000/api/sessions'
 ]
 
 { #category : 'private' }
