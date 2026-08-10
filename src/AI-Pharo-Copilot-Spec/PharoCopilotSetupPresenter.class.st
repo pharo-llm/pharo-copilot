@@ -494,17 +494,12 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 ]
 
 { #category : 'initialization' }
-PharoCopilotSetupPresenter >> showWelcomeStep [
+PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
 	| welcomeContainer messageLabel telemetryStateLabel learnMoreButton noButton yesButton buttonRow |
-	titleLabel label: 'Welcome to Pharo-Copilot'.
-	descriptionLabel label: 'Local AI code completion for Pharo.'.
-	statusLabel label: ''.
-
-	CopilotSettings researchTelemetryNotAsked ifFalse: [ ^ self showWelcomeStepAfterConsentDecision ].
-	CopilotSettings declineResearchTelemetryIfNotAsked.
 	titleLabel label: 'Help improve Pharo'.
 	descriptionLabel label: 'Anonymous usage research consent for Pharo Copilot.'.
+	statusLabel label: ''.
 
 	messageLabel := self newLabel
 		label: CopilotSettings researchTelemetryFirstLaunchText;
@@ -517,7 +512,10 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 	learnMoreButton := self newButton
 		label: 'Learn more';
 		icon: (self iconNamed: #glamorousBrowse);
-		action: [ CopilotSettings showResearchTelemetryStudyInformation ];
+		action: [
+			self
+				showResearchTelemetryLearnMoreStepReturningTo: [ self showResearchTelemetryConsentChoiceStep ]
+				includeConsentButtons: true ];
 		yourself.
 
 	welcomeContainer := SpBoxLayout newTopToBottom
@@ -553,6 +551,75 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 ]
 
 { #category : 'initialization' }
+PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: returnBlock includeConsentButtons: includeConsentButtons [
+
+	| detailsText backButton noButton yesButton continueButton buttonRow |
+	titleLabel label: 'Anonymous Usage Research'.
+	descriptionLabel label: 'Details about the Pharo usage research project.'.
+	statusLabel label: 'Use the scroll bar to read the full study information.'.
+
+	detailsText := self newText.
+	detailsText
+		text: CopilotSettings researchTelemetryLearnMoreText;
+		beNotEditable.
+
+	backButton := self newButton
+		label: 'Back';
+		action: [ returnBlock value ];
+		yourself.
+
+	includeConsentButtons
+		ifTrue: [
+			noButton := self newButton
+				label: 'No, don''t collect data';
+				action: [ self handleResearchTelemetryDeclined ];
+				yourself.
+
+			yesButton := self newButton
+				label: 'Yes, I agree';
+				action: [ self handleResearchTelemetryAccepted ];
+				yourself.
+
+			buttonRow := SpBoxLayout newHorizontal
+				spacing: 10;
+				add: backButton width: 110;
+				add: noButton width: 220;
+				add: yesButton width: 170;
+				yourself ]
+		ifFalse: [
+			continueButton := self newButton
+				label: 'Continue setup';
+				action: [ self handleOk ];
+				yourself.
+
+			buttonRow := SpBoxLayout newHorizontal
+				spacing: 10;
+				add: backButton width: 110;
+				add: continueButton width: 180;
+				yourself ].
+
+	contentContainer layout: (SpBoxLayout newTopToBottom
+		spacing: 10;
+		add: detailsText expand: true;
+		add: buttonRow expand: false;
+		yourself).
+
+	self layout: self defaultLayout
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> showWelcomeStep [
+
+	titleLabel label: 'Welcome to Pharo-Copilot'.
+	descriptionLabel label: 'Local AI code completion for Pharo.'.
+	statusLabel label: ''.
+
+	CopilotSettings researchTelemetryNotAsked ifFalse: [ ^ self showWelcomeStepAfterConsentDecision ].
+	CopilotSettings declineResearchTelemetryIfNotAsked.
+	self showResearchTelemetryConsentChoiceStep
+]
+
+{ #category : 'initialization' }
 PharoCopilotSetupPresenter >> showWelcomeStepAfterConsentDecision [
 
 	| messageLabel learnMoreButton continueButton buttonRow |
@@ -565,7 +632,10 @@ PharoCopilotSetupPresenter >> showWelcomeStepAfterConsentDecision [
 	learnMoreButton := self newButton
 		label: 'Learn more';
 		icon: (self iconNamed: #glamorousBrowse);
-		action: [ CopilotSettings showResearchTelemetryStudyInformation ];
+		action: [
+			self
+				showResearchTelemetryLearnMoreStepReturningTo: [ self showWelcomeStepAfterConsentDecision ]
+				includeConsentButtons: false ];
 		yourself.
 
 	continueButton := self newButton

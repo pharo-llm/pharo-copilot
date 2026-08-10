@@ -402,14 +402,29 @@ CoPharoCopilotLogger class >> pharoCopilotDirectoryName [
 { #category : 'session management' }
 CoPharoCopilotLogger class >> archiveCurrentSession [
 
+	^ self archiveCurrentSessionReportingProgress: nil
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> archiveCurrentSessionReportingProgress: aProgressBlock [
+
 	| directory archiveFile archiveClass archive archivedAt |
 	self loggingEnabled ifFalse: [ ^ nil ].
+
+	self
+		reportArchiveProgress: aProgressBlock
+		status: 'Preparing session archive...'
+		percent: 5.
 
 	directory := self ensureSessionDirectory.
 	(directory isNil or: [ directory exists not ]) ifTrue: [ ^ nil ].
 	archiveFile := self sessionArchiveFileReference.
 	archiveFile ifNil: [ ^ nil ].
 	archiveClass := Smalltalk globals at: #ZipArchive ifAbsent: [
+		self
+			reportArchiveProgress: aProgressBlock
+			status: 'Cannot archive session: ZipArchive is unavailable.'
+			percent: 0.
 		self
 			logBackEndEvent: 'Could not archive Copilot session'
 			details: (Dictionary new
@@ -425,22 +440,46 @@ CoPharoCopilotLogger class >> archiveCurrentSession [
 		archiveFile: archiveFile.
 
 	^ [
+		self
+			reportArchiveProgress: aProgressBlock
+			status: 'Creating zip archive...'
+			percent: 15.
 		archiveFile parent ensureCreateDirectory.
 		archiveFile exists ifTrue: [ archiveFile ensureDelete ].
 		archive := archiveClass new.
 		[
+			self
+				reportArchiveProgress: aProgressBlock
+				status: 'Adding session files to archive...'
+				percent: 35.
 			archive
 				addTree: directory
 				relativeTo: directory parent
 				match: [ :entry | true ].
+			self
+				reportArchiveProgress: aProgressBlock
+				status: 'Writing zip archive...'
+				percent: 70.
 			archive writeToFile: archiveFile.
 			sessionArchived := true.
+			self
+				reportArchiveProgress: aProgressBlock
+				status: 'Uploading session archive...'
+				percent: 90.
 			self uploadSessionArchive: archiveFile.
+			self
+				reportArchiveProgress: aProgressBlock
+				status: 'Session archive is complete.'
+				percent: 100.
 			archiveFile
 		] ensure: [
 			archive ifNotNil: [ archive close ] ] ]
 		on: Error
 		do: [ :ex |
+			self
+				reportArchiveProgress: aProgressBlock
+				status: 'Could not archive Copilot session.'
+				percent: 0.
 			Transcript
 				show: 'Could not archive Copilot session: ', ex messageText;
 				cr.
@@ -452,6 +491,22 @@ CoPharoCopilotLogger class >> archiveCurrentSession [
 					at: #sessionDirectory put: directory fullName;
 					yourself).
 			nil ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> reportArchiveProgress: aProgressBlock status: statusString percent: percentNumber [
+
+	aProgressBlock ifNil: [ ^ self ].
+
+	[
+		aProgressBlock value: (Dictionary new
+			at: #status put: statusString;
+			at: #percent put: percentNumber;
+			yourself)
+	] on: Error do: [ :ex |
+		Transcript
+			show: 'Copilot archive progress callback failed: ', ex messageText;
+			cr ]
 ]
 
 { #category : 'session management' }
