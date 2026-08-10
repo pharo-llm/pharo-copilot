@@ -9,7 +9,6 @@ Class {
 		'descriptionLabel',
 		'statusLabel',
 		'contentContainer',
-		'privacyConsentCheckbox',
 		'progressBar',
 		'downloadProcess',
 		'setupProgress',
@@ -96,13 +95,32 @@ PharoCopilotSetupPresenter >> descriptionLabel: anObject [
 { #category : 'accessing' }
 PharoCopilotSetupPresenter >> handleOk [
 
-	privacyConsentCheckbox state ifFalse: [ statusLabel label: 'You must accept the privacy policy before continuing.'.
-		^ self ].
+	self continueSetupAfterConsentDecision
+]
 
-	CopilotSettings recordPrivacyPolicyUserConsentAccepted: true.
+{ #category : 'accessing' }
+PharoCopilotSetupPresenter >> handleResearchTelemetryAccepted [
+
+	CopilotSettings recordResearchTelemetryConsentAccepted: true.
+	statusLabel label: 'Anonymous research telemetry is now enabled. Continuing setup...'.
+	self continueSetupAfterConsentDecision
+]
+
+{ #category : 'accessing' }
+PharoCopilotSetupPresenter >> handleResearchTelemetryDeclined [
+
+	CopilotSettings recordResearchTelemetryConsentAccepted: false.
+	statusLabel label: 'Anonymous research telemetry is disabled. Continuing setup...'.
+	self continueSetupAfterConsentDecision
+]
+
+{ #category : 'accessing' }
+PharoCopilotSetupPresenter >> continueSetupAfterConsentDecision [
 
 	self showDownloadStep.
-	statusLabel label: 'Authorizing server connection...'.
+	statusLabel label: (CopilotSettings researchTelemetryAccepted
+		ifTrue: [ 'Authorizing server connection...' ]
+		ifFalse: [ 'Anonymous research telemetry disabled. Continuing local setup.' ]).
 	self startSetupDownloads
 ]
 
@@ -144,7 +162,7 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 
 	aWindowPresenter
 		title: 'Pharo-Copilot Setup';
-		initialExtent: 500 @ 400;
+		initialExtent: 640 @ 500;
 		centered.
 
 ]
@@ -276,6 +294,12 @@ PharoCopilotSetupPresenter >> performSetupPipeline [
 
 	| authorized |
 	self setupProgressPercentage: 0.
+
+	CopilotSettings researchTelemetryAccepted ifFalse: [
+		self deferUI: [ statusLabel label: 'Anonymous research telemetry disabled. Continuing local setup.' ].
+		(Delay forMilliseconds: 500) wait.
+		^ self performSetupDownloads ].
+
 	self deferUI: [ statusLabel label: 'Authorizing server connection...' ].
 
 	authorized := [
@@ -472,51 +496,92 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showWelcomeStep [
 
-	| welcomeContainer privacyLabel privacyDetailLabel termsButton okButton buttonRow |
+	| welcomeContainer messageLabel telemetryStateLabel learnMoreButton noButton yesButton buttonRow |
 	titleLabel label: 'Welcome to Pharo-Copilot'.
-	descriptionLabel label: 'Your AI code Completion'.
+	descriptionLabel label: 'Local AI code completion for Pharo.'.
 	statusLabel label: ''.
 
-	privacyLabel := self newLabel
-		label: 'Pharo-Copilot is fully private.';
+	CopilotSettings researchTelemetryNotAsked ifFalse: [ ^ self showWelcomeStepAfterConsentDecision ].
+	CopilotSettings declineResearchTelemetryIfNotAsked.
+	titleLabel label: 'Help improve Pharo'.
+	descriptionLabel label: 'Anonymous usage research consent for Pharo Copilot.'.
+
+	messageLabel := self newLabel
+		label: CopilotSettings researchTelemetryFirstLaunchText;
 		yourself.
 
-	privacyDetailLabel := self newLabel
-		label: 'Your code and interactions stay private.';
+	telemetryStateLabel := self newLabel
+		label: 'Default: anonymous research telemetry is OFF.';
 		yourself.
 
-	privacyConsentCheckbox := self newCheckBox
-		label: 'I agree with the privacy policy';
-		state: false;
-		yourself.
-
-	termsButton := self newButton
-		label: 'Privacy Policy & Terms';
+	learnMoreButton := self newButton
+		label: 'Learn more';
 		icon: (self iconNamed: #glamorousBrowse);
-		action: [ WebBrowser openOn: 'https://pharo-llm.github.io/privacy.html' ];
+		action: [ CopilotSettings showResearchTelemetryStudyInformation ];
 		yourself.
 
 	welcomeContainer := SpBoxLayout newTopToBottom
-		spacing: 16;
-		add: privacyLabel expand: false;
-		add: privacyDetailLabel expand: false;
-		add: termsButton expand: false;
+		spacing: 12;
+		add: messageLabel expand: true;
+		add: telemetryStateLabel expand: false;
+		add: learnMoreButton expand: false;
 		yourself.
 
-	okButton := self newButton
-		label: 'OK';
-		action: [ self handleOk ];
+	noButton := self newButton
+		label: 'No, don''t collect data';
+		action: [ self handleResearchTelemetryDeclined ];
+		yourself.
+
+	yesButton := self newButton
+		label: 'Yes, I agree';
+		action: [ self handleResearchTelemetryAccepted ];
 		yourself.
 
 	buttonRow := SpBoxLayout newHorizontal
 		spacing: 8;
-		add: okButton expand: false;
+		add: noButton expand: false;
+		add: yesButton expand: false;
 		yourself.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
 		add: welcomeContainer expand: true;
-		add: privacyConsentCheckbox expand: false;
+		add: buttonRow expand: false;
+		yourself).
+
+	self layout: self defaultLayout
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> showWelcomeStepAfterConsentDecision [
+
+	| messageLabel learnMoreButton continueButton buttonRow |
+	messageLabel := self newLabel
+		label: (CopilotSettings researchTelemetryAccepted
+			ifTrue: [ CopilotSettings researchTelemetryEnabledStatusText ]
+			ifFalse: [ CopilotSettings researchTelemetryDisabledStatusText ]);
+		yourself.
+
+	learnMoreButton := self newButton
+		label: 'Learn more';
+		icon: (self iconNamed: #glamorousBrowse);
+		action: [ CopilotSettings showResearchTelemetryStudyInformation ];
+		yourself.
+
+	continueButton := self newButton
+		label: 'Continue setup';
+		action: [ self handleOk ];
+		yourself.
+
+	buttonRow := SpBoxLayout newHorizontal
+		spacing: 8;
+		add: learnMoreButton expand: false;
+		add: continueButton expand: false;
+		yourself.
+
+	contentContainer layout: (SpBoxLayout newTopToBottom
+		spacing: 12;
+		add: messageLabel expand: true;
 		add: buttonRow expand: false;
 		yourself).
 

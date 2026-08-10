@@ -38,6 +38,7 @@ CoPCSessionArchiveUploader class >> defaultUploadUrl [
 CoPCSessionArchiveUploader class >> authorizeConnection [
 
 	self enabled ifFalse: [ ^ false ].
+	CopilotSettings researchTelemetryAccepted ifFalse: [ ^ false ].
 	self ensureInternetUploadUrl.
 	^ self authorizeConnectionUsingCandidateUrls
 ]
@@ -176,6 +177,7 @@ CoPCSessionArchiveUploader class >> timeoutSeconds: aNumber [
 CoPCSessionArchiveUploader class >> uploadArchive: archiveFile sessionId: sessionId userId: userId [
 
 	self enabled ifFalse: [ ^ nil ].
+	CopilotSettings researchTelemetryAccepted ifFalse: [ ^ nil ].
 	archiveFile ifNil: [ ^ nil ].
 	((archiveFile exists) and: [ archiveFile isFile ]) ifFalse: [ ^ nil ].
 

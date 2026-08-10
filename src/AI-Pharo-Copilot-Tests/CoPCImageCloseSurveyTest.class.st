@@ -35,6 +35,8 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 		CoPharoCopilotLogger rawLogFileReference: sessionDir / CoPharoCopilotLogger logFileName.
 		CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
 		CoPharoCopilotLogger rawUserId: 'user-test'.
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
+		tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 		aBlock
 			value: tempDir
 			value: tempEvalFile

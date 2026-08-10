@@ -300,6 +300,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetada
 
 	CopilotSettings withDefaultSettingsDo: [
 		| builder client mock logprobs contextInfo suggestions attempts attempt request response payload generated |
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
 		CopilotSettings loggingEnabled: true.
 		builder := CoPharoCopilotResultSetBuilder new.
 		mock := OAHttpTransportMockExtended new.
@@ -364,6 +365,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRejectsLowConfidenceL
 
 	CopilotSettings withDefaultSettingsDo: [
 		| builder client mock logprobs contextInfo suggestions attempts attempt |
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
 		CopilotSettings loggingEnabled: true.
 		builder := CoPharoCopilotResultSetBuilder new.
 		mock := OAHttpTransportMockExtended new.
