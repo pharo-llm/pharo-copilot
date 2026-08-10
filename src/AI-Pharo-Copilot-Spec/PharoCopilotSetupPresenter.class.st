@@ -429,7 +429,6 @@ PharoCopilotSetupPresenter >> showMissingOllamaStep [
 
 	installButton := self newButton
 		label: 'Download Ollama';
-		icon: (self iconNamed: #glamorousBrowse);
 		action: [ WebBrowser openOn: CopilotSettings ollamaDownloadPageUrl ];
 		yourself.
 
@@ -511,7 +510,6 @@ PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
 	learnMoreButton := self newButton
 		label: 'Learn more';
-		icon: (self iconNamed: #glamorousBrowse);
 		action: [
 			self
 				showResearchTelemetryLearnMoreStepReturningTo: [ self showResearchTelemetryConsentChoiceStep ]
@@ -526,7 +524,7 @@ PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 		yourself.
 
 	noButton := self newButton
-		label: 'No, don''t collect data';
+		label: 'Do not collect data';
 		action: [ self handleResearchTelemetryDeclined ];
 		yourself.
 
@@ -537,8 +535,8 @@ PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
 	buttonRow := SpBoxLayout newHorizontal
 		spacing: 10;
-		add: noButton width: 220;
-		add: yesButton width: 170;
+		add: noButton width: 230;
+		add: yesButton width: 190;
 		yourself.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
@@ -571,7 +569,7 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 	includeConsentButtons
 		ifTrue: [
 			noButton := self newButton
-				label: 'No, don''t collect data';
+				label: 'Do not collect data';
 				action: [ self handleResearchTelemetryDeclined ];
 				yourself.
 
@@ -582,9 +580,9 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 
 			buttonRow := SpBoxLayout newHorizontal
 				spacing: 10;
-				add: backButton width: 110;
-				add: noButton width: 220;
-				add: yesButton width: 170;
+				add: backButton width: 90;
+				add: noButton width: 230;
+				add: yesButton width: 190;
 				yourself ]
 		ifFalse: [
 			continueButton := self newButton
@@ -631,7 +629,6 @@ PharoCopilotSetupPresenter >> showWelcomeStepAfterConsentDecision [
 
 	learnMoreButton := self newButton
 		label: 'Learn more';
-		icon: (self iconNamed: #glamorousBrowse);
 		action: [
 			self
 				showResearchTelemetryLearnMoreStepReturningTo: [ self showWelcomeStepAfterConsentDecision ]
