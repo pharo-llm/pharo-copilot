@@ -58,8 +58,8 @@ PharoCopilotSetupPresenter >> beginIndeterminateProgressForIndex: index total: t
 PharoCopilotSetupPresenter >> defaultLayout [
 
 	^ SpBoxLayout newTopToBottom
-		  spacing: 16;
-		  borderWidth: 20;
+		  spacing: 10;
+		  borderWidth: 14;
 		  add: titleLabel expand: false;
 		  add: descriptionLabel expand: false;
 		  add: contentContainer expand: true;
@@ -162,7 +162,7 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 
 	aWindowPresenter
 		title: 'Pharo-Copilot Setup';
-		initialExtent: 640 @ 500;
+		initialExtent: 560 @ 420;
 		centered.
 
 ]
@@ -521,10 +521,10 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 		yourself.
 
 	welcomeContainer := SpBoxLayout newTopToBottom
-		spacing: 12;
+		spacing: 8;
 		add: messageLabel expand: true;
 		add: telemetryStateLabel expand: false;
-		add: learnMoreButton expand: false;
+		add: learnMoreButton width: 160;
 		yourself.
 
 	noButton := self newButton
@@ -538,13 +538,13 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 		yourself.
 
 	buttonRow := SpBoxLayout newHorizontal
-		spacing: 8;
-		add: noButton expand: false;
-		add: yesButton expand: false;
+		spacing: 10;
+		add: noButton width: 220;
+		add: yesButton width: 170;
 		yourself.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
-		spacing: 12;
+		spacing: 10;
 		add: welcomeContainer expand: true;
 		add: buttonRow expand: false;
 		yourself).
@@ -574,13 +574,13 @@ PharoCopilotSetupPresenter >> showWelcomeStepAfterConsentDecision [
 		yourself.
 
 	buttonRow := SpBoxLayout newHorizontal
-		spacing: 8;
-		add: learnMoreButton expand: false;
-		add: continueButton expand: false;
+		spacing: 10;
+		add: learnMoreButton width: 160;
+		add: continueButton width: 180;
 		yourself.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
-		spacing: 12;
+		spacing: 10;
 		add: messageLabel expand: true;
 		add: buttonRow expand: false;
 		yourself).
