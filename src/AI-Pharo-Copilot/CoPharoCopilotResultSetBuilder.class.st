@@ -50,7 +50,7 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext contextInfo: contextInfo [
 
-	| combined fallback reranker topStatus |
+	| combined fallback reranker topStatus prefix receiverName |
 	combined := OrderedCollection new.
 	entryCollection ifNotNil: [ combined addAll: entryCollection ].
 
@@ -59,6 +59,10 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 			fallbackCompletionEntriesFor: aContext
 			excluding: combined.
 		^ fallback asArray ].
+
+	prefix := self completionPrefixFor: aContext contextInfo: contextInfo.
+	receiverName := self textualReceiverBeforeCompletionIn: prefix.
+	receiverName isEmpty ifTrue: [ ^ combined asArray ].
 
 	reranker := CoPCSemanticReranker
 		builder: self
@@ -256,6 +260,14 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		at: #timestamp put: DateAndTime now asString;
 		at: #rejected put: OrderedCollection new].
 
+	(self shouldOpenSemanticSelectorFastPathFor: context prefix: prefix) ifTrue: [
+		| entries position |
+		entries := self semanticSelectorFastPathEntriesFor: context contextInfo: contextInfo.
+		entries isEmpty ifFalse: [
+			position := self menuPositionForContextOrDefault: context.
+			self openCompletionMenuFor: context entries: entries position: position.
+			^ self emptyResultSet ] ].
+
 	cached := self
 		fastCachedSuggestionsFor: context
 		prefix: prefix
@@ -264,14 +276,6 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	cached ifNotNil: [
 		(self openCachedSuggestions: cached for: context prefix: prefix suffix: suffix contextInfo: contextInfo)
 			ifTrue: [ ^ self emptyResultSet ] ].
-
-	(self shouldOpenSemanticSelectorFastPathFor: context prefix: prefix) ifTrue: [
-		| entries position |
-		entries := self semanticSelectorFastPathEntriesFor: context contextInfo: contextInfo.
-		entries isEmpty ifFalse: [
-			position := self menuPositionForContextOrDefault: context.
-			self openCompletionMenuFor: context entries: entries position: position.
-			^ self emptyResultSet ] ].
 	
 	delay := self requestDelayForSnapshot: snapshot.
 
@@ -583,16 +587,47 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext contextInfo: contextInfo [
 
-	| copilotEntries |
-	copilotEntries := self
-		modelCompletionEntriesFrom: contentCollection
+	| cleaned sessionId copilotEntries |
+	cleaned := self
+		normalizedCompletionContentsFrom: contentCollection
 		inContext: aContext
 		contextInfo: contextInfo.
+
+	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
+
+	copilotEntries := cleaned collect: [ :each |
+		| entry |
+		entry := CoCopilotEntry
+			contents: each
+			description: (self descriptionForSuggestion: each inContext: aContext).
+
+		entry label: (self menuLabelForSuggestion: each contextInfo: contextInfo).
+
+		(entry respondsTo: #sessionId:) ifTrue: [
+			entry sessionId: sessionId ].
+
+		entry ].
 
 	^ self
 		appendFallbackCompletionEntriesTo: copilotEntries
 		inContext: aContext
 		contextInfo: contextInfo
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> completionPrefixFor: aContext contextInfo: contextInfo [
+
+	contextInfo ifNotNil: [
+		^ contextInfo
+			at: #prefix
+			ifAbsent: [
+				aContext
+					ifNil: [ '' ]
+					ifNotNil: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ] ] ].
+
+	^ aContext
+		ifNil: [ '' ]
+		ifNotNil: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ]
 ]
 
 { #category : 'semantic context' }
@@ -991,11 +1026,13 @@ CoPharoCopilotResultSetBuilder >> fastCacheContextFor: aContext prefix: prefixSt
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> fastCachedSuggestionsFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
-	^ self
-		cachedSuggestionsForPrefix: prefixString
+	| cachedContent |
+	cachedContent := self
+		exactCachedSuggestionsForPrefix: prefixString
 		suffix: suffixString
-		classContext: (self fastCacheContextFor: aContext prefix: prefixString)
-		contextInfo: contextInfo
+		classContext: (self fastCacheContextFor: aContext prefix: prefixString).
+	contextInfo at: #cacheHit put: cachedContent notNil.
+	^ cachedContent
 ]
 
 { #category : 'new' }
@@ -1641,32 +1678,6 @@ CoPharoCopilotResultSetBuilder >> menuPositionForContextOrDefault: aContext [
 	^ position
 ]
 
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> modelCompletionEntriesFrom: contentCollection inContext: aContext contextInfo: contextInfo [
-
-	| cleaned sessionId |
-	cleaned := self
-		normalizedCompletionContentsFrom: contentCollection
-		inContext: aContext
-		contextInfo: contextInfo.
-
-	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
-
-	^ cleaned collect: [ :each |
-		| entry |
-		entry := CoCopilotEntry
-			contents: each
-			description: (self descriptionForSuggestion: each inContext: aContext).
-
-		entry label: (self menuLabelForSuggestion: each contextInfo: contextInfo).
-
-		(entry respondsTo: #sessionId:) ifTrue: [
-			entry sessionId: sessionId ].
-
-		entry ]
-]
-
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> methodClassForBehavior: behavior selector: selector [
 
 	| compiledMethod |
@@ -1915,17 +1926,10 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 CoPharoCopilotResultSetBuilder >> openCachedSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
 	| entries position |
-	entries := (self shouldRerankCachedSuggestionsFor: aContext prefix: prefixString)
-		ifTrue: [
-			self
-				completionEntriesFrom: suggestions
-				inContext: aContext
-				contextInfo: contextInfo ]
-		ifFalse: [
-			self
-				modelCompletionEntriesFrom: suggestions
-				inContext: aContext
-				contextInfo: contextInfo ].
+	entries := self
+		completionEntriesFrom: suggestions
+		inContext: aContext
+		contextInfo: contextInfo.
 	entries isEmpty ifTrue: [ ^ false ].
 
 	position := self menuPositionForContextOrDefault: aContext.
@@ -2806,13 +2810,6 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForPrefix: prefixString
 	^ true
 ]
 
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> shouldRerankCachedSuggestionsFor: aContext prefix: prefixString [
-
-	^ (self textualReceiverBeforeCompletionIn: prefixString) isEmpty not
-]
-
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> sortedSelectorsFor: aBehavior [
 	"Return a cached sorted-selectors array for aBehavior. Invalidates when the methodDict
 	identity or size changes."

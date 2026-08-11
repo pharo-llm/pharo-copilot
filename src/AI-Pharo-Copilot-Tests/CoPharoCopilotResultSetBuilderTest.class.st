@@ -105,6 +105,32 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompleti
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testFastCacheIgnoresNearMatchForImmediateCompletion [
+
+	| b ctx contextInfo cached |
+	b := CopilotTestableBuilder new.
+	ctx := CoCopilotContextMock new
+		source: 'self si';
+		position: 'self si' size;
+		yourself.
+	b completionCache
+		at: 'self s'
+		suffix: ''
+		context: (b fastCacheContextFor: ctx prefix: 'self s')
+		put: { 'inspect' }.
+
+	contextInfo := Dictionary new.
+	cached := b
+		fastCachedSuggestionsFor: ctx
+		prefix: 'self si'
+		suffix: ''
+		contextInfo: contextInfo.
+
+	self assert: cached isNil.
+	self deny: (contextInfo at: #cacheHit)
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testBuildCompletionReranksCachedSemanticSuggestion [
 
 	| b ctx entries |
