@@ -58,6 +58,8 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 	entryCollection ifNotNil: [ combined addAll: entryCollection ].
 
 	contextInfo ifNotNil: [
+		(contextInfo at: #skipSemanticCompletionEnrichment ifAbsent: [ false ])
+			ifTrue: [ ^ combined asArray ].
 		(contextInfo at: #semanticFusionApplied ifAbsent: [ false ])
 			ifTrue: [ ^ combined asArray ] ].
 
@@ -272,14 +274,6 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		at: #timestamp put: DateAndTime now asString;
 		at: #rejected put: OrderedCollection new].
 
-	(self shouldOpenSemanticSelectorFastPathFor: context prefix: prefix) ifTrue: [
-		| entries position |
-		entries := self semanticSelectorFastPathEntriesFor: context contextInfo: contextInfo.
-		entries isEmpty ifFalse: [
-			position := self menuPositionForContextOrDefault: context.
-			self openCompletionMenuFor: context entries: entries position: position.
-			^ self emptyResultSet ] ].
-
 	cached := self
 		fastCachedSuggestionsFor: context
 		prefix: prefix
@@ -288,6 +282,14 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	cached ifNotNil: [
 		(self openCachedSuggestions: cached for: context prefix: prefix suffix: suffix contextInfo: contextInfo)
 			ifTrue: [ ^ self emptyResultSet ] ].
+
+	(self shouldOpenSemanticSelectorFastPathFor: context prefix: prefix) ifTrue: [
+		| entries position |
+		entries := self semanticSelectorFastPathEntriesFor: context contextInfo: contextInfo.
+		entries isEmpty ifFalse: [
+			position := self menuPositionForContextOrDefault: context.
+			self openCompletionMenuFor: context entries: entries position: position.
+			^ self emptyResultSet ] ].
 	
 	delay := self requestDelayForSnapshot: snapshot.
 
@@ -2161,11 +2163,19 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> openCachedSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
-	| entries position |
+	| entries position info previousSkip |
+	info := contextInfo ifNil: [ Dictionary new ].
+	previousSkip := info
+		at: #skipSemanticCompletionEnrichment
+		ifAbsent: [ false ].
+	info at: #skipSemanticCompletionEnrichment put: true.
 	entries := self
 		completionEntriesFrom: suggestions
 		inContext: aContext
-		contextInfo: contextInfo.
+		contextInfo: info.
+	previousSkip
+		ifTrue: [ info at: #skipSemanticCompletionEnrichment put: true ]
+		ifFalse: [ info removeKey: #skipSemanticCompletionEnrichment ifAbsent: [ ] ].
 	entries isEmpty ifTrue: [ ^ false ].
 
 	position := self menuPositionForContextOrDefault: aContext.
@@ -2221,13 +2231,13 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			suggestions := self fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
 			self cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext
 		].
-		self cacheFastSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString.
 		semanticDone wait.
 		combined := self
 			fuseModelSuggestions: suggestions
 			semanticEntries: semanticEntries
 			context: aContext
 			contextInfo: contextInfo.
+		self cacheFastSuggestions: combined for: aContext prefix: prefixString suffix: suffixString.
 
 		loggingOn ifTrue: [
 			sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].

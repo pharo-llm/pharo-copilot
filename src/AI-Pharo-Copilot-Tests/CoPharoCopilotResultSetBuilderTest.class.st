@@ -139,12 +139,11 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompleti
 	b buildCompletion.
 
 	entries := b openedEntries.
-	self assert: entries size equals: 2.
+	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'CompletedValue'.
-	self assert: entries second contents equals: 'fallbackCompletion'.
 	self assert: b scheduledDelay isNil.
 	self assert: b classContextCallCount equals: 0.
-	self assert: b fallbackCallCount equals: 1.
+	self assert: b fallbackCallCount equals: 0.
 	self assert: b semanticAstCallCount equals: 0
 ]
 
@@ -175,7 +174,7 @@ CoPharoCopilotResultSetBuilderTest >> testFastCacheIgnoresNearMatchForImmediateC
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionReranksCachedSemanticSuggestion [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCacheBeforeSemanticRerank [
 
 	| b ctx entries |
 	b := CopilotTestableBuilder new.
@@ -194,8 +193,8 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionReranksCachedSemanticSu
 	b buildCompletion.
 
 	entries := b openedEntries.
-	self assert: b fallbackCallCount equals: 1.
-	self assert: entries first contents equals: 'fallbackCompletion'.
+	self assert: b fallbackCallCount equals: 0.
+	self assert: entries first contents equals: 'DefinitelyNotASelector'.
 	self assert: b scheduledDelay isNil
 ]
 

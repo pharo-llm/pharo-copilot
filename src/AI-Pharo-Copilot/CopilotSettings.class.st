@@ -225,7 +225,7 @@ CopilotSettings class >> completionSuggestionsCount: anObject [
 CopilotSettings class >> completionTopLogprobs [
 	"Answer how many likely tokens Ollama should return at each generated token position."
 
-	^ completionTopLogprobs ifNil: [ completionTopLogprobs := 5 ]
+^ completionTopLogprobs ifNil: [ completionTopLogprobs := 1 ]
 ]
 
 { #category : 'settings' }
@@ -708,12 +708,12 @@ CopilotSettings class >> initializeDefaults [
 	seed := 0.
 	modelKeepAlive := '30m'.
 	customParameters := Dictionary new.
-	maxInstanceMethods := 10.
-	maxClassMethods := 5.
+	maxInstanceMethods := 6.
+	maxClassMethods := 3.
 	minimumPrefixLength := 3.
 	completionSuggestionsCount := 1.
 	completionLogprobsEnabled := true.
-	completionTopLogprobs := 5.
+	completionTopLogprobs := 1.
 	backgroundColor := self defaultBackgroundColor.
 	installModelUserConsent := false.
 	imageCloseSurveyEnabled := true.
@@ -1173,7 +1173,7 @@ CopilotSettings class >> loggingEnabled: aBoolean [
 { #category : 'context' }
 CopilotSettings class >> maxClassMethods [
 
-	^ maxClassMethods ifNil: [ maxClassMethods := 5 ]
+	^ maxClassMethods ifNil: [ maxClassMethods := 3 ]
 ]
 
 { #category : 'context' }
@@ -1186,7 +1186,7 @@ CopilotSettings class >> maxClassMethods: anObject [
 { #category : 'context' }
 CopilotSettings class >> maxInstanceMethods [
 
-	^ maxInstanceMethods ifNil: [ maxInstanceMethods := 10 ]
+	^ maxInstanceMethods ifNil: [ maxInstanceMethods := 6 ]
 ]
 
 { #category : 'context' }
@@ -2338,7 +2338,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #maxInstanceMethods:;
 					default: self maxInstanceMethods;
 					description:
-						'Maximum number of instance-side methods to include in the class context sent with completions (1-200). Default: 10'.
+						'Maximum number of instance-side methods to include in the class context sent with completions (1-200). Default: 6'.
 
 				(aBuilder setting: #maxClassMethods)
 					order: 0.67;
@@ -2348,7 +2348,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					setSelector: #maxClassMethods:;
 					default: self maxClassMethods;
 					description:
-						'Maximum number of class-side methods to include in the class context sent with completions (1-100). Default: 5'.
+						'Maximum number of class-side methods to include in the class context sent with completions (1-100). Default: 3'.
 
 				(aBuilder setting: #minimumPrefixLength)
 					order: 0.68;
@@ -2669,7 +2669,13 @@ CopilotSettings class >> upgradeLegacyCompletionDefaults [
 	completionIdleMilliseconds = 300 ifTrue: [
 		completionIdleMilliseconds := 75 ].
 	numPredict = 64 ifTrue: [
-		numPredict := 32 ]
+		numPredict := 32 ].
+	maxInstanceMethods = 10 ifTrue: [
+		maxInstanceMethods := 6 ].
+	maxClassMethods = 5 ifTrue: [
+		maxClassMethods := 3 ].
+	completionTopLogprobs = 5 ifTrue: [
+		completionTopLogprobs := 1 ]
 ]
 
 { #category : 'settings' }
