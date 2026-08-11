@@ -78,7 +78,7 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotBuildClassContex
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompletionWithoutClassContext [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompletionWithLocalFallbackWithoutClassContext [
 
 	| b ctx entries |
 	b := CopilotTestableBuilder new.
@@ -96,11 +96,12 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompleti
 	b buildCompletion.
 
 	entries := b openedEntries.
-	self assert: entries size equals: 1.
+	self assert: entries size equals: 2.
 	self assert: entries first contents equals: 'CompletedValue'.
+	self assert: entries second contents equals: 'fallbackCompletion'.
 	self assert: b scheduledDelay isNil.
 	self assert: b classContextCallCount equals: 0.
-	self assert: b fallbackCallCount equals: 0.
+	self assert: b fallbackCallCount equals: 1.
 	self assert: b semanticAstCallCount equals: 0
 ]
 
@@ -322,7 +323,7 @@ CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromWithTextInput [
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSkipFallbackWhenAISuggestionExists [
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesAppendFallbackWhenAISuggestionExists [
 
 	| builder context entries |
 	builder := CopilotTestableBuilder new.
@@ -333,8 +334,10 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSkipFallbackWhenAISug
 		inContext: context
 		contextInfo: Dictionary new.
 
-	self assert: entries size equals: 1.
-	self assert: builder fallbackCallCount equals: 0
+	self assert: entries size equals: 2.
+	self assert: entries first contents equals: 'aiCompletion'.
+	self assert: entries second contents equals: 'fallbackCompletion'.
+	self assert: builder fallbackCallCount equals: 1
 ]
 
 { #category : 'tests' }

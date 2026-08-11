@@ -62,7 +62,12 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 
 	prefix := self completionPrefixFor: aContext contextInfo: contextInfo.
 	receiverName := self textualReceiverBeforeCompletionIn: prefix.
-	receiverName isEmpty ifTrue: [ ^ combined asArray ].
+	receiverName isEmpty ifTrue: [
+		fallback := self
+			fallbackCompletionEntriesFor: aContext
+			excluding: combined.
+		combined addAll: fallback.
+		^ combined asArray ].
 
 	reranker := CoPCSemanticReranker
 		builder: self
