@@ -234,7 +234,7 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
 
-	| context snapshot prefix suffix contextInfo delay |
+	| context snapshot prefix suffix contextInfo delay cached |
 	context := completionContext.
 
 	(self shouldRequestCompletionForContext: context) ifFalse: [ ^ self emptyResultSet ].
@@ -263,6 +263,15 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 			position := self menuPositionForContextOrDefault: context.
 			self openCompletionMenuFor: context entries: entries position: position.
 			^ self emptyResultSet ] ].
+
+	cached := self
+		fastCachedSuggestionsFor: context
+		prefix: prefix
+		suffix: suffix
+		contextInfo: contextInfo.
+	cached ifNotNil: [
+		(self openCachedSuggestions: cached for: context prefix: prefix suffix: suffix contextInfo: contextInfo)
+			ifTrue: [ ^ self emptyResultSet ] ].
 	
 	delay := self requestDelayForSnapshot: snapshot.
 
@@ -302,6 +311,18 @@ CoPharoCopilotResultSetBuilder >> cacheSuggestions: suggestions prefix: prefixSt
 		at: prefixString
 		suffix: suffixString
 		context: classContext
+		put: suggestions asArray
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> cacheFastSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString [
+
+	suggestions isEmpty ifTrue: [ ^ self ].
+
+	self completionCache
+		at: prefixString
+		suffix: suffixString
+		context: (self fastCacheContextFor: aContext prefix: prefixString)
 		put: suggestions asArray
 ]
 
@@ -962,6 +983,34 @@ CoPharoCopilotResultSetBuilder >> fallbackResultSetFor: aContext [
 			buildCompletion ]
 		on: Error
 		do: [ nil ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> fastCacheContextFor: aContext prefix: prefixString [
+
+	| behavior stamp |
+	behavior := self behaviorFor: aContext.
+	behavior ifNil: [ ^ 'fast|no-behavior' ].
+
+	stamp := self classStampFor: behavior.
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: 'fast|';
+			nextPutAll: behavior identityHash asString;
+			nextPut: $|;
+			nextPutAll: stamp first asString;
+			nextPut: $|;
+			nextPutAll: stamp second asString ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> fastCachedSuggestionsFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+
+	^ self
+		cachedSuggestionsForPrefix: prefixString
+		suffix: suffixString
+		classContext: (self fastCacheContextFor: aContext prefix: prefixString)
+		contextInfo: contextInfo
 ]
 
 { #category : 'new' }
@@ -1853,6 +1902,21 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 ]
 
 { #category : 'new' }
+CoPharoCopilotResultSetBuilder >> openCachedSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+
+	| entries position |
+	entries := self
+		completionEntriesFrom: suggestions
+		inContext: aContext
+		contextInfo: contextInfo.
+	entries isEmpty ifTrue: [ ^ false ].
+
+	position := self menuPositionForContextOrDefault: aContext.
+	self openCompletionMenuFor: aContext entries: entries position: position.
+	^ true
+]
+
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> positionFromSnapshot: snapshot [
 
 	^ snapshot at: #position ifAbsent: [ 0 ]
@@ -1883,6 +1947,7 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			suggestions := self fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
 			self cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext
 		].
+		self cacheFastSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString.
 
 		loggingOn ifTrue: [
 			sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
@@ -2666,7 +2731,7 @@ CoPharoCopilotResultSetBuilder >> selectorHeaderFor: aString [
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
 	"NO trigger while cursor is inside the same word."
-	| pair source pos prefix token receiver before after |
+	| pair source pos before after |
 	aContext ifNil: [ ^ false ].
 
 	pair := self safeSourceAndPositionFor: aContext.
@@ -2680,14 +2745,6 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
 
 	"Cursor inside a word => do NOT initialize completion engine."
 	((self isWordChar: before) and: [ self isWordChar: after ]) ifTrue: [ ^ false ].
-
-	prefix := pos > 0
-		ifTrue: [ source copyFrom: 1 to: pos ]
-		ifFalse: [ '' ].
-	token := self trailingWordFragmentIn: prefix.
-	(token isEmpty not and: [ token size < self minimumPrefixLength ]) ifTrue: [
-		receiver := self textualReceiverBeforeCompletionIn: prefix.
-		receiver isEmpty ifTrue: [ ^ false ] ].
 
 	(self isInsideCommentOrStringIn: source position: pos) ifTrue: [ ^ false ].
 

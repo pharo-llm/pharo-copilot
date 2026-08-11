@@ -78,6 +78,31 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotBuildClassContex
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompletionWithoutClassContext [
+
+	| b ctx entries |
+	b := CopilotTestableBuilder new.
+	ctx := CoCopilotContextMock new
+		source: 'temporaryName';
+		position: 'temporaryName' size;
+		yourself.
+	b completionContext: ctx.
+	b completionCache
+		at: 'temporaryName'
+		suffix: ''
+		context: (b fastCacheContextFor: ctx prefix: 'temporaryName')
+		put: { 'CompletedValue' }.
+
+	b buildCompletion.
+
+	entries := b openedEntries.
+	self assert: entries size equals: 1.
+	self assert: entries first contents equals: 'CompletedValue'.
+	self assert: b scheduledDelay isNil.
+	self assert: b classContextCallCount equals: 0
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalFastPathForSemanticSelectorTail [
 
 	| b ctx entries |
@@ -906,7 +931,7 @@ CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerInsideStringOrComment 
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerShortTokenAfterLongPrefix [
+CoPharoCopilotResultSetBuilderTest >> testShouldTriggerShortTokenAfterLongPrefix [
 
 	| b ctx source |
 	b := CoPharoCopilotResultSetBuilder new.
@@ -916,7 +941,7 @@ CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerShortTokenAfterLongPre
 		position: source size;
 		yourself.
 
-	self deny: (b shouldRequestCompletionForContext: ctx)
+	self assert: (b shouldRequestCompletionForContext: ctx)
 ]
 
 { #category : 'tests' }
