@@ -22,16 +22,16 @@ Metacello new
   load.
 ```
 
-After the setup agreement is accepted, Pharo-Copilot registers this image with
-the public session receiver at `http://193.49.213.134:9092/api/sessions`.
-The setup window reports `Connection authorized` or `Connection denied` and then
-continues the normal model setup pipeline.
+On first launch, Pharo-Copilot asks whether you want to participate in anonymous
+Pharo usage research. Telemetry is off by default; choosing
+"No, don't collect data" or closing the dialog keeps telemetry disabled and
+still lets setup continue.
 
-To point a development image at a different receiver:
+If you explicitly agree, Pharo-Copilot can send anonymous IDE interaction events
+to the Inria-hosted research receiver configured by
+`CoPCSessionArchiveUploader`. The default public receiver is
+`http://193.49.213.134:9092/api/sessions`.
 
-```smalltalk
-CoPCSessionArchiveUploader uploadUrl: 'http://YOUR_SERVER_HOST:3000/api/sessions'.
-```
 
 ## Troubleshooting Ollama model downloads
 
@@ -42,8 +42,3 @@ You can install the default model manually with:
 ```sh
 ollama pull pharo-llm/Qwen2.5-Coder-SFT:q4_K_M
 ```
-
-
-# Example
-
-https://github.com/user-attachments/assets/dc33edb3-6e3c-4d1d-a6f8-550f03c17631

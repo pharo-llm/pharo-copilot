@@ -159,7 +159,7 @@ evaluator recordSuggestionRejected: (CoCopilotEntry contents: 'rejected') contex
 { #category : 'running' }
 CoSuggestionEvaluatorTest >> testSavePersistentStatsProducesJson [
 
-    | tempFs tempDir tempFile sessionDir originalReference originalLogRef originalLogsRef originalSessionRef originalArchiveRef originalUserId originalSessionId originalStartedAt originalArchived originalLoggingEnabled jsonLine parsed |
+    | tempFs tempDir tempFile sessionDir originalReference originalLogRef originalLogsRef originalSessionRef originalArchiveRef originalUserId originalSessionId originalStartedAt originalArchived originalSettings jsonLine parsed |
     tempFs := FileSystem memory.
             tempDir := tempFs
             / CoPharoCopilotLogger pharoCopilotDirectoryName.
@@ -177,9 +177,10 @@ CoSuggestionEvaluatorTest >> testSavePersistentStatsProducesJson [
     originalSessionId := CoPharoCopilotLogger instVarNamed: #sessionId.
     originalStartedAt := CoPharoCopilotLogger instVarNamed: #sessionStartedAt.
     originalArchived := CoPharoCopilotLogger instVarNamed: #sessionArchived.
-    originalLoggingEnabled := CopilotSettings loggingEnabled.
+    originalSettings := CopilotSettings settingsSnapshot.
 
     [
+            CopilotSettings recordResearchTelemetryConsentAccepted: true.
             CopilotSettings loggingEnabled: true.
             CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
             CoPharoCopilotLogger rawSessionDirectoryReference: sessionDir.
@@ -205,7 +206,7 @@ CoSuggestionEvaluatorTest >> testSavePersistentStatsProducesJson [
 			CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
 			CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
 			CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived.
-			CopilotSettings loggingEnabled: originalLoggingEnabled ]
+			CopilotSettings restoreSettingsFromSnapshot: originalSettings ]
 ]
 
 { #category : 'running' }

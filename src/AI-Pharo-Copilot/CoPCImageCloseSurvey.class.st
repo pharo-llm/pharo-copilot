@@ -78,6 +78,21 @@ CoPCImageCloseSurvey class >> availableUserExperienceLabelsByValue [
 	^ labels
 ]
 
+{ #category : 'session management' }
+CoPCImageCloseSurvey class >> archiveCurrentSessionAfterPromptUsing: uiManager [
+
+	CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ nil ].
+
+	(self shouldShowArchiveProgressWindowUsing: uiManager) ifFalse: [
+		^ CoPharoCopilotLogger archiveCurrentSession ].
+
+	^ [
+		CoPCSessionArchiveProgressPresenter openForCurrentSessionAndWait
+	] on: Error do: [ :ex |
+		self logSurveyError: ex.
+		CoPharoCopilotLogger archiveCurrentSession ]
+]
+
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 
@@ -178,7 +193,7 @@ CoPCImageCloseSurvey class >> promptBeforeImageQuitUsing: uiManager [
 			self logSurveyError: ex.
 			^ nil ]
 	] ensure: [
-		CoPharoCopilotLogger archiveCurrentSession.
+		self archiveCurrentSessionAfterPromptUsing: uiManager.
 		promptInProgress := false ]
 ]
 
@@ -280,8 +295,23 @@ CoPCImageCloseSurvey class >> shutDown: isImageQuitting [
 			] on: Error do: [ :ex |
 				self logSurveyError: ex ] ]
 	] ensure: [
-		isImageQuitting ifTrue: [ CoPharoCopilotLogger archiveCurrentSession ].
+		isImageQuitting ifTrue: [
+			self archiveCurrentSessionAfterPromptUsing: self uiManager ].
 		promptInProgress := false ]
+]
+
+{ #category : 'session management' }
+CoPCImageCloseSurvey class >> shouldShowArchiveProgressWindowUsing: uiManager [
+
+	| presenterClass |
+	uiManager ifNil: [ ^ false ].
+	uiManager class name = #NonInteractiveUIManager ifTrue: [ ^ false ].
+	(uiManager respondsTo: #defer:) ifFalse: [ ^ false ].
+
+	presenterClass := Smalltalk globals
+		at: #CoPCSessionArchiveProgressPresenter
+		ifAbsent: [ nil ].
+	^ presenterClass notNil
 ]
 
 { #category : 'session management' }

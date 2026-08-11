@@ -21,7 +21,9 @@ Class {
 		'classContextOldestTime',
 		'lastSelectorPrefix',
 		'lastSelectorResult',
-		'sortedSelectorsCache'
+		'sortedSelectorsCache',
+		'lastSemanticReceiverKey',
+		'lastSemanticReceiverValue'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -48,7 +50,7 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext contextInfo: contextInfo [
 
-	| combined fallback reranker topStatus |
+	| combined fallback reranker topStatus prefix receiverName |
 	combined := OrderedCollection new.
 	entryCollection ifNotNil: [ combined addAll: entryCollection ].
 
@@ -57,6 +59,15 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 			fallbackCompletionEntriesFor: aContext
 			excluding: combined.
 		^ fallback asArray ].
+
+	prefix := self completionPrefixFor: aContext contextInfo: contextInfo.
+	receiverName := self textualReceiverBeforeCompletionIn: prefix.
+	receiverName isEmpty ifTrue: [
+		fallback := self
+			fallbackCompletionEntriesFor: aContext
+			excluding: combined.
+		combined addAll: fallback.
+		^ combined asArray ].
 
 	reranker := CoPCSemanticReranker
 		builder: self
@@ -232,7 +243,7 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
 
-	| context snapshot prefix suffix contextInfo delay classContext cached |
+	| context snapshot prefix suffix contextInfo delay cached |
 	context := completionContext.
 
 	(self shouldRequestCompletionForContext: context) ifFalse: [ ^ self emptyResultSet ].
@@ -240,6 +251,12 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	snapshot := self contextSnapshotFor: context.
 	prefix := snapshot at: #prefix.
 	suffix := snapshot at: #suffix.
+	(self
+		shouldUseFallbackCompletionForContext: context
+		prefix: prefix)
+			ifTrue: [
+				^ (self fallbackResultSetFor: context)
+					ifNil: [ self emptyResultSet ] ].
 	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
 
 	self isLoggingEnabled ifTrue: [
@@ -255,33 +272,16 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 			position := self menuPositionForContextOrDefault: context.
 			self openCompletionMenuFor: context entries: entries position: position.
 			^ self emptyResultSet ] ].
-	
-	classContext := self classContextFor: context prefix: prefix.
-	cached := self
-		          cachedSuggestionsForPrefix: prefix
-		          suffix: suffix
-		          classContext: classContext
-		          contextInfo: contextInfo.
-	cached ifNotNil: [
-			| entries position sessionId sessionPayload |
-			entries := self completionEntriesFrom: cached inContext: context contextInfo: contextInfo.
-			entries isEmpty ifFalse: [
-					self isLoggingEnabled ifTrue: [
-						sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
-						sessionId ifNotNil: [
-							sessionPayload := CoPharoCopilotLogger
-								initialCompletionPayloadForContextInfo: contextInfo
-								prefix: prefix
-								suffix: suffix
-								classContext: classContext
-								cacheStats: self completionCache statisticsDictionary.
-							CoPharoCopilotLogger
-								writeCompletionSession: sessionPayload
-								sessionId: sessionId ] ].
-					position := self menuPositionForContextOrDefault: context.
-					self openCompletionMenuFor: context entries: entries position: position.
-					^ self emptyResultSet ] ].
 
+	cached := self
+		fastCachedSuggestionsFor: context
+		prefix: prefix
+		suffix: suffix
+		contextInfo: contextInfo.
+	cached ifNotNil: [
+		(self openCachedSuggestions: cached for: context prefix: prefix suffix: suffix contextInfo: contextInfo)
+			ifTrue: [ ^ self emptyResultSet ] ].
+	
 	delay := self requestDelayForSnapshot: snapshot.
 
 	self
@@ -320,6 +320,18 @@ CoPharoCopilotResultSetBuilder >> cacheSuggestions: suggestions prefix: prefixSt
 		at: prefixString
 		suffix: suffixString
 		context: classContext
+		put: suggestions asArray
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> cacheFastSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString [
+
+	suggestions isEmpty ifTrue: [ ^ self ].
+
+	self completionCache
+		at: prefixString
+		suffix: suffixString
+		context: (self fastCacheContextFor: aContext prefix: prefixString)
 		put: suggestions asArray
 ]
 
@@ -607,6 +619,22 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 		contextInfo: contextInfo
 ]
 
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> completionPrefixFor: aContext contextInfo: contextInfo [
+
+	contextInfo ifNotNil: [
+		^ contextInfo
+			at: #prefix
+			ifAbsent: [
+				aContext
+					ifNil: [ '' ]
+					ifNotNil: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ] ] ].
+
+	^ aContext
+		ifNil: [ '' ]
+		ifNotNil: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ]
+]
+
 { #category : 'semantic context' }
 CoPharoCopilotResultSetBuilder >> completionContractFor: aContext prefix: prefixString [
 
@@ -781,6 +809,14 @@ lastSnapshotKey := { source. position }.
 		                     yourself.
 
 	^ lastSnapshotValue
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> cachedSemanticReceiverInfoForKey: key [
+
+	(lastSemanticReceiverKey notNil and: [ lastSemanticReceiverKey = key ])
+		ifTrue: [ ^ lastSemanticReceiverValue ].
+	^ nil
 ]
 
 { #category : 'initialization' }
@@ -972,6 +1008,36 @@ CoPharoCopilotResultSetBuilder >> fallbackResultSetFor: aContext [
 			buildCompletion ]
 		on: Error
 		do: [ nil ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> fastCacheContextFor: aContext prefix: prefixString [
+
+	| behavior stamp |
+	behavior := self behaviorFor: aContext.
+	behavior ifNil: [ ^ 'fast|no-behavior' ].
+
+	stamp := self classStampFor: behavior.
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: 'fast|';
+			nextPutAll: behavior identityHash asString;
+			nextPut: $|;
+			nextPutAll: stamp first asString;
+			nextPut: $|;
+			nextPutAll: stamp second asString ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> fastCachedSuggestionsFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+
+	| cachedContent |
+	cachedContent := self
+		exactCachedSuggestionsForPrefix: prefixString
+		suffix: suffixString
+		classContext: (self fastCacheContextFor: aContext prefix: prefixString).
+	contextInfo at: #cacheHit put: cachedContent notNil.
+	^ cachedContent
 ]
 
 { #category : 'new' }
@@ -1617,7 +1683,6 @@ CoPharoCopilotResultSetBuilder >> menuPositionForContextOrDefault: aContext [
 	^ position
 ]
 
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> methodClassForBehavior: behavior selector: selector [
 
 	| compiledMethod |
@@ -1863,6 +1928,21 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 ]
 
 { #category : 'new' }
+CoPharoCopilotResultSetBuilder >> openCachedSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+
+	| entries position |
+	entries := self
+		completionEntriesFrom: suggestions
+		inContext: aContext
+		contextInfo: contextInfo.
+	entries isEmpty ifTrue: [ ^ false ].
+
+	position := self menuPositionForContextOrDefault: aContext.
+	self openCompletionMenuFor: aContext entries: entries position: position.
+	^ true
+]
+
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> positionFromSnapshot: snapshot [
 
 	^ snapshot at: #position ifAbsent: [ 0 ]
@@ -1893,6 +1973,7 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			suggestions := self fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
 			self cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext
 		].
+		self cacheFastSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString.
 
 		loggingOn ifTrue: [
 			sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
@@ -2150,8 +2231,18 @@ CoPharoCopilotResultSetBuilder >> isClassOrTrait: anObject [
 { #category : 'semantic context' }
 CoPharoCopilotResultSetBuilder >> isScriptingContext: aContext [
 
-	^ (aContext notNil and: [ aContext respondsTo: #isScripting ])
-		and: [ [ aContext isScripting ] on: Error do: [ false ] ]
+	| engine |
+	aContext ifNil: [ ^ false ].
+
+	(aContext respondsTo: #isScripting) ifTrue: [
+		^ [ aContext isScripting ] on: Error do: [ false ] ].
+
+	engine := (aContext respondsTo: #engine)
+		ifTrue: [ [ aContext engine ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+
+	^ (engine notNil and: [ engine respondsTo: #isScripting ])
+		and: [ [ engine isScripting ] on: Error do: [ false ] ]
 ]
 
 { #category : 'semantic context' }
@@ -2373,7 +2464,7 @@ CoPharoCopilotResultSetBuilder >> semanticCompletionContextFor: aContext prefix:
 { #category : 'semantic context' }
 CoPharoCopilotResultSetBuilder >> semanticReceiverInfoFor: aContext prefix: prefixString [
 
-	| source position behavior node receiverNode receiverName receiverTypes token |
+	| source position behavior key cached node receiverNode receiverName receiverTypes token info |
 	source := [ aContext source ifNil: [ prefixString ifNil: [ '' ] ] ]
 		on: Error
 		do: [ prefixString ifNil: [ '' ] ].
@@ -2382,6 +2473,13 @@ CoPharoCopilotResultSetBuilder >> semanticReceiverInfoFor: aContext prefix: pref
 		do: [ source size ].
 	position := (position max: 0) min: source size.
 	behavior := self behaviorFor: aContext.
+	key := self
+		semanticReceiverInfoCacheKeyForSource: source
+		position: position
+		behavior: behavior
+		prefix: prefixString.
+	cached := self cachedSemanticReceiverInfoForKey: key.
+	cached ifNotNil: [ ^ cached ].
 
 	node := self
 		semanticAstNodeFor: aContext
@@ -2419,10 +2517,29 @@ CoPharoCopilotResultSetBuilder >> semanticReceiverInfoFor: aContext prefix: pref
 			inContext: aContext
 			behavior: behavior ].
 
-	^ Dictionary new
+	info := Dictionary new
 		at: #receiver put: receiverName;
 		at: #types put: receiverTypes;
-		yourself
+		yourself.
+	^ self cacheSemanticReceiverInfo: info forKey: key
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> cacheSemanticReceiverInfo: info forKey: key [
+
+	lastSemanticReceiverKey := key.
+	lastSemanticReceiverValue := info.
+	^ info
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> semanticReceiverInfoCacheKeyForSource: sourceString position: positionInteger behavior: aBehavior prefix: prefixString [
+
+	^ {
+		sourceString.
+		positionInteger.
+		aBehavior.
+		prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ] }
 ]
 
 { #category : 'semantic context' }
@@ -2577,6 +2694,7 @@ CoPharoCopilotResultSetBuilder >> textualReceiverBeforeCompletionIn: prefixStrin
 					ifFalse: [ base copyFrom: 1 to: base size - fragment size ] ] ].
 	base := base trimRight.
 	base isEmpty ifTrue: [ ^ '' ].
+	(self hasStandaloneCompletionBoundaryBeforeTokenIn: base) ifTrue: [ ^ '' ].
 
 	end := base size.
 	[ end > 0 and: [ (self isWordChar: (base at: end)) not ] ] whileTrue: [
@@ -2588,6 +2706,19 @@ CoPharoCopilotResultSetBuilder >> textualReceiverBeforeCompletionIn: prefixStrin
 		start := start - 1 ].
 
 	^ base copyFrom: start + 1 to: end
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> hasStandaloneCompletionBoundaryBeforeTokenIn: prefixString [
+
+	| prefix last boundaryCharacters |
+	prefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString trimRight ].
+	prefix isEmpty ifTrue: [ ^ true ].
+	(prefix endsWith: ':=') ifTrue: [ ^ true ].
+
+	last := prefix last.
+	boundaryCharacters := '.^([{:|,+-*/\~<>=@%&?!'.
+	^ boundaryCharacters includes: last
 ]
 
 { #category : 'new' }
@@ -2634,7 +2765,6 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
 	pos := pair second.
 
 	(pos < self minimumPrefixLength) ifTrue: [ ^ false ].
-	(self isInsideCommentOrStringIn: source position: pos) ifTrue: [ ^ false ].
 
 	before := pos > 0 ifTrue: [ source at: pos ] ifFalse: [ nil ].
 	after := pos < source size ifTrue: [ source at: pos + 1 ] ifFalse: [ nil ].
@@ -2642,7 +2772,19 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
 	"Cursor inside a word => do NOT initialize completion engine."
 	((self isWordChar: before) and: [ self isWordChar: after ]) ifTrue: [ ^ false ].
 
+	(self isInsideCommentOrStringIn: source position: pos) ifTrue: [ ^ false ].
+
 	^ true
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> shouldUseFallbackCompletionForContext: aContext prefix: prefixString [
+
+	| receiver |
+	(self isScriptingContext: aContext) ifFalse: [ ^ false ].
+
+	receiver := self textualReceiverBeforeCompletionIn: prefixString.
+	^ receiver isEmpty
 ]
 
 { #category : 'private' }
@@ -2673,7 +2815,6 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForPrefix: prefixString
 	^ true
 ]
 
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> sortedSelectorsFor: aBehavior [
 	"Return a cached sorted-selectors array for aBehavior. Invalidates when the methodDict
 	identity or size changes."

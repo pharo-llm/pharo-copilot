@@ -11,7 +11,8 @@ Class {
 		'behavior',
 		'method',
 		'doItRequestor',
-		'doItContext'
+		'doItContext',
+		'scripting'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -72,6 +73,18 @@ CoCopilotContextMock >> initialize [
 	source := ''.
 	position := 0.
 	replaceCount := 0.
+]
+
+{ #category : 'accessing' }
+CoCopilotContextMock >> isScripting [
+
+	^ scripting = true
+]
+
+{ #category : 'accessing' }
+CoCopilotContextMock >> isScripting: aBoolean [
+
+	scripting := aBoolean
 ]
 
 { #category : 'accessing' }

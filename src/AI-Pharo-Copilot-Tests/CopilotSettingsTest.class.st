@@ -194,6 +194,7 @@ CopilotSettingsTest >> testFastCompletionDefaults [
 		self assert: CopilotSettings completionDebounceMilliseconds equals: 0.
 		self assert: CopilotSettings completionIdleMilliseconds equals: 75.
 		self assert: CopilotSettings numPredict equals: 32.
+		self assert: CopilotSettings completionLogprobsEnabled.
 	]
 ]
 
@@ -280,11 +281,49 @@ CopilotSettingsTest >> testInstallModelPromptMessageExplainsPluginBehavior [
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testLoggingEnabledDefaultsToTrue [
+CopilotSettingsTest >> testResearchTelemetryDefaultsToOff [
 
     CopilotSettings withDefaultSettingsDo: [
-        self assert: CopilotSettings loggingEnabled equals: true.
+        self deny: CopilotSettings loggingEnabled.
+        self deny: CopilotSettings anonymousResearchTelemetryEnabled.
+        self assert: CopilotSettings researchTelemetryConsentState equals: #notAsked.
     ].
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testResearchTelemetryConsentAcceptedEnablesLogging [
+
+	CopilotSettings withDefaultSettingsDo: [
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
+		self assert: CopilotSettings anonymousResearchTelemetryEnabled.
+		self assert: CopilotSettings loggingEnabled.
+		self assert: CopilotSettings researchTelemetryConsentState equals: #accepted ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testResearchTelemetryConsentDeclinedDisablesLogging [
+
+	CopilotSettings withDefaultSettingsDo: [
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
+		CopilotSettings recordResearchTelemetryConsentAccepted: false.
+		self deny: CopilotSettings anonymousResearchTelemetryEnabled.
+		self deny: CopilotSettings loggingEnabled.
+		self assert: CopilotSettings researchTelemetryConsentState equals: #declined ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testUnknownResearchTelemetryConsentStateDisablesLogging [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		snapshot := CopilotSettings settingsSnapshot.
+		snapshot
+			at: #researchTelemetryConsentState put: #unexpected;
+			at: #loggingEnabled put: true.
+		CopilotSettings restoreSettingsFromSnapshot: snapshot.
+		self deny: CopilotSettings anonymousResearchTelemetryEnabled.
+		self deny: CopilotSettings loggingEnabled.
+		self assert: CopilotSettings researchTelemetryConsentState equals: #declined ]
 ]
 
 { #category : 'tests' }
@@ -538,9 +577,10 @@ CopilotSettingsTest >> testNullModelGeneratesMetadataFiles [
         originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
         originalFactory := CopilotSettings ollamaClientFactory.
         [
-            tempDir exists ifTrue: [ tempDir ensureDelete ].
-            CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
-            CopilotSettings loggingEnabled: true.
+			tempDir exists ifTrue: [ tempDir ensureDelete ].
+			CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
+            CopilotSettings recordResearchTelemetryConsentAccepted: true.
+			CopilotSettings loggingEnabled: true.
             CopilotSettings clearCachedModelMetadata.
             CopilotSettings modelName: CopilotSettings nullModelFullName.
             CopilotSettings ollamaClientFactory: [ self fail: 'Null model should not request Ollama metadata.' ].
@@ -618,7 +658,7 @@ CopilotSettingsTest >> testRecordInstallModelConsentIsStoredInSnapshot [
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testRecordPrivacyPolicyConsentWritesEvaluationJsonEntr [
+CopilotSettingsTest >> testRecordResearchTelemetryConsentWritesEvaluationJsonEntry [
 
 
 	CopilotSettings withDefaultSettingsDo: [
@@ -645,14 +685,15 @@ CopilotSettingsTest >> testRecordPrivacyPolicyConsentWritesEvaluationJsonEntr [
 			CoPharoCopilotLogger rawUserId: 'user-test'.
 			tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 
-			CopilotSettings recordPrivacyPolicyUserConsentAccepted: true.
+			CopilotSettings recordResearchTelemetryConsentAccepted: true.
 
 			jsonLine := tempEvalFile readStreamDo: [ :stream | stream nextLine ].
 			parsed := STONJSON fromString: jsonLine.
-			self assert: (parsed at: #event) equals: 'privacy-policy-consent'.
+			self assert: (parsed at: #event) equals: 'research-telemetry-consent'.
 			self assert: (parsed at: #userId) equals: 'user-test'.
 			self assert: (parsed at: #sessionId) equals: sessionDir basename.
 			self assert: ((parsed at: #data) at: #accepted) equals: true.
+			self assert: ((parsed at: #data) at: #consentState) equals: #accepted.
 			self assert: ((parsed at: #data) includesKey: #timestamp)
 		] ensure: [
 			tempDir exists ifTrue: [ tempDir ensureDeleteAll ].

@@ -40,7 +40,8 @@ Class {
 		'completionTopLogprobs',
 		'backgroundColor',
 		'installModelUserConsent',
-		'imageCloseSurveyEnabled'
+		'imageCloseSurveyEnabled',
+		'researchTelemetryConsentState'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -641,7 +642,8 @@ CopilotSettings class >> host: aString [
 CopilotSettings class >> imageCloseSurveyEnabled [
 	"Answer whether Copilot asks for a short rating survey when the Pharo image quits."
 
-	^ imageCloseSurveyEnabled ifNil: [ imageCloseSurveyEnabled := true ]
+	^ self researchTelemetryAccepted
+		and: [ imageCloseSurveyEnabled ifNil: [ imageCloseSurveyEnabled := true ] ]
 ]
 
 { #category : 'accessing' }
@@ -649,6 +651,29 @@ CopilotSettings class >> imageCloseSurveyEnabled: aBoolean [
 
 	imageCloseSurveyEnabled := aBoolean.
 	self autoSaveSettings
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> anonymousResearchTelemetryEnabled [
+	"Settings UI accessor. Unknown, missing, or declined consent is always OFF."
+
+	^ self researchTelemetryAccepted
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> anonymousResearchTelemetryEnabled: aBoolean [
+	"Settings UI mutator. Enabling requires a fresh explicit confirmation."
+
+	aBoolean = true
+		ifTrue: [ ^ self requestEnableAnonymousResearchTelemetry ].
+	^ self requestDisableAnonymousResearchTelemetry
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> declineResearchTelemetryIfNotAsked [
+
+	self researchTelemetryNotAsked ifTrue: [
+		self recordResearchTelemetryConsentAccepted: false ]
 ]
 
 { #category : 'class initialization' }
@@ -668,7 +693,7 @@ CopilotSettings class >> initializeDefaults [
 	host := '127.0.0.1'.
 	port := 11434.
 	autoInstallModelScriptEnabled := true.
-	loggingEnabled := true.
+	loggingEnabled := false.
 	templatesDirectory := (FileLocator imageDirectory / 'pharo-copilot' / 'templates') asFileReference.
 	completionDebounceMilliseconds := 0.
 	completionIdleMilliseconds := 75.
@@ -692,6 +717,7 @@ CopilotSettings class >> initializeDefaults [
 	backgroundColor := self defaultBackgroundColor.
 	installModelUserConsent := false.
 	imageCloseSurveyEnabled := true.
+	researchTelemetryConsentState := #notAsked.
 	ollamaClientFactory := [ CoPCOllamaClient new ].
 	modelMetadata := nil
 ]
@@ -1131,9 +1157,10 @@ CopilotSettings class >> logValidatedModelAvailability: aModelName availableMode
 
 { #category : 'accessing' }
 CopilotSettings class >> loggingEnabled [
-	"Answer whether logging is enabled; default to true."
+	"Answer whether research telemetry logging is enabled. No explicit consent means OFF."
 
-	^ loggingEnabled ifNil: [ loggingEnabled := true ].
+	^ self researchTelemetryAccepted
+		and: [ loggingEnabled ifNil: [ loggingEnabled := true ] ]
 ]
 
 { #category : 'accessing' }
@@ -1676,15 +1703,198 @@ CopilotSettings class >> recordInstallModelUserConsentForModelNamed: aModelName 
 { #category : 'accessing' }
 CopilotSettings class >> recordPrivacyPolicyUserConsentAccepted: aBoolean [
 
+	^ self recordResearchTelemetryConsentAccepted: aBoolean
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> recordResearchTelemetryConsentAccepted: aBoolean [
+
 	| consentRecord |
 	consentRecord := Dictionary new
 		at: #accepted put: aBoolean;
+		at: #consentState put: (aBoolean = true ifTrue: [ #accepted ] ifFalse: [ #declined ]);
 		at: #timestamp put: DateAndTime now asString;
 		yourself.
 
-	CoPharoCopilotLogger
-		appendEvaluationEvent: 'privacy-policy-consent'
-		data: consentRecord
+	aBoolean = true
+		ifTrue: [
+			researchTelemetryConsentState := #accepted.
+			loggingEnabled := true.
+			self autoSaveSettings.
+			CoPharoCopilotLogger
+				appendEvaluationEvent: 'research-telemetry-consent'
+				data: consentRecord ]
+		ifFalse: [
+			researchTelemetryConsentState := #declined.
+			loggingEnabled := false.
+			self autoSaveSettings ].
+
+	^ consentRecord
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryAccepted [
+
+	^ self researchTelemetryConsentState = #accepted
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryConsentState [
+	"Answer the persisted consent state. Anything unknown is treated as declined."
+
+	| normalized |
+	normalized := researchTelemetryConsentState ifNil: [ #notAsked ].
+	normalized := [ normalized asSymbol ] on: Error do: [ ^ #declined ].
+	(#(#notAsked #declined #accepted) includes: normalized) ifFalse: [ ^ #declined ].
+	^ normalized
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryDeclined [
+
+	^ self researchTelemetryConsentState = #declined
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryDisabledStatusText [
+
+	^ 'Anonymous research telemetry is disabled.', String cr,
+		'Pharo Copilot is not sending research telemetry about your IDE interactions.'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryEnabledStatusText [
+
+	^ 'Anonymous research telemetry is enabled.', String cr,
+		'Pharo Copilot is contributing anonymous interaction events to the Pharo usage research project.', String cr,
+		'The data is sent to an Inria-hosted research server and may become part of a public research dataset.'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryFirstLaunchText [
+
+	^ 'Pharo researchers and engineers are studying how developers use Pharo and its development tools.', String cr,
+		'With your permission, Pharo Copilot can send anonymous interaction events about IDE tool usage to an Inria-hosted research server.', String cr,
+		String cr,
+		'- Participation is voluntary.', String cr,
+		'- Telemetry is OFF by default.', String cr,
+		'- No research telemetry is sent unless you explicitly agree.', String cr,
+		'- Events describe tool interactions, not your source-code contents.', String cr,
+		'- Anonymous submitted data may become part of a public research dataset.', String cr,
+		'- You can disable telemetry later in Settings.'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryLearnMoreText [
+
+	^ 'About the Pharo Usage Research Project', String cr,
+		String cr,
+		'Why collect this data?', String cr,
+		'Researchers have limited quantitative information about how Pharo development tools are used in real projects. Anonymous telemetry can help improve existing tools, evaluate new features, and support reproducible software-engineering research.', String cr,
+		String cr,
+		'What may be collected?', String cr,
+		'Anonymous interaction events such as opening development tools, opening debugger windows, using debugger actions and buttons, browsing code, using IDE commands, copy/paste interaction events, interacting with Pharo libraries and tools, and using newly introduced Pharo features.', String cr,
+		String cr,
+		'Events may include a UTC timestamp, a randomly generated identifier, an interaction type, and references linking related events when necessary.', String cr,
+		String cr,
+		'What is not intended to be collected?', String cr,
+		'Your name, email address, account credentials, passwords, authentication tokens, sensitive personal information, or source-code contents.', String cr,
+		String cr,
+		'Where does the data go?', String cr,
+		'If you agree, telemetry is transmitted to infrastructure hosted by Inria. The collected data may be used to create an anonymous public research dataset about Pharo development practices.', String cr,
+		String cr,
+		'Can you withdraw?', String cr,
+		'Yes. You can disable telemetry at any time from Pharo Copilot settings. Disabling telemetry stops future collection and transmission. Because submitted events are anonymous, previously submitted events may not be individually removable.', String cr,
+		String cr,
+		'Who is responsible?', String cr,
+		'Members of the Pharo Consortium and researchers from Inria''s EVREF team.', String cr,
+		String cr,
+		'Questions: dpo@inria.fr'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryNotAsked [
+
+	^ self researchTelemetryConsentState = #notAsked
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> requestDisableAnonymousResearchTelemetry [
+
+	self researchTelemetryAccepted ifFalse: [
+		self recordResearchTelemetryConsentAccepted: false.
+		^ false ].
+
+	(self confirmViaUIManager: self researchTelemetryDisablePrompt) = true ifFalse: [ ^ true ].
+	self recordResearchTelemetryConsentAccepted: false.
+	self notifyUser: 'Anonymous research telemetry disabled', String cr,
+		'Pharo Copilot will no longer collect or transmit research telemetry.'.
+	^ false
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> requestEnableAnonymousResearchTelemetry [
+
+	(self confirmViaUIManager: self researchTelemetryEnablePrompt) = true ifFalse: [
+		self declineResearchTelemetryIfNotAsked.
+		^ false ].
+	self recordResearchTelemetryConsentAccepted: true.
+	self notifyUser: 'Thank you for participating', String cr,
+		'Anonymous research telemetry is now enabled.', String cr,
+		'You can disable it at any time from Pharo Copilot settings.'.
+	^ true
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryDisablePrompt [
+
+	^ 'Disable anonymous research telemetry?', String cr,
+		String cr,
+		'Pharo Copilot will stop collecting and transmitting future research telemetry.', String cr,
+		'Data already anonymously submitted may remain in the research dataset because it cannot be linked back to you.'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryEnablePrompt [
+
+	^ 'Enable anonymous research telemetry?', String cr,
+		String cr,
+		'By enabling this option, you agree that Pharo Copilot may collect anonymous interaction events describing how you use Pharo development tools.', String cr,
+		'The data will be transmitted to an Inria-hosted research server and may later become part of a public research dataset.', String cr,
+		'Participation is voluntary and you can disable telemetry again at any time.', String cr,
+		'Data already anonymously submitted may not be individually removable because it cannot be linked back to you.'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> showResearchTelemetryStudyInformation [
+
+	| message uiClass uiManager |
+	message := self researchTelemetryLearnMoreText.
+	uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
+	uiClass ifNotNil: [
+		(uiClass respondsTo: #default) ifTrue: [
+			uiManager := uiClass default.
+			(uiManager respondsTo: #longMessage:title:)
+				ifTrue: [
+					^ uiManager
+						longMessage: message
+						title: 'Anonymous Usage Research' ].
+			(uiManager respondsTo: #inform:)
+				ifTrue: [ ^ uiManager inform: message ] ] ].
+
+	self notifyViaTranscript: message
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> showResearchTelemetryStudyInformationSetting [
+
+	^ false
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> showResearchTelemetryStudyInformationSetting: aBoolean [
+
+	aBoolean ifTrue: [ self showResearchTelemetryStudyInformation ]
 ]
 
 { #category : 'settings' }
@@ -1816,6 +2026,7 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	backgroundColor := self valueAt: #backgroundColor from: aDictionary default: backgroundColor.
 	installModelUserConsent := self valueAt: #installModelUserConsent from: aDictionary default: installModelUserConsent.
 	imageCloseSurveyEnabled := self valueAt: #imageCloseSurveyEnabled from: aDictionary default: imageCloseSurveyEnabled.
+	researchTelemetryConsentState := self valueAt: #researchTelemetryConsentState from: aDictionary default: researchTelemetryConsentState.
 
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
 	templatesPath = nil ifFalse: [
@@ -1875,6 +2086,7 @@ completionTopLogprobs := aDictionary at: #completionTopLogprobs ifAbsent: [ aDic
 backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ aDictionary at: #BackgroundColor ifAbsent: [ nil ] ].
 installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ aDictionary at: #InstallModelUserConsent ifAbsent: [ nil ] ].
 imageCloseSurveyEnabled := aDictionary at: #imageCloseSurveyEnabled ifAbsent: [ aDictionary at: #ImageCloseSurveyEnabled ifAbsent: [ nil ] ].
+researchTelemetryConsentState := aDictionary at: #researchTelemetryConsentState ifAbsent: [ aDictionary at: #ResearchTelemetryConsentState ifAbsent: [ nil ] ].
 self useDefaultCompletionModelWhenSavedModelIsMissingOrNull
 ]
 
@@ -1975,6 +2187,7 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #backgroundColor put: backgroundColor;
 		at: #installModelUserConsent put: installModelUserConsent;
 		at: #imageCloseSurveyEnabled put: imageCloseSurveyEnabled;
+		at: #researchTelemetryConsentState put: self researchTelemetryConsentState;
 		            yourself.
 	templatesDirectory ifNotNil: [
 			templatesPath := [ templatesDirectory pathString ]
@@ -2033,14 +2246,23 @@ CopilotSettings class >> settingsOn: aBuilder [
 					default: self modelName;
 					domainValues: self availableModelNames.
 
-				(aBuilder setting: #loggingEnabled)
+				(aBuilder setting: #anonymousResearchTelemetryEnabled)
 					order: 0.3;
-					label: 'Enable logging';
+					label: 'Anonymous usage research';
 					target: self;
-					getSelector: #loggingEnabled;
-					setSelector: #loggingEnabled:;
-					default: self loggingEnabled;
-					description: 'When disabled, Copilot will not record activity or evaluation logs.'.
+					getSelector: #anonymousResearchTelemetryEnabled;
+					setSelector: #anonymousResearchTelemetryEnabled:;
+					default: false;
+					description: 'OFF by default. When enabled, Pharo Copilot sends anonymous IDE interaction events to an Inria-hosted research server for the Pharo usage research project. You can disable it at any time.'.
+
+				(aBuilder setting: #showResearchTelemetryStudyInformationSetting)
+					order: 0.31;
+					label: 'Learn more about usage research';
+					target: self;
+					getSelector: #showResearchTelemetryStudyInformationSetting;
+					setSelector: #showResearchTelemetryStudyInformationSetting:;
+					default: false;
+					description: 'Show the anonymous usage research purpose, data limits, destination, public dataset note, and withdrawal information.'.
 
 				(aBuilder setting: #imageCloseSurveyEnabled)
 					order: 0.35;
@@ -2049,7 +2271,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #imageCloseSurveyEnabled;
 					setSelector: #imageCloseSurveyEnabled:;
 					default: self imageCloseSurveyEnabled;
-					description: 'When enabled, Copilot asks a short star-rating survey before the Pharo image quits.'.
+					description: 'Only active when anonymous usage research is enabled. When enabled, Copilot asks a short star-rating survey before the Pharo image quits.'.
 
 				(aBuilder setting: #autoInstallModelScriptEnabled)
 					order: 0.4;
@@ -2294,6 +2516,7 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #backgroundColor put: backgroundColor;
 		at: #installModelUserConsent put: installModelUserConsent;
 		at: #imageCloseSurveyEnabled put: imageCloseSurveyEnabled;
+		at: #researchTelemetryConsentState put: self researchTelemetryConsentState;
 		  yourself
 ]
 

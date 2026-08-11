@@ -28,6 +28,22 @@ CopilotDetailMorph class >> width [
 	^ CopilotMenuMorph itemWidth * 1.2
 ]
 
+{ #category : 'accessing - defaults' }
+CopilotDetailMorph class >> foregroundColorForBackground: aColor [
+	"Answer a readable text color for the configured popup background."
+
+	| brightness |
+	aColor ifNil: [ ^ Color black ].
+
+	brightness := [
+		(aColor red * 0.299) + (aColor green * 0.587) + (aColor blue * 0.114)
+	] on: Error do: [ ^ Color black ].
+
+	^ brightness > 0.55
+		ifTrue: [ Color black ]
+		ifFalse: [ Color white ]
+]
+
 { #category : 'geometry' }
 CopilotDetailMorph >> bounds [
 
@@ -81,6 +97,12 @@ CopilotDetailMorph >> drawOn: aCanvas [
 ]
 
 { #category : 'initialization' }
+CopilotDetailMorph >> foregroundColor [
+
+	^ self class foregroundColorForBackground: self defaultColor
+]
+
+{ #category : 'initialization' }
 CopilotDetailMorph >> entryDescription: anEntryDescription [
 	title
 		contents: (anEntryDescription title
@@ -97,22 +119,25 @@ CopilotDetailMorph >> entryDescription: anEntryDescription [
 { #category : 'initialization' }
 CopilotDetailMorph >> initialize [
 
-	| childBounds |
+	| childBounds foregroundColor |
 	super initialize.
 	self color: self defaultColor.
 	self borderStyle: (BorderStyle color: Color gray width: 1).
 
 	childBounds := self contentBounds.
+	foregroundColor := self foregroundColor.
 
 	label := StringMorph
 		contents: ''
 		font: StandardFonts menuFont.
+	label color: foregroundColor.
 	label bounds: childBounds.
 	self addMorph: label.
 
 	title := StringMorph
 		contents: ''
 		font: StandardFonts windowTitleFont.
+	title color: foregroundColor.
 	title bounds: self titleBounds.
 	self addMorph: title.
 
@@ -120,7 +145,19 @@ CopilotDetailMorph >> initialize [
 	description autoFit: false.
 	description bounds: self descriptionBounds.
 	description borderWidth: 0.
+	self setTextColor: foregroundColor on: description.
 	self addMorph: description
+]
+
+{ #category : 'initialization' }
+CopilotDetailMorph >> setTextColor: aColor on: aMorph [
+
+	(aMorph respondsTo: #textColor:) ifTrue: [
+		aMorph textColor: aColor.
+		^ self ].
+
+	(aMorph respondsTo: #color:) ifTrue: [
+		aMorph color: aColor ]
 ]
 
 { #category : 'initialization' }

@@ -35,6 +35,8 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 		CoPharoCopilotLogger rawLogFileReference: sessionDir / CoPharoCopilotLogger logFileName.
 		CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
 		CoPharoCopilotLogger rawUserId: 'user-test'.
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
+		tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
 		aBlock
 			value: tempDir
 			value: tempEvalFile
@@ -52,6 +54,82 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 		CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
 		CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
 		CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived ]
+]
+
+{ #category : 'support' }
+CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: tempEvalFile [
+
+	| completionsDir response attempt payload ratings evalData evalEvent |
+	sessionDir ensureCreateDirectory.
+	completionsDir := sessionDir / 'completions'.
+	completionsDir ensureCreateDirectory.
+
+	response := Dictionary new
+		at: #logprobs put: {
+			(Dictionary new at: #logprob put: -0.1; yourself).
+			(Dictionary new at: #logprob put: -0.2; yourself) };
+		at: #prompt_eval_count put: 10;
+		at: #eval_count put: 2;
+		yourself.
+	attempt := Dictionary new
+		at: #suggestion put: 'String';
+		at: #response put: response;
+		yourself.
+	payload := Dictionary new
+		at: #timestamp put: '2026-08-11T10:00:00+02:00';
+		at: #userId put: 'user-test';
+		at: #loggerSessionId put: sessionDir basename;
+		at: #cache put: (Dictionary new
+			at: #hits put: 2;
+			at: #misses put: 3;
+			yourself);
+		at: #context put: (Dictionary new
+			at: #fullSource put: 'example', String cr, String tab, 'self as';
+			at: #classContext put: 'Object';
+			yourself);
+		at: #fim put: (Dictionary new
+			at: #prefix put: 'self as';
+			at: #suffix put: '';
+			yourself);
+		at: #generated put: (Dictionary new
+			at: #suggestions put: { 'String' };
+			at: #attempts put: { attempt };
+			yourself);
+		at: #accepted put: 'String';
+		at: #acceptedAt put: '2026-08-11T10:00:01+02:00';
+		at: #nullCompletion put: false;
+		at: #rejected put: #();
+		yourself.
+
+	(completionsDir / 'completion-1.json') writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: payload) ].
+
+	ratings := Dictionary new
+		at: #overall put: 5;
+		at: #suggestionQuality put: 4;
+		at: #speed put: 5;
+		at: #usefulness put: 4;
+		yourself.
+	evalData := Dictionary new
+		at: #tasks put: #(#codeCompletion);
+		at: #ratings put: ratings;
+		yourself.
+	evalEvent := Dictionary new
+		at: #event put: 'image-close-survey';
+		at: #timestamp put: '2026-08-11T10:01:00+02:00';
+		at: #userId put: 'user-test';
+		at: #sessionId put: sessionDir basename;
+		at: #data put: evalData;
+		at: #sessionStats put: (Dictionary new
+			at: #totalSuggestions put: 1;
+			at: #totalAccepted put: 1;
+			at: #totalRejected put: 0;
+			yourself);
+		yourself.
+	tempEvalFile writeStreamDo: [ :stream |
+		stream
+			nextPutAll: (STONJSON toString: evalEvent);
+			nextPut: Character lf ]
 ]
 
 { #category : 'tests' }
@@ -77,6 +155,49 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionUploadsZipAfterWritingIt [
 			self assert: uploadedUser equals: 'user-test'.
 			self assert: uploadSawExistingArchive.
 			self assert: uploadSawZipArchive ] ]
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesAndUploadsTelemetrySummaryAfterZip [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
+			| spy summaryFile payload session summary |
+			self writeTelemetryFixtureIn: sessionDir evaluationLog: tempEvalFile.
+			spy := CoPCSessionArchiveUploaderSpy new.
+			CoPharoCopilotLogger rawSessionArchiveUploader: spy.
+
+			CoPharoCopilotLogger archiveCurrentSession.
+
+			summaryFile := tempDir / (sessionDir basename , '-telemetry.json').
+			self assert: archiveFile exists.
+			self assert: summaryFile exists.
+			self assert: spy uploadedArchive equals: archiveFile.
+			self assert: spy uploadedTelemetrySummary fullName equals: summaryFile fullName.
+			self assert: spy uploadedSession equals: sessionDir basename.
+			self assert: spy uploadedUser equals: 'user-test'.
+			self assert: spy telemetrySession equals: sessionDir basename.
+			self assert: spy telemetryUser equals: 'user-test'.
+			self assert: spy uploadSawExistingArchive.
+			self assert: spy uploadSawZipArchive.
+			self assert: spy uploadSawExistingTelemetrySummary.
+
+			payload := spy telemetryPayload.
+			session := payload at: #session.
+			summary := payload at: #summary.
+			self assert: (payload at: #event) equals: 'pharo-copilot-session-telemetry'.
+			self assert: (payload at: #sessionId) equals: sessionDir basename.
+			self assert: (payload at: #archiveFile) equals: archiveFile basename.
+			self assert: ((payload at: #completionFiles) includes: 'completion-1.json').
+			self assert: (session at: #sessionId) equals: sessionDir basename.
+			self assert: (summary at: #completion_requests) equals: 1.
+			self assert: (summary at: #accepted_requests) equals: 1.
+			self assert: (summary at: #suggestion_candidates) equals: 1.
+			self assert: (summary at: #self_receiver_completion_requests) equals: 1.
+			self assert: (summary at: #logprob_tokens) equals: 2.
+			self assert: (summary at: #prompt_tokens) equals: 10.
+			self assert: (summary at: #completion_tokens) equals: 2.
+			self assert: (summary at: #cache_hit_rate) equals: 40.0 ] ]
 ]
 
 { #category : 'tests' }
