@@ -81,6 +81,25 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalFastPathForSem
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesStandaloneFallbackInScriptingContext [
+
+	| b ctx result |
+	b := CopilotTestableBuilder new.
+	ctx := CoCopilotContextMock new
+		isScripting: true;
+		source: 'Ord';
+		position: 3;
+		yourself.
+	b completionContext: ctx.
+
+	result := b buildCompletion.
+
+	self assert: result equals: #fallbackResultSet.
+	self assert: b fallbackCallCount equals: 1.
+	self assert: b scheduledDelay isNil
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testClassContextIsCached [
 
 	| b ctx first second |
@@ -681,6 +700,69 @@ CoPharoCopilotResultSetBuilderTest >> testNormalizedCompletionContentsRejectMeth
 		contextInfo: contextInfo.
 
 	self assert: contents isEmpty
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testReceiverCompletionDoesNotUseStandaloneFallback [
+
+	| builder context |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		isScripting: true;
+		source: 'OrderedCollection ne';
+		position: 'OrderedCollection ne' size;
+		yourself.
+
+	self deny: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: 'OrderedCollection ne')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSelfReceiverStillUsesCopilot [
+
+	| builder context |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		isScripting: true;
+		source: 'self pri';
+		position: 'self pri' size;
+		yourself.
+
+	self deny: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: 'self pri')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenOutsideScriptingContextDoesNotUseFallback [
+
+	| builder context |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		source: 'Ord';
+		position: 3;
+		yourself.
+
+	self deny: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: 'Ord')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenUsesFallbackCompletion [
+
+	| builder context |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		isScripting: true;
+		source: 'Ord';
+		position: 3;
+		yourself.
+
+	self assert: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: 'Ord')
 ]
 
 { #category : 'tests' }

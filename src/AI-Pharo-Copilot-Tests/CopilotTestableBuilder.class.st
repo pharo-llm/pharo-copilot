@@ -91,6 +91,13 @@ CopilotTestableBuilder >> fallbackCompletionEntriesFor: aContext excluding: exis
 ]
 
 { #category : 'accessing' }
+CopilotTestableBuilder >> fallbackResultSetFor: aContext [
+
+	fallbackCallCount := self fallbackCallCount + 1.
+	^ #fallbackResultSet
+]
+
+{ #category : 'accessing' }
 CopilotTestableBuilder >> openCompletionMenuFor: aContext entries: entries position: position [
 
 	openedEntries := entries

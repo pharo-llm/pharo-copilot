@@ -240,6 +240,10 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	snapshot := self contextSnapshotFor: context.
 	prefix := snapshot at: #prefix.
 	suffix := snapshot at: #suffix.
+	(self
+		shouldUseFallbackCompletionForContext: context
+		prefix: prefix)
+			ifTrue: [ ^ self fallbackResultSetFor: context ].
 	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
 
 	self isLoggingEnabled ifTrue: [
@@ -2643,6 +2647,16 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
 	((self isWordChar: before) and: [ self isWordChar: after ]) ifTrue: [ ^ false ].
 
 	^ true
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> shouldUseFallbackCompletionForContext: aContext prefix: prefixString [
+
+	| receiver |
+	(self isScriptingContext: aContext) ifFalse: [ ^ false ].
+
+	receiver := self textualReceiverBeforeCompletionIn: prefixString.
+	^ receiver isEmpty
 ]
 
 { #category : 'private' }
