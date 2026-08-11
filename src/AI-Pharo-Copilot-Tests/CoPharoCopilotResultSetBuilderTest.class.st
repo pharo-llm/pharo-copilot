@@ -60,6 +60,24 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotSnapshotWhenInsi
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotBuildClassContextSynchronously [
+
+	| b ctx |
+	b := CopilotTestableBuilder new.
+	ctx := CoCopilotContextMock new
+		behavior: Object;
+		source: 'temporaryName';
+		position: 'temporaryName' size;
+		yourself.
+	b completionContext: ctx.
+
+	b buildCompletion.
+
+	self assert: b scheduledPrefix equals: 'temporaryName'.
+	self assert: b classContextCallCount equals: 0
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalFastPathForSemanticSelectorTail [
 
 	| b ctx entries |
@@ -629,6 +647,24 @@ CoPharoCopilotResultSetBuilderTest >> testSemanticContextUsesLiveBindingValueTyp
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticReceiverInfoIsCachedForSameSnapshot [
+
+	| builder context source |
+	builder := CopilotTestableBuilder new.
+	source := 'semanticContextExample', String lf, String tab, 'self as'.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: source;
+		position: source size;
+		yourself.
+
+	builder semanticReceiverInfoFor: context prefix: source.
+	builder semanticReceiverInfoFor: context prefix: source.
+
+	self assert: builder semanticAstCallCount equals: 1
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorHintsAreLimitedAndFiltered [
 
 	| builder hints |
@@ -866,6 +902,20 @@ CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerInsideStringOrComment 
 	ctx
 		source: source;
 		position: source size.
+	self deny: (b shouldRequestCompletionForContext: ctx)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerShortTokenAfterLongPrefix [
+
+	| b ctx source |
+	b := CoPharoCopilotResultSetBuilder new.
+	source := 'Transcript cr.', String lf, 'Or'.
+	ctx := CoCopilotContextMock new
+		source: source;
+		position: source size;
+		yourself.
+
 	self deny: (b shouldRequestCompletionForContext: ctx)
 ]
 

@@ -8,7 +8,9 @@ Class {
 		'scheduledPrefix',
 		'scheduledSuffix',
 		'fallbackCallCount',
-		'openedEntries'
+		'openedEntries',
+		'classContextCallCount',
+		'semanticAstCallCount'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -44,6 +46,19 @@ CopilotTestableBuilder >> completionContext: aContext [
 
 	completionContext := aContext.
 	^ testContext := aContext
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> classContextCallCount [
+
+	^ classContextCallCount ifNil: [ 0 ]
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> classContextFor: aContext prefix: prefixString [
+
+	classContextCallCount := self classContextCallCount + 1.
+	^ super classContextFor: aContext prefix: prefixString
 ]
 
 { #category : 'accessing' }
@@ -133,6 +148,22 @@ CopilotTestableBuilder >> scheduledPrefix [
 CopilotTestableBuilder >> scheduledSuffix [
 
 	^ scheduledSuffix
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> semanticAstCallCount [
+
+	^ semanticAstCallCount ifNil: [ 0 ]
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> semanticAstNodeFor: aContext source: sourceString position: positionInteger [
+
+	semanticAstCallCount := self semanticAstCallCount + 1.
+	^ super
+		semanticAstNodeFor: aContext
+		source: sourceString
+		position: positionInteger
 ]
 
 { #category : 'accessing' }
