@@ -25,6 +25,21 @@ CoPCSessionArchiveUploaderTest >> testConnectionEndpointsAreDerivedFromSessionUp
 ]
 
 { #category : 'tests' }
+CoPCSessionArchiveUploaderTest >> testTelemetrySummaryEndpointIsDerivedFromSessionUploadEndpoint [
+
+	| originalUrl |
+	originalUrl := CoPCSessionArchiveUploader uploadUrl.
+	[
+		CoPCSessionArchiveUploader uploadUrl: 'http://example.com:3000/api/sessions'.
+
+		self
+			assert: CoPCSessionArchiveUploader telemetrySummaryUploadUrl
+			equals: 'http://example.com:3000/api/session-telemetry'
+	] ensure: [
+		CoPCSessionArchiveUploader uploadUrl: originalUrl ]
+]
+
+{ #category : 'tests' }
 CoPCSessionArchiveUploaderTest >> testCandidateUploadUrlsPreferPublicReceiverAndKeepLegacyFallbacks [
 
 	| originalUrl urls |

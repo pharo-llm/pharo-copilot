@@ -408,7 +408,7 @@ CoPharoCopilotLogger class >> archiveCurrentSession [
 { #category : 'session management' }
 CoPharoCopilotLogger class >> archiveCurrentSessionReportingProgress: aProgressBlock [
 
-	| directory archiveFile archiveClass archive archivedAt |
+	| directory archiveFile archiveClass archive archivedAt telemetryFile |
 	self loggingEnabled ifFalse: [ ^ nil ].
 
 	self
@@ -464,9 +464,22 @@ CoPharoCopilotLogger class >> archiveCurrentSessionReportingProgress: aProgressB
 			sessionArchived := true.
 			self
 				reportArchiveProgress: aProgressBlock
+				status: 'Writing telemetry summary...'
+				percent: 82.
+			telemetryFile := self
+				writeSessionTelemetrySummaryFor: directory
+				archiveFile: archiveFile.
+			self
+				reportArchiveProgress: aProgressBlock
 				status: 'Uploading session archive...'
 				percent: 90.
 			self uploadSessionArchive: archiveFile.
+			telemetryFile ifNotNil: [
+				self
+					reportArchiveProgress: aProgressBlock
+					status: 'Uploading telemetry summary...'
+					percent: 95.
+				self uploadSessionTelemetrySummary: telemetryFile ].
 			self
 				reportArchiveProgress: aProgressBlock
 				status: 'Session archive is complete.'
@@ -773,6 +786,56 @@ CoPharoCopilotLogger class >> uploadSessionArchive: archiveFile [
 					at: #error put: ex description;
 					at: #archiveFile put: archiveFile fullName;
 					yourself) ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> writeSessionTelemetrySummaryFor: sessionDirectory archiveFile: archiveFile [
+
+	^ [
+		CoPCSessionTelemetryAnalyzer
+			writeSummaryForSessionDirectory: sessionDirectory
+			archiveFile: archiveFile
+			sessionId: self currentSessionId
+			userId: self userId
+	] on: Error do: [ :ex |
+		Transcript
+			show: 'Could not write Copilot telemetry summary: ', ex messageText;
+			cr.
+		self
+			logBackEndEvent: 'Could not write Copilot telemetry summary'
+			details: (Dictionary new
+				at: #errorClass put: ex class name;
+				at: #error put: ex description;
+				at: #archiveFile put: (archiveFile ifNil: [ nil ] ifNotNil: [ archiveFile fullName ]);
+				yourself).
+		nil ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> uploadSessionTelemetrySummary: summaryFile [
+
+	| uploader |
+	summaryFile ifNil: [ ^ self ].
+	uploader := self sessionArchiveUploader.
+	uploader ifNil: [ ^ self ].
+	(uploader respondsTo: #uploadTelemetrySummary:sessionId:userId:) ifFalse: [ ^ self ].
+
+	[
+		uploader
+			uploadTelemetrySummary: summaryFile
+			sessionId: self currentSessionId
+			userId: self userId
+	] on: Error do: [ :ex |
+		Transcript
+			show: 'Could not upload Copilot telemetry summary: ', ex messageText;
+			cr.
+		self
+			logBackEndEvent: 'Could not upload Copilot telemetry summary'
+			details: (Dictionary new
+				at: #errorClass put: ex class name;
+				at: #error put: ex description;
+				at: #summaryFile put: summaryFile fullName;
+				yourself) ]
 ]
 
 { #category : 'session management' }

@@ -84,6 +84,12 @@ CoPCSessionArchiveUploader class >> connectionRegistrationUrl [
 	^ self uploadUrlForEndpoint: '/api/connections/register'
 ]
 
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> telemetrySummaryUploadUrl [
+
+	^ self uploadUrlForEndpoint: '/api/session-telemetry'
+]
+
 { #category : 'accessing' }
 CoPCSessionArchiveUploader class >> enabled [
 
@@ -183,6 +189,20 @@ CoPCSessionArchiveUploader class >> uploadArchive: archiveFile sessionId: sessio
 
 	^ self new
 		uploadArchive: archiveFile
+		sessionId: sessionId
+		userId: userId
+]
+
+{ #category : 'uploading' }
+CoPCSessionArchiveUploader class >> uploadTelemetrySummary: summaryFile sessionId: sessionId userId: userId [
+
+	self enabled ifFalse: [ ^ nil ].
+	CopilotSettings researchTelemetryAccepted ifFalse: [ ^ nil ].
+	summaryFile ifNil: [ ^ nil ].
+	((summaryFile exists) and: [ summaryFile isFile ]) ifFalse: [ ^ nil ].
+
+	^ self new
+		uploadTelemetrySummary: summaryFile
 		sessionId: sessionId
 		userId: userId
 ]
@@ -358,6 +378,22 @@ CoPCSessionArchiveUploader >> newUploadClientForFile: file sessionId: sessionId 
 ]
 
 { #category : 'uploading' }
+CoPCSessionArchiveUploader >> newTelemetrySummaryUploadClientForFile: file sessionId: sessionId userId: userId [
+
+	| client token |
+	client := self newJsonClientForUrl: self class telemetrySummaryUploadUrl.
+	client headerAt: 'X-File-Name' put: file basename.
+	token := self class ensureUploadToken.
+	client headerAt: 'Authorization' put: 'Bearer ' , token.
+	sessionId ifNotNil: [
+		client headerAt: 'X-Session-Id' put: sessionId asString ].
+	userId ifNotNil: [
+		client headerAt: 'X-User-Id' put: userId asString ].
+
+	^ client
+]
+
+{ #category : 'uploading' }
 CoPCSessionArchiveUploader >> uploadArchive: archiveFile sessionId: sessionId userId: userId [
 
 	| file bytes client |
@@ -370,6 +406,25 @@ CoPCSessionArchiveUploader >> uploadArchive: archiveFile sessionId: sessionId us
 
 	[
 		client entity: (ZnEntity bytes: bytes).
+		^ client execute
+	] ensure: [
+		(client respondsTo: #close) ifTrue: [
+			[ client close ] on: Error do: [ :ignored | ] ] ]
+]
+
+{ #category : 'uploading' }
+CoPCSessionArchiveUploader >> uploadTelemetrySummary: summaryFile sessionId: sessionId userId: userId [
+
+	| file json client |
+	file := summaryFile asFileReference.
+	json := file contents.
+	client := self
+		newTelemetrySummaryUploadClientForFile: file
+		sessionId: sessionId
+		userId: userId.
+
+	[
+		client entity: (ZnEntity json: json).
 		^ client execute
 	] ensure: [
 		(client respondsTo: #close) ifTrue: [
