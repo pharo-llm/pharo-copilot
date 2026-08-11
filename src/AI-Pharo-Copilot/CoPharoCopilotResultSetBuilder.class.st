@@ -23,7 +23,10 @@ Class {
 		'lastSelectorResult',
 		'sortedSelectorsCache',
 		'lastSemanticReceiverKey',
-		'lastSemanticReceiverValue'
+		'lastSemanticReceiverValue',
+		'completionRouter',
+		'generationPolicy',
+		'semanticProvider'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -53,6 +56,12 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 	| combined fallback reranker topStatus prefix receiverName |
 	combined := OrderedCollection new.
 	entryCollection ifNotNil: [ combined addAll: entryCollection ].
+
+	contextInfo ifNotNil: [
+		(contextInfo at: #skipSemanticCompletionEnrichment ifAbsent: [ false ])
+			ifTrue: [ ^ combined asArray ].
+		(contextInfo at: #semanticFusionApplied ifAbsent: [ false ])
+			ifTrue: [ ^ combined asArray ] ].
 
 	combined isEmpty ifTrue: [
 		fallback := self
@@ -265,14 +274,6 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		at: #timestamp put: DateAndTime now asString;
 		at: #rejected put: OrderedCollection new].
 
-	(self shouldOpenSemanticSelectorFastPathFor: context prefix: prefix) ifTrue: [
-		| entries position |
-		entries := self semanticSelectorFastPathEntriesFor: context contextInfo: contextInfo.
-		entries isEmpty ifFalse: [
-			position := self menuPositionForContextOrDefault: context.
-			self openCompletionMenuFor: context entries: entries position: position.
-			^ self emptyResultSet ] ].
-
 	cached := self
 		fastCachedSuggestionsFor: context
 		prefix: prefix
@@ -281,6 +282,14 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	cached ifNotNil: [
 		(self openCachedSuggestions: cached for: context prefix: prefix suffix: suffix contextInfo: contextInfo)
 			ifTrue: [ ^ self emptyResultSet ] ].
+
+	(self shouldOpenSemanticSelectorFastPathFor: context prefix: prefix) ifTrue: [
+		| entries position |
+		entries := self semanticSelectorFastPathEntriesFor: context contextInfo: contextInfo.
+		entries isEmpty ifFalse: [
+			position := self menuPositionForContextOrDefault: context.
+			self openCompletionMenuFor: context entries: entries position: position.
+			^ self emptyResultSet ] ].
 	
 	delay := self requestDelayForSnapshot: snapshot.
 
@@ -521,6 +530,18 @@ CoPharoCopilotResultSetBuilder >> closeMenu [
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix: prefixString suffix: suffixString context: classContext contextInfo: contextInfo [
 
+	^ self
+		collectNormalizedSuggestionsFor: client
+		prefix: prefixString
+		suffix: suffixString
+		context: classContext
+		contextInfo: contextInfo
+		requestOptions: nil
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix: prefixString suffix: suffixString context: classContext contextInfo: contextInfo requestOptions: requestOptions [
+
 	| desiredCount collected seen |
 	desiredCount := CopilotSettings completionSuggestionsCount.
 	collected := OrderedCollection new.
@@ -536,7 +557,8 @@ CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix
 			suffix: suffixString
 			context: classContext
 			attempt: attempt
-			contextInfo: contextInfo.
+			contextInfo: contextInfo
+			requestOptions: requestOptions.
 
 		(content isEmpty not and: [ (seen includes: content) not ]) ifTrue: [
 			seen add: content.
@@ -545,6 +567,13 @@ CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix
 	].
 
 	^ self finalizeCollectedSuggestions: collected contextInfo: contextInfo
+]
+
+{ #category : 'routing' }
+CoPharoCopilotResultSetBuilder >> completionRouter [
+
+	^ completionRouter ifNil: [
+		completionRouter := CoPCCompletionRouter new ]
 ]
 
 { #category : 'initialization' }
@@ -665,7 +694,7 @@ CoPharoCopilotResultSetBuilder >> completionContractFor: aContext prefix: prefix
 	selectorHints := self
 		semanticSelectorHintsForTypes: receiverTypes
 		token: token
-		limit: 20.
+		limit: 8.
 	selectorHints isEmpty ifFalse: [
 		lines add: 'allowedSelectors=' , (self commaSeparatedStrings: selectorHints) ].
 
@@ -924,21 +953,22 @@ CoPharoCopilotResultSetBuilder >> extractResponseContentFromRaw: rawResponseStri
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> fallbackCompletionEntriesFor: aContext excluding: existingEntries [
 
-	| result rawEntries seen |
+	^ self
+		semanticFallbackEntriesFrom: (self semanticEntriesFor: aContext)
+		excluding: existingEntries
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> semanticFallbackEntriesFrom: rawEntries excluding: existingEntries [
+
+	| seen |
 	seen := Set new.
 	existingEntries do: [ :each |
 		| contents |
 		contents := self entryContentsFor: each.
 		contents isEmpty ifFalse: [ seen add: contents ] ].
 
-	result := self fallbackResultSetFor: aContext.
-	result ifNil: [ ^ #() ].
-
-	rawEntries := [ result first: self fallbackCompletionLimit ]
-		on: Error
-		do: [ #() ].
-
-	^ (rawEntries select: [ :each |
+	^ ((rawEntries ifNil: [ #() ]) select: [ :each |
 			| contents |
 			contents := self entryContentsFor: each.
 			(contents isEmpty or: [ seen includes: contents ])
@@ -1010,6 +1040,28 @@ CoPharoCopilotResultSetBuilder >> fallbackResultSetFor: aContext [
 		do: [ nil ]
 ]
 
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> semanticProvider [
+
+	^ semanticProvider ifNil: [
+		semanticProvider := CoPCSemanticCompletionProvider new
+			builder: self;
+			limit: self fallbackCompletionLimit;
+			yourself ]
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> semanticProvider: aProvider [
+
+	semanticProvider := aProvider
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> semanticEntriesFor: aContext [
+
+	^ self semanticProvider entriesFor: aContext
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> fastCacheContextFor: aContext prefix: prefixString [
 
@@ -1049,6 +1101,26 @@ CoPharoCopilotResultSetBuilder >> fetchSuggestionsForPrefix: prefixString suffix
 		suffix: suffixString
 		context: classContext
 		contextInfo: contextInfo
+		requestOptions: (self generationOptionsForContextInfo: contextInfo)
+]
+
+{ #category : 'generation' }
+CoPharoCopilotResultSetBuilder >> generationOptionsForContextInfo: contextInfo [
+
+	| route |
+	route := contextInfo
+		ifNil: [ #unknown ]
+		ifNotNil: [ contextInfo at: #completionRoute ifAbsent: [ #unknown ] ].
+	^ Dictionary new
+		at: #num_predict put: (self generationPolicy numPredictFor: route);
+		yourself
+]
+
+{ #category : 'generation' }
+CoPharoCopilotResultSetBuilder >> generationPolicy [
+
+	^ generationPolicy ifNil: [
+		generationPolicy := CoPCCompletionGenerationPolicy new ]
 ]
 
 { #category : 'new' }
@@ -1075,6 +1147,144 @@ CoPharoCopilotResultSetBuilder >> finalizeCollectedSuggestions: collected contex
 
 	contextInfo at: #rawSuggestions put: collected asArray.
 	^ collected asArray
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> fuseModelSuggestions: modelSuggestions semanticEntries: semanticEntries context: aContext contextInfo: contextInfo [
+
+	| modelArray semanticArray semanticStrings semanticSelectors reranker exactModels modelOnly result seenStrings seenSelectors |
+	modelArray := modelSuggestions ifNil: [ #() ] ifNotNil: [ modelSuggestions asArray ].
+	semanticArray := semanticEntries ifNil: [ #() ] ifNotNil: [ semanticEntries asArray ].
+	semanticStrings := self semanticStringsFrom: semanticArray.
+	semanticStrings isEmpty ifTrue: [ ^ modelArray ].
+
+	reranker := CoPCSemanticReranker
+		builder: self
+		context: aContext
+		contextInfo: contextInfo.
+	semanticSelectors := Set new.
+	semanticArray do: [ :entry |
+		| selector |
+		selector := self semanticSelectorForEntry: entry reranker: reranker.
+		selector isEmpty ifFalse: [ semanticSelectors add: selector ] ].
+
+	exactModels := OrderedCollection new.
+	modelOnly := OrderedCollection new.
+	modelArray do: [ :model |
+		| selector |
+		selector := reranker selectorForCompletionString: model.
+		(selector isEmpty not and: [ semanticSelectors includes: selector ])
+			ifTrue: [ exactModels add: model -> selector ]
+			ifFalse: [ modelOnly add: model -> selector ] ].
+
+	result := OrderedCollection new.
+	seenStrings := Set new.
+	seenSelectors := Set new.
+	exactModels do: [ :assoc |
+		self
+			addFusedSuggestion: assoc key
+			selector: assoc value
+			to: result
+			seenStrings: seenStrings
+			seenSelectors: seenSelectors ].
+	semanticArray do: [ :entry |
+		| contents selector |
+		contents := self entryContentsFor: entry.
+		selector := self semanticSelectorForEntry: entry reranker: reranker.
+		self
+			addFusedSuggestion: contents
+			selector: selector
+			to: result
+			seenStrings: seenStrings
+			seenSelectors: seenSelectors ].
+	modelOnly do: [ :assoc |
+		self
+			addFusedSuggestion: assoc key
+			selector: assoc value
+			to: result
+			seenStrings: seenStrings
+			seenSelectors: seenSelectors ].
+
+	self
+		recordSemanticFusionForModelSuggestions: modelArray
+		semanticStrings: semanticStrings
+		exactModels: exactModels
+		result: result
+		contextInfo: contextInfo.
+	^ result asArray
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> addFusedSuggestion: suggestionString selector: selectorString to: result seenStrings: seenStrings seenSelectors: seenSelectors [
+
+	| suggestion selector |
+	suggestion := suggestionString ifNil: [ '' ] ifNotNil: [ suggestionString asString ].
+	suggestion isEmpty ifTrue: [ ^ self ].
+	selector := selectorString ifNil: [ '' ] ifNotNil: [ selectorString asString ].
+	(selector isEmpty not and: [ seenSelectors includes: selector ]) ifTrue: [ ^ self ].
+	(seenStrings includes: suggestion) ifTrue: [ ^ self ].
+
+	result add: suggestion.
+	seenStrings add: suggestion.
+	selector isEmpty ifFalse: [ seenSelectors add: selector ]
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> semanticStringsFrom: entries [
+
+	| strings |
+	strings := OrderedCollection new.
+	(entries ifNil: [ #() ]) do: [ :each |
+		| contents |
+		contents := self entryContentsFor: each.
+		contents isEmpty ifFalse: [ strings add: contents ] ].
+	^ strings asArray
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> semanticSelectorForEntry: anEntry reranker: reranker [
+
+	| candidate |
+	candidate := reranker selectorCandidateFrom: (self entryContentsFor: anEntry).
+	^ candidate at: #selector ifAbsent: [ '' ]
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> recordSemanticFusionForModelSuggestions: modelSuggestions semanticStrings: semanticStrings exactModels: exactModels result: result contextInfo: contextInfo [
+
+	| payload status |
+	contextInfo ifNil: [ ^ self ].
+	contextInfo at: #semanticFusionApplied put: true.
+	status := exactModels isEmpty
+		ifTrue: [
+			modelSuggestions isEmpty
+				ifTrue: [ #semanticOnly ]
+				ifFalse: [ #semanticFirst ] ]
+		ifFalse: [ #high ].
+	payload := Dictionary new
+		at: #status put: status;
+		at: #modelTop put: (modelSuggestions isEmpty
+			ifTrue: [ '' ]
+			ifFalse: [ modelSuggestions first asString ]);
+		at: #heuristicTop put: (semanticStrings isEmpty
+			ifTrue: [ '' ]
+			ifFalse: [ semanticStrings first ]);
+		at: #modelStatuses put: ((modelSuggestions collect: [ :each |
+			Dictionary new
+				at: #contents put: each asString;
+				at: #status put: ((exactModels anySatisfy: [ :assoc | assoc key = each ])
+					ifTrue: [ #high ]
+					ifFalse: [ #modelOnly ]);
+				yourself ]) asArray);
+		at: #shownOrder put: ((result collect: [ :each |
+			((modelSuggestions includes: each) and: [ semanticStrings includes: each ])
+				ifTrue: [ #both ]
+				ifFalse: [
+					(modelSuggestions includes: each)
+						ifTrue: [ #copilot ]
+						ifFalse: [ #semantic ] ] ]) asArray);
+		yourself.
+	contextInfo at: #semanticGate put: payload
 ]
 
 { #category : 'new' }
@@ -1810,9 +2020,10 @@ CoPharoCopilotResultSetBuilder >> normalizedCompletionContentsFrom: contentColle
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> semanticSelectorFastPathEntriesFor: aContext contextInfo: contextInfo [
 
-	| entries gate |
+	| rawEntries entries gate |
+	rawEntries := self semanticEntriesFor: aContext.
 	entries := self
-		fallbackCompletionEntriesFor: aContext
+		semanticFallbackEntriesFrom: rawEntries
 		excluding: #().
 
 	contextInfo ifNotNil: [
@@ -1822,7 +2033,7 @@ CoPharoCopilotResultSetBuilder >> semanticSelectorFastPathEntriesFor: aContext c
 			at: #heuristicTop put: (entries isEmpty
 				ifTrue: [ '' ]
 				ifFalse: [ self entryContentsFor: entries first ]);
-			at: #shownOrder put: ((entries collect: [ :each | #heuristic ]) asArray);
+			at: #shownOrder put: ((entries collect: [ :each | #semantic ]) asArray);
 			yourself.
 		contextInfo at: #semanticGate put: gate ].
 
@@ -1846,17 +2057,39 @@ CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefi
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefixString suffix: suffixString context: classContext attempt: attempt contextInfo: contextInfo [
 
+	^ self
+		normalizedSuggestionFrom: client
+		prefix: prefixString
+		suffix: suffixString
+		context: classContext
+		attempt: attempt
+		contextInfo: contextInfo
+		requestOptions: nil
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> normalizedSuggestionFrom: client prefix: prefixString suffix: suffixString context: classContext attempt: attempt contextInfo: contextInfo requestOptions: requestOptions [
+
 	| metadata rawResponse content |
-	metadata := (client respondsTo: #generateWithMetadataForPrefix:suffix:context:)
+	metadata := ((requestOptions notNil and: [ requestOptions isEmpty not ])
+		and: [ client respondsTo: #generateWithMetadataForPrefix:suffix:context:options: ])
 		ifTrue: [
 			client
 				generateWithMetadataForPrefix: prefixString
 				suffix: suffixString
-				context: classContext ]
+				context: classContext
+				options: requestOptions ]
 		ifFalse: [
-			Dictionary new
-				at: #content put: (client generateForPrefix: prefixString suffix: suffixString context: classContext);
-				yourself ].
+			(client respondsTo: #generateWithMetadataForPrefix:suffix:context:)
+				ifTrue: [
+					client
+						generateWithMetadataForPrefix: prefixString
+						suffix: suffixString
+						context: classContext ]
+				ifFalse: [
+					Dictionary new
+						at: #content put: (client generateForPrefix: prefixString suffix: suffixString context: classContext);
+						yourself ] ].
 	rawResponse := metadata at: #content ifAbsent: [ '' ].
 	content := self normalizeSuggestion: rawResponse forPrefix: prefixString.
 	(content isEmpty not and: [ self isLowConfidenceMetadata: metadata ]) ifTrue: [
@@ -1930,11 +2163,19 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> openCachedSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
-	| entries position |
+	| entries position info previousSkip |
+	info := contextInfo ifNil: [ Dictionary new ].
+	previousSkip := info
+		at: #skipSemanticCompletionEnrichment
+		ifAbsent: [ false ].
+	info at: #skipSemanticCompletionEnrichment put: true.
 	entries := self
 		completionEntriesFrom: suggestions
 		inContext: aContext
-		contextInfo: contextInfo.
+		contextInfo: info.
+	previousSkip
+		ifTrue: [ info at: #skipSemanticCompletionEnrichment put: true ]
+		ifFalse: [ info removeKey: #skipSemanticCompletionEnrichment ifAbsent: [ ] ].
 	entries isEmpty ifTrue: [ ^ false ].
 
 	position := self menuPositionForContextOrDefault: aContext.
@@ -1960,7 +2201,24 @@ CoPharoCopilotResultSetBuilder >> prependNavigationHistoryTo: contextString [
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
 	[
-		| classContext suggestions sessionId sessionPayload loggingOn |
+		| classContext suggestions semanticEntries semanticDone combined sessionId sessionPayload loggingOn |
+
+		semanticEntries := #().
+		semanticDone := Semaphore new.
+		[
+			[
+				semanticEntries := self semanticEntriesFor: aContext
+			] ensure: [
+				semanticDone signal ]
+		] forkAt: Processor userBackgroundPriority.
+
+		contextInfo ifNotNil: [
+			contextInfo
+				at: #completionRoute
+				put: (self completionRouter
+					classifyContext: aContext
+					prefix: prefixString
+					builder: self) ].
 
 		classContext := self classContextFor: aContext prefix: prefixString.
 		loggingOn := self isLoggingEnabled.
@@ -1973,7 +2231,13 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			suggestions := self fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
 			self cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext
 		].
-		self cacheFastSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString.
+		semanticDone wait.
+		combined := self
+			fuseModelSuggestions: suggestions
+			semanticEntries: semanticEntries
+			context: aContext
+			contextInfo: contextInfo.
+		self cacheFastSuggestions: combined for: aContext prefix: prefixString suffix: suffixString.
 
 		loggingOn ifTrue: [
 			sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
@@ -1989,7 +2253,7 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 					sessionId: sessionId ] ].
 
 		self
-			applyContents: suggestions
+			applyContents: combined
 			toContext: aContext
 			expectedPrefix: prefixString
 			suffix: suffixString
@@ -2439,7 +2703,7 @@ CoPharoCopilotResultSetBuilder >> semanticCompletionContextFor: aContext prefix:
 	selectorHints := self
 		semanticSelectorHintsForTypes: receiverTypes
 		token: token
-		limit: 30.
+		limit: 8.
 	selectorHints isEmpty ifFalse: [
 		lines add: (token isEmpty
 			ifTrue: [ 'Receiver selector samples:' ]
@@ -2790,9 +3054,15 @@ CoPharoCopilotResultSetBuilder >> shouldUseFallbackCompletionForContext: aContex
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> shouldOpenSemanticSelectorFastPathFor: aContext prefix: prefixString [
 
-	| token receiverName behavior receiverTypes |
+	| route token receiverName behavior receiverTypes |
+	route := self completionRouter
+		classifyContext: aContext
+		prefix: prefixString
+		builder: self.
+	route = #selector ifFalse: [ ^ false ].
+
 	token := self completionTokenFor: aContext prefix: prefixString.
-	token isEmpty ifTrue: [ ^ false ].
+	token size < 2 ifTrue: [ ^ false ].
 
 	receiverName := self textualReceiverBeforeCompletionIn: prefixString.
 	(receiverName isEmpty or: [ receiverName = token ]) ifTrue: [ ^ false ].

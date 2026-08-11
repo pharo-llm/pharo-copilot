@@ -113,6 +113,13 @@ CopilotTestableBuilder >> fallbackResultSetFor: aContext [
 ]
 
 { #category : 'accessing' }
+CopilotTestableBuilder >> semanticEntriesFor: aContext [
+
+	fallbackCallCount := self fallbackCallCount + 1.
+	^ { CoCopilotEntry contents: 'fallbackCompletion' }
+]
+
+{ #category : 'accessing' }
 CopilotTestableBuilder >> openCompletionMenuFor: aContext entries: entries position: position [
 
 	openedEntries := entries
