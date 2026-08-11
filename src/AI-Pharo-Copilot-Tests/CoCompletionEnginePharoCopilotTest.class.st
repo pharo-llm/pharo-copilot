@@ -54,3 +54,44 @@ CoCompletionEnginePharoCopilotTest >> testDifferentEnginesHaveDifferentBuilders 
     self deny: builder1 identicalTo: builder2.
 
 ]
+
+{ #category : 'tests' }
+CoCompletionEnginePharoCopilotTest >> testSpecConfigurationAccessorsAreStored [
+
+	| engine requestor doItContext |
+	engine := CoPharoCopilotCompletionEngine new.
+	requestor := Object new.
+	doItContext := Object new.
+
+	engine
+		scripting: true;
+		completionClass: String;
+		doItRequestor: requestor;
+		doItContext: doItContext;
+		smartCharacters: false.
+
+	self assert: engine isScripting.
+	self assert: engine completionClass equals: String.
+	self assert: engine doItRequestor identicalTo: requestor.
+	self assert: engine doItContext identicalTo: doItContext.
+	self deny: engine smartCharacters
+]
+
+{ #category : 'tests' }
+CoCompletionEnginePharoCopilotTest >> testStandaloneTokenUsesFallbackWhenScriptingComesFromEngine [
+
+	| engine context builder |
+	engine := CoPharoCopilotCompletionEngine new
+		scripting: true;
+		yourself.
+	context := CoEngineBackedContextMock new
+		engine: engine;
+		source: 'Ord';
+		position: 3;
+		yourself.
+	builder := CoPharoCopilotResultSetBuilder new.
+
+	self assert: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: 'Ord')
+]
