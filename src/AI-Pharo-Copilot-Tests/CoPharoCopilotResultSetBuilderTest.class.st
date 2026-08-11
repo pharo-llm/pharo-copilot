@@ -99,7 +99,34 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompleti
 	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'CompletedValue'.
 	self assert: b scheduledDelay isNil.
-	self assert: b classContextCallCount equals: 0
+	self assert: b classContextCallCount equals: 0.
+	self assert: b fallbackCallCount equals: 0.
+	self assert: b semanticAstCallCount equals: 0
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionReranksCachedSemanticSuggestion [
+
+	| b ctx entries |
+	b := CopilotTestableBuilder new.
+	ctx := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	b completionContext: ctx.
+	b completionCache
+		at: 'self as'
+		suffix: ''
+		context: (b fastCacheContextFor: ctx prefix: 'self as')
+		put: { 'DefinitelyNotASelector' }.
+
+	b buildCompletion.
+
+	entries := b openedEntries.
+	self assert: b fallbackCallCount equals: 1.
+	self assert: entries first contents equals: 'fallbackCompletion'.
+	self assert: b scheduledDelay isNil
 ]
 
 { #category : 'tests' }
@@ -384,6 +411,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetada
 		| builder client mock logprobs contextInfo suggestions attempts attempt request response payload generated |
 		CopilotSettings recordResearchTelemetryConsentAccepted: true.
 		CopilotSettings loggingEnabled: true.
+		CopilotSettings completionLogprobsEnabled: true.
 		builder := CoPharoCopilotResultSetBuilder new.
 		mock := OAHttpTransportMockExtended new.
 		logprobs := {
@@ -449,6 +477,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRejectsLowConfidenceL
 		| builder client mock logprobs contextInfo suggestions attempts attempt |
 		CopilotSettings recordResearchTelemetryConsentAccepted: true.
 		CopilotSettings loggingEnabled: true.
+		CopilotSettings completionLogprobsEnabled: true.
 		builder := CoPharoCopilotResultSetBuilder new.
 		mock := OAHttpTransportMockExtended new.
 		logprobs := {

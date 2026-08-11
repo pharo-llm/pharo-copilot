@@ -194,6 +194,7 @@ CopilotSettingsTest >> testFastCompletionDefaults [
 		self assert: CopilotSettings completionDebounceMilliseconds equals: 0.
 		self assert: CopilotSettings completionIdleMilliseconds equals: 75.
 		self assert: CopilotSettings numPredict equals: 32.
+		self assert: CopilotSettings completionLogprobsEnabled.
 	]
 ]
 
