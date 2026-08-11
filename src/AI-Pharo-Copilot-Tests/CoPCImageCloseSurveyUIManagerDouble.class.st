@@ -3,6 +3,7 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'ratings',
+		'comments',
 		'requests'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
@@ -23,12 +24,45 @@ CoPCImageCloseSurveyUIManagerDouble >> chooseFrom: labelList values: valueList t
 	^ ratings removeFirst
 ]
 
+{ #category : 'accessing' }
+CoPCImageCloseSurveyUIManagerDouble >> comments: aCollection [
+
+	comments := OrderedCollection withAll: aCollection
+]
+
 { #category : 'initialization' }
 CoPCImageCloseSurveyUIManagerDouble >> initialize [
 
 	super initialize.
 	ratings := OrderedCollection new.
+	comments := OrderedCollection new.
 	requests := OrderedCollection new
+]
+
+{ #category : 'accessing' }
+CoPCImageCloseSurveyUIManagerDouble >> multiLineRequest: requestString initialAnswer: initialAnswerString answerHeight: answerHeight [
+
+	requests add: (Dictionary new
+		at: #request put: requestString;
+		at: #initialAnswer put: initialAnswerString;
+		at: #answerHeight put: answerHeight;
+		yourself).
+
+	comments isEmpty ifTrue: [ ^ '' ].
+	^ comments removeFirst
+]
+
+{ #category : 'accessing' }
+CoPCImageCloseSurveyUIManagerDouble >> request: requestString initialAnswer: initialAnswerString title: titleString [
+
+	requests add: (Dictionary new
+		at: #request put: requestString;
+		at: #initialAnswer put: initialAnswerString;
+		at: #title put: titleString;
+		yourself).
+
+	comments isEmpty ifTrue: [ ^ '' ].
+	^ comments removeFirst
 ]
 
 { #category : 'accessing' }

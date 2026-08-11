@@ -44,6 +44,27 @@ CoPCImageCloseSurvey class >> askTaskUsing: uiManager [
 ]
 
 { #category : 'survey' }
+CoPCImageCloseSurvey class >> askOptionalCommentUsing: uiManager [
+
+	| comment |
+	uiManager ifNil: [ ^ nil ].
+	(uiManager respondsTo: #multiLineRequest:initialAnswer:answerHeight:) ifTrue: [
+		comment := uiManager
+			multiLineRequest: self optionalCommentQuestionTitle
+			initialAnswer: ''
+			answerHeight: self optionalCommentAnswerHeight.
+		^ self validatedOptionalComment: comment ].
+	(uiManager respondsTo: #request:initialAnswer:title:) ifFalse: [ ^ nil ].
+
+	comment := uiManager
+		request: self optionalCommentQuestionTitle
+		initialAnswer: ''
+		title: self optionalCommentWindowTitle.
+
+	^ self validatedOptionalComment: comment
+]
+
+{ #category : 'survey' }
 CoPCImageCloseSurvey class >> askUserExperienceUsing: uiManager [
 
 	| experience |
@@ -163,12 +184,17 @@ CoPCImageCloseSurvey class >> logSurveyError: anException [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> promptAndRecordUsing: uiManager [
 
-	| ratings tasks userProfile |
+	| ratings tasks userProfile feedbackComment |
 	ratings := self collectRatingsUsing: uiManager.
 	ratings ifNil: [ ^ nil ].
 	tasks := self collectTasksUsing: uiManager.
 	userProfile := self collectUserProfileUsing: uiManager.
-	self recordRatings: ratings tasks: tasks userProfile: userProfile.
+	feedbackComment := self askOptionalCommentUsing: uiManager.
+	self
+		recordRatings: ratings
+		tasks: tasks
+		userProfile: userProfile
+		feedbackComment: feedbackComment.
 	^ ratings
 ]
 
@@ -208,6 +234,24 @@ CoPCImageCloseSurvey class >> questionLabelsByKey [
 ]
 
 { #category : 'survey' }
+CoPCImageCloseSurvey class >> optionalCommentAnswerHeight [
+
+	^ 180
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> optionalCommentQuestionTitle [
+
+	^ 'Do you have any thoughts or feedback to share, positive or negative? (Optional - you can leave this blank and continue.)'
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> optionalCommentWindowTitle [
+
+	^ 'Pharo Copilot feedback'
+]
+
+{ #category : 'survey' }
 CoPCImageCloseSurvey class >> ratingLabels [
 
 	^ #(
@@ -243,13 +287,24 @@ CoPCImageCloseSurvey class >> recordRatings: ratingsDictionary tasks: taskCollec
 { #category : 'logging' }
 CoPCImageCloseSurvey class >> recordRatings: ratingsDictionary tasks: taskCollection userProfile: userProfileDictionary [
 
+	self
+		recordRatings: ratingsDictionary
+		tasks: taskCollection
+		userProfile: userProfileDictionary
+		feedbackComment: nil
+]
+
+{ #category : 'logging' }
+CoPCImageCloseSurvey class >> recordRatings: ratingsDictionary tasks: taskCollection userProfile: userProfileDictionary feedbackComment: feedbackComment [
+
 	CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ self ].
 	CoPharoCopilotLogger
 		appendEvaluationEvent: 'image-close-survey'
 		data: (self
 			surveyPayloadForRatings: ratingsDictionary
 			tasks: taskCollection
-			userProfile: userProfileDictionary)
+			userProfile: userProfileDictionary
+			feedbackComment: feedbackComment)
 ]
 
 { #category : 'session management' }
@@ -345,7 +400,18 @@ CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary tasks: taskCo
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary tasks: taskCollection userProfile: userProfileDictionary [
 
-	^ Dictionary new
+	^ self
+		surveyPayloadForRatings: aDictionary
+		tasks: taskCollection
+		userProfile: userProfileDictionary
+		feedbackComment: nil
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary tasks: taskCollection userProfile: userProfileDictionary feedbackComment: feedbackComment [
+
+	| payload |
+	payload := Dictionary new
 		at: #userId put: CoPharoCopilotLogger userId;
 		at: #sessionId put: CoPharoCopilotLogger currentSessionId;
 		at: #timestamp put: DateAndTime now asString;
@@ -356,7 +422,10 @@ CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary tasks: taskCo
 		at: #tasks put: taskCollection asArray;
 		at: #availableUserExperience put: self availableUserExperienceLabelsByValue;
 		at: #userProfile put: (userProfileDictionary ifNil: [ Dictionary new ]);
-		yourself
+		yourself.
+	feedbackComment ifNotNil: [
+		payload at: #feedbackComment put: feedbackComment ].
+	^ payload
 ]
 
 { #category : 'survey' }
@@ -479,6 +548,14 @@ CoPCImageCloseSurvey class >> validatedRating: anObject [
 	^ (self ratingValues includes: rating)
 		ifTrue: [ rating ]
 		ifFalse: [ nil ]
+]
+
+{ #category : 'private' }
+CoPCImageCloseSurvey class >> validatedOptionalComment: anObject [
+
+	anObject ifNil: [ ^ nil ].
+	(anObject respondsTo: #asString) ifFalse: [ ^ nil ].
+	^ anObject asString
 ]
 
 { #category : 'private' }
