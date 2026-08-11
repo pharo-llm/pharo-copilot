@@ -100,6 +100,26 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesStandaloneFallbackI
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesEmptyResultSetWhenStandaloneFallbackFails [
+
+	| b ctx result |
+	b := CopilotNilFallbackTestBuilder new.
+	ctx := CoCopilotContextMock new
+		isScripting: true;
+		source: 'Ord';
+		position: 3;
+		yourself.
+	b completionContext: ctx.
+
+	result := b buildCompletion.
+
+	self deny: result isNil.
+	self assert: (result isKindOf: CoResultSet).
+	self assert: b fallbackCallCount equals: 1.
+	self assert: b scheduledDelay isNil
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testClassContextIsCached [
 
 	| b ctx first second |

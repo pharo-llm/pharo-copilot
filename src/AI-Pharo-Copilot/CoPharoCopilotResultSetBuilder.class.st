@@ -243,7 +243,9 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	(self
 		shouldUseFallbackCompletionForContext: context
 		prefix: prefix)
-			ifTrue: [ ^ self fallbackResultSetFor: context ].
+			ifTrue: [
+				^ (self fallbackResultSetFor: context)
+					ifNil: [ self emptyResultSet ] ].
 	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
 
 	self isLoggingEnabled ifTrue: [
