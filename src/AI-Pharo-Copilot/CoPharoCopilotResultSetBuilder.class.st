@@ -2156,8 +2156,18 @@ CoPharoCopilotResultSetBuilder >> isClassOrTrait: anObject [
 { #category : 'semantic context' }
 CoPharoCopilotResultSetBuilder >> isScriptingContext: aContext [
 
-	^ (aContext notNil and: [ aContext respondsTo: #isScripting ])
-		and: [ [ aContext isScripting ] on: Error do: [ false ] ]
+	| engine |
+	aContext ifNil: [ ^ false ].
+
+	(aContext respondsTo: #isScripting) ifTrue: [
+		^ [ aContext isScripting ] on: Error do: [ false ] ].
+
+	engine := (aContext respondsTo: #engine)
+		ifTrue: [ [ aContext engine ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+
+	^ (engine notNil and: [ engine respondsTo: #isScripting ])
+		and: [ [ engine isScripting ] on: Error do: [ false ] ]
 ]
 
 { #category : 'semantic context' }
@@ -2583,6 +2593,7 @@ CoPharoCopilotResultSetBuilder >> textualReceiverBeforeCompletionIn: prefixStrin
 					ifFalse: [ base copyFrom: 1 to: base size - fragment size ] ] ].
 	base := base trimRight.
 	base isEmpty ifTrue: [ ^ '' ].
+	(self hasStandaloneCompletionBoundaryBeforeTokenIn: base) ifTrue: [ ^ '' ].
 
 	end := base size.
 	[ end > 0 and: [ (self isWordChar: (base at: end)) not ] ] whileTrue: [
@@ -2594,6 +2605,19 @@ CoPharoCopilotResultSetBuilder >> textualReceiverBeforeCompletionIn: prefixStrin
 		start := start - 1 ].
 
 	^ base copyFrom: start + 1 to: end
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> hasStandaloneCompletionBoundaryBeforeTokenIn: prefixString [
+
+	| prefix last boundaryCharacters |
+	prefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString trimRight ].
+	prefix isEmpty ifTrue: [ ^ true ].
+	(prefix endsWith: ':=') ifTrue: [ ^ true ].
+
+	last := prefix last.
+	boundaryCharacters := '.^([{:|,+-*/\~<>=@%&?!'.
+	^ boundaryCharacters includes: last
 ]
 
 { #category : 'new' }

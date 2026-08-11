@@ -770,6 +770,57 @@ CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenOutsideScriptingContext
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterAssignmentUsesFallbackCompletion [
+
+	| builder context source |
+	builder := CopilotTestableBuilder new.
+	source := 'items := Ord'.
+	context := CoCopilotContextMock new
+		isScripting: true;
+		source: source;
+		position: source size;
+		yourself.
+
+	self assert: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: source)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterKeywordArgumentUsesFallbackCompletion [
+
+	| builder context source |
+	builder := CopilotTestableBuilder new.
+	source := 'Dictionary new at: Ord'.
+	context := CoCopilotContextMock new
+		isScripting: true;
+		source: source;
+		position: source size;
+		yourself.
+
+	self assert: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: source)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterStatementSeparatorUsesFallbackCompletion [
+
+	| builder context source |
+	builder := CopilotTestableBuilder new.
+	source := 'Transcript cr.', String lf, 'Ord'.
+	context := CoCopilotContextMock new
+		isScripting: true;
+		source: source;
+		position: source size;
+		yourself.
+
+	self assert: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: source)
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenUsesFallbackCompletion [
 
 	| builder context |
