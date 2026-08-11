@@ -495,7 +495,7 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
-	| welcomeContainer messageLabel telemetryStateLabel learnMoreButton noButton yesButton buttonRow |
+	| messageLabel telemetryStateLabel learnMoreButton noButton yesButton buttonRow |
 	titleLabel label: 'Help improve Pharo'.
 	descriptionLabel label: 'Anonymous usage research consent for Pharo Copilot.'.
 	statusLabel label: ''.
@@ -505,7 +505,7 @@ PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 		yourself.
 
 	telemetryStateLabel := self newLabel
-		label: 'Default: anonymous research telemetry is OFF.';
+		label: 'Anonymous research telemetry is OFF by default.';
 		yourself.
 
 	learnMoreButton := self newButton
@@ -514,13 +514,6 @@ PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 			self
 				showResearchTelemetryLearnMoreStepReturningTo: [ self showResearchTelemetryConsentChoiceStep ]
 				includeConsentButtons: true ];
-		yourself.
-
-	welcomeContainer := SpBoxLayout newTopToBottom
-		spacing: 8;
-		add: messageLabel expand: true;
-		add: telemetryStateLabel expand: false;
-		add: learnMoreButton width: 160;
 		yourself.
 
 	noButton := self newButton
@@ -535,13 +528,15 @@ PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
 	buttonRow := SpBoxLayout newHorizontal
 		spacing: 10;
-		add: noButton width: 230;
-		add: yesButton width: 190;
+		add: learnMoreButton;
+		add: noButton;
+		add: yesButton;
 		yourself.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
-		spacing: 10;
-		add: welcomeContainer expand: true;
+		spacing: 12;
+		add: messageLabel expand: true;
+		add: telemetryStateLabel expand: false;
 		add: buttonRow expand: false;
 		yourself).
 
@@ -580,9 +575,9 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 
 			buttonRow := SpBoxLayout newHorizontal
 				spacing: 10;
-				add: backButton width: 90;
-				add: noButton width: 230;
-				add: yesButton width: 190;
+				add: backButton;
+				add: noButton;
+				add: yesButton;
 				yourself ]
 		ifFalse: [
 			continueButton := self newButton
@@ -592,8 +587,8 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 
 			buttonRow := SpBoxLayout newHorizontal
 				spacing: 10;
-				add: backButton width: 110;
-				add: continueButton width: 180;
+				add: backButton;
+				add: continueButton;
 				yourself ].
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
@@ -612,9 +607,9 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 	descriptionLabel label: 'Local AI code completion for Pharo.'.
 	statusLabel label: ''.
 
-	CopilotSettings researchTelemetryNotAsked ifFalse: [ ^ self showWelcomeStepAfterConsentDecision ].
-	CopilotSettings declineResearchTelemetryIfNotAsked.
-	self showResearchTelemetryConsentChoiceStep
+	CopilotSettings researchTelemetryNotAsked
+		ifTrue: [ ^ self showResearchTelemetryConsentChoiceStep ].
+	^ self showWelcomeStepAfterConsentDecision
 ]
 
 { #category : 'initialization' }
@@ -642,8 +637,8 @@ PharoCopilotSetupPresenter >> showWelcomeStepAfterConsentDecision [
 
 	buttonRow := SpBoxLayout newHorizontal
 		spacing: 10;
-		add: learnMoreButton width: 160;
-		add: continueButton width: 180;
+		add: learnMoreButton;
+		add: continueButton;
 		yourself.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
