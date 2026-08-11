@@ -7,6 +7,49 @@ Class {
 }
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionRouterClassifiesSelectorVariableAndStatement [
+
+	| builder router selectorContext variableContext statementContext statementSource |
+	builder := CoPharoCopilotResultSetBuilder new.
+	router := CoPCCompletionRouter new.
+	selectorContext := CoCopilotContextMock new
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	variableContext := CoCopilotContextMock new
+		source: 'localVar';
+		position: 'localVar' size;
+		yourself.
+	statementSource := 'self doSomething.'.
+	statementContext := CoCopilotContextMock new
+		source: statementSource;
+		position: statementSource size;
+		yourself.
+
+	self
+		assert: (router classifyContext: selectorContext prefix: selectorContext source builder: builder)
+		equals: #selector.
+	self
+		assert: (router classifyContext: variableContext prefix: variableContext source builder: builder)
+		equals: #variable.
+	self
+		assert: (router classifyContext: statementContext prefix: statementSource builder: builder)
+		equals: #statement
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionGenerationPolicyUsesSmallBudgetsForShortRoutes [
+
+	| policy |
+	policy := CoPCCompletionGenerationPolicy new.
+
+	self assert: (policy numPredictFor: #selector) equals: 8.
+	self assert: (policy numPredictFor: #variable) equals: 8.
+	self assert: (policy numPredictFor: #statement) equals: 24.
+	self assert: (policy numPredictFor: #unknown) equals: 24
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testApplyContentDoesNothingOnSnapshotMismatch [
 	| b ctx ed |
 	b := CopilotTestableBuilder new.
@@ -407,6 +450,63 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISu
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testFuseModelTailMatchingSemanticSelectorKeepsModelFirst [
+
+	| builder context contextInfo result gate |
+	builder := CoPharoCopilotResultSetBuilder new.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'self as';
+		yourself.
+
+	result := builder
+		fuseModelSuggestions: { 'String' }
+		semanticEntries: {
+			CoCopilotEntry contents: 'asString'.
+			CoCopilotEntry contents: 'asArray' }
+		context: context
+		contextInfo: contextInfo.
+
+	self assert: result equals: { 'String'. 'asArray' }.
+	self assert: (contextInfo at: #semanticFusionApplied).
+	gate := contextInfo at: #semanticGate.
+	self assert: (gate at: #status) equals: #high.
+	self assert: (gate at: #heuristicTop) equals: 'asString'
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testFuseInvalidModelSuggestionFallsBehindSemanticCandidates [
+
+	| builder context contextInfo result gate |
+	builder := CoPharoCopilotResultSetBuilder new.
+	context := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'self as';
+		yourself.
+
+	result := builder
+		fuseModelSuggestions: { 'DefinitelyNotASelector' }
+		semanticEntries: {
+			CoCopilotEntry contents: 'asString'.
+			CoCopilotEntry contents: 'asArray' }
+		context: context
+		contextInfo: contextInfo.
+
+	self assert: result equals: { 'asString'. 'asArray'. 'DefinitelyNotASelector' }.
+	self assert: (contextInfo at: #semanticFusionApplied).
+	gate := contextInfo at: #semanticGate.
+	self assert: (gate at: #status) equals: #semanticFirst
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionContractAppendsStrictSection [
 
 	| builder context base source result |
@@ -662,6 +762,26 @@ CoPharoCopilotResultSetBuilderTest >> testLiveEditorTypedAheadDoesNotCountAsStal
 		typedAheadIn: context
 		expectedPrefix: 'self as'
 		suffix: '') equals: 'Str'
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorFastPathRequiresTwoCharacterToken [
+
+	| builder oneCharacter twoCharacters |
+	builder := CoPharoCopilotResultSetBuilder new.
+	oneCharacter := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self a';
+		position: 'self a' size;
+		yourself.
+	twoCharacters := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+
+	self deny: (builder shouldOpenSemanticSelectorFastPathFor: oneCharacter prefix: oneCharacter source).
+	self assert: (builder shouldOpenSemanticSelectorFastPathFor: twoCharacters prefix: twoCharacters source)
 ]
 
 { #category : 'tests' }

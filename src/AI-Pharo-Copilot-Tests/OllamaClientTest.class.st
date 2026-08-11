@@ -122,6 +122,34 @@ OllamaClientTest >> testGenerateForPrefixRequestsLogprobs [
 ]
 
 { #category : 'tests' }
+OllamaClientTest >> testGenerateForPrefixUsesRequestLocalOptions [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| client mock payload options |
+		client := CoPCOllamaClient basicNew.
+		mock := OAHttpTransportMockExtended new.
+		mock mockResponse: (Dictionary new at: #response put: 'completion'; yourself).
+		client instVarNamed: 'transport' put: mock.
+		client instVarNamed: 'modelSpec' put: (CoPCModelSpec family: 'test-model' tag: nil label: 'test-model').
+		client instVarNamed: 'stream' put: false.
+		client instVarNamed: 'options' put: Dictionary new.
+		client instVarNamed: 'fimTemplate' put: CoPCOllamaClient defaultFimGenerationTemplate.
+
+		options := Dictionary new
+			at: #num_predict put: 8;
+			yourself.
+		client
+			generateForPrefix: 'self '
+			suffix: ''
+			context: ''
+			options: options.
+
+		payload := mock lastBody.
+		self assert: ((payload at: #options) at: #num_predict) equals: 8.
+		self assert: (client optionAt: #num_predict) isNil ]
+]
+
+{ #category : 'tests' }
 OllamaClientTest >> testGenerateIncludesFormatWhenSet [
 	| client mock payload |
 	client := CoPCOllamaClient new.

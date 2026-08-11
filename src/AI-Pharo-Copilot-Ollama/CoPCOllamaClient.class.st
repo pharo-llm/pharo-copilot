@@ -214,7 +214,28 @@ CoPCOllamaClient >> generateForPrefix: prefixString suffix: suffixString context
 ]
 
 { #category : 'generation-operations' }
+CoPCOllamaClient >> generateForPrefix: prefixString suffix: suffixString context: contextString options: requestOptions [
+
+	^ (self
+		generateWithMetadataForPrefix: prefixString
+		suffix: suffixString
+		context: contextString
+		options: requestOptions) at: #content
+]
+
+{ #category : 'generation-operations' }
 CoPCOllamaClient >> generateWithMetadataForPrefix: prefixString suffix: suffixString context: contextString [
+	"Generate a fill-in-the-middle completion and preserve response metadata for logging."
+
+	^ self
+		generateWithMetadataForPrefix: prefixString
+		suffix: suffixString
+		context: contextString
+		options: nil
+]
+
+{ #category : 'generation-operations' }
+CoPCOllamaClient >> generateWithMetadataForPrefix: prefixString suffix: suffixString context: contextString options: extraOptions [
 	"Generate a fill-in-the-middle completion and preserve response metadata for logging."
 
 	| safePrefix safeSuffix safeContext prompt payload requestOptions response normalized |
@@ -245,6 +266,9 @@ CoPCOllamaClient >> generateWithMetadataForPrefix: prefixString suffix: suffixSt
 	requestOptions := options
 		ifNil: [ Dictionary new ]
 		ifNotNil: [ options copy ].
+	extraOptions ifNotNil: [
+		extraOptions keysAndValuesDo: [ :key :value |
+			requestOptions at: key put: value ] ].
 	requestOptions at: #stop ifAbsentPut: [ self class fimStopSequences ].
 	payload at: #options put: requestOptions.
 	self addLogprobsOptionsToPayload: payload.
