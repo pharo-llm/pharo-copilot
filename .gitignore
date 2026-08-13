@@ -36,6 +36,7 @@ github-*.zip
 
 # Copilot runtime data
 /pharo-copilot/
+/pharo-copilot-json/
 
 # Ignore Python virtual environments
 venv/

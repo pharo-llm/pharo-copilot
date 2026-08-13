@@ -9,8 +9,9 @@ Class {
 { #category : 'support' }
 CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 
-	| tempDir tempEvalFile sessionDir archiveFile originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUploader originalUserId originalSessionId originalStartedAt originalArchived originalComplishonRerouteCount |
-	tempDir := FileLocator temp / ('copilot-image-close-session-test-' , UUID new asString).
+	| rootDir tempDir tempEvalFile sessionDir archiveFile originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUploader originalUserId originalSessionId originalStartedAt originalArchived originalComplishonRerouteCount |
+	rootDir := FileLocator temp / ('copilot-image-close-session-test-' , UUID new asString).
+	tempDir := rootDir / CoPharoCopilotLogger pharoCopilotDirectoryName.
 	sessionDir := tempDir / 'session-test'.
 	tempEvalFile := sessionDir / CoPharoCopilotLogger evaluationLogFileName.
 	archiveFile := tempDir / 'session-test.zip'.
@@ -27,7 +28,7 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 	originalComplishonRerouteCount := CoPharoCopilotLogger instVarNamed: #complishonRerouteCount.
 
 	[
-		tempDir exists ifTrue: [ tempDir ensureDeleteAll ].
+		rootDir exists ifTrue: [ rootDir ensureDeleteAll ].
 		tempDir ensureCreateDirectory.
 		CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
 		CoPharoCopilotLogger rawSessionDirectoryReference: sessionDir.
@@ -44,7 +45,7 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 			value: sessionDir
 			value: archiveFile
 	] ensure: [
-		tempDir exists ifTrue: [ tempDir ensureDeleteAll ].
+		rootDir exists ifTrue: [ rootDir ensureDeleteAll ].
 		CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
 		CoPharoCopilotLogger rawSessionDirectoryReference: originalSessionRef.
 		CoPharoCopilotLogger rawSessionArchiveFileReference: originalArchiveRef.
@@ -97,6 +98,10 @@ CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: t
 			at: #suggestions put: { 'String' };
 			at: #attempts put: { attempt };
 			yourself);
+		at: #completionEnvironment put: (Dictionary new
+			at: #kind put: #systemBrowser;
+			at: #windowTitle put: 'System Browser';
+			yourself);
 		at: #accepted put: 'String';
 		at: #acceptedAt put: '2026-08-11T10:00:01+02:00';
 		at: #nullCompletion put: false;
@@ -137,6 +142,10 @@ CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: t
 			at: #oldEngine put: #Complishon;
 			at: #reason put: #standaloneScriptingContext;
 			at: #rerouteCount put: 1;
+			at: #completionEnvironment put: (Dictionary new
+				at: #kind put: #playground;
+				at: #windowTitle put: 'Playground';
+				yourself);
 			yourself);
 		yourself.
 	rerouteEvent2 := Dictionary new
@@ -148,6 +157,10 @@ CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: t
 			at: #oldEngine put: #Complishon;
 			at: #reason put: #standaloneScriptingContext;
 			at: #rerouteCount put: 2;
+			at: #completionEnvironment put: (Dictionary new
+				at: #kind put: #playground;
+				at: #windowTitle put: 'Playground';
+				yourself);
 			yourself);
 		yourself.
 	tempEvalFile writeStreamDo: [ :stream |
@@ -158,53 +171,48 @@ CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: t
 ]
 
 { #category : 'tests' }
-CoPCImageCloseSurveyTest >> testArchiveCurrentSessionUploadsZipAfterWritingIt [
+CoPCImageCloseSurveyTest >> testArchiveCurrentSessionDoesNotUploadZip [
 
 	CopilotSettings withDefaultSettingsDo: [
 		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
-			| uploadedArchive uploadedSession uploadedUser uploadSawExistingArchive uploadSawZipArchive |
+			| spy |
 			sessionDir ensureCreateDirectory.
 			(sessionDir / 'marker.txt') writeStreamDo: [ :stream |
 				stream nextPutAll: 'session marker' ].
-			CoPharoCopilotLogger rawSessionArchiveUploader: [ :archive :session :user |
-				uploadedArchive := archive.
-				uploadedSession := session.
-				uploadedUser := user.
-				uploadSawExistingArchive := archive exists.
-				uploadSawZipArchive := ZipArchive isZipArchive: archive ].
+			spy := CoPCSessionArchiveUploaderSpy new.
+			CoPharoCopilotLogger rawSessionArchiveUploader: spy.
 
 			CoPharoCopilotLogger archiveCurrentSession.
 
-			self assert: uploadedArchive equals: archiveFile.
-			self assert: uploadedSession equals: sessionDir basename.
-			self assert: uploadedUser equals: 'user-test'.
-			self assert: uploadSawExistingArchive.
-			self assert: uploadSawZipArchive ] ]
+			self assert: archiveFile exists.
+			self assert: (ZipArchive isZipArchive: archiveFile).
+			self assert: spy uploadedArchive isNil.
+			self deny: spy uploadSawExistingArchive.
+			self deny: spy uploadSawZipArchive ] ]
 ]
 
 { #category : 'tests' }
-CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesAndUploadsTelemetrySummaryAfterZip [
+CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesJsonToJsonDirectoryAndUploadsOnlyIt [
 
 	CopilotSettings withDefaultSettingsDo: [
 		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
-			| spy summaryFile payload session summary |
+			| spy summaryFile payload session summary environmentCounts rerouteEnvironmentCounts |
 			self writeTelemetryFixtureIn: sessionDir evaluationLog: tempEvalFile.
 			spy := CoPCSessionArchiveUploaderSpy new.
 			CoPharoCopilotLogger rawSessionArchiveUploader: spy.
 
 			CoPharoCopilotLogger archiveCurrentSession.
 
-			summaryFile := tempDir / (sessionDir basename , '-telemetry.json').
+			summaryFile := CoPharoCopilotLogger telemetryJsonDirectoryReference / (sessionDir basename , '-telemetry.json').
 			self assert: archiveFile exists.
 			self assert: summaryFile exists.
-			self assert: spy uploadedArchive equals: archiveFile.
+			self assert: (summaryFile fullName includesSubstring: CoPharoCopilotLogger telemetryJsonDirectoryName).
+			self assert: spy uploadedArchive isNil.
 			self assert: spy uploadedTelemetrySummary fullName equals: summaryFile fullName.
-			self assert: spy uploadedSession equals: sessionDir basename.
-			self assert: spy uploadedUser equals: 'user-test'.
 			self assert: spy telemetrySession equals: sessionDir basename.
 			self assert: spy telemetryUser equals: 'user-test'.
-			self assert: spy uploadSawExistingArchive.
-			self assert: spy uploadSawZipArchive.
+			self deny: spy uploadSawExistingArchive.
+			self deny: spy uploadSawZipArchive.
 			self assert: spy uploadSawExistingTelemetrySummary.
 
 			payload := spy telemetryPayload.
@@ -225,7 +233,11 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesAndUploadsTelemetrySu
 			self assert: (summary at: #logprob_tokens) equals: 2.
 			self assert: (summary at: #prompt_tokens) equals: 10.
 			self assert: (summary at: #completion_tokens) equals: 2.
-			self assert: (summary at: #cache_hit_rate) equals: 40.0 ] ]
+			self assert: (summary at: #cache_hit_rate) equals: 40.0.
+			environmentCounts := summary at: #completion_environment_counts.
+			rerouteEnvironmentCounts := summary at: #complishon_reroute_environment_counts.
+			self assert: (environmentCounts at: 'systemBrowser') equals: 1.
+			self assert: (rerouteEnvironmentCounts at: 'playground') equals: 2 ] ]
 ]
 
 { #category : 'tests' }

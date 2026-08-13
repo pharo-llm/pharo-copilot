@@ -2,7 +2,8 @@ Class {
 	#name : 'CoTestEditorMock',
 	#superclass : 'Object',
 	#instVars : [
-		'caret'
+		'caret',
+		'morph'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -19,6 +20,18 @@ CoTestEditorMock >> caret [
 CoTestEditorMock >> caret: anInteger [
 
     caret := anInteger
+]
+
+{ #category : 'accessing' }
+CoTestEditorMock >> morph [
+
+	^ morph
+]
+
+{ #category : 'accessing' }
+CoTestEditorMock >> morph: anObject [
+
+	morph := anObject
 ]
 
 { #category : 'accessing' }

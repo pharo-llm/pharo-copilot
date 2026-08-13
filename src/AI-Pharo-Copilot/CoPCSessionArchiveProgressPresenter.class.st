@@ -1,6 +1,6 @@
 "
-I show a compact progress window while the current Pharo Copilot session is zipped
-and uploaded.
+I show a compact progress window while the current Pharo Copilot session is saved
+and its telemetry JSON is uploaded.
 "
 Class {
 	#name : 'CoPCSessionArchiveProgressPresenter',
@@ -136,11 +136,11 @@ CoPCSessionArchiveProgressPresenter >> handleArchiveProgressEvent: event [
 CoPCSessionArchiveProgressPresenter >> initializePresenters [
 
 	titleLabel := self newLabel
-		label: 'Saving Pharo-Copilot session';
+		label: 'Saving Pharo-Copilot telemetry';
 		yourself.
 
 	descriptionLabel := self newLabel
-		label: 'Creating the anonymous research archive before quitting.';
+		label: 'Creating the anonymous research JSON before quitting.';
 		yourself.
 
 	statusLabel := self newLabel
@@ -242,7 +242,7 @@ CoPCSessionArchiveProgressPresenter >> startArchiving [
 					statusLabel label: 'Could not archive Copilot session.'.
 					self progressPercentage: 0 ]
 				ifNotNil: [
-					statusLabel label: 'Session archive is complete.'.
+					statusLabel label: 'Session telemetry JSON is complete.'.
 					self progressPercentage: 100 ] ].
 
 		finished := true.

@@ -1,7 +1,7 @@
 "
-CoPCSessionArchiveUploader sends completed Pharo Copilot session zip archives to
+CoPCSessionArchiveUploader sends completed Pharo Copilot telemetry JSON files to
 the configured receiver. Upload failures are intentionally best-effort and are handled
-by CoPharoCopilotLogger so archiving can still finish when the receiver is down.
+by CoPharoCopilotLogger so session saving can still finish when the receiver is down.
 "
 Class {
 	#name : 'CoPCSessionArchiveUploader',

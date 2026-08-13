@@ -237,6 +237,7 @@ CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInf
 		at: #userId put: self userId;
 		at: #loggerSessionId put: self currentSessionId;
 		at: #cache put: cacheStats;
+		at: #completionEnvironment put: (contextInfo at: #completionEnvironment ifAbsent: [ Dictionary new ]);
 		at: #context put: (Dictionary new
 			at: #fullSource put: (contextInfo at: #fullSource ifAbsent: [ '' ]);
 			at: #prefix put: prefixString;
@@ -434,6 +435,21 @@ CoPharoCopilotLogger class >> pharoCopilotDirectoryName [
 	^ 'pharo-copilot'
 ]
 
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> telemetryJsonDirectoryName [
+
+	^ 'pharo-copilot-json'
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> telemetryJsonDirectoryReference [
+
+	| parent |
+	parent := self logsDirectoryReference parent.
+	parent ifNil: [ parent := FileLocator imageDirectory ].
+	^ parent / self telemetryJsonDirectoryName
+]
+
 { #category : 'session management' }
 CoPharoCopilotLogger class >> archiveCurrentSession [
 
@@ -504,20 +520,15 @@ CoPharoCopilotLogger class >> archiveCurrentSessionReportingProgress: aProgressB
 			telemetryFile := self
 				writeSessionTelemetrySummaryFor: directory
 				archiveFile: archiveFile.
-			self
-				reportArchiveProgress: aProgressBlock
-				status: 'Uploading session archive...'
-				percent: 90.
-			self uploadSessionArchive: archiveFile.
 			telemetryFile ifNotNil: [
 				self
 					reportArchiveProgress: aProgressBlock
-					status: 'Uploading telemetry summary...'
-					percent: 95.
+					status: 'Uploading telemetry JSON...'
+					percent: 90.
 				self uploadSessionTelemetrySummary: telemetryFile ].
 			self
 				reportArchiveProgress: aProgressBlock
-				status: 'Session archive is complete.'
+				status: 'Session telemetry JSON is complete.'
 				percent: 100.
 			archiveFile
 		] ensure: [
@@ -831,6 +842,7 @@ CoPharoCopilotLogger class >> writeSessionTelemetrySummaryFor: sessionDirectory 
 	^ [
 		CoPCSessionTelemetryAnalyzer
 			writeSummaryForSessionDirectory: sessionDirectory
+			outputDirectory: self telemetryJsonDirectoryReference
 			archiveFile: archiveFile
 			sessionId: self currentSessionId
 			userId: self userId

@@ -1,6 +1,6 @@
 "
-Builds a single-session telemetry summary from the same files that are later zipped:
-session-info.json, copilot-evaluation-log.jsonl, and completions/*.json.
+Builds a single-session telemetry summary from session-info.json,
+copilot-evaluation-log.jsonl, and completions/*.json.
 "
 Class {
 	#name : 'CoPCSessionTelemetryAnalyzer',
@@ -12,9 +12,20 @@ Class {
 { #category : 'writing' }
 CoPCSessionTelemetryAnalyzer class >> writeSummaryForSessionDirectory: sessionDirectory archiveFile: archiveFile sessionId: sessionId userId: userId [
 
+	^ self
+		writeSummaryForSessionDirectory: sessionDirectory
+		outputDirectory: archiveFile asFileReference parent
+		archiveFile: archiveFile
+		sessionId: sessionId
+		userId: userId
+]
+
+{ #category : 'writing' }
+CoPCSessionTelemetryAnalyzer class >> writeSummaryForSessionDirectory: sessionDirectory outputDirectory: outputDirectory archiveFile: archiveFile sessionId: sessionId userId: userId [
+
 	| file payload |
 	file := self
-		summaryFileReferenceForArchiveFile: archiveFile
+		summaryFileReferenceForDirectory: outputDirectory
 		sessionId: sessionId.
 	payload := self
 		payloadForSessionDirectory: sessionDirectory
@@ -31,9 +42,17 @@ CoPCSessionTelemetryAnalyzer class >> writeSummaryForSessionDirectory: sessionDi
 { #category : 'writing' }
 CoPCSessionTelemetryAnalyzer class >> summaryFileReferenceForArchiveFile: archiveFile sessionId: sessionId [
 
+	^ self
+		summaryFileReferenceForDirectory: archiveFile asFileReference parent
+		sessionId: sessionId
+]
+
+{ #category : 'writing' }
+CoPCSessionTelemetryAnalyzer class >> summaryFileReferenceForDirectory: directory sessionId: sessionId [
+
 	| safeSessionId |
 	safeSessionId := (sessionId ifNil: [ 'unknown-session' ] ifNotNil: [ sessionId asString ]) asFileName.
-	^ archiveFile asFileReference parent / (safeSessionId , '-telemetry.json')
+	^ directory asFileReference / (safeSessionId , '-telemetry.json')
 ]
 
 { #category : 'building' }
@@ -145,6 +164,8 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #cache_hit_rate put: (self pct: hits total: hits + misses);
 		at: #avg_local_context_chars put: (self averageCollection: (completions at: #localContextChars));
 		at: #avg_global_context_chars put: (self averageCollection: (completions at: #globalContextChars));
+		at: #completion_environment_counts put: (completions at: #completionEnvironmentCounts) copy;
+		at: #complishon_reroute_environment_counts put: (evaluation at: #complishonRerouteEnvironmentCounts) copy;
 		at: #first_activity put: (completions at: #firstActivity);
 		at: #last_activity put: (completions at: #lastActivity);
 		at: #usage_hours put: 0.0;
@@ -186,6 +207,7 @@ CoPCSessionTelemetryAnalyzer class >> completionSummaryForSessionDirectory: sess
 		at: #completionTokens put: 0;
 		at: #cacheHits put: 0;
 		at: #cacheMisses put: 0;
+		at: #completionEnvironmentCounts put: Dictionary new;
 		at: #localContextChars put: OrderedCollection new;
 		at: #globalContextChars put: OrderedCollection new;
 		at: #activityTimestamps put: OrderedCollection new;
@@ -210,14 +232,33 @@ CoPCSessionTelemetryAnalyzer class >> completionJsonFilesForSessionDirectory: se
 ]
 
 { #category : 'completion parsing' }
+CoPCSessionTelemetryAnalyzer class >> completionEnvironmentFrom: data [
+
+	| environment |
+	environment := self dictionaryAt: #completionEnvironment from: data.
+	environment isEmpty ifFalse: [ ^ environment ].
+	^ self dictionaryAt: #environment from: data
+]
+
+{ #category : 'completion parsing' }
+CoPCSessionTelemetryAnalyzer class >> completionEnvironmentKindFrom: environment [
+
+	| kind |
+	kind := self stringAt: #kind from: environment.
+	kind isEmpty ifTrue: [ ^ 'unknown' ].
+	^ kind
+]
+
+{ #category : 'completion parsing' }
 CoPCSessionTelemetryAnalyzer class >> addCompletionFile: file toSummary: summary [
 
-	| data fim context cache prefix suffix classContext fullSource suggestions acceptedText rejectedItems nullCompletion logprobStats tokenStats hits misses |
+	| data fim context cache environment prefix suffix classContext fullSource suggestions acceptedText rejectedItems nullCompletion logprobStats tokenStats hits misses |
 	data := self readJsonFile: file.
 	data isEmpty ifTrue: [ ^ self ].
 	fim := self dictionaryAt: #fim from: data.
 	context := self dictionaryAt: #context from: data.
 	cache := self dictionaryAt: #cache from: data.
+	environment := self completionEnvironmentFrom: data.
 	prefix := self stringAt: #prefix from: fim.
 	suffix := self stringAt: #suffix from: fim.
 	classContext := self stringAt: #classContext from: context.
@@ -228,6 +269,9 @@ CoPCSessionTelemetryAnalyzer class >> addCompletionFile: file toSummary: summary
 
 	(self isSelfReceiverCompletionPrefix: prefix) ifTrue: [
 		self increment: #selfReceiverCompletionRequests in: summary ].
+	self
+		increment: (self completionEnvironmentKindFrom: environment)
+		in: (summary at: #completionEnvironmentCounts).
 	self addSuggestions: suggestions prefix: prefix suffix: suffix toSummary: summary.
 	acceptedText isEmpty ifFalse: [
 		self increment: #acceptedRequests in: summary.
@@ -485,6 +529,7 @@ CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sess
 		at: #rejectedSuggestions put: 0;
 		at: #ignoredSuggestions put: 0;
 		at: #complishonReroutes put: 0;
+		at: #complishonRerouteEnvironmentCounts put: Dictionary new;
 		at: #privacyConsent put: 'unknown';
 		at: #tasksDone put: #();
 		at: #surveyRatings put: Dictionary new;
@@ -512,7 +557,10 @@ CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sess
 					summary at: #tasksDone put: (self arrayAt: #tasks from: data).
 					summary at: #surveyRatings put: (self dictionaryAt: #ratings from: data) ].
 				event = 'completion-rerouted-to-complishon' ifTrue: [
-					self increment: #complishonReroutes in: summary ].
+					self increment: #complishonReroutes in: summary.
+					self
+						increment: (self completionEnvironmentKindFrom: (self completionEnvironmentFrom: data))
+						in: (summary at: #complishonRerouteEnvironmentCounts) ].
 				action := (self stringAt: #action from: row) asLowercase.
 				action isEmpty ifTrue: [ action := (self stringAt: #action from: data) asLowercase ].
 				action = 'accepted' ifTrue: [ directAccepted := directAccepted + 1 ].

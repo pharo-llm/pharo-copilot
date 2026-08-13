@@ -599,6 +599,64 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetada
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoRecordsEditorEnvironment [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| builder context editor morph window contextInfo environment |
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
+		CopilotSettings loggingEnabled: true.
+		builder := CoPharoCopilotResultSetBuilder new.
+		window := CoPCEnvironmentWindowMock new
+			label: 'Debugger on Example>>#broken';
+			yourself.
+		morph := CoPCEnvironmentMorphMock new
+			window: window;
+			yourself.
+		editor := CoTestEditorMock new
+			morph: morph;
+			yourself.
+		context := CoCopilotContextMock new
+			isScripting: true;
+			source: 'Ord';
+			position: 3;
+			editor: editor;
+			yourself.
+
+		contextInfo := builder contextInfoFor: context prefix: 'Ord' suffix: ''.
+		environment := contextInfo at: #completionEnvironment.
+
+		self assert: (environment at: #kind) equals: #debugger.
+		self assert: (environment at: #isScripting).
+		self assert: (environment at: #editorClass) equals: 'CoTestEditorMock'.
+		self assert: (environment at: #morphClass) equals: 'CoPCEnvironmentMorphMock'.
+		self assert: (environment at: #windowClass) equals: 'CoPCEnvironmentWindowMock'.
+		self assert: (environment at: #windowTitle) equals: 'Debugger on Example>>#broken' ]
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionPayloadIncludesEnvironment [
+
+	| contextInfo environment payload |
+	environment := Dictionary new
+		at: #kind put: #playground;
+		at: #windowTitle put: 'Playground';
+		yourself.
+	contextInfo := Dictionary new
+		at: #timestamp put: '2026-08-13T12:00:00+02:00';
+		at: #completionEnvironment put: environment;
+		yourself.
+
+	payload := CoPharoCopilotLogger
+		initialCompletionPayloadForContextInfo: contextInfo
+		prefix: 'Object new'
+		suffix: ''
+		classContext: ''
+		cacheStats: Dictionary new.
+
+	self assert: (payload at: #completionEnvironment) equals: environment
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRejectsLowConfidenceLogprobSuggestion [
 
 	CopilotSettings withDefaultSettingsDo: [

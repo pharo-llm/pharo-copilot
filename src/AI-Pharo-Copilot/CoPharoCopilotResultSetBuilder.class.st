@@ -789,8 +789,152 @@ CoPharoCopilotResultSetBuilder >> contextInfoFor: aContext prefix: prefixString 
 			at: #contextClass put: aContext class name;
 			at: #cursorPosition put: aContext position;
 			at: #sourceSize put: aContext source size;
-			at: #fullSource put: aContext source ].
+			at: #fullSource put: aContext source;
+			at: #completionEnvironment put: (self completionEnvironmentFor: aContext) ].
 	^ info
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> completionEnvironmentFor: aContext [
+
+	| engine editor morph window ownerClasses title isScripting kind |
+	engine := [ aContext engine ] on: Error do: [ nil ].
+	editor := self liveEditorFor: aContext.
+	morph := self morphForEditor: editor.
+	window := self windowForMorph: morph.
+	ownerClasses := self ownerClassNamesForMorph: morph limit: 12.
+	title := self titleForWindow: window.
+	isScripting := self isScriptingContext: aContext.
+	kind := self
+		completionEnvironmentKindForContext: aContext
+		engine: engine
+		editor: editor
+		morph: morph
+		window: window
+		ownerClasses: ownerClasses
+		windowTitle: title
+		isScripting: isScripting.
+
+	^ Dictionary new
+		at: #kind put: kind;
+		at: #isScripting put: isScripting;
+		at: #contextClass put: (self telemetryClassNameFor: aContext);
+		at: #engineClass put: (self telemetryClassNameFor: engine);
+		at: #editorClass put: (self telemetryClassNameFor: editor);
+		at: #morphClass put: (self telemetryClassNameFor: morph);
+		at: #windowClass put: (self telemetryClassNameFor: window);
+		at: #windowTitle put: title;
+		at: #ownerClasses put: ownerClasses asArray;
+		yourself
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> completionEnvironmentKindForContext: aContext engine: engine editor: editor morph: morph window: window ownerClasses: ownerClasses windowTitle: title isScripting: isScripting [
+
+	| text |
+	text := String streamContents: [ :stream |
+		{ aContext. engine. editor. morph. window } do: [ :each |
+			each ifNotNil: [
+				stream
+					nextPutAll: each class name asString;
+					space ] ].
+		ownerClasses do: [ :each |
+			stream
+				nextPutAll: each asString;
+				space ].
+		stream nextPutAll: title asString ].
+	text := text asLowercase.
+
+	(text includesSubstring: 'debugger') ifTrue: [ ^ #debugger ].
+	(text includesSubstring: 'inspector') ifTrue: [ ^ #inspector ].
+	((text includesSubstring: 'playground') or: [ text includesSubstring: 'workspace' ])
+		ifTrue: [ ^ #playground ].
+	((text includesSubstring: 'browser') or: [
+		(text includesSubstring: 'calypso') or: [ text includesSubstring: 'cly' ] ])
+		ifTrue: [ ^ #systemBrowser ].
+	isScripting ifTrue: [ ^ #scripting ].
+	^ #unknown
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> morphForEditor: editor [
+
+	editor ifNil: [ ^ nil ].
+	^ (editor respondsTo: #morph)
+		ifTrue: [ [ editor morph ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> ownerClassNamesForMorph: morph limit: limitInteger [
+
+	| classes current limit |
+	classes := OrderedCollection new.
+	current := morph.
+	limit := limitInteger ifNil: [ 12 ].
+	[ current notNil and: [ classes size < limit ] ] whileTrue: [
+		classes add: (self telemetryClassNameFor: current).
+		current := (current respondsTo: #owner)
+			ifTrue: [ [ current owner ] on: Error do: [ nil ] ]
+			ifFalse: [ nil ] ].
+	^ classes asArray
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> telemetryClassNameFor: anObject [
+
+	anObject ifNil: [ ^ '' ].
+	^ [ anObject class name asString ] on: Error do: [ '' ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> telemetryStringFor: anObject max: maxLength [
+
+	| text limit |
+	anObject ifNil: [ ^ '' ].
+	text := [ anObject asString ] on: Error do: [ '' ].
+	text ifNil: [ ^ '' ].
+	limit := maxLength ifNil: [ 120 ].
+	^ text size > limit
+		ifTrue: [ text copyFrom: 1 to: limit ]
+		ifFalse: [ text ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> titleForWindow: window [
+
+	#(label labelString title titleString name) do: [ :selector |
+		(window notNil and: [ window respondsTo: selector ]) ifTrue: [
+			| value title |
+			value := [ window perform: selector ] on: Error do: [ nil ].
+			title := self telemetryStringFor: value max: 120.
+			title isEmpty ifFalse: [ ^ title ] ] ].
+	^ ''
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> windowForMorph: morph [
+
+	morph ifNil: [ ^ nil ].
+	(morph respondsTo: #window) ifTrue: [
+		| window |
+		window := [ morph window ] on: Error do: [ nil ].
+		window ifNotNil: [ ^ window ] ].
+	^ self windowInOwnerChainForMorph: morph
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> windowInOwnerChainForMorph: morph [
+
+	| current |
+	current := morph.
+	[ current notNil ] whileTrue: [
+		((self telemetryClassNameFor: current) asLowercase includesSubstring: 'window')
+			ifTrue: [ ^ current ].
+		current := (current respondsTo: #owner)
+			ifTrue: [ [ current owner ] on: Error do: [ nil ] ]
+			ifFalse: [ nil ] ].
+	^ nil
 ]
 
 { #category : 'new' }
@@ -1770,11 +1914,12 @@ CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollectio
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logCompletionReroutedToComplishonFor: aContext prefix: prefixString suffix: suffixString [
 
-	| prefix suffix route |
+	| prefix suffix route environment |
 	self isLoggingEnabled ifFalse: [ ^ self ].
 
 	prefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
 	suffix := suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ].
+	environment := self completionEnvironmentFor: aContext.
 	route := [
 		self completionRouter
 			classifyContext: aContext
@@ -1791,6 +1936,7 @@ CoPharoCopilotResultSetBuilder >> logCompletionReroutedToComplishonFor: aContext
 			at: #oldEngineBuilder put: #CoASTHeuristicsResultSetBuilder;
 			at: #prefixSize put: prefix size;
 			at: #suffixSize put: suffix size;
+			at: #completionEnvironment put: environment;
 			yourself)
 ]
 
