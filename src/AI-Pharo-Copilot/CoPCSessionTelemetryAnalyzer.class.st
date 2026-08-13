@@ -81,7 +81,7 @@ CoPCSessionTelemetryAnalyzer class >> payloadForSessionDirectory: sessionDirecto
 { #category : 'building' }
 CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions evaluationSummary: evaluation [
 
-	| requests acceptedRequests rejectedRequests ignoredRequests suggestionCandidates suggestionChars acceptedChars suggestionLines acceptedLines logprobTokens logprobSum logprobCompletions avgLogprob tokenAttempts hits misses evaluated acceptedSuggestions rejectedSuggestions ignoredSuggestions complishonReroutes completionAttempts |
+	| requests acceptedRequests rejectedRequests ignoredRequests suggestionCandidates suggestionChars acceptedChars suggestionLines acceptedLines logprobTokens logprobSum logprobCompletions avgLogprob tokenAttempts hits misses evaluated acceptedSuggestions rejectedSuggestions ignoredSuggestions complishonReroutes completionAttempts selfReceiverLogprobTokens selfReceiverAvgLogprob environmentAvgLogprob environmentAvgConfidence inspectorLogprobTokens inspectorAvgLogprob rerouteEnvironmentCounts oldCompletionLookups oldLookupEnvironmentCounts |
 	requests := completions at: #completionRequests.
 	acceptedRequests := completions at: #acceptedRequests.
 	rejectedRequests := completions at: #nullCompletionRequests.
@@ -97,6 +97,18 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 	avgLogprob := logprobTokens = 0
 		ifTrue: [ nil ]
 		ifFalse: [ self round: logprobSum / logprobTokens digits: 4 ].
+	selfReceiverLogprobTokens := completions at: #selfReceiverLogprobTokens.
+	selfReceiverAvgLogprob := self
+		averageLogprobFromSum: (completions at: #selfReceiverLogprobSum)
+		tokenCount: selfReceiverLogprobTokens.
+	environmentAvgLogprob := self
+		averageLogprobByKeyFromTokens: (completions at: #completionEnvironmentLogprobTokens)
+		sums: (completions at: #completionEnvironmentLogprobSum).
+	environmentAvgConfidence := self
+		confidenceByKeyFromAverageLogprob: environmentAvgLogprob
+		tokens: (completions at: #completionEnvironmentLogprobTokens).
+	inspectorLogprobTokens := (completions at: #completionEnvironmentLogprobTokens) at: 'inspector' ifAbsent: [ 0 ].
+	inspectorAvgLogprob := environmentAvgLogprob at: 'inspector' ifAbsent: [ nil ].
 	tokenAttempts := completions at: #tokenCountAttempts.
 	hits := completions at: #cacheHits.
 	misses := completions at: #cacheMisses.
@@ -106,12 +118,25 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 	evaluated := acceptedSuggestions + rejectedSuggestions + ignoredSuggestions.
 	complishonReroutes := evaluation at: #complishonReroutes.
 	completionAttempts := requests + complishonReroutes.
+	rerouteEnvironmentCounts := self
+		resolvedRerouteEnvironmentCounts: (evaluation at: #complishonRerouteEnvironmentCounts)
+		completionEnvironmentCounts: (completions at: #completionEnvironmentCounts).
+	oldCompletionLookups := (evaluation at: #oldCompletionLookups) max: complishonReroutes.
+	oldLookupEnvironmentCounts := self
+		resolvedRerouteEnvironmentCounts: (evaluation at: #oldCompletionLookupEnvironmentCounts)
+		completionEnvironmentCounts: (completions at: #completionEnvironmentCounts).
+	oldLookupEnvironmentCounts isEmpty ifTrue: [
+		oldLookupEnvironmentCounts := rerouteEnvironmentCounts copy ].
 
 	^ Dictionary new
 		at: #completion_requests put: requests;
 		at: #completion_attempts put: completionAttempts;
 		at: #complishon_reroute_count put: complishonReroutes;
 		at: #complishon_reroute_rate put: (self pct: complishonReroutes total: completionAttempts);
+		at: #old_completion_fallback_requests put: complishonReroutes;
+		at: #old_completion_fallback_rate put: (self pct: complishonReroutes total: completionAttempts);
+		at: #old_completion_lookup_requests put: oldCompletionLookups;
+		at: #old_completion_lookup_rate put: (self pct: oldCompletionLookups total: completionAttempts);
 		at: #accepted_requests put: acceptedRequests;
 		at: #rejected_requests put: rejectedRequests;
 		at: #ignored_requests put: ignoredRequests;
@@ -120,6 +145,11 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #ignored_rate put: (self pct: ignoredRequests total: requests);
 		at: #self_receiver_completion_requests put: (completions at: #selfReceiverCompletionRequests);
 		at: #self_receiver_completion_rate put: (self pct: (completions at: #selfReceiverCompletionRequests) total: requests);
+		at: #self_receiver_logprob_completions put: (completions at: #selfReceiverLogprobCompletions);
+		at: #self_receiver_logprob_tokens put: selfReceiverLogprobTokens;
+		at: #self_receiver_logprob_sum put: (self round: (completions at: #selfReceiverLogprobSum) digits: 4);
+		at: #self_receiver_avg_logprob put: selfReceiverAvgLogprob;
+		at: #self_receiver_avg_confidence put: (self confidenceFromAvgLogprob: selfReceiverAvgLogprob tokenCount: selfReceiverLogprobTokens);
 		at: #suggestion_candidates put: suggestionCandidates;
 		at: #suggestion_chars put: suggestionChars;
 		at: #accepted_chars put: acceptedChars;
@@ -154,6 +184,17 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #logprob_sum put: (self round: logprobSum digits: 4);
 		at: #avg_logprob put: avgLogprob;
 		at: #avg_confidence put: (self confidenceFromAvgLogprob: avgLogprob tokenCount: logprobTokens);
+		at: #completion_environment_logprob_completions put: (completions at: #completionEnvironmentLogprobCompletions) copy;
+		at: #completion_environment_logprob_attempts put: (completions at: #completionEnvironmentLogprobAttempts) copy;
+		at: #completion_environment_logprob_tokens put: (completions at: #completionEnvironmentLogprobTokens) copy;
+		at: #completion_environment_logprob_sum put: (completions at: #completionEnvironmentLogprobSum) copy;
+		at: #completion_environment_avg_logprob put: environmentAvgLogprob;
+		at: #completion_environment_avg_confidence put: environmentAvgConfidence;
+		at: #inspector_logprob_completions put: ((completions at: #completionEnvironmentLogprobCompletions) at: 'inspector' ifAbsent: [ 0 ]);
+		at: #inspector_logprob_tokens put: inspectorLogprobTokens;
+		at: #inspector_logprob_sum put: (self round: ((completions at: #completionEnvironmentLogprobSum) at: 'inspector' ifAbsent: [ 0.0 ]) digits: 4);
+		at: #inspector_avg_logprob put: inspectorAvgLogprob;
+		at: #inspector_avg_confidence put: (self confidenceFromAvgLogprob: inspectorAvgLogprob tokenCount: inspectorLogprobTokens);
 		at: #token_count_completions put: (completions at: #tokenCountCompletions);
 		at: #token_count_attempts put: tokenAttempts;
 		at: #prompt_tokens put: (completions at: #promptTokens);
@@ -165,7 +206,9 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #avg_local_context_chars put: (self averageCollection: (completions at: #localContextChars));
 		at: #avg_global_context_chars put: (self averageCollection: (completions at: #globalContextChars));
 		at: #completion_environment_counts put: (completions at: #completionEnvironmentCounts) copy;
-		at: #complishon_reroute_environment_counts put: (evaluation at: #complishonRerouteEnvironmentCounts) copy;
+		at: #complishon_reroute_environment_counts put: rerouteEnvironmentCounts;
+		at: #old_completion_environment_counts put: rerouteEnvironmentCounts copy;
+		at: #old_completion_lookup_environment_counts put: oldLookupEnvironmentCounts;
 		at: #first_activity put: (completions at: #firstActivity);
 		at: #last_activity put: (completions at: #lastActivity);
 		at: #usage_hours put: 0.0;
@@ -201,6 +244,13 @@ CoPCSessionTelemetryAnalyzer class >> completionSummaryForSessionDirectory: sess
 		at: #logprobAttempts put: 0;
 		at: #logprobTokens put: 0;
 		at: #logprobSum put: 0.0;
+		at: #selfReceiverLogprobCompletions put: 0;
+		at: #selfReceiverLogprobTokens put: 0;
+		at: #selfReceiverLogprobSum put: 0.0;
+		at: #completionEnvironmentLogprobCompletions put: Dictionary new;
+		at: #completionEnvironmentLogprobAttempts put: Dictionary new;
+		at: #completionEnvironmentLogprobTokens put: Dictionary new;
+		at: #completionEnvironmentLogprobSum put: Dictionary new;
 		at: #tokenCountCompletions put: 0;
 		at: #tokenCountAttempts put: 0;
 		at: #promptTokens put: 0;
@@ -252,13 +302,14 @@ CoPCSessionTelemetryAnalyzer class >> completionEnvironmentKindFrom: environment
 { #category : 'completion parsing' }
 CoPCSessionTelemetryAnalyzer class >> addCompletionFile: file toSummary: summary [
 
-	| data fim context cache environment prefix suffix classContext fullSource suggestions acceptedText rejectedItems nullCompletion logprobStats tokenStats hits misses |
+	| data fim context cache environment environmentKind prefix suffix classContext fullSource suggestions acceptedText rejectedItems nullCompletion logprobStats tokenStats hits misses isSelfReceiver |
 	data := self readJsonFile: file.
 	data isEmpty ifTrue: [ ^ self ].
 	fim := self dictionaryAt: #fim from: data.
 	context := self dictionaryAt: #context from: data.
 	cache := self dictionaryAt: #cache from: data.
 	environment := self completionEnvironmentFrom: data.
+	environmentKind := self completionEnvironmentKindFrom: environment.
 	prefix := self stringAt: #prefix from: fim.
 	suffix := self stringAt: #suffix from: fim.
 	classContext := self stringAt: #classContext from: context.
@@ -267,10 +318,11 @@ CoPCSessionTelemetryAnalyzer class >> addCompletionFile: file toSummary: summary
 	acceptedText := self stringAt: #accepted from: data.
 	rejectedItems := self arrayAt: #rejected from: data.
 
-	(self isSelfReceiverCompletionPrefix: prefix) ifTrue: [
+	isSelfReceiver := self isSelfReceiverCompletionPrefix: prefix.
+	isSelfReceiver ifTrue: [
 		self increment: #selfReceiverCompletionRequests in: summary ].
 	self
-		increment: (self completionEnvironmentKindFrom: environment)
+		increment: environmentKind
 		in: (summary at: #completionEnvironmentCounts).
 	self addSuggestions: suggestions prefix: prefix suffix: suffix toSummary: summary.
 	acceptedText isEmpty ifFalse: [
@@ -293,7 +345,15 @@ CoPCSessionTelemetryAnalyzer class >> addCompletionFile: file toSummary: summary
 		self increment: #logprobCompletions in: summary.
 		self add: (logprobStats at: #attempts) to: #logprobAttempts in: summary.
 		self add: (logprobStats at: #tokens) to: #logprobTokens in: summary.
-		self add: (logprobStats at: #sum) to: #logprobSum in: summary ].
+		self add: (logprobStats at: #sum) to: #logprobSum in: summary.
+		isSelfReceiver ifTrue: [
+			self increment: #selfReceiverLogprobCompletions in: summary.
+			self add: (logprobStats at: #tokens) to: #selfReceiverLogprobTokens in: summary.
+			self add: (logprobStats at: #sum) to: #selfReceiverLogprobSum in: summary ].
+		self increment: environmentKind in: (summary at: #completionEnvironmentLogprobCompletions).
+		self add: (logprobStats at: #attempts) to: environmentKind in: (summary at: #completionEnvironmentLogprobAttempts).
+		self add: (logprobStats at: #tokens) to: environmentKind in: (summary at: #completionEnvironmentLogprobTokens).
+		self add: (logprobStats at: #sum) to: environmentKind in: (summary at: #completionEnvironmentLogprobSum) ].
 
 	tokenStats := self tokenStatsFromCompletion: data.
 	((tokenStats at: #attempts) > 0) ifTrue: [
@@ -520,6 +580,26 @@ CoPCSessionTelemetryAnalyzer class >> tokenStatsFromCompletion: data [
 ]
 
 { #category : 'evaluation parsing' }
+CoPCSessionTelemetryAnalyzer class >> resolvedRerouteEnvironmentCounts: rerouteCounts completionEnvironmentCounts: completionCounts [
+
+	| resolved unresolved knownEnvironments |
+	resolved := Dictionary new.
+	unresolved := 0.
+	rerouteCounts keysAndValuesDo: [ :key :count |
+		((key = 'unknown') or: [ key = 'not recorded' ])
+			ifTrue: [ unresolved := unresolved + count ]
+			ifFalse: [ self add: count to: key in: resolved ] ].
+
+	unresolved = 0 ifTrue: [ ^ resolved ].
+	knownEnvironments := completionCounts keys select: [ :key |
+		((key = 'unknown') or: [ key = 'not recorded' ]) not
+			and: [ (completionCounts at: key) > 0 ] ].
+	knownEnvironments size = 1 ifTrue: [
+		self add: unresolved to: knownEnvironments anyOne in: resolved ].
+	^ resolved
+]
+
+{ #category : 'evaluation parsing' }
 CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sessionDirectory [
 
 	| file summary latestStats latestRow directAccepted directRejected directIgnored |
@@ -530,6 +610,8 @@ CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sess
 		at: #ignoredSuggestions put: 0;
 		at: #complishonReroutes put: 0;
 		at: #complishonRerouteEnvironmentCounts put: Dictionary new;
+		at: #oldCompletionLookups put: 0;
+		at: #oldCompletionLookupEnvironmentCounts put: Dictionary new;
 		at: #privacyConsent put: 'unknown';
 		at: #tasksDone put: #();
 		at: #surveyRatings put: Dictionary new;
@@ -561,6 +643,11 @@ CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sess
 					self
 						increment: (self completionEnvironmentKindFrom: (self completionEnvironmentFrom: data))
 						in: (summary at: #complishonRerouteEnvironmentCounts) ].
+				event = 'old-completion-lookup' ifTrue: [
+					self increment: #oldCompletionLookups in: summary.
+					self
+						increment: (self completionEnvironmentKindFrom: (self completionEnvironmentFrom: data))
+						in: (summary at: #oldCompletionLookupEnvironmentCounts) ].
 				action := (self stringAt: #action from: row) asLowercase.
 				action isEmpty ifTrue: [ action := (self stringAt: #action from: data) asLowercase ].
 				action = 'accepted' ifTrue: [ directAccepted := directAccepted + 1 ].
@@ -797,6 +884,41 @@ CoPCSessionTelemetryAnalyzer class >> confidenceFromAvgLogprob: avgLogprob token
 	^ [
 		self round: avgLogprob exp * 100 digits: 2
 	] on: Error do: [ nil ]
+]
+
+{ #category : 'private' }
+CoPCSessionTelemetryAnalyzer class >> averageLogprobFromSum: sum tokenCount: tokenCount [
+
+	tokenCount = 0 ifTrue: [ ^ nil ].
+	^ self round: sum / tokenCount digits: 4
+]
+
+{ #category : 'private' }
+CoPCSessionTelemetryAnalyzer class >> averageLogprobByKeyFromTokens: tokenCounts sums: sums [
+
+	| result |
+	result := Dictionary new.
+	tokenCounts keysAndValuesDo: [ :key :tokenCount |
+		result
+			at: key
+			put: (self
+				averageLogprobFromSum: (sums at: key ifAbsent: [ 0.0 ])
+				tokenCount: tokenCount) ].
+	^ result
+]
+
+{ #category : 'private' }
+CoPCSessionTelemetryAnalyzer class >> confidenceByKeyFromAverageLogprob: averageLogprobs tokens: tokenCounts [
+
+	| result |
+	result := Dictionary new.
+	averageLogprobs keysAndValuesDo: [ :key :avgLogprob |
+		result
+			at: key
+			put: (self
+				confidenceFromAvgLogprob: avgLogprob
+				tokenCount: (tokenCounts at: key ifAbsent: [ 0 ])) ].
+	^ result
 ]
 
 { #category : 'private' }

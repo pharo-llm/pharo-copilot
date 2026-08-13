@@ -175,6 +175,10 @@ CoPCSemanticCompletionProvider >> resultSetFor: aContext locationKey: locationKe
 					on: Error
 					do: [ ] ].
 
+	builder ifNotNil: [
+		builder
+			logOldCompletionLookupFor: aContext
+			reason: #semanticHelperLookup ].
 	lastResultSet := [
 		(CoASTHeuristicsResultSetBuilder initializeOnContext: aContext)
 			buildCompletion ]

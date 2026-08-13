@@ -17,7 +17,8 @@ Class {
 		'sessionStartedAt',
 		'sessionArchived',
 		'userId',
-		'complishonRerouteCount'
+		'complishonRerouteCount',
+		'oldCompletionLookupCount'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -277,6 +278,7 @@ CoPharoCopilotLogger class >> initialize [
 	sessionArchived := false.
 	userId := nil.
 	complishonRerouteCount := 0.
+	oldCompletionLookupCount := 0.
 
 	self ensureLogsDirectory.
 	self startNewSession
@@ -299,6 +301,7 @@ CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol [
 	name = #sessionArchived ifTrue: [ ^ sessionArchived ].
 	name = #userId ifTrue: [ ^ userId ].
 	name = #complishonRerouteCount ifTrue: [ ^ complishonRerouteCount ].
+	name = #oldCompletionLookupCount ifTrue: [ ^ oldCompletionLookupCount ].
 
 	^ super instVarNamed: aStringOrSymbol
 ]
@@ -320,6 +323,7 @@ CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
 	name = #sessionArchived ifTrue: [ sessionArchived := aValue. ^ aValue ].
 	name = #userId ifTrue: [ userId := aValue. ^ aValue ].
 	name = #complishonRerouteCount ifTrue: [ complishonRerouteCount := aValue. ^ aValue ].
+	name = #oldCompletionLookupCount ifTrue: [ oldCompletionLookupCount := aValue. ^ aValue ].
 
 	^ super instVarNamed: name put: aValue
 ]
@@ -328,6 +332,12 @@ CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
 CoPharoCopilotLogger class >> complishonRerouteCount [
 
 	^ complishonRerouteCount ifNil: [ complishonRerouteCount := 0 ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> oldCompletionLookupCount [
+
+	^ oldCompletionLookupCount ifNil: [ oldCompletionLookupCount := 0 ]
 ]
 
 { #category : 'class initialization' }
@@ -377,6 +387,32 @@ CoPharoCopilotLogger class >> logCompletionReroutedToComplishon: aDictionary [
 		details: details.
 	self
 		appendEvaluationEvent: 'completion-rerouted-to-complishon'
+		data: details
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> logOldCompletionLookup: aDictionary [
+
+	| details count |
+	self loggingEnabled ifFalse: [ ^ self ].
+
+	count := self oldCompletionLookupCount + 1.
+	oldCompletionLookupCount := count.
+
+	details := Dictionary new.
+	(aDictionary notNil and: [ aDictionary respondsTo: #associationsDo ]) ifTrue: [
+		aDictionary associationsDo: [ :assoc |
+			details at: assoc key put: assoc value ] ].
+	details
+		at: #oldEngine put: (details at: #oldEngine ifAbsent: [ #Complishon ]);
+		at: #oldEngineBuilder put: (details at: #oldEngineBuilder ifAbsent: [ #CoASTHeuristicsResultSetBuilder ]);
+		at: #lookupCount put: count.
+
+	self
+		logBackEndEvent: 'Old completion engine lookup'
+		details: details.
+	self
+		appendEvaluationEvent: 'old-completion-lookup'
 		data: details
 ]
 
@@ -663,7 +699,8 @@ CoPharoCopilotLogger class >> rawSessionDirectoryReference: aDirectoryReference 
 		ifNil: [ nil ]
 		ifNotNil: [ DateAndTime now ].
 	sessionArchived := false.
-	complishonRerouteCount := 0
+	complishonRerouteCount := 0.
+	oldCompletionLookupCount := 0
 ]
 
 { #category : 'session management' }
@@ -764,6 +801,7 @@ CoPharoCopilotLogger class >> startNewSession [
 	sessionArchiveFileReference := self archiveFileReferenceForSessionDirectory: sessionDirectoryReference.
 	sessionArchived := false.
 	complishonRerouteCount := 0.
+	oldCompletionLookupCount := 0.
 	logFileReference := nil.
 	evaluationLogFileReference := nil.
 

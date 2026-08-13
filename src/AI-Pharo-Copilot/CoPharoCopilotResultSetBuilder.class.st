@@ -1181,6 +1181,9 @@ CoPharoCopilotResultSetBuilder >> fallbackMenuPositionFor: aContext [
 CoPharoCopilotResultSetBuilder >> fallbackResultSetFor: aContext [
 	"Build the same AST/heuristic result set used by CoCompletionEngine in Complishon."
 
+	self
+		logOldCompletionLookupFor: aContext
+		reason: #fullFallbackReroute.
 	^ [
 		(CoASTHeuristicsResultSetBuilder initializeOnContext: aContext)
 			buildCompletion ]
@@ -1937,6 +1940,19 @@ CoPharoCopilotResultSetBuilder >> logCompletionReroutedToComplishonFor: aContext
 			at: #prefixSize put: prefix size;
 			at: #suffixSize put: suffix size;
 			at: #completionEnvironment put: environment;
+			yourself)
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> logOldCompletionLookupFor: aContext reason: reasonSymbol [
+
+	self isLoggingEnabled ifFalse: [ ^ self ].
+	CoPharoCopilotLogger logOldCompletionLookup: (
+		Dictionary new
+			at: #reason put: reasonSymbol;
+			at: #oldEngine put: #Complishon;
+			at: #oldEngineBuilder put: #CoASTHeuristicsResultSetBuilder;
+			at: #completionEnvironment put: (self completionEnvironmentFor: aContext);
 			yourself)
 ]
 

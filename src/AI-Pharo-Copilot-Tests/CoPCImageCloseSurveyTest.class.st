@@ -9,7 +9,7 @@ Class {
 { #category : 'support' }
 CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 
-	| rootDir tempDir tempEvalFile sessionDir archiveFile originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUploader originalUserId originalSessionId originalStartedAt originalArchived originalComplishonRerouteCount |
+	| rootDir tempDir tempEvalFile sessionDir archiveFile originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUploader originalUserId originalSessionId originalStartedAt originalArchived originalComplishonRerouteCount originalOldCompletionLookupCount |
 	rootDir := FileLocator temp / ('copilot-image-close-session-test-' , UUID new asString).
 	tempDir := rootDir / CoPharoCopilotLogger pharoCopilotDirectoryName.
 	sessionDir := tempDir / 'session-test'.
@@ -26,6 +26,7 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 	originalStartedAt := CoPharoCopilotLogger instVarNamed: #sessionStartedAt.
 	originalArchived := CoPharoCopilotLogger instVarNamed: #sessionArchived.
 	originalComplishonRerouteCount := CoPharoCopilotLogger instVarNamed: #complishonRerouteCount.
+	originalOldCompletionLookupCount := CoPharoCopilotLogger instVarNamed: #oldCompletionLookupCount.
 
 	[
 		rootDir exists ifTrue: [ rootDir ensureDeleteAll ].
@@ -56,13 +57,14 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 		CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
 		CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
 		CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived.
-		CoPharoCopilotLogger instVarNamed: #complishonRerouteCount put: originalComplishonRerouteCount ]
+		CoPharoCopilotLogger instVarNamed: #complishonRerouteCount put: originalComplishonRerouteCount.
+		CoPharoCopilotLogger instVarNamed: #oldCompletionLookupCount put: originalOldCompletionLookupCount ]
 ]
 
 { #category : 'support' }
 CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: tempEvalFile [
 
-	| completionsDir response attempt payload ratings evalData evalEvent rerouteEvent1 rerouteEvent2 |
+	| completionsDir response attempt payload ratings evalData evalEvent rerouteEvent1 rerouteEvent2 oldLookupEvent1 oldLookupEvent2 |
 	sessionDir ensureCreateDirectory.
 	completionsDir := sessionDir / 'completions'.
 	completionsDir ensureCreateDirectory.
@@ -148,6 +150,22 @@ CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: t
 				yourself);
 			yourself);
 		yourself.
+	oldLookupEvent1 := Dictionary new
+		at: #event put: 'old-completion-lookup';
+		at: #timestamp put: '2026-08-11T10:00:10+02:00';
+		at: #userId put: 'user-test';
+		at: #sessionId put: sessionDir basename;
+		at: #data put: (Dictionary new
+			at: #oldEngine put: #Complishon;
+			at: #oldEngineBuilder put: #CoASTHeuristicsResultSetBuilder;
+			at: #reason put: #fullFallbackReroute;
+			at: #lookupCount put: 1;
+			at: #completionEnvironment put: (Dictionary new
+				at: #kind put: #playground;
+				at: #windowTitle put: 'Playground';
+				yourself);
+			yourself);
+		yourself.
 	rerouteEvent2 := Dictionary new
 		at: #event put: 'completion-rerouted-to-complishon';
 		at: #timestamp put: '2026-08-11T10:00:20+02:00';
@@ -163,8 +181,24 @@ CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: t
 				yourself);
 			yourself);
 		yourself.
+	oldLookupEvent2 := Dictionary new
+		at: #event put: 'old-completion-lookup';
+		at: #timestamp put: '2026-08-11T10:00:20+02:00';
+		at: #userId put: 'user-test';
+		at: #sessionId put: sessionDir basename;
+		at: #data put: (Dictionary new
+			at: #oldEngine put: #Complishon;
+			at: #oldEngineBuilder put: #CoASTHeuristicsResultSetBuilder;
+			at: #reason put: #fullFallbackReroute;
+			at: #lookupCount put: 2;
+			at: #completionEnvironment put: (Dictionary new
+				at: #kind put: #playground;
+				at: #windowTitle put: 'Playground';
+				yourself);
+			yourself);
+		yourself.
 	tempEvalFile writeStreamDo: [ :stream |
-		{ rerouteEvent1. rerouteEvent2. evalEvent } do: [ :event |
+		{ rerouteEvent1. oldLookupEvent1. rerouteEvent2. oldLookupEvent2. evalEvent } do: [ :event |
 			stream
 				nextPutAll: (STONJSON toString: event);
 				nextPut: Character lf ] ]
@@ -196,7 +230,7 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesJsonToJsonDirectoryAn
 
 	CopilotSettings withDefaultSettingsDo: [
 		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
-			| spy summaryFile payload session summary environmentCounts rerouteEnvironmentCounts |
+			| spy summaryFile payload session summary environmentCounts rerouteEnvironmentCounts oldLookupEnvironmentCounts environmentConfidence |
 			self writeTelemetryFixtureIn: sessionDir evaluationLog: tempEvalFile.
 			spy := CoPCSessionArchiveUploaderSpy new.
 			CoPharoCopilotLogger rawSessionArchiveUploader: spy.
@@ -227,17 +261,49 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesJsonToJsonDirectoryAn
 			self assert: (summary at: #completion_attempts) equals: 3.
 			self assert: (summary at: #complishon_reroute_count) equals: 2.
 			self assert: (summary at: #complishon_reroute_rate) equals: 66.67.
+			self assert: (summary at: #old_completion_fallback_requests) equals: 2.
+			self assert: (summary at: #old_completion_fallback_rate) equals: 66.67.
+			self assert: (summary at: #old_completion_lookup_requests) equals: 2.
+			self assert: (summary at: #old_completion_lookup_rate) equals: 66.67.
 			self assert: (summary at: #accepted_requests) equals: 1.
 			self assert: (summary at: #suggestion_candidates) equals: 1.
 			self assert: (summary at: #self_receiver_completion_requests) equals: 1.
+			self assert: (summary at: #self_receiver_logprob_tokens) equals: 2.
+			self assert: (summary at: #self_receiver_avg_confidence) equals: 86.07.
 			self assert: (summary at: #logprob_tokens) equals: 2.
 			self assert: (summary at: #prompt_tokens) equals: 10.
 			self assert: (summary at: #completion_tokens) equals: 2.
 			self assert: (summary at: #cache_hit_rate) equals: 40.0.
 			environmentCounts := summary at: #completion_environment_counts.
 			rerouteEnvironmentCounts := summary at: #complishon_reroute_environment_counts.
+			oldLookupEnvironmentCounts := summary at: #old_completion_lookup_environment_counts.
+			environmentConfidence := summary at: #completion_environment_avg_confidence.
 			self assert: (environmentCounts at: 'systemBrowser') equals: 1.
+			self assert: (environmentConfidence at: 'systemBrowser') equals: 86.07.
+			self assert: (summary at: #inspector_logprob_tokens) equals: 0.
+			self assert: (summary at: #inspector_avg_confidence) isNil.
+			self assert: ((summary at: #old_completion_environment_counts) at: 'playground') equals: 2.
+			self assert: (oldLookupEnvironmentCounts at: 'playground') equals: 2.
 			self assert: (rerouteEnvironmentCounts at: 'playground') equals: 2 ] ]
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testRerouteEnvironmentResolverUsesOnlyKnownCompletionEnvironment [
+
+	| reroutes completions resolved |
+	reroutes := Dictionary new
+		at: 'unknown' put: 1;
+		yourself.
+	completions := Dictionary new
+		at: 'systemBrowser' put: 11;
+		yourself.
+
+	resolved := CoPCSessionTelemetryAnalyzer
+		resolvedRerouteEnvironmentCounts: reroutes
+		completionEnvironmentCounts: completions.
+
+	self deny: (resolved includesKey: 'unknown').
+	self assert: (resolved at: 'systemBrowser') equals: 1
 ]
 
 { #category : 'tests' }
