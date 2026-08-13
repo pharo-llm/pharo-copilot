@@ -9,7 +9,7 @@ Class {
 { #category : 'support' }
 CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 
-	| tempDir tempEvalFile sessionDir archiveFile originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUploader originalUserId originalSessionId originalStartedAt originalArchived |
+	| tempDir tempEvalFile sessionDir archiveFile originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUploader originalUserId originalSessionId originalStartedAt originalArchived originalComplishonRerouteCount |
 	tempDir := FileLocator temp / ('copilot-image-close-session-test-' , UUID new asString).
 	sessionDir := tempDir / 'session-test'.
 	tempEvalFile := sessionDir / CoPharoCopilotLogger evaluationLogFileName.
@@ -24,6 +24,7 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 	originalSessionId := CoPharoCopilotLogger instVarNamed: #sessionId.
 	originalStartedAt := CoPharoCopilotLogger instVarNamed: #sessionStartedAt.
 	originalArchived := CoPharoCopilotLogger instVarNamed: #sessionArchived.
+	originalComplishonRerouteCount := CoPharoCopilotLogger instVarNamed: #complishonRerouteCount.
 
 	[
 		tempDir exists ifTrue: [ tempDir ensureDeleteAll ].
@@ -53,13 +54,14 @@ CoPCImageCloseSurveyTest >> withIsolatedLoggerSessionDo: aBlock [
 		CoPharoCopilotLogger rawUserId: originalUserId.
 		CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
 		CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
-		CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived ]
+		CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived.
+		CoPharoCopilotLogger instVarNamed: #complishonRerouteCount put: originalComplishonRerouteCount ]
 ]
 
 { #category : 'support' }
 CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: tempEvalFile [
 
-	| completionsDir response attempt payload ratings evalData evalEvent |
+	| completionsDir response attempt payload ratings evalData evalEvent rerouteEvent1 rerouteEvent2 |
 	sessionDir ensureCreateDirectory.
 	completionsDir := sessionDir / 'completions'.
 	completionsDir ensureCreateDirectory.
@@ -126,10 +128,33 @@ CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: t
 			at: #totalRejected put: 0;
 			yourself);
 		yourself.
+	rerouteEvent1 := Dictionary new
+		at: #event put: 'completion-rerouted-to-complishon';
+		at: #timestamp put: '2026-08-11T10:00:10+02:00';
+		at: #userId put: 'user-test';
+		at: #sessionId put: sessionDir basename;
+		at: #data put: (Dictionary new
+			at: #oldEngine put: #Complishon;
+			at: #reason put: #standaloneScriptingContext;
+			at: #rerouteCount put: 1;
+			yourself);
+		yourself.
+	rerouteEvent2 := Dictionary new
+		at: #event put: 'completion-rerouted-to-complishon';
+		at: #timestamp put: '2026-08-11T10:00:20+02:00';
+		at: #userId put: 'user-test';
+		at: #sessionId put: sessionDir basename;
+		at: #data put: (Dictionary new
+			at: #oldEngine put: #Complishon;
+			at: #reason put: #standaloneScriptingContext;
+			at: #rerouteCount put: 2;
+			yourself);
+		yourself.
 	tempEvalFile writeStreamDo: [ :stream |
-		stream
-			nextPutAll: (STONJSON toString: evalEvent);
-			nextPut: Character lf ]
+		{ rerouteEvent1. rerouteEvent2. evalEvent } do: [ :event |
+			stream
+				nextPutAll: (STONJSON toString: event);
+				nextPut: Character lf ] ]
 ]
 
 { #category : 'tests' }
@@ -191,6 +216,9 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesAndUploadsTelemetrySu
 			self assert: ((payload at: #completionFiles) includes: 'completion-1.json').
 			self assert: (session at: #sessionId) equals: sessionDir basename.
 			self assert: (summary at: #completion_requests) equals: 1.
+			self assert: (summary at: #completion_attempts) equals: 3.
+			self assert: (summary at: #complishon_reroute_count) equals: 2.
+			self assert: (summary at: #complishon_reroute_rate) equals: 66.67.
 			self assert: (summary at: #accepted_requests) equals: 1.
 			self assert: (summary at: #suggestion_candidates) equals: 1.
 			self assert: (summary at: #self_receiver_completion_requests) equals: 1.

@@ -264,6 +264,10 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		shouldUseFallbackCompletionForContext: context
 		prefix: prefix)
 			ifTrue: [
+				self
+					logCompletionReroutedToComplishonFor: context
+					prefix: prefix
+					suffix: suffix.
 				^ (self fallbackResultSetFor: context)
 					ifNil: [ self emptyResultSet ] ].
 	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
@@ -1761,6 +1765,33 @@ CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollectio
 			at: #rawSuggestionCount put: contentCollection size;
 			yourself
 	)
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> logCompletionReroutedToComplishonFor: aContext prefix: prefixString suffix: suffixString [
+
+	| prefix suffix route |
+	self isLoggingEnabled ifFalse: [ ^ self ].
+
+	prefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
+	suffix := suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ].
+	route := [
+		self completionRouter
+			classifyContext: aContext
+			prefix: prefix
+			builder: self ]
+		on: Error
+		do: [ #unknown ].
+
+	CoPharoCopilotLogger logCompletionReroutedToComplishon: (
+		Dictionary new
+			at: #reason put: #standaloneScriptingContext;
+			at: #completionRoute put: route;
+			at: #oldEngine put: #Complishon;
+			at: #oldEngineBuilder put: #CoASTHeuristicsResultSetBuilder;
+			at: #prefixSize put: prefix size;
+			at: #suffixSize put: suffix size;
+			yourself)
 ]
 
 { #category : 'new' }

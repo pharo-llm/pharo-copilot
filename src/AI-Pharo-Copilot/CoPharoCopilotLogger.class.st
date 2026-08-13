@@ -16,7 +16,8 @@ Class {
 		'sessionId',
 		'sessionStartedAt',
 		'sessionArchived',
-		'userId'
+		'userId',
+		'complishonRerouteCount'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -274,6 +275,7 @@ CoPharoCopilotLogger class >> initialize [
 	sessionStartedAt := nil.
 	sessionArchived := false.
 	userId := nil.
+	complishonRerouteCount := 0.
 
 	self ensureLogsDirectory.
 	self startNewSession
@@ -295,6 +297,7 @@ CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol [
 	name = #sessionStartedAt ifTrue: [ ^ sessionStartedAt ].
 	name = #sessionArchived ifTrue: [ ^ sessionArchived ].
 	name = #userId ifTrue: [ ^ userId ].
+	name = #complishonRerouteCount ifTrue: [ ^ complishonRerouteCount ].
 
 	^ super instVarNamed: aStringOrSymbol
 ]
@@ -315,8 +318,15 @@ CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
 	name = #sessionStartedAt ifTrue: [ sessionStartedAt := aValue. ^ aValue ].
 	name = #sessionArchived ifTrue: [ sessionArchived := aValue. ^ aValue ].
 	name = #userId ifTrue: [ userId := aValue. ^ aValue ].
+	name = #complishonRerouteCount ifTrue: [ complishonRerouteCount := aValue. ^ aValue ].
 
 	^ super instVarNamed: name put: aValue
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> complishonRerouteCount [
+
+	^ complishonRerouteCount ifNil: [ complishonRerouteCount := 0 ]
 ]
 
 { #category : 'class initialization' }
@@ -342,6 +352,31 @@ CoPharoCopilotLogger class >> logFileReference [
 CoPharoCopilotLogger class >> logFrontEndEvent: eventName details: aDictionary [
 
 	self logSection: 'FRONTEND' event: eventName details: aDictionary
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> logCompletionReroutedToComplishon: aDictionary [
+
+	| details count |
+	self loggingEnabled ifFalse: [ ^ self ].
+
+	count := self complishonRerouteCount + 1.
+	complishonRerouteCount := count.
+
+	details := Dictionary new.
+	(aDictionary notNil and: [ aDictionary respondsTo: #associationsDo ]) ifTrue: [
+		aDictionary associationsDo: [ :assoc |
+			details at: assoc key put: assoc value ] ].
+	details
+		at: #oldEngine put: (details at: #oldEngine ifAbsent: [ #Complishon ]);
+		at: #rerouteCount put: count.
+
+	self
+		logBackEndEvent: 'Completion rerouted to Complishon'
+		details: details.
+	self
+		appendEvaluationEvent: 'completion-rerouted-to-complishon'
+		data: details
 ]
 
 { #category : 'class initialization' }
@@ -616,7 +651,8 @@ CoPharoCopilotLogger class >> rawSessionDirectoryReference: aDirectoryReference 
 	sessionStartedAt := aDirectoryReference
 		ifNil: [ nil ]
 		ifNotNil: [ DateAndTime now ].
-	sessionArchived := false
+	sessionArchived := false.
+	complishonRerouteCount := 0
 ]
 
 { #category : 'session management' }
@@ -716,6 +752,7 @@ CoPharoCopilotLogger class >> startNewSession [
 	sessionDirectoryReference := root / (self sessionDirectoryNameForId: newSessionId).
 	sessionArchiveFileReference := self archiveFileReferenceForSessionDirectory: sessionDirectoryReference.
 	sessionArchived := false.
+	complishonRerouteCount := 0.
 	logFileReference := nil.
 	evaluationLogFileReference := nil.
 

@@ -62,7 +62,7 @@ CoPCSessionTelemetryAnalyzer class >> payloadForSessionDirectory: sessionDirecto
 { #category : 'building' }
 CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions evaluationSummary: evaluation [
 
-	| requests acceptedRequests rejectedRequests ignoredRequests suggestionCandidates suggestionChars acceptedChars suggestionLines acceptedLines logprobTokens logprobSum logprobCompletions avgLogprob tokenAttempts hits misses evaluated acceptedSuggestions rejectedSuggestions ignoredSuggestions |
+	| requests acceptedRequests rejectedRequests ignoredRequests suggestionCandidates suggestionChars acceptedChars suggestionLines acceptedLines logprobTokens logprobSum logprobCompletions avgLogprob tokenAttempts hits misses evaluated acceptedSuggestions rejectedSuggestions ignoredSuggestions complishonReroutes completionAttempts |
 	requests := completions at: #completionRequests.
 	acceptedRequests := completions at: #acceptedRequests.
 	rejectedRequests := completions at: #nullCompletionRequests.
@@ -85,9 +85,14 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 	rejectedSuggestions := evaluation at: #rejectedSuggestions.
 	ignoredSuggestions := evaluation at: #ignoredSuggestions.
 	evaluated := acceptedSuggestions + rejectedSuggestions + ignoredSuggestions.
+	complishonReroutes := evaluation at: #complishonReroutes.
+	completionAttempts := requests + complishonReroutes.
 
 	^ Dictionary new
 		at: #completion_requests put: requests;
+		at: #completion_attempts put: completionAttempts;
+		at: #complishon_reroute_count put: complishonReroutes;
+		at: #complishon_reroute_rate put: (self pct: complishonReroutes total: completionAttempts);
 		at: #accepted_requests put: acceptedRequests;
 		at: #rejected_requests put: rejectedRequests;
 		at: #ignored_requests put: ignoredRequests;
@@ -479,6 +484,7 @@ CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sess
 		at: #acceptedSuggestions put: 0;
 		at: #rejectedSuggestions put: 0;
 		at: #ignoredSuggestions put: 0;
+		at: #complishonReroutes put: 0;
 		at: #privacyConsent put: 'unknown';
 		at: #tasksDone put: #();
 		at: #surveyRatings put: Dictionary new;
@@ -505,6 +511,8 @@ CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sess
 				event = 'image-close-survey' ifTrue: [
 					summary at: #tasksDone put: (self arrayAt: #tasks from: data).
 					summary at: #surveyRatings put: (self dictionaryAt: #ratings from: data) ].
+				event = 'completion-rerouted-to-complishon' ifTrue: [
+					self increment: #complishonReroutes in: summary ].
 				action := (self stringAt: #action from: row) asLowercase.
 				action isEmpty ifTrue: [ action := (self stringAt: #action from: data) asLowercase ].
 				action = 'accepted' ifTrue: [ directAccepted := directAccepted + 1 ].
