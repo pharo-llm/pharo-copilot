@@ -264,7 +264,7 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesJsonToJsonDirectoryAn
 			self assert: (summary at: #old_completion_fallback_requests) equals: 2.
 			self assert: (summary at: #old_completion_fallback_rate) equals: 66.67.
 			self assert: (summary at: #old_completion_lookup_requests) equals: 2.
-			self assert: (summary at: #old_completion_lookup_rate) equals: 66.67.
+			self assert: (summary at: #old_completion_lookups_per_attempt) equals: 0.67.
 			self assert: (summary at: #accepted_requests) equals: 1.
 			self assert: (summary at: #suggestion_candidates) equals: 1.
 			self assert: (summary at: #self_receiver_completion_requests) equals: 1.

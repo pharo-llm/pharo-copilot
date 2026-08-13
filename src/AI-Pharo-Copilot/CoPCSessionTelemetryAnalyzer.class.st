@@ -136,7 +136,7 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #old_completion_fallback_requests put: complishonReroutes;
 		at: #old_completion_fallback_rate put: (self pct: complishonReroutes total: completionAttempts);
 		at: #old_completion_lookup_requests put: oldCompletionLookups;
-		at: #old_completion_lookup_rate put: (self pct: oldCompletionLookups total: completionAttempts);
+		at: #old_completion_lookups_per_attempt put: (self average: oldCompletionLookups count: completionAttempts);
 		at: #accepted_requests put: acceptedRequests;
 		at: #rejected_requests put: rejectedRequests;
 		at: #ignored_requests put: ignoredRequests;
