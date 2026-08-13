@@ -634,6 +634,35 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoRecordsEditorEnvi
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoTreatsTestFailureWindowAsDebugger [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| builder context editor morph window contextInfo environment |
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
+		CopilotSettings loggingEnabled: true.
+		builder := CoPharoCopilotResultSetBuilder new.
+		window := CoPCEnvironmentWindowMock new
+			label: 'TestFailure: Given Collections do not match!';
+			yourself.
+		morph := CoPCEnvironmentMorphMock new
+			window: window;
+			yourself.
+		editor := CoTestEditorMock new
+			morph: morph;
+			yourself.
+		context := CoCopilotContextMock new
+			source: 'self assertCollection: shortestPath';
+			position: 35;
+			editor: editor;
+			yourself.
+
+		contextInfo := builder contextInfoFor: context prefix: 'self assertCollection: shortestPath' suffix: ''.
+		environment := contextInfo at: #completionEnvironment.
+
+		self assert: (environment at: #kind) equals: #debugger ]
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionPayloadIncludesEnvironment [
 
 	| contextInfo environment payload |

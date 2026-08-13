@@ -435,7 +435,39 @@ CoPCSessionTelemetryAnalyzer class >> completionTypeForPrefix: prefix suggestion
 { #category : 'classification' }
 CoPCSessionTelemetryAnalyzer class >> isSelfReceiverCompletionPrefix: prefix [
 
-	^ (self receiverBeforeCompletionIn: prefix) = 'self'
+	| receiver |
+	receiver := self receiverAtCurrentStatementStartIn: prefix.
+	receiver = 'self' ifTrue: [ ^ true ].
+	^ receiver size >= 3 and: [ 'self' beginsWith: receiver ]
+]
+
+{ #category : 'classification' }
+CoPCSessionTelemetryAnalyzer class >> receiverAtCurrentStatementStartIn: prefix [
+
+	| source separatorIndex statement start stop |
+	source := (self stringValue: prefix) trimRight.
+	source isEmpty ifTrue: [ ^ '' ].
+
+	separatorIndex := source size.
+	[ separatorIndex > 0 and: [ (source at: separatorIndex) ~= $. ] ] whileTrue: [
+		separatorIndex := separatorIndex - 1 ].
+	statement := separatorIndex = source size
+		ifTrue: [ '' ]
+		ifFalse: [ source copyFrom: separatorIndex + 1 to: source size ].
+	statement := statement trimBoth.
+	[ statement isEmpty not and: [ statement first = $^ ] ] whileTrue: [
+		statement size = 1 ifTrue: [ ^ '' ].
+		statement := (statement copyFrom: 2 to: statement size) trimBoth ].
+	statement isEmpty ifTrue: [ ^ '' ].
+
+	start := 1.
+	[ start <= statement size and: [ (self isWordChar: (statement at: start)) not ] ] whileTrue: [
+		start := start + 1 ].
+	start > statement size ifTrue: [ ^ '' ].
+	stop := start.
+	[ stop <= statement size and: [ self isWordChar: (statement at: stop) ] ] whileTrue: [
+		stop := stop + 1 ].
+	^ statement copyFrom: start to: stop - 1
 ]
 
 { #category : 'classification' }

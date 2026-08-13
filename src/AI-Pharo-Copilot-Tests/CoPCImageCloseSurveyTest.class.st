@@ -307,6 +307,19 @@ CoPCImageCloseSurveyTest >> testRerouteEnvironmentResolverUsesOnlyKnownCompletio
 ]
 
 { #category : 'tests' }
+CoPCImageCloseSurveyTest >> testTelemetryCountsSelfReceiverAtCurrentStatementStart [
+
+	self assert: (CoPCSessionTelemetryAnalyzer isSelfReceiverCompletionPrefix:
+		'astar reset.', String cr,
+		String tab, 'self assertCollection: shortestPath hasSameElements: #( $a $d' ).
+	self assert: (CoPCSessionTelemetryAnalyzer isSelfReceiverCompletionPrefix:
+		'astar reset.', String cr,
+		String tab, 'sel' ).
+	self deny: (CoPCSessionTelemetryAnalyzer isSelfReceiverCompletionPrefix:
+		'OrderedIdentityDictionary n' )
+]
+
+{ #category : 'tests' }
 CoPCImageCloseSurveyTest >> testCancellingSurveyDoesNotWriteEvaluationEvent [
 
 	CopilotSettings withDefaultSettingsDo: [

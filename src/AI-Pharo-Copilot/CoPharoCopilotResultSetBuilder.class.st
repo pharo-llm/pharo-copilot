@@ -845,7 +845,10 @@ CoPharoCopilotResultSetBuilder >> completionEnvironmentKindForContext: aContext 
 		stream nextPutAll: title asString ].
 	text := text asLowercase.
 
-	(text includesSubstring: 'debugger') ifTrue: [ ^ #debugger ].
+	((text includesSubstring: 'debugger') or: [
+		(text includesSubstring: 'testfailure') or: [
+		text includesSubstring: 'testerror' ] ])
+			ifTrue: [ ^ #debugger ].
 	(text includesSubstring: 'inspector') ifTrue: [ ^ #inspector ].
 	((text includesSubstring: 'playground') or: [ text includesSubstring: 'workspace' ])
 		ifTrue: [ ^ #playground ].
