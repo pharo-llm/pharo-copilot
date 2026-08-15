@@ -495,14 +495,15 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
-	| messageLabel telemetryStateLabel learnMoreButton noButton yesButton buttonRow |
+	| messageText telemetryStateLabel learnMoreButton noButton yesButton buttonRow |
 	titleLabel label: 'Help improve Pharo'.
 	descriptionLabel label: 'Anonymous usage research consent for Pharo Copilot.'.
 	statusLabel label: ''.
 
-	messageLabel := self newLabel
-		label: CopilotSettings researchTelemetryFirstLaunchText;
-		yourself.
+	messageText := self newText.
+	messageText
+		text: CopilotSettings researchTelemetryFirstLaunchText;
+		beNotEditable.
 
 	telemetryStateLabel := self newLabel
 		label: 'Anonymous research telemetry is OFF by default.';
@@ -535,7 +536,7 @@ PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
-		add: messageLabel expand: true;
+		add: messageText expand: true;
 		add: telemetryStateLabel expand: false;
 		add: buttonRow expand: false;
 		yourself).

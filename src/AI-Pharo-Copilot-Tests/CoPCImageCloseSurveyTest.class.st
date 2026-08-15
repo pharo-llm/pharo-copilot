@@ -122,6 +122,7 @@ CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: t
 	evalData := Dictionary new
 		at: #tasks put: #(#codeCompletion);
 		at: #ratings put: ratings;
+		at: #feedbackComment put: 'Fixture feedback from image close';
 		yourself.
 	evalEvent := Dictionary new
 		at: #event put: 'image-close-survey';
@@ -230,7 +231,7 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesJsonToJsonDirectoryAn
 
 	CopilotSettings withDefaultSettingsDo: [
 		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
-			| spy summaryFile payload session summary environmentCounts rerouteEnvironmentCounts oldLookupEnvironmentCounts environmentConfidence |
+			| spy summaryFile payload session evaluation summary environmentCounts rerouteEnvironmentCounts oldLookupEnvironmentCounts environmentConfidence |
 			self writeTelemetryFixtureIn: sessionDir evaluationLog: tempEvalFile.
 			spy := CoPCSessionArchiveUploaderSpy new.
 			CoPharoCopilotLogger rawSessionArchiveUploader: spy.
@@ -251,12 +252,14 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesJsonToJsonDirectoryAn
 
 			payload := spy telemetryPayload.
 			session := payload at: #session.
+			evaluation := payload at: #evaluation.
 			summary := payload at: #summary.
 			self assert: (payload at: #event) equals: 'pharo-copilot-session-telemetry'.
 			self assert: (payload at: #sessionId) equals: sessionDir basename.
 			self assert: (payload at: #archiveFile) equals: archiveFile basename.
 			self assert: ((payload at: #completionFiles) includes: 'completion-1.json').
 			self assert: (session at: #sessionId) equals: sessionDir basename.
+			self assert: (evaluation at: #feedbackComment) equals: 'Fixture feedback from image close'.
 			self assert: (summary at: #completion_requests) equals: 1.
 			self assert: (summary at: #completion_attempts) equals: 3.
 			self assert: (summary at: #complishon_reroute_count) equals: 2.
@@ -274,6 +277,7 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesJsonToJsonDirectoryAn
 			self assert: (summary at: #prompt_tokens) equals: 10.
 			self assert: (summary at: #completion_tokens) equals: 2.
 			self assert: (summary at: #cache_hit_rate) equals: 40.0.
+			self assert: (summary at: #survey_feedback_comment) equals: 'Fixture feedback from image close'.
 			environmentCounts := summary at: #completion_environment_counts.
 			rerouteEnvironmentCounts := summary at: #complishon_reroute_environment_counts.
 			oldLookupEnvironmentCounts := summary at: #old_completion_lookup_environment_counts.

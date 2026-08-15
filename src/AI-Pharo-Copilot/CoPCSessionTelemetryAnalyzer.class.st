@@ -215,6 +215,7 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #privacy_consent put: (evaluation at: #privacyConsent);
 		at: #tasks_done put: (evaluation at: #tasksDone) copy;
 		at: #survey_ratings put: (evaluation at: #surveyRatings) copy;
+		at: #survey_feedback_comment put: (evaluation at: #feedbackComment ifAbsent: [ '' ]);
 		yourself
 ]
 
@@ -647,6 +648,7 @@ CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sess
 		at: #privacyConsent put: 'unknown';
 		at: #tasksDone put: #();
 		at: #surveyRatings put: Dictionary new;
+		at: #feedbackComment put: '';
 		yourself.
 	(file exists and: [ file isFile ]) ifFalse: [ ^ summary ].
 	latestStats := nil.
@@ -669,7 +671,8 @@ CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sess
 					summary at: #privacyConsent put: (self stringValue: (self valueAt: #accepted from: data default: 'unknown')) ].
 				event = 'image-close-survey' ifTrue: [
 					summary at: #tasksDone put: (self arrayAt: #tasks from: data).
-					summary at: #surveyRatings put: (self dictionaryAt: #ratings from: data) ].
+					summary at: #surveyRatings put: (self dictionaryAt: #ratings from: data).
+					summary at: #feedbackComment put: (self stringAt: #feedbackComment from: data) ].
 				event = 'completion-rerouted-to-complishon' ifTrue: [
 					self increment: #complishonReroutes in: summary.
 					self
