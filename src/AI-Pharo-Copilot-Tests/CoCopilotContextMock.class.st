@@ -10,6 +10,7 @@ Class {
 		'lastReplacement',
 		'behavior',
 		'method',
+		'engine',
 		'doItRequestor',
 		'doItContext',
 		'scripting'
@@ -64,6 +65,18 @@ CoCopilotContextMock >> editor: anEditor [
 
 
 		editor := anEditor
+]
+
+{ #category : 'accessing' }
+CoCopilotContextMock >> engine [
+
+	^ engine
+]
+
+{ #category : 'accessing' }
+CoCopilotContextMock >> engine: anObject [
+
+	engine := anObject
 ]
 
 { #category : 'initialization' }

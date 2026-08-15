@@ -663,6 +663,31 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoTreatsTestFailure
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoRecordsInspectorEnvironmentFromEngineRequestor [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| builder context requestor engine contextInfo environment |
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
+		CopilotSettings loggingEnabled: true.
+		builder := CoPharoCopilotResultSetBuilder new.
+		requestor := CoPCInspectorRequestorDouble new.
+		engine := CoSpyCompletionEnginePharoCopilot new
+			doItRequestor: requestor;
+			yourself.
+		context := CoCopilotContextMock new
+			engine: engine;
+			source: 'self ';
+			position: 'self ' size;
+			yourself.
+
+		contextInfo := builder contextInfoFor: context prefix: 'self ' suffix: ''.
+		environment := contextInfo at: #completionEnvironment.
+
+		self assert: (environment at: #kind) equals: #inspector.
+		self assert: (environment at: #requestorClass) equals: 'CoPCInspectorRequestorDouble' ]
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionPayloadIncludesEnvironment [
 
 	| contextInfo environment payload |
@@ -683,6 +708,30 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionPayloadIncludesEnvironment [
 		cacheStats: Dictionary new.
 
 	self assert: (payload at: #completionEnvironment) equals: environment
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticContextUsesEngineDoItRequestorBinding [
+
+	| builder context requestor engine source semantic |
+	builder := CoPharoCopilotResultSetBuilder new.
+	requestor := CoPCInspectorRequestorDouble new.
+	requestor bind: 'self' to: OrderedCollection new.
+	engine := CoSpyCompletionEnginePharoCopilot new
+		doItRequestor: requestor;
+		yourself.
+	source := 'self add'.
+	context := CoCopilotContextMock new
+		engine: engine;
+		source: source;
+		position: source size;
+		yourself.
+
+	semantic := builder semanticCompletionContextFor: context prefix: source.
+
+	self assert: (semantic includesSubstring: 'Current receiver: self').
+	self assert: (semantic includesSubstring: 'Receiver type: OrderedCollection').
+	self assert: (semantic includesSubstring: 'self -> OrderedCollection')
 ]
 
 { #category : 'tests' }

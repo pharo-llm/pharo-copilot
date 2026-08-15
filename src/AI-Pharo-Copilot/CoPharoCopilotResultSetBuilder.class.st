@@ -213,12 +213,32 @@ CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aC
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> behaviorFor: aContext [
 
-	^ (aContext respondsTo: #completionClass)
-		ifTrue: [ aContext completionClass ]
-		ifFalse: [
-			(aContext respondsTo: #behavior)
-				ifTrue: [ aContext behavior ]
-				ifFalse: [ nil ] ]
+	| behavior engine |
+	aContext ifNil: [ ^ nil ].
+
+	behavior := (aContext respondsTo: #completionClass)
+		ifTrue: [ [ aContext completionClass ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+	behavior ifNotNil: [ ^ behavior ].
+
+	behavior := (aContext respondsTo: #behavior)
+		ifTrue: [ [ aContext behavior ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+	behavior ifNotNil: [ ^ behavior ].
+
+	engine := self engineFor: aContext.
+	^ (engine notNil and: [ engine respondsTo: #completionClass ])
+		ifTrue: [ [ engine completionClass ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> engineFor: aContext [
+
+	aContext ifNil: [ ^ nil ].
+	^ (aContext respondsTo: #engine)
+		ifTrue: [ [ aContext engine ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
 ]
 
 { #category : 'new' }
@@ -797,10 +817,13 @@ CoPharoCopilotResultSetBuilder >> contextInfoFor: aContext prefix: prefixString 
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> completionEnvironmentFor: aContext [
 
-	| engine editor morph window ownerClasses title isScripting kind |
-	engine := [ aContext engine ] on: Error do: [ nil ].
+	| engine editor morph window ownerClasses title isScripting kind requestor requestorModel |
+	engine := self engineFor: aContext.
+	requestor := self doItRequestorFor: aContext.
+	requestorModel := self modelForRequestor: requestor.
 	editor := self liveEditorFor: aContext.
 	morph := self morphForEditor: editor.
+	morph ifNil: [ morph := self morphForRequestor: requestor ].
 	window := self windowForMorph: morph.
 	ownerClasses := self ownerClassNamesForMorph: morph limit: 12.
 	title := self titleForWindow: window.
@@ -813,13 +836,16 @@ CoPharoCopilotResultSetBuilder >> completionEnvironmentFor: aContext [
 		window: window
 		ownerClasses: ownerClasses
 		windowTitle: title
-		isScripting: isScripting.
+		isScripting: isScripting
+		requestor: requestor.
 
 	^ Dictionary new
 		at: #kind put: kind;
 		at: #isScripting put: isScripting;
 		at: #contextClass put: (self telemetryClassNameFor: aContext);
 		at: #engineClass put: (self telemetryClassNameFor: engine);
+		at: #requestorClass put: (self telemetryClassNameFor: requestor);
+		at: #requestorModelClass put: (self telemetryClassNameFor: requestorModel);
 		at: #editorClass put: (self telemetryClassNameFor: editor);
 		at: #morphClass put: (self telemetryClassNameFor: morph);
 		at: #windowClass put: (self telemetryClassNameFor: window);
@@ -829,11 +855,12 @@ CoPharoCopilotResultSetBuilder >> completionEnvironmentFor: aContext [
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> completionEnvironmentKindForContext: aContext engine: engine editor: editor morph: morph window: window ownerClasses: ownerClasses windowTitle: title isScripting: isScripting [
+CoPharoCopilotResultSetBuilder >> completionEnvironmentKindForContext: aContext engine: engine editor: editor morph: morph window: window ownerClasses: ownerClasses windowTitle: title isScripting: isScripting requestor: requestor [
 
-	| text |
+	| text requestorModel |
+	requestorModel := self modelForRequestor: requestor.
 	text := String streamContents: [ :stream |
-		{ aContext. engine. editor. morph. window } do: [ :each |
+		{ aContext. engine. requestor. requestorModel. editor. morph. window } do: [ :each |
 			each ifNotNil: [
 				stream
 					nextPutAll: each class name asString;
@@ -845,11 +872,11 @@ CoPharoCopilotResultSetBuilder >> completionEnvironmentKindForContext: aContext 
 		stream nextPutAll: title asString ].
 	text := text asLowercase.
 
+	(text includesSubstring: 'inspector') ifTrue: [ ^ #inspector ].
 	((text includesSubstring: 'debugger') or: [
 		(text includesSubstring: 'testfailure') or: [
 		text includesSubstring: 'testerror' ] ])
 			ifTrue: [ ^ #debugger ].
-	(text includesSubstring: 'inspector') ifTrue: [ ^ #inspector ].
 	((text includesSubstring: 'playground') or: [ text includesSubstring: 'workspace' ])
 		ifTrue: [ ^ #playground ].
 	((text includesSubstring: 'browser') or: [
@@ -862,10 +889,36 @@ CoPharoCopilotResultSetBuilder >> completionEnvironmentKindForContext: aContext 
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> morphForEditor: editor [
 
-	editor ifNil: [ ^ nil ].
-	^ (editor respondsTo: #morph)
-		ifTrue: [ [ editor morph ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ]
+	^ self
+		morphFrom: editor
+		selectors: #(morph textArea widget view)
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> morphForRequestor: requestor [
+
+	| morph model |
+	morph := self
+		morphFrom: requestor
+		selectors: #(morph window widget view).
+	morph ifNotNil: [ ^ morph ].
+
+	model := self modelForRequestor: requestor.
+	^ self
+		morphFrom: model
+		selectors: #(morph window widget view)
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> morphFrom: anObject selectors: selectorCollection [
+
+	| candidate |
+	anObject ifNil: [ ^ nil ].
+	selectorCollection do: [ :selector |
+		(anObject respondsTo: selector) ifTrue: [
+			candidate := [ anObject perform: selector ] on: Error do: [ nil ].
+			candidate ifNotNil: [ ^ candidate ] ] ].
+	^ nil
 ]
 
 { #category : 'private' }
@@ -1141,7 +1194,7 @@ CoPharoCopilotResultSetBuilder >> fallbackCompletionLimit [
 CoPharoCopilotResultSetBuilder >> fallbackMenuPositionFor: aContext [
 
 	| engine editor textArea position |
-	engine := [ aContext engine ] on: Error do: [ nil ].
+	engine := self engineFor: aContext.
 	editor := engine
 		ifNotNil: [ [ engine editor ] on: Error do: [ nil ] ]
 		ifNil: [ nil ].
@@ -1580,7 +1633,7 @@ CoPharoCopilotResultSetBuilder >> liveEditorFor: aContext [
 	| engine editor |
 	aContext ifNil: [ ^ nil ].
 
-	engine := [ aContext engine ] on: Error do: [ nil ].
+	engine := self engineFor: aContext.
 	editor := engine
 		ifNotNil: [ [ engine editor ] on: Error do: [ nil ] ]
 		ifNil: [ nil ].
@@ -2697,12 +2750,42 @@ CoPharoCopilotResultSetBuilder >> isScriptingContext: aContext [
 	(aContext respondsTo: #isScripting) ifTrue: [
 		^ [ aContext isScripting ] on: Error do: [ false ] ].
 
-	engine := (aContext respondsTo: #engine)
-		ifTrue: [ [ aContext engine ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ].
+	engine := self engineFor: aContext.
 
 	^ (engine notNil and: [ engine respondsTo: #isScripting ])
 		and: [ [ engine isScripting ] on: Error do: [ false ] ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> doItContextFor: aContext [
+
+	| engine |
+	aContext ifNil: [ ^ nil ].
+	(aContext respondsTo: #doItContext) ifTrue: [
+		| context |
+		context := [ aContext doItContext ] on: Error do: [ nil ].
+		context ifNotNil: [ ^ context ] ].
+
+	engine := self engineFor: aContext.
+	^ (engine notNil and: [ engine respondsTo: #doItContext ])
+		ifTrue: [ [ engine doItContext ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> doItRequestorFor: aContext [
+
+	| engine |
+	aContext ifNil: [ ^ nil ].
+	(aContext respondsTo: #doItRequestor) ifTrue: [
+		| requestor |
+		requestor := [ aContext doItRequestor ] on: Error do: [ nil ].
+		requestor ifNotNil: [ ^ requestor ] ].
+
+	engine := self engineFor: aContext.
+	^ (engine notNil and: [ engine respondsTo: #doItRequestor ])
+		ifTrue: [ [ engine doItRequestor ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
 ]
 
 { #category : 'semantic context' }
@@ -2731,9 +2814,7 @@ CoPharoCopilotResultSetBuilder >> liveVariableValueNamed: variableName inContext
 	name := variableName asString.
 	name isEmpty ifTrue: [ ^ self ].
 
-	doItContext := (aContext respondsTo: #doItContext)
-		ifTrue: [ [ aContext doItContext ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ].
+	doItContext := self doItContextFor: aContext.
 	doItContext ifNotNil: [
 		variable := [
 			(doItContext respondsTo: #lookupVar:)
@@ -2744,9 +2825,7 @@ CoPharoCopilotResultSetBuilder >> liveVariableValueNamed: variableName inContext
 		variable ifNotNil: [
 			^ aBlock value: ([ variable readInContext: doItContext ] on: Error do: [ nil ]) ] ].
 
-	requestor := (aContext respondsTo: #doItRequestor)
-		ifTrue: [ [ aContext doItRequestor ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ].
+	requestor := self doItRequestorFor: aContext.
 	requestor ifNil: [ ^ self ].
 
 	((requestor respondsTo: #hasBindingOf:) and: [
@@ -2762,6 +2841,15 @@ CoPharoCopilotResultSetBuilder >> liveVariableValueNamed: variableName inContext
 	binding ifNil: [ ^ self ].
 
 	^ aBlock value: ([ binding value ] on: Error do: [ nil ])
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> modelForRequestor: requestor [
+
+	requestor ifNil: [ ^ nil ].
+	^ (requestor respondsTo: #model)
+		ifTrue: [ [ requestor model ] on: Error do: [ requestor ] ]
+		ifFalse: [ requestor ]
 ]
 
 { #category : 'semantic context' }
@@ -3445,7 +3533,7 @@ CoPharoCopilotResultSetBuilder >> updateContextInfo: contextInfo withClassContex
 { #category : 'semantic context' }
 CoPharoCopilotResultSetBuilder >> variableBindingNamesFor: aContext [
 
-	| names seen addName requestor model bindings |
+	| names seen addName engine requestor model bindings |
 	names := OrderedCollection new.
 	seen := Set new.
 	addName := [ :name |
@@ -3456,18 +3544,20 @@ CoPharoCopilotResultSetBuilder >> variableBindingNamesFor: aContext [
 				seen add: text.
 				names add: text ] ] ].
 
+	engine := self engineFor: aContext.
+	(engine notNil and: [ engine respondsTo: #variableBindingNames ]) ifTrue: [
+		[ engine variableBindingNames do: addName ]
+			on: Error
+			do: [ ] ].
+
 	(aContext notNil and: [ aContext respondsTo: #variableBindingNames ]) ifTrue: [
 		[ aContext variableBindingNames do: addName ]
 			on: Error
 			do: [ ] ].
 
-	requestor := (aContext notNil and: [ aContext respondsTo: #doItRequestor ])
-		ifTrue: [ [ aContext doItRequestor ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ].
+	requestor := self doItRequestorFor: aContext.
 	requestor ifNotNil: [
-		model := (requestor respondsTo: #model)
-			ifTrue: [ [ requestor model ] on: Error do: [ requestor ] ]
-			ifFalse: [ requestor ].
+		model := self modelForRequestor: requestor.
 		bindings := (model respondsTo: #variableBindings)
 			ifTrue: [ [ model variableBindings ] on: Error do: [ nil ] ]
 			ifFalse: [ nil ].
