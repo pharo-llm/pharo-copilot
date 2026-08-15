@@ -81,7 +81,7 @@ CoPCSessionTelemetryAnalyzer class >> payloadForSessionDirectory: sessionDirecto
 { #category : 'building' }
 CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions evaluationSummary: evaluation [
 
-	| requests acceptedRequests rejectedRequests ignoredRequests suggestionCandidates suggestionChars acceptedChars suggestionLines acceptedLines logprobTokens logprobSum logprobCompletions avgLogprob tokenAttempts hits misses evaluated acceptedSuggestions rejectedSuggestions ignoredSuggestions complishonReroutes completionAttempts selfReceiverLogprobTokens selfReceiverAvgLogprob environmentAvgLogprob environmentAvgConfidence inspectorLogprobTokens inspectorAvgLogprob rerouteEnvironmentCounts oldCompletionLookups oldLookupEnvironmentCounts |
+	| requests acceptedRequests rejectedRequests ignoredRequests suggestionCandidates suggestionChars acceptedChars suggestionLines acceptedLines logprobTokens logprobSum logprobCompletions avgLogprob tokenAttempts hits misses evaluated acceptedSuggestions rejectedSuggestions ignoredSuggestions outcomeAccepted outcomeRejected outcomeIgnored outcomeDecided complishonReroutes completionAttempts selfReceiverLogprobTokens selfReceiverAvgLogprob environmentAvgLogprob environmentAvgConfidence inspectorLogprobTokens inspectorAvgLogprob rerouteEnvironmentCounts oldCompletionLookups oldLookupEnvironmentCounts |
 	requests := completions at: #completionRequests.
 	acceptedRequests := completions at: #acceptedRequests.
 	rejectedRequests := completions at: #nullCompletionRequests.
@@ -116,6 +116,11 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 	rejectedSuggestions := evaluation at: #rejectedSuggestions.
 	ignoredSuggestions := evaluation at: #ignoredSuggestions.
 	evaluated := acceptedSuggestions + rejectedSuggestions + ignoredSuggestions.
+	outcomeRejected := ((rejectedRequests max: rejectedSuggestions) min: requests) max: 0.
+	outcomeAccepted := ((acceptedRequests max: acceptedSuggestions)
+		min: ((requests - outcomeRejected) max: 0)) max: 0.
+	outcomeIgnored := (requests - outcomeAccepted - outcomeRejected) max: 0.
+	outcomeDecided := outcomeAccepted + outcomeRejected.
 	complishonReroutes := evaluation at: #complishonReroutes.
 	completionAttempts := requests + complishonReroutes.
 	rerouteEnvironmentCounts := self
@@ -140,9 +145,9 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #accepted_requests put: acceptedRequests;
 		at: #rejected_requests put: rejectedRequests;
 		at: #ignored_requests put: ignoredRequests;
-		at: #acceptance_rate put: (self pct: acceptedSuggestions total: evaluated);
-		at: #rejection_rate put: (self pct: rejectedSuggestions total: evaluated);
-		at: #ignored_rate put: (self pct: ignoredSuggestions total: evaluated);
+		at: #acceptance_rate put: (self pct: outcomeAccepted total: outcomeDecided);
+		at: #rejection_rate put: (self pct: outcomeRejected total: outcomeDecided);
+		at: #ignored_rate put: (self pct: outcomeIgnored total: requests);
 		at: #self_receiver_completion_requests put: (completions at: #selfReceiverCompletionRequests);
 		at: #self_receiver_completion_rate put: (self pct: (completions at: #selfReceiverCompletionRequests) total: requests);
 		at: #self_receiver_logprob_completions put: (completions at: #selfReceiverLogprobCompletions);
@@ -164,10 +169,13 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #multiline_accepted_suggestions put: (completions at: #multilineAcceptedSuggestions);
 		at: #suggestion_type_counts put: (completions at: #suggestionTypeCounts) copy;
 		at: #suggestion_ast_signal_counts put: Dictionary new;
-		at: #accepted_suggestions put: acceptedSuggestions;
-		at: #rejected_suggestions put: rejectedSuggestions;
-		at: #ignored_suggestions put: ignoredSuggestions;
+		at: #accepted_suggestions put: outcomeAccepted;
+		at: #rejected_suggestions put: outcomeRejected;
+		at: #ignored_suggestions put: outcomeIgnored;
 		at: #evaluated_suggestions put: evaluated;
+		at: #evaluated_accepted_suggestions put: acceptedSuggestions;
+		at: #evaluated_rejected_suggestions put: rejectedSuggestions;
+		at: #evaluated_ignored_suggestions put: ignoredSuggestions;
 		at: #evaluated_acceptance_rate put: (self pct: acceptedSuggestions total: evaluated);
 		at: #evaluated_rejection_rate put: (self pct: rejectedSuggestions total: evaluated);
 		at: #evaluated_ignored_rate put: (self pct: ignoredSuggestions total: evaluated);
