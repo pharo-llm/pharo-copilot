@@ -140,9 +140,9 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #accepted_requests put: acceptedRequests;
 		at: #rejected_requests put: rejectedRequests;
 		at: #ignored_requests put: ignoredRequests;
-		at: #acceptance_rate put: (self pct: acceptedRequests total: requests);
-		at: #rejection_rate put: (self pct: rejectedRequests total: requests);
-		at: #ignored_rate put: (self pct: ignoredRequests total: requests);
+		at: #acceptance_rate put: (self pct: acceptedSuggestions total: evaluated);
+		at: #rejection_rate put: (self pct: rejectedSuggestions total: evaluated);
+		at: #ignored_rate put: (self pct: ignoredSuggestions total: evaluated);
 		at: #self_receiver_completion_requests put: (completions at: #selfReceiverCompletionRequests);
 		at: #self_receiver_completion_rate put: (self pct: (completions at: #selfReceiverCompletionRequests) total: requests);
 		at: #self_receiver_logprob_completions put: (completions at: #selfReceiverLogprobCompletions);
