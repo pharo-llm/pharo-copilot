@@ -76,7 +76,7 @@ CoPCRatingTileMorph >> initialize [
 	selected := false.
 	actionBlock := [ :ignored | ].
 	self
-		extent: 104 @ 68;
+		extent: 88 @ 54;
 		hResizing: #spaceFill;
 		vResizing: #spaceFill;
 		borderWidth: 2.

@@ -254,7 +254,7 @@ CoPCImageCloseSurveyPresenter >> newRatingQuestionLayoutFor: question [
 
 	buttons := OrderedCollection new.
 	scaleLayout := SpBoxLayout newLeftToRight
-		spacing: 14;
+		spacing: 12;
 		vAlignCenter;
 		add: (self newLabel
 			label: CoPCImageCloseSurvey ratingLowAnchorLabel;
@@ -275,7 +275,7 @@ CoPCImageCloseSurveyPresenter >> newRatingQuestionLayoutFor: question [
 			morph: tile;
 			yourself.
 		buttons add: tile.
-		scaleLayout add: tilePresenter width: 104 ].
+		scaleLayout add: tilePresenter width: 88 ].
 
 	scaleLayout add: (self newLabel
 		label: CoPCImageCloseSurvey ratingHighAnchorLabel;
@@ -284,7 +284,7 @@ CoPCImageCloseSurveyPresenter >> newRatingQuestionLayoutFor: question [
 	^ SpBoxLayout newTopToBottom
 		spacing: 8;
 		add: questionLabel expand: false;
-		add: scaleLayout height: 68;
+		add: scaleLayout height: 54;
 		yourself
 ]
 
