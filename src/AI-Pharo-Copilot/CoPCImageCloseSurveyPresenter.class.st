@@ -218,7 +218,7 @@ CoPCImageCloseSurveyPresenter >> initializeWindow: aWindowPresenter [
 
 	aWindowPresenter
 		title: CoPCImageCloseSurvey surveyFormWindowTitle;
-		initialExtent: 920 @ 760;
+		initialExtent: 1000 @ 780;
 		centered.
 
 	(aWindowPresenter respondsTo: #whenClosedDo:) ifTrue: [
@@ -262,19 +262,20 @@ CoPCImageCloseSurveyPresenter >> newRatingQuestionLayoutFor: question [
 		yourself.
 
 	CoPCImageCloseSurvey ratingValues do: [ :rating |
-		| button |
-		button := self newButton
-			label: rating asString;
-			font: StandardFonts windowTitleFont;
-			action: [
+		| tile tilePresenter |
+		tile := CoPCRatingTileMorph
+			value: rating
+			action: [ :selectedTile |
 				self
 					selectRating: rating
 					forQuestion: question key.
-				buttons do: [ :each | each state: false ].
-				button state: true ];
+				buttons do: [ :each | each selected: false ].
+				selectedTile selected: true ].
+		tilePresenter := self newMorph
+			morph: tile;
 			yourself.
-		buttons add: button.
-		scaleLayout add: button width: 78 ].
+		buttons add: tile.
+		scaleLayout add: tilePresenter width: 104 ].
 
 	scaleLayout add: (self newLabel
 		label: CoPCImageCloseSurvey ratingHighAnchorLabel;
@@ -283,7 +284,7 @@ CoPCImageCloseSurveyPresenter >> newRatingQuestionLayoutFor: question [
 	^ SpBoxLayout newTopToBottom
 		spacing: 8;
 		add: questionLabel expand: false;
-		add: scaleLayout height: 58;
+		add: scaleLayout height: 68;
 		yourself
 ]
 
