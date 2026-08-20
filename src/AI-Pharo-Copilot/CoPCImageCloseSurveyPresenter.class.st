@@ -245,16 +245,30 @@ CoPCImageCloseSurveyPresenter >> isDone [
 { #category : 'layout' }
 CoPCImageCloseSurveyPresenter >> newRatingQuestionLayoutFor: question [
 
-	| questionLabel scaleLayout buttons |
+	| questionLabel scaleLayout numberLayout buttonLayout buttons |
 	ratingSelections at: question key put: nil.
 
 	questionLabel := self newLabel
 		label: (CoPCImageCloseSurvey requiredQuestionTitle: question value);
 		yourself.
 
-	buttons := OrderedCollection new.
-	scaleLayout := SpBoxLayout newLeftToRight
+	numberLayout := SpBoxLayout newLeftToRight
 		spacing: 10;
+		vAlignCenter;
+		add: (self newLabel label: ''; yourself) width: 150;
+		yourself.
+
+	CoPCImageCloseSurvey ratingValues do: [ :rating |
+		numberLayout add: (self newLabel
+			label: rating asString;
+			yourself) width: 52 ].
+
+	numberLayout add: (self newLabel label: ''; yourself) width: 150.
+
+	buttons := OrderedCollection new.
+	buttonLayout := SpBoxLayout newLeftToRight
+		spacing: 10;
+		vAlignCenter;
 		add: (self newLabel
 			label: CoPCImageCloseSurvey ratingLowAnchorLabel;
 			yourself) width: 150;
@@ -263,26 +277,32 @@ CoPCImageCloseSurveyPresenter >> newRatingQuestionLayoutFor: question [
 	CoPCImageCloseSurvey ratingValues do: [ :rating |
 		| button |
 		button := self newRadioButton
-			label: rating asString;
+			label: '';
 			whenActivatedDo: [
 				self
 					selectRating: rating
 					forQuestion: question key ];
 			yourself.
 		buttons add: button.
-		scaleLayout add: button width: 52 ].
+		buttonLayout add: button width: 52 ].
 
 	buttons do: [ :button |
 		button associatedRadioButtons: buttons asArray ].
 
-	scaleLayout add: (self newLabel
+	buttonLayout add: (self newLabel
 		label: CoPCImageCloseSurvey ratingHighAnchorLabel;
 		yourself) width: 150.
+
+	scaleLayout := SpBoxLayout newTopToBottom
+		spacing: 2;
+		add: numberLayout height: 24;
+		add: buttonLayout height: 36;
+		yourself.
 
 	^ SpBoxLayout newTopToBottom
 		spacing: 5;
 		add: questionLabel expand: false;
-		add: scaleLayout expand: false;
+		add: scaleLayout height: 62;
 		yourself
 ]
 
