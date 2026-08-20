@@ -334,6 +334,7 @@ CoPCImageCloseSurveyTest >> testCancellingSurveyDoesNotWriteEvaluationEvent [
 			result := CoPCImageCloseSurvey promptAndRecordUsing: ui.
 
 			self assert: result isNil.
+			self assert: ui requests size equals: 1.
 			self deny: tempEvalFile exists ] ]
 ]
 
@@ -367,7 +368,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitAppendsEveryCloseAttempt [
 				self assert: thirdLine isNil.
 				self assert: (firstEvent at: #event) equals: 'image-close-survey'.
 				self assert: (secondEvent at: #event) equals: 'image-close-survey'.
-				self assert: (ui requests size) equals: (CoPCImageCloseSurvey surveyQuestions size + 3) * 2.
+				self assert: ui requests size equals: 2.
 				self assert: archiveFile exists
 			] ensure: [
 			CoPCImageCloseSurvey resetPromptState ] ] ]
@@ -378,14 +379,19 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
 
 	CopilotSettings withDefaultSettingsDo: [
 		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
-			| ui ratings jsonLine parsed data storedRatings storedTasks userProfile |
+			| ui ratings jsonLine parsed data storedRatings storedTasks userProfile surveySpec |
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
 			ui ratings: { 4. 3. 5. 4. #codeCompletion. 5 }.
 			ui comments: { 'Useful overall, but speed varied.' }.
 			ratings := CoPCImageCloseSurvey promptAndRecordUsing: ui.
 
-			self assert: ui requests size equals: CoPCImageCloseSurvey surveyQuestions size + 3.
-			self assert: (ui requests last at: #answerHeight) equals: CoPCImageCloseSurvey optionalCommentAnswerHeight.
+			self assert: ui requests size equals: 1.
+			surveySpec := ui requests first at: #surveyFormSpec.
+			self assert: (surveySpec at: #questions) size equals: CoPCImageCloseSurvey surveyQuestions size.
+			self assert: (surveySpec at: #ratingValues) equals: CoPCImageCloseSurvey ratingValues.
+			self assert: ((surveySpec at: #taskQuestion) last) equals: $*.
+			self assert: ((surveySpec at: #experienceQuestion) last) equals: $*.
+			self assert: (surveySpec at: #commentQuestion) equals: CoPCImageCloseSurvey optionalCommentFormTitle.
 			self assert: (ratings at: #overall) equals: 4.
 			self assert: (ratings at: #suggestionQuality) equals: 3.
 
@@ -438,6 +444,51 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordContinuesWithBlankOptionalComment
 ]
 
 { #category : 'tests' }
+CoPCImageCloseSurveyTest >> testPromptAndRecordRequiresEveryRequiredSurveyAnswer [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
+			| ui ratings |
+			ui := CoPCImageCloseSurveyUIManagerDouble new.
+			ui ratings: { 5. 5. 5. 5. #codeCompletion }.
+
+			ratings := CoPCImageCloseSurvey promptAndRecordUsing: ui.
+
+			self assert: ratings isNil.
+			self assert: ui requests size equals: 1.
+			self deny: tempEvalFile exists
+		] ]
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testSurveyPresenterRequiresAllRequiredAnswers [
+
+	| presenter selections |
+	presenter := CoPCImageCloseSurveyPresenter new.
+	self assert: presenter defaultLayout isNotNil.
+	self deny: presenter isComplete.
+
+	selections := presenter instVarNamed: #ratingSelections.
+	CoPCImageCloseSurvey surveyQuestions do: [ :question |
+		selections at: question key put: 5 ].
+	self deny: presenter isComplete.
+
+	(presenter instVarNamed: #taskDropList)
+		selectItem: CoPCImageCloseSurvey taskChoices first.
+	self deny: presenter isComplete.
+
+	(presenter instVarNamed: #experienceDropList)
+		selectItem: CoPCImageCloseSurvey userExperienceChoices first.
+	self assert: presenter isComplete.
+
+	presenter submit.
+	self assert: presenter isDone.
+	self assert: (((presenter result at: #ratings) at: #overall)) equals: 5.
+	self assert: (presenter result at: #task) equals: CoPCImageCloseSurvey taskChoices first key.
+	self assert: (presenter result at: #experienceYears) equals: CoPCImageCloseSurvey userExperienceChoices first key
+]
+
+{ #category : 'tests' }
 CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitWritesOnceAndSkipsShutdownFallback [
 
 	CopilotSettings withDefaultSettingsDo: [
@@ -457,7 +508,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitWritesOnceAndSkipsShutdownF
 
 				self assert: firstLine isNotNil.
 				self assert: secondLine isNil.
-				self assert: (ui requests size) equals: CoPCImageCloseSurvey surveyQuestions size + 3.
+				self assert: ui requests size equals: 1.
 				self assert: archiveFile exists
 			] ensure: [
 			CoPCImageCloseSurvey resetPromptState ] ] ]

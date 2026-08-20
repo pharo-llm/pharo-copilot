@@ -640,7 +640,7 @@ CopilotSettings class >> host: aString [
 
 { #category : 'accessing' }
 CopilotSettings class >> imageCloseSurveyEnabled [
-	"Answer whether Copilot asks for a short rating survey when the Pharo image quits."
+	"Answer whether Copilot asks for a short feedback form when the Pharo image quits."
 
 	^ self researchTelemetryAccepted
 		and: [ imageCloseSurveyEnabled ifNil: [ imageCloseSurveyEnabled := true ] ]
@@ -2271,7 +2271,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #imageCloseSurveyEnabled;
 					setSelector: #imageCloseSurveyEnabled:;
 					default: self imageCloseSurveyEnabled;
-					description: 'Only active when anonymous usage research is enabled. When enabled, Copilot asks a short star-rating survey before the Pharo image quits.'.
+					description: 'Only active when anonymous usage research is enabled. When enabled, Copilot asks a short feedback form before the Pharo image quits.'.
 
 				(aBuilder setting: #autoInstallModelScriptEnabled)
 					order: 0.4;
