@@ -218,7 +218,7 @@ CoPCImageCloseSurveyPresenter >> initializeWindow: aWindowPresenter [
 
 	aWindowPresenter
 		title: CoPCImageCloseSurvey surveyFormWindowTitle;
-		initialExtent: 820 @ 650;
+		initialExtent: 920 @ 760;
 		centered.
 
 	(aWindowPresenter respondsTo: #whenClosedDo:) ifTrue: [
@@ -245,29 +245,16 @@ CoPCImageCloseSurveyPresenter >> isDone [
 { #category : 'layout' }
 CoPCImageCloseSurveyPresenter >> newRatingQuestionLayoutFor: question [
 
-	| questionLabel scaleLayout numberLayout buttonLayout buttons |
+	| questionLabel scaleLayout buttons |
 	ratingSelections at: question key put: nil.
 
 	questionLabel := self newLabel
 		label: (CoPCImageCloseSurvey requiredQuestionTitle: question value);
 		yourself.
 
-	numberLayout := SpBoxLayout newLeftToRight
-		spacing: 10;
-		vAlignCenter;
-		add: (self newLabel label: ''; yourself) width: 150;
-		yourself.
-
-	CoPCImageCloseSurvey ratingValues do: [ :rating |
-		numberLayout add: (self newLabel
-			label: rating asString;
-			yourself) width: 52 ].
-
-	numberLayout add: (self newLabel label: ''; yourself) width: 150.
-
 	buttons := OrderedCollection new.
-	buttonLayout := SpBoxLayout newLeftToRight
-		spacing: 10;
+	scaleLayout := SpBoxLayout newLeftToRight
+		spacing: 14;
 		vAlignCenter;
 		add: (self newLabel
 			label: CoPCImageCloseSurvey ratingLowAnchorLabel;
@@ -276,33 +263,27 @@ CoPCImageCloseSurveyPresenter >> newRatingQuestionLayoutFor: question [
 
 	CoPCImageCloseSurvey ratingValues do: [ :rating |
 		| button |
-		button := self newRadioButton
-			label: '';
-			whenActivatedDo: [
+		button := self newButton
+			label: rating asString;
+			font: StandardFonts windowTitleFont;
+			action: [
 				self
 					selectRating: rating
-					forQuestion: question key ];
+					forQuestion: question key.
+				buttons do: [ :each | each state: false ].
+				button state: true ];
 			yourself.
 		buttons add: button.
-		buttonLayout add: button width: 52 ].
+		scaleLayout add: button width: 78 ].
 
-	buttons do: [ :button |
-		button associatedRadioButtons: buttons asArray ].
-
-	buttonLayout add: (self newLabel
+	scaleLayout add: (self newLabel
 		label: CoPCImageCloseSurvey ratingHighAnchorLabel;
-		yourself) width: 150.
-
-	scaleLayout := SpBoxLayout newTopToBottom
-		spacing: 2;
-		add: numberLayout height: 24;
-		add: buttonLayout height: 36;
-		yourself.
+		yourself) width: 170.
 
 	^ SpBoxLayout newTopToBottom
-		spacing: 5;
+		spacing: 8;
 		add: questionLabel expand: false;
-		add: scaleLayout height: 62;
+		add: scaleLayout height: 58;
 		yourself
 ]
 
