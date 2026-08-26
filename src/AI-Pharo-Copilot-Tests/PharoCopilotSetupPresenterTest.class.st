@@ -15,7 +15,6 @@ PharoCopilotSetupPresenterTest >> testSetupButtonLayoutsDoNotUseFixedWidths [
 		showScreenRecordingConsentStep
 		showScreenRecordingLearnMoreStepReturningTo:
 		showConsentSummaryStep
-		showResearchParticipationStep
 	) do: [ :selector |
 		self deny:
 			((PharoCopilotSetupPresenter sourceCodeAt: selector)

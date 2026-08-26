@@ -690,26 +690,17 @@ PharoCopilotSetupPresenter >> showConsentSummaryStep [
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showWelcomeStep [
 
+	| continueButton |
 	titleLabel label: 'Welcome to Pharo-Copilot'.
 	descriptionLabel label: 'Local AI-powered code completion for Pharo.'.
 	statusLabel label: ''.
 
-	CopilotSettings researchTelemetryNotAsked
-		ifTrue: [ ^ self showResearchParticipationStep ].
-	^ self showConsentSummaryStep
-]
-
-{ #category : 'initialization' }
-PharoCopilotSetupPresenter >> showResearchParticipationStep [
-
-	| continueButton |
-	titleLabel label: 'Welcome to Pharo-Copilot'.
-	descriptionLabel label: 'Local AI-powered code completion for Pharo. Before we finish setup, we''d like to ask whether you want to help us improve AI code completion. Participation is completely optional.'.
-	statusLabel label: ''.
-
 	continueButton := self newButton
 		label: 'Continue';
-		action: [ self showResearchTelemetryConsentChoiceStep ];
+		action: [
+			CopilotSettings researchTelemetryNotAsked
+				ifTrue: [ self showResearchTelemetryConsentChoiceStep ]
+				ifFalse: [ self showConsentSummaryStep ] ];
 		yourself.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
