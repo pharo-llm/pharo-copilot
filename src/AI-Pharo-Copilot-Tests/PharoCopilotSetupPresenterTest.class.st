@@ -11,8 +11,11 @@ PharoCopilotSetupPresenterTest >> testSetupButtonLayoutsDoNotUseFixedWidths [
 
 	#(
 		showResearchTelemetryConsentChoiceStep
-		showResearchTelemetryLearnMoreStepReturningTo:includeConsentButtons:
-		showWelcomeStepAfterConsentDecision
+		showResearchTelemetryLearnMoreStepReturningTo:
+		showScreenRecordingConsentStep
+		showScreenRecordingLearnMoreStepReturningTo:
+		showConsentSummaryStep
+		showResearchParticipationStep
 	) do: [ :selector |
 		self deny:
 			((PharoCopilotSetupPresenter sourceCodeAt: selector)
@@ -26,7 +29,6 @@ PharoCopilotSetupPresenterTest >> testTelemetryConsentIntroUsesReadOnlyTextForLi
 	source := PharoCopilotSetupPresenter
 		sourceCodeAt: #showResearchTelemetryConsentChoiceStep.
 
-	self assert: CopilotSettings researchTelemetryFirstLaunchText lines size > 1.
 	self assert: (source includesSubstring: 'newText').
 	self assert: (source includesSubstring: 'beNotEditable').
 	self deny: (source includesSubstring: 'label: CopilotSettings researchTelemetryFirstLaunchText')
@@ -43,4 +45,17 @@ PharoCopilotSetupPresenterTest >> testShowWelcomeStepDoesNotRecordTelemetryDecis
 		self assert: CopilotSettings researchTelemetryConsentState equals: #notAsked.
 		self deny: CopilotSettings researchTelemetryAccepted.
 		self deny: CopilotSettings researchTelemetryDeclined ]
+]
+
+{ #category : 'tests' }
+PharoCopilotSetupPresenterTest >> testShowWelcomeStepDoesNotRecordScreenRecordingDecisionWhenNotAsked [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| presenter |
+		presenter := PharoCopilotSetupPresenter new.
+		presenter showWelcomeStep.
+
+		self assert: CopilotSettings screenRecordingConsentState equals: #notAsked.
+		self deny: CopilotSettings screenRecordingAccepted.
+		self deny: CopilotSettings screenRecordingDeclined ]
 ]

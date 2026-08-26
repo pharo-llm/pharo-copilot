@@ -41,7 +41,8 @@ Class {
 		'backgroundColor',
 		'installModelUserConsent',
 		'imageCloseSurveyEnabled',
-		'researchTelemetryConsentState'
+		'researchTelemetryConsentState',
+		'screenRecordingConsentState'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -1895,6 +1896,111 @@ CopilotSettings class >> showResearchTelemetryStudyInformationSetting [
 CopilotSettings class >> showResearchTelemetryStudyInformationSetting: aBoolean [
 
 	aBoolean ifTrue: [ self showResearchTelemetryStudyInformation ]
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingAccepted [
+
+	^ self screenRecordingConsentState = #accepted
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingConsentState [
+	"Answer the persisted screen recording consent state. Anything unknown is treated as declined."
+
+	| normalized |
+	normalized := screenRecordingConsentState ifNil: [ #notAsked ].
+	normalized := [ normalized asSymbol ] on: Error do: [ ^ #declined ].
+	(#(#notAsked #declined #accepted) includes: normalized) ifFalse: [ ^ #declined ].
+	^ normalized
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingDeclined [
+
+	^ self screenRecordingConsentState = #declined
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingDisabledStatusText [
+
+	^ 'Screen recording is disabled.', String cr,
+	'Pharo Copilot is not recording your screen.'
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingEnabledStatusText [
+
+	^ 'Screen recording is enabled.', String cr,
+	'Screen recordings may help researchers understand how developers work with AI code completion.',
+	'A recording may capture source code or other information visible in your Pharo environment.'
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingFirstLaunchText [
+
+	^ 'Screen recordings can help researchers understand how developers work with AI code completion in real coding sessions.', String cr,
+	String cr,
+	'- Screen recording is optional.', String cr,
+	'- A recording may capture source code or other information visible in your Pharo environment.', String cr,
+	'- Screen recording is not enabled unless you explicitly agree.', String cr,
+	'- You can disable screen recording later in Settings.'
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingLearnMoreText [
+
+	^ 'About Screen Recording', String cr,
+	String cr,
+	'Why record the screen?', String cr,
+	'Screen recordings help researchers observe how developers interact with AI code completion during real coding sessions. This qualitative data complements the anonymous interaction telemetry.', String cr,
+	String cr,
+	'What may be visible in a recording?', String cr,
+	'A screen recording captures whatever is visible on your Pharo screen during the session. This may include source code, variable names, comments, and other on-screen information.', String cr,
+	String cr,
+	'What is not intended to be collected?', String cr,
+	'Your name, email address, account credentials, passwords, or authentication tokens.', String cr,
+	String cr,
+	'Where does the data go?', String cr,
+	'If you agree, screen recordings are transmitted to infrastructure hosted by Inria. The recordings may be used for research analysis and may become part of a research dataset.', String cr,
+	String cr,
+	'Can you withdraw?', String cr,
+	'Yes. You can disable screen recording at any time from Pharo Copilot settings. Disabling screen recording stops future recordings. Previously recorded sessions may already have been processed.', String cr,
+	String cr,
+	'Who is responsible?', String cr,
+	'Members of the Pharo Consortium and researchers from Inria''s EVREF team.', String cr,
+	String cr,
+	'Questions: dpo@inria.fr'
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingNotAsked [
+
+	^ self screenRecordingConsentState = #notAsked
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> recordScreenRecordingConsentAccepted: aBoolean [
+
+	| consentRecord |
+	consentRecord := Dictionary new
+		at: #accepted put: aBoolean;
+		at: #consentState put: (aBoolean = true ifTrue: [ #accepted ] ifFalse: [ #declined ]);
+		at: #timestamp put: DateAndTime now asString;
+		yourself.
+
+	aBoolean = true
+		ifTrue: [
+			screenRecordingConsentState := #accepted.
+			self autoSaveSettings.
+			CoPharoCopilotLogger
+				appendEvaluationEvent: 'screen-recording-consent'
+				data: consentRecord ]
+		ifFalse: [
+			screenRecordingConsentState := #declined.
+			self autoSaveSettings ].
+
+	^ consentRecord
 ]
 
 { #category : 'settings' }
