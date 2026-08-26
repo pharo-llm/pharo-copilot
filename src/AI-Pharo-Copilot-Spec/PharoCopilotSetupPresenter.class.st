@@ -58,8 +58,8 @@ PharoCopilotSetupPresenter >> beginIndeterminateProgressForIndex: index total: t
 PharoCopilotSetupPresenter >> defaultLayout [
 
 	^ SpBoxLayout newTopToBottom
-		  spacing: 10;
-		  borderWidth: 14;
+		  spacing: 6;
+		  borderWidth: 8;
 		  add: titleLabel expand: false;
 		  add: descriptionLabel expand: false;
 		  add: contentContainer expand: true;
@@ -170,7 +170,7 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 
 	aWindowPresenter
 		title: 'Pharo-Copilot Setup';
-		initialExtent: 560 @ 420;
+		initialExtent: 460 @ 300;
 		centered.
 
 ]
