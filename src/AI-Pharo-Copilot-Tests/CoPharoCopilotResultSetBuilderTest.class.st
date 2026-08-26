@@ -7,6 +7,45 @@ Class {
 }
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testClassContextComposesSemanticRecentChangesBeforeInteractionHistory [
+
+	| builder context result semanticIndex changesIndex historyIndex |
+	builder := CopilotRecentCodeChangesTestBuilder new.
+	builder
+		semanticCompletionContextForPrompt: 'semantic data';
+		recentCodeChangesForPrompt: 'EpMethodAddition: CoFoo>>bar [AI-Pharo-Copilot]';
+		interactionHistoryForPrompt: 'Browser navigation history (Calypso):'.
+	context := CoCopilotContextMock new.
+
+	result := builder classContextFor: context prefix: ''.
+
+	semanticIndex := result findString: '<|file_sep|>Semantic completion context' startingAt: 1.
+	changesIndex := result findString: '<|file_sep|>Recent code changes' startingAt: 1.
+	historyIndex := result findString: '<|file_sep|>IDE interaction history' startingAt: 1.
+
+	self assert: semanticIndex > 0.
+	self assert: changesIndex > semanticIndex.
+	self assert: historyIndex > changesIndex.
+	self deny: (result includesSubstring: '<|file_sep|>.pharo-completion-contract')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionKindForMessageTailRemainsAvailable [
+
+	| builder context source |
+	builder := CoPharoCopilotResultSetBuilder new.
+	source := 'semanticContextExample', String lf, String tab, 'self as'.
+	context := CoCopilotContextMock new
+		source: source;
+		position: source size;
+		yourself.
+
+	self
+		assert: (builder completionKindFor: context prefix: source)
+		equals: #messageTail
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionRouterClassifiesSelectorVariableAndStatement [
 
 	| builder router selectorContext variableContext statementContext statementSource |
@@ -506,33 +545,6 @@ CoPharoCopilotResultSetBuilderTest >> testFuseInvalidModelSuggestionFallsBehindS
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionContractAppendsStrictSection [
-
-	| builder context base source result |
-	builder := CoPharoCopilotResultSetBuilder new.
-	source := 'semanticContextExample', String lf, String tab, 'self as'.
-	context := CoCopilotContextMock new
-		behavior: Object;
-		source: source;
-		position: source size;
-		yourself.
-	base := '<|repo_name|>Object', String lf.
-
-	result := builder
-		appendCompletionContractFor: context
-		prefix: source
-		toContext: base.
-
-	self assert: (result beginsWith: base).
-	self assert: (result includesSubstring: '<|file_sep|>.pharo-completion-contract').
-	self assert: (result includesSubstring: 'completionKind=messageTail').
-	self assert: (result includesSubstring: 'insertOnlyTail=true').
-	self assert: (result includesSubstring: 'forbidden=methodHeader').
-	self assert: (result includesSubstring: 'receiver=self').
-	self assert: (result includesSubstring: 'receiverTypes=Object')
-]
-
-{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetadata [
 
 	CopilotSettings withDefaultSettingsDo: [
@@ -917,6 +929,64 @@ CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorFastPathRequiresTwoCha
 
 	self deny: (builder shouldOpenSemanticSelectorFastPathFor: oneCharacter prefix: oneCharacter source).
 	self assert: (builder shouldOpenSemanticSelectorFastPathFor: twoCharacters prefix: twoCharacters source)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testRecentCodeChangesAppendsContextSection [
+
+	| builder base changes result changesIndex sampleIndex |
+	builder := CopilotRecentCodeChangesTestBuilder new.
+	base := '<|repo_name|>Sample', String lf,
+		'<|file_sep|>Sample', String lf,
+		'Class { #name : #Sample }', String lf.
+	changes := 'EpMethodModification: Sample>>example [AI-Pharo-Copilot]'.
+	builder recentCodeChangesForPrompt: changes.
+
+	result := builder appendRecentCodeChangesToContext: base.
+
+	changesIndex := result findString: '<|file_sep|>Recent code changes' startingAt: 1.
+	sampleIndex := result findString: '<|file_sep|>Sample' startingAt: 1.
+
+	self assert: (result beginsWith: base).
+	self assert: changesIndex > 0.
+	self assert: sampleIndex > 0.
+	self assert: changesIndex > sampleIndex.
+	self assert: (result includesSubstring: changes).
+	self assert: (result endsWith: String lf)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testRecentCodeChangesDoesNotAppendEmptySection [
+
+	| builder base result |
+	builder := CopilotRecentCodeChangesTestBuilder new.
+	base := '<|repo_name|>Sample', String lf.
+	builder recentCodeChangesForPrompt: ''.
+
+	result := builder appendRecentCodeChangesToContext: base.
+
+	self assert: result equals: base
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testRecentCodeChangesFormatsMethodAndClassChanges [
+
+	| provider methodChange classChange result |
+	provider := CoPCTestRecentCodeChanges new.
+	methodChange := CoPCTestEpMethodChange
+		behavior: 'CoFoo'
+		selector: #bar
+		package: 'AI-Pharo-Copilot'.
+	classChange := CoPCTestEpClassChange
+		affectedName: 'CoSomething'
+		package: 'AI-Pharo-Copilot'.
+	provider recentChanges: { methodChange. classChange }.
+
+	result := provider gather.
+
+	self assert: (result includesSubstring: 'CoPCTestEpMethodChange: CoFoo>>bar [AI-Pharo-Copilot]').
+	self assert: (result includesSubstring: 'CoPCTestEpClassChange: CoSomething [AI-Pharo-Copilot]').
+	self deny: (result includesSubstring: '<|file_sep|>Recent code changes')
 ]
 
 { #category : 'tests' }
