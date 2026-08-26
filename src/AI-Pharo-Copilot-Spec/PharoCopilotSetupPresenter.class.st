@@ -503,19 +503,10 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
-	| messageText telemetryStateLabel learnMoreButton noButton yesButton buttonRow |
+	| learnMoreButton noButton yesButton buttonRow |
 	titleLabel label: 'Help improve AI code completion'.
-	descriptionLabel label: 'Pharo Copilot is part of a research project studying how AI can provide better code completions for Pharo. Your participation is optional.'.
+	descriptionLabel label: 'Can we collect anonymous usage data?'.
 	statusLabel label: ''.
-
-	messageText := self newText.
-	messageText
-		text: 'Can we collect anonymous usage data?';
-		beNotEditable.
-
-	telemetryStateLabel := self newLabel
-		label: 'With your permission, Pharo Copilot can collect anonymous information about how you interact with AI code completions.';
-		yourself.
 
 	learnMoreButton := self newButton
 		label: 'Learn more';
@@ -547,8 +538,6 @@ PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
-		add: messageText expand: true;
-		add: telemetryStateLabel expand: false;
 		add: buttonRow expand: false;
 		yourself).
 
@@ -590,19 +579,10 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showScreenRecordingConsentStep [
 
-	| messageText messageLabel learnMoreButton noButton yesButton buttonRow |
-	titleLabel label: 'Help us understand the coding experience'.
-	descriptionLabel label: 'Can we record your screen? Screen recordings can help researchers understand how developers work with AI code completion in real coding sessions.'.
+	| learnMoreButton noButton yesButton buttonRow |
+	titleLabel label: 'Can we record your screen?'.
+	descriptionLabel label: 'Screen recordings help researchers understand how developers work with AI code completion. A recording may capture code visible on your screen.'.
 	statusLabel label: ''.
-
-	messageText := self newText.
-	messageText
-		text: CopilotSettings screenRecordingFirstLaunchText;
-		beNotEditable.
-
-	messageLabel := self newLabel
-		label: 'A recording may capture source code or other information visible in your Pharo environment. Screen recording is optional and is not enabled unless you explicitly agree.';
-		yourself.
 
 	learnMoreButton := self newButton
 		label: 'Learn more';
@@ -634,8 +614,6 @@ PharoCopilotSetupPresenter >> showScreenRecordingConsentStep [
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
-		add: messageText expand: true;
-		add: messageLabel expand: false;
 		add: buttonRow expand: false;
 		yourself).
 
@@ -713,7 +691,7 @@ PharoCopilotSetupPresenter >> showConsentSummaryStep [
 PharoCopilotSetupPresenter >> showWelcomeStep [
 
 	titleLabel label: 'Welcome to Pharo-Copilot'.
-	descriptionLabel label: 'Local AI-powered code completion for Pharo. Before we finish setup, we''d like to ask whether you want to help us improve AI code completion. Participation is completely optional.'.
+	descriptionLabel label: 'Local AI-powered code completion for Pharo.'.
 	statusLabel label: ''.
 
 	CopilotSettings researchTelemetryNotAsked

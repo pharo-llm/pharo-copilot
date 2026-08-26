@@ -23,15 +23,15 @@ PharoCopilotSetupPresenterTest >> testSetupButtonLayoutsDoNotUseFixedWidths [
 ]
 
 { #category : 'tests' }
-PharoCopilotSetupPresenterTest >> testTelemetryConsentIntroUsesReadOnlyTextForLineBreaks [
+PharoCopilotSetupPresenterTest >> testTelemetryLearnMoreUsesReadOnlyTextForLineBreaks [
 
 	| source |
 	source := PharoCopilotSetupPresenter
-		sourceCodeAt: #showResearchTelemetryConsentChoiceStep.
+		sourceCodeAt: #showResearchTelemetryLearnMoreStepReturningTo:.
 
+	self assert: CopilotSettings researchTelemetryLearnMoreText lines size > 1.
 	self assert: (source includesSubstring: 'newText').
-	self assert: (source includesSubstring: 'beNotEditable').
-	self deny: (source includesSubstring: 'label: CopilotSettings researchTelemetryFirstLaunchText')
+	self assert: (source includesSubstring: 'beNotEditable')
 ]
 
 { #category : 'tests' }
