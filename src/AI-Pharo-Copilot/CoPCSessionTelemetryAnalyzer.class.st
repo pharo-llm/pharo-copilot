@@ -221,6 +221,8 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #last_activity put: (completions at: #lastActivity);
 		at: #usage_hours put: 0.0;
 		at: #privacy_consent put: (evaluation at: #privacyConsent);
+		at: #data_collection_consent put: (evaluation at: #dataCollectionConsent);
+		at: #screen_recording_consent put: (evaluation at: #screenRecordingConsent);
 		at: #tasks_done put: (evaluation at: #tasksDone) copy;
 		at: #survey_ratings put: (evaluation at: #surveyRatings) copy;
 		at: #survey_feedback_comment put: (evaluation at: #feedbackComment ifAbsent: [ '' ]);
@@ -654,6 +656,8 @@ CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sess
 		at: #oldCompletionLookups put: 0;
 		at: #oldCompletionLookupEnvironmentCounts put: Dictionary new;
 		at: #privacyConsent put: 'unknown';
+		at: #dataCollectionConsent put: 'unknown';
+		at: #screenRecordingConsent put: 'unknown';
 		at: #tasksDone put: #();
 		at: #surveyRatings put: Dictionary new;
 		at: #feedbackComment put: '';
@@ -674,9 +678,12 @@ CoPCSessionTelemetryAnalyzer class >> evaluationSummaryForSessionDirectory: sess
 				data := self dictionaryAt: #data from: row.
 				event := self stringAt: #event from: row.
 				event = 'research-telemetry-consent' ifTrue: [
-					summary at: #privacyConsent put: (self stringValue: (self valueAt: #accepted from: data default: 'unknown')) ].
+					summary at: #privacyConsent put: (self stringValue: (self valueAt: #accepted from: data default: 'unknown')).
+					summary at: #dataCollectionConsent put: (self stringValue: (self valueAt: #consentState from: data default: 'unknown')) ].
 				event = 'privacy-policy-consent' ifTrue: [
 					summary at: #privacyConsent put: (self stringValue: (self valueAt: #accepted from: data default: 'unknown')) ].
+				event = 'screen-recording-consent' ifTrue: [
+					summary at: #screenRecordingConsent put: (self stringValue: (self valueAt: #consentState from: data default: 'unknown')) ].
 				event = 'image-close-survey' ifTrue: [
 					summary at: #tasksDone put: (self arrayAt: #tasks from: data).
 					summary at: #surveyRatings put: (self dictionaryAt: #ratings from: data).

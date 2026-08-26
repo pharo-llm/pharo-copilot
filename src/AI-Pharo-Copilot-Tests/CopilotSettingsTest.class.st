@@ -736,6 +736,12 @@ CopilotSettingsTest >> testRecordResearchTelemetryConsentWritesEvaluationJsonEnt
 			self assert: (parsed at: #sessionId) equals: sessionDir basename.
 			self assert: ((parsed at: #data) at: #accepted) equals: true.
 			self assert: ((parsed at: #data) at: #consentState) equals: #accepted.
+			self assert: ((parsed at: #data) at: #consentSubject) equals: #anonymousResearchTelemetry.
+			self assert: ((parsed at: #data) at: #dataCollectionConsentState) equals: #accepted.
+			self assert: ((parsed at: #data) at: #screenRecordingConsentState) equals: #notAsked.
+			self assert: (((parsed at: #data) at: #consentPurpose) includesSubstring: 'Collect anonymous IDE interaction events').
+			self assert: (((parsed at: #data) at: #consentNotice) includesSubstring: 'Telemetry is OFF by default').
+			self assert: (((parsed at: #data) at: #consentDetails) includesSubstring: 'About the Pharo Usage Research Project').
 			self assert: ((parsed at: #data) includesKey: #timestamp)
 		] ensure: [
 			tempDir exists ifTrue: [ tempDir ensureDeleteAll ].
@@ -748,6 +754,50 @@ CopilotSettingsTest >> testRecordResearchTelemetryConsentWritesEvaluationJsonEnt
 			CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
 			CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
 			CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived ] ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRecordResearchTelemetryConsentDeclinedWritesConsentJsonEntry [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self withTemporaryEvaluationLogDo: [ :tempEvalFile :sessionDir |
+			| jsonLine parsed |
+			CopilotSettings recordResearchTelemetryConsentAccepted: false.
+
+			jsonLine := tempEvalFile readStreamDo: [ :stream | stream nextLine ].
+			parsed := STONJSON fromString: jsonLine.
+			self assert: (parsed at: #event) equals: 'research-telemetry-consent'.
+			self assert: (parsed at: #userId) equals: 'user-test'.
+			self assert: (parsed at: #sessionId) equals: sessionDir basename.
+			self assert: ((parsed at: #data) at: #accepted) equals: false.
+			self assert: ((parsed at: #data) at: #consentState) equals: #declined.
+			self assert: ((parsed at: #data) at: #consentSubject) equals: #anonymousResearchTelemetry.
+			self assert: ((parsed at: #data) at: #dataCollectionConsentState) equals: #declined.
+			self assert: (((parsed at: #data) at: #consentNotice) includesSubstring: 'Telemetry is OFF by default').
+			self deny: CopilotSettings loggingEnabled ] ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testRecordScreenRecordingConsentWritesEvaluationJsonEntry [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self withTemporaryEvaluationLogDo: [ :tempEvalFile :sessionDir |
+			| jsonLine parsed |
+			CopilotSettings recordScreenRecordingConsentAccepted: true.
+
+			jsonLine := tempEvalFile readStreamDo: [ :stream | stream nextLine ].
+			parsed := STONJSON fromString: jsonLine.
+			self assert: (parsed at: #event) equals: 'screen-recording-consent'.
+			self assert: (parsed at: #userId) equals: 'user-test'.
+			self assert: (parsed at: #sessionId) equals: sessionDir basename.
+			self assert: ((parsed at: #data) at: #accepted) equals: true.
+			self assert: ((parsed at: #data) at: #consentState) equals: #accepted.
+			self assert: ((parsed at: #data) at: #consentSubject) equals: #screenRecording.
+			self assert: ((parsed at: #data) at: #dataCollectionConsentState) equals: #notAsked.
+			self assert: ((parsed at: #data) at: #screenRecordingConsentState) equals: #accepted.
+			self assert: (((parsed at: #data) at: #consentNotice) includesSubstring: 'Raw videos will not be made public').
+			self assert: (((parsed at: #data) at: #consentDetails) includesSubstring: 'Will recordings be made public?').
+			self deny: CopilotSettings loggingEnabled ] ]
 ]
 
 { #category : 'tests' }
@@ -897,6 +947,45 @@ CopilotSettingsTest >> testTimingSettingsSnapshotRestore [
         self assert: CopilotSettings completionIdleMilliseconds equals: 2400.
         self assert: CopilotSettings requestTimeoutSeconds equals: 9.
     ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> withTemporaryEvaluationLogDo: aBlock [
+
+	| tempDir tempEvalFile sessionDir originalDirRef originalLogRef originalEvalRef originalSessionRef originalArchiveRef originalUserId originalSessionId originalStartedAt originalArchived |
+	tempDir := FileLocator temp / ('copilot-consent-log-test-' , UUID new asString).
+	tempEvalFile := tempDir / CoPharoCopilotLogger evaluationLogFileName.
+	sessionDir := tempDir / 'session-test'.
+	originalDirRef := CoPharoCopilotLogger rawLogsDirectoryReference.
+	originalLogRef := CoPharoCopilotLogger rawLogFileReference.
+	originalEvalRef := CoPharoCopilotLogger rawEvaluationLogFileReference.
+	originalSessionRef := CoPharoCopilotLogger rawSessionDirectoryReference.
+	originalArchiveRef := CoPharoCopilotLogger rawSessionArchiveFileReference.
+	originalUserId := CoPharoCopilotLogger rawUserId.
+	originalSessionId := CoPharoCopilotLogger instVarNamed: #sessionId.
+	originalStartedAt := CoPharoCopilotLogger instVarNamed: #sessionStartedAt.
+	originalArchived := CoPharoCopilotLogger instVarNamed: #sessionArchived.
+	[
+		tempDir exists ifTrue: [ tempDir ensureDeleteAll ].
+		tempDir ensureCreateDirectory.
+		CoPharoCopilotLogger rawLogsDirectoryReference: tempDir.
+		CoPharoCopilotLogger rawSessionDirectoryReference: sessionDir.
+		CoPharoCopilotLogger rawSessionArchiveFileReference: tempDir / 'session-test.zip'.
+		CoPharoCopilotLogger rawEvaluationLogFileReference: tempEvalFile.
+		CoPharoCopilotLogger rawUserId: 'user-test'.
+		tempEvalFile exists ifTrue: [ tempEvalFile ensureDelete ].
+		aBlock value: tempEvalFile value: sessionDir
+	] ensure: [
+		tempDir exists ifTrue: [ tempDir ensureDeleteAll ].
+		CoPharoCopilotLogger rawLogsDirectoryReference: originalDirRef.
+		CoPharoCopilotLogger rawSessionDirectoryReference: originalSessionRef.
+		CoPharoCopilotLogger rawSessionArchiveFileReference: originalArchiveRef.
+		CoPharoCopilotLogger rawLogFileReference: originalLogRef.
+		CoPharoCopilotLogger rawEvaluationLogFileReference: originalEvalRef.
+		CoPharoCopilotLogger rawUserId: originalUserId.
+		CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
+		CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
+		CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived ]
 ]
 
 { #category : 'tests' }

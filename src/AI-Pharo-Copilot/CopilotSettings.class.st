@@ -1711,10 +1711,17 @@ CopilotSettings class >> recordPrivacyPolicyUserConsentAccepted: aBoolean [
 { #category : 'research telemetry' }
 CopilotSettings class >> recordResearchTelemetryConsentAccepted: aBoolean [
 
-	| consentRecord |
+	| consentRecord consentState |
+	consentState := aBoolean = true ifTrue: [ #accepted ] ifFalse: [ #declined ].
 	consentRecord := Dictionary new
+		at: #consentSubject put: #anonymousResearchTelemetry;
+		at: #consentPurpose put: 'Collect anonymous IDE interaction events for Pharo usage research.';
 		at: #accepted put: aBoolean;
-		at: #consentState put: (aBoolean = true ifTrue: [ #accepted ] ifFalse: [ #declined ]);
+		at: #consentState put: consentState;
+		at: #dataCollectionConsentState put: consentState;
+		at: #screenRecordingConsentState put: self screenRecordingConsentState;
+		at: #consentNotice put: self researchTelemetryFirstLaunchText;
+		at: #consentDetails put: self researchTelemetryLearnMoreText;
 		at: #timestamp put: DateAndTime now asString;
 		yourself.
 
@@ -1724,12 +1731,15 @@ CopilotSettings class >> recordResearchTelemetryConsentAccepted: aBoolean [
 			loggingEnabled := true.
 			self autoSaveSettings.
 			CoPharoCopilotLogger
-				appendEvaluationEvent: 'research-telemetry-consent'
+				appendConsentEvent: 'research-telemetry-consent'
 				data: consentRecord ]
 		ifFalse: [
 			researchTelemetryConsentState := #declined.
 			loggingEnabled := false.
-			self autoSaveSettings ].
+			self autoSaveSettings.
+			CoPharoCopilotLogger
+				appendConsentEvent: 'research-telemetry-consent'
+				data: consentRecord ].
 
 	^ consentRecord
 ]
@@ -1991,10 +2001,17 @@ CopilotSettings class >> screenRecordingNotAsked [
 { #category : 'screen recording' }
 CopilotSettings class >> recordScreenRecordingConsentAccepted: aBoolean [
 
-	| consentRecord |
+	| consentRecord consentState |
+	consentState := aBoolean = true ifTrue: [ #accepted ] ifFalse: [ #declined ].
 	consentRecord := Dictionary new
+		at: #consentSubject put: #screenRecording;
+		at: #consentPurpose put: 'Record the Pharo screen during coding sessions for research analysis.';
 		at: #accepted put: aBoolean;
-		at: #consentState put: (aBoolean = true ifTrue: [ #accepted ] ifFalse: [ #declined ]);
+		at: #consentState put: consentState;
+		at: #dataCollectionConsentState put: self researchTelemetryConsentState;
+		at: #screenRecordingConsentState put: consentState;
+		at: #consentNotice put: self screenRecordingFirstLaunchText;
+		at: #consentDetails put: self screenRecordingLearnMoreText;
 		at: #timestamp put: DateAndTime now asString;
 		yourself.
 
@@ -2003,11 +2020,14 @@ CopilotSettings class >> recordScreenRecordingConsentAccepted: aBoolean [
 			screenRecordingConsentState := #accepted.
 			self autoSaveSettings.
 			CoPharoCopilotLogger
-				appendEvaluationEvent: 'screen-recording-consent'
+				appendConsentEvent: 'screen-recording-consent'
 				data: consentRecord ]
 		ifFalse: [
 			screenRecordingConsentState := #declined.
-			self autoSaveSettings ].
+			self autoSaveSettings.
+			CoPharoCopilotLogger
+				appendConsentEvent: 'screen-recording-consent'
+				data: consentRecord ].
 
 	^ consentRecord
 ]

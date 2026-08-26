@@ -92,6 +92,45 @@ CoPharoCopilotLogger class >> appendEvaluationEvent: eventName data: aDictionary
 ]
 
 { #category : 'class initialization' }
+CoPharoCopilotLogger class >> appendConsentEvent: eventName data: aDictionary [
+	"Append an explicit consent decision to the evaluation JSONL file.
+	Consent decisions are audit records, so declined decisions are written even when
+	regular telemetry logging is disabled."
+
+	| event file eventUserId eventSessionId |
+	[
+		self loggingEnabled
+			ifTrue: [
+				eventSessionId := self currentSessionId.
+				eventUserId := self userId.
+				file := self evaluationLogFileReference ]
+			ifFalse: [
+				self ensureConsentSessionDirectory.
+				eventSessionId := sessionId.
+				eventUserId := userId.
+				file := evaluationLogFileReference ifNil: [
+					evaluationLogFileReference := self ensureConsentSessionDirectory / self evaluationLogFileName ] ].
+
+		event := Dictionary new
+			at: #event put: eventName;
+			at: #userId put: eventUserId;
+			at: #sessionId put: eventSessionId;
+			at: #data put: (aDictionary ifNil: [ Dictionary new ]);
+			yourself.
+
+		self ensureFileExists: file.
+		file writeStreamDo: [ :stream |
+			stream setToEnd.
+			stream
+				nextPutAll: (STONJSON toString: event);
+				nextPut: Character lf ]
+	] on: Error do: [ :ex |
+		Transcript
+			show: 'Could not append Copilot consent event: ', ex messageText;
+			cr ]
+]
+
+{ #category : 'class initialization' }
 CoPharoCopilotLogger class >> completionFileReferenceFor: aSessionId [
 	^ self ensureCompletionsDirectory / ('completion-', aSessionId, '.json')
 ]
@@ -113,6 +152,30 @@ CoPharoCopilotLogger class >> ensureCompletionsDirectory [
 	directory ensureCreateDirectory.
 	^ directory
 
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> ensureConsentSessionDirectory [
+
+	| startedAt newSessionId root |
+	sessionDirectoryReference ifNil: [
+		startedAt := DateAndTime now.
+		newSessionId := self newSessionIdAt: startedAt.
+		root := self logsDirectoryReference / self sessionsDirectoryName.
+		root ensureCreateDirectory.
+
+		sessionId := newSessionId.
+		sessionStartedAt := startedAt.
+		sessionDirectoryReference := root / (self sessionDirectoryNameForId: newSessionId).
+		sessionArchiveFileReference := self archiveFileReferenceForSessionDirectory: sessionDirectoryReference.
+		sessionArchived := false.
+		complishonRerouteCount := 0.
+		oldCompletionLookupCount := 0.
+		logFileReference := nil.
+		evaluationLogFileReference := nil ].
+
+	sessionDirectoryReference ensureCreateDirectory.
+	^ sessionDirectoryReference
 ]
 
 { #category : 'class initialization' }
@@ -996,6 +1059,9 @@ CoPharoCopilotLogger class >> writeSessionMetadataClosedAt: closedAt archivedAt:
 		at: #evaluationLogFile put: self evaluationLogFileName;
 		at: #completionsDirectory put: 'completions';
 		at: #modelName put: CopilotSettings modelName;
+		at: #dataCollectionConsentState put: CopilotSettings researchTelemetryConsentState;
+		at: #researchTelemetryConsentState put: CopilotSettings researchTelemetryConsentState;
+		at: #screenRecordingConsentState put: CopilotSettings screenRecordingConsentState;
 		yourself.
 
 	file := self sessionMetadataFileReference.
