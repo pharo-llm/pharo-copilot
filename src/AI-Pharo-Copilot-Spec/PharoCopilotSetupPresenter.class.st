@@ -67,6 +67,15 @@ PharoCopilotSetupPresenter >> defaultLayout [
 		  yourself
 ]
 
+{ #category : 'layout' }
+PharoCopilotSetupPresenter >> consentLayoutWith: buttons [
+
+	^ SpBoxLayout newTopToBottom
+		spacing: 12;
+		add: buttons expand: false;
+		yourself
+]
+
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> deferUI: aBlock [
 
@@ -503,11 +512,19 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
-	| learnMoreButton noButton yesButton buttonRow |
 	titleLabel label: 'Help improve AI code completion'.
 	descriptionLabel label: 'Can we collect anonymous usage data?'.
 	statusLabel label: ''.
 
+	contentContainer layout: (self consentLayoutWith: self telemetryButtonRow).
+
+	self layout: self defaultLayout
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> telemetryButtonRow [
+
+	| learnMoreButton noButton yesButton |
 	learnMoreButton := self newButton
 		label: 'Learn more';
 		action: [
@@ -529,19 +546,12 @@ PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 			self showScreenRecordingConsentStep ];
 		yourself.
 
-	buttonRow := SpBoxLayout newHorizontal
+	^ SpBoxLayout newHorizontal
 		spacing: 10;
 		add: learnMoreButton;
 		add: noButton;
 		add: yesButton;
-		yourself.
-
-	contentContainer layout: (SpBoxLayout newTopToBottom
-		spacing: 12;
-		add: buttonRow expand: false;
-		yourself).
-
-	self layout: self defaultLayout
+		yourself
 ]
 
 { #category : 'initialization' }
@@ -579,11 +589,19 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showScreenRecordingConsentStep [
 
-	| learnMoreButton noButton yesButton buttonRow |
 	titleLabel label: 'Can we record your screen?'.
 	descriptionLabel label: 'Screen recordings help researchers understand how developers work with AI code completion. A recording may capture code visible on your screen.'.
 	statusLabel label: ''.
 
+	contentContainer layout: (self consentLayoutWith: self screenRecordingButtonRow).
+
+	self layout: self defaultLayout
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> screenRecordingButtonRow [
+
+	| learnMoreButton noButton yesButton |
 	learnMoreButton := self newButton
 		label: 'Learn more';
 		action: [
@@ -605,19 +623,12 @@ PharoCopilotSetupPresenter >> showScreenRecordingConsentStep [
 			self showConsentSummaryStep ];
 		yourself.
 
-	buttonRow := SpBoxLayout newHorizontal
+	^ SpBoxLayout newHorizontal
 		spacing: 10;
 		add: learnMoreButton;
 		add: noButton;
 		add: yesButton;
-		yourself.
-
-	contentContainer layout: (SpBoxLayout newTopToBottom
-		spacing: 12;
-		add: buttonRow expand: false;
-		yourself).
-
-	self layout: self defaultLayout
+		yourself
 ]
 
 { #category : 'initialization' }

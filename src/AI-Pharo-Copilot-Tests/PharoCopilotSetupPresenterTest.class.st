@@ -10,9 +10,10 @@ Class {
 PharoCopilotSetupPresenterTest >> testSetupButtonLayoutsDoNotUseFixedWidths [
 
 	#(
-		showResearchTelemetryConsentChoiceStep
+		consentLayoutWith:
+		telemetryButtonRow
+		screenRecordingButtonRow
 		showResearchTelemetryLearnMoreStepReturningTo:
-		showScreenRecordingConsentStep
 		showScreenRecordingLearnMoreStepReturningTo:
 		showConsentSummaryStep
 	) do: [ :selector |
