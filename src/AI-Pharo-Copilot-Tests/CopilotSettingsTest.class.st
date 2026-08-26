@@ -330,6 +330,45 @@ CopilotSettingsTest >> testUnknownResearchTelemetryConsentStateDisablesLogging [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testScreenRecordingDefaultsToOff [
+
+	CopilotSettings withDefaultSettingsDo: [
+		self deny: CopilotSettings screenRecordingAccepted.
+		self assert: CopilotSettings screenRecordingConsentState equals: #notAsked ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testScreenRecordingConsentAccepted [
+
+	CopilotSettings withDefaultSettingsDo: [
+		CopilotSettings recordScreenRecordingConsentAccepted: true.
+		self assert: CopilotSettings screenRecordingAccepted.
+		self assert: CopilotSettings screenRecordingConsentState equals: #accepted ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testScreenRecordingConsentDeclined [
+
+	CopilotSettings withDefaultSettingsDo: [
+		CopilotSettings recordScreenRecordingConsentAccepted: true.
+		CopilotSettings recordScreenRecordingConsentAccepted: false.
+		self deny: CopilotSettings screenRecordingAccepted.
+		self assert: CopilotSettings screenRecordingConsentState equals: #declined ]
+]
+
+{ #category : 'tests' }
+CopilotSettingsTest >> testUnknownScreenRecordingConsentStateDeclined [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		snapshot := CopilotSettings settingsSnapshot.
+		snapshot at: #screenRecordingConsentState put: #unexpected.
+		CopilotSettings restoreSettingsFromSnapshot: snapshot.
+		self deny: CopilotSettings screenRecordingAccepted.
+		self assert: CopilotSettings screenRecordingConsentState equals: #declined ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testMetadataStringForKeyDefaultWhenMissing [
     | value oldFactory stub |
     oldFactory := CopilotSettings ollamaClientFactory.

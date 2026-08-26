@@ -10,9 +10,12 @@ Class {
 PharoCopilotSetupPresenterTest >> testSetupButtonLayoutsDoNotUseFixedWidths [
 
 	#(
-		showResearchTelemetryConsentChoiceStep
-		showResearchTelemetryLearnMoreStepReturningTo:includeConsentButtons:
-		showWelcomeStepAfterConsentDecision
+		consentLayoutWith:
+		telemetryButtonRow
+		screenRecordingButtonRow
+		showResearchTelemetryLearnMoreStepReturningTo:
+		showScreenRecordingLearnMoreStepReturningTo:
+		showConsentSummaryStep
 	) do: [ :selector |
 		self deny:
 			((PharoCopilotSetupPresenter sourceCodeAt: selector)
@@ -20,16 +23,15 @@ PharoCopilotSetupPresenterTest >> testSetupButtonLayoutsDoNotUseFixedWidths [
 ]
 
 { #category : 'tests' }
-PharoCopilotSetupPresenterTest >> testTelemetryConsentIntroUsesReadOnlyTextForLineBreaks [
+PharoCopilotSetupPresenterTest >> testTelemetryLearnMoreUsesReadOnlyTextForLineBreaks [
 
 	| source |
 	source := PharoCopilotSetupPresenter
-		sourceCodeAt: #showResearchTelemetryConsentChoiceStep.
+		sourceCodeAt: #showResearchTelemetryLearnMoreStepReturningTo:.
 
-	self assert: CopilotSettings researchTelemetryFirstLaunchText lines size > 1.
+	self assert: CopilotSettings researchTelemetryLearnMoreText lines size > 1.
 	self assert: (source includesSubstring: 'newText').
-	self assert: (source includesSubstring: 'beNotEditable').
-	self deny: (source includesSubstring: 'label: CopilotSettings researchTelemetryFirstLaunchText')
+	self assert: (source includesSubstring: 'beNotEditable')
 ]
 
 { #category : 'tests' }
@@ -43,4 +45,17 @@ PharoCopilotSetupPresenterTest >> testShowWelcomeStepDoesNotRecordTelemetryDecis
 		self assert: CopilotSettings researchTelemetryConsentState equals: #notAsked.
 		self deny: CopilotSettings researchTelemetryAccepted.
 		self deny: CopilotSettings researchTelemetryDeclined ]
+]
+
+{ #category : 'tests' }
+PharoCopilotSetupPresenterTest >> testShowWelcomeStepDoesNotRecordScreenRecordingDecisionWhenNotAsked [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| presenter |
+		presenter := PharoCopilotSetupPresenter new.
+		presenter showWelcomeStep.
+
+		self assert: CopilotSettings screenRecordingConsentState equals: #notAsked.
+		self deny: CopilotSettings screenRecordingAccepted.
+		self deny: CopilotSettings screenRecordingDeclined ]
 ]

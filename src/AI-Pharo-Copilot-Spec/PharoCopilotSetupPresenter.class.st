@@ -58,13 +58,22 @@ PharoCopilotSetupPresenter >> beginIndeterminateProgressForIndex: index total: t
 PharoCopilotSetupPresenter >> defaultLayout [
 
 	^ SpBoxLayout newTopToBottom
-		  spacing: 10;
-		  borderWidth: 14;
+		  spacing: 6;
+		  borderWidth: 8;
 		  add: titleLabel expand: false;
 		  add: descriptionLabel expand: false;
 		  add: contentContainer expand: true;
 		  add: statusLabel expand: false;
 		  yourself
+]
+
+{ #category : 'layout' }
+PharoCopilotSetupPresenter >> consentLayoutWith: buttons [
+
+	^ SpBoxLayout newTopToBottom
+		spacing: 12;
+		add: buttons expand: false;
+		yourself
 ]
 
 { #category : 'initialization' }
@@ -101,17 +110,25 @@ PharoCopilotSetupPresenter >> handleOk [
 { #category : 'accessing' }
 PharoCopilotSetupPresenter >> handleResearchTelemetryAccepted [
 
-	CopilotSettings recordResearchTelemetryConsentAccepted: true.
-	statusLabel label: 'Anonymous research telemetry is now enabled. Continuing setup...'.
-	self continueSetupAfterConsentDecision
+	CopilotSettings recordResearchTelemetryConsentAccepted: true
 ]
 
 { #category : 'accessing' }
 PharoCopilotSetupPresenter >> handleResearchTelemetryDeclined [
 
-	CopilotSettings recordResearchTelemetryConsentAccepted: false.
-	statusLabel label: 'Anonymous research telemetry is disabled. Continuing setup...'.
-	self continueSetupAfterConsentDecision
+	CopilotSettings recordResearchTelemetryConsentAccepted: false
+]
+
+{ #category : 'accessing' }
+PharoCopilotSetupPresenter >> handleScreenRecordingAccepted [
+
+	CopilotSettings recordScreenRecordingConsentAccepted: true
+]
+
+{ #category : 'accessing' }
+PharoCopilotSetupPresenter >> handleScreenRecordingDeclined [
+
+	CopilotSettings recordScreenRecordingConsentAccepted: false
 ]
 
 { #category : 'accessing' }
@@ -162,7 +179,7 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 
 	aWindowPresenter
 		title: 'Pharo-Copilot Setup';
-		initialExtent: 560 @ 420;
+		initialExtent: 460 @ 300;
 		centered.
 
 ]
@@ -495,59 +512,52 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
-	| messageText telemetryStateLabel learnMoreButton noButton yesButton buttonRow |
-	titleLabel label: 'Help improve Pharo'.
-	descriptionLabel label: 'Anonymous usage research consent for Pharo Copilot.'.
+	titleLabel label: 'Help improve AI code completion'.
+	descriptionLabel label: 'Can we collect anonymous usage data?'.
 	statusLabel label: ''.
 
-	messageText := self newText.
-	messageText
-		text: CopilotSettings researchTelemetryFirstLaunchText;
-		beNotEditable.
-
-	telemetryStateLabel := self newLabel
-		label: 'Anonymous research telemetry is OFF by default.';
-		yourself.
-
-	learnMoreButton := self newButton
-		label: 'Learn more';
-		action: [
-			self
-				showResearchTelemetryLearnMoreStepReturningTo: [ self showResearchTelemetryConsentChoiceStep ]
-				includeConsentButtons: true ];
-		yourself.
-
-	noButton := self newButton
-		label: 'Do not collect data';
-		action: [ self handleResearchTelemetryDeclined ];
-		yourself.
-
-	yesButton := self newButton
-		label: 'Yes, I agree';
-		action: [ self handleResearchTelemetryAccepted ];
-		yourself.
-
-	buttonRow := SpBoxLayout newHorizontal
-		spacing: 10;
-		add: learnMoreButton;
-		add: noButton;
-		add: yesButton;
-		yourself.
-
-	contentContainer layout: (SpBoxLayout newTopToBottom
-		spacing: 12;
-		add: messageText expand: true;
-		add: telemetryStateLabel expand: false;
-		add: buttonRow expand: false;
-		yourself).
+	contentContainer layout: (self consentLayoutWith: self telemetryButtonRow).
 
 	self layout: self defaultLayout
 ]
 
 { #category : 'initialization' }
-PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: returnBlock includeConsentButtons: includeConsentButtons [
+PharoCopilotSetupPresenter >> telemetryButtonRow [
 
-	| detailsText backButton noButton yesButton continueButton buttonRow |
+	| learnMoreButton noButton yesButton |
+	learnMoreButton := self newButton
+		label: 'Learn more';
+		action: [
+			self
+				showResearchTelemetryLearnMoreStepReturningTo: [ self showResearchTelemetryConsentChoiceStep ] ];
+		yourself.
+
+	noButton := self newButton
+		label: 'No, thanks';
+		action: [
+			self handleResearchTelemetryDeclined.
+			self showScreenRecordingConsentStep ];
+		yourself.
+
+	yesButton := self newButton
+		label: 'Yes, share anonymous data';
+		action: [
+			self handleResearchTelemetryAccepted.
+			self showScreenRecordingConsentStep ];
+		yourself.
+
+	^ SpBoxLayout newHorizontal
+		spacing: 10;
+		add: learnMoreButton;
+		add: noButton;
+		add: yesButton;
+		yourself
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: returnBlock [
+
+	| detailsText backButton buttonRow |
 	titleLabel label: 'Anonymous Usage Research'.
 	descriptionLabel label: 'Details about the Pharo usage research project.'.
 	statusLabel label: 'Use the scroll bar to read the full study information.'.
@@ -562,35 +572,10 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 		action: [ returnBlock value ];
 		yourself.
 
-	includeConsentButtons
-		ifTrue: [
-			noButton := self newButton
-				label: 'Do not collect data';
-				action: [ self handleResearchTelemetryDeclined ];
-				yourself.
-
-			yesButton := self newButton
-				label: 'Yes, I agree';
-				action: [ self handleResearchTelemetryAccepted ];
-				yourself.
-
-			buttonRow := SpBoxLayout newHorizontal
-				spacing: 10;
-				add: backButton;
-				add: noButton;
-				add: yesButton;
-				yourself ]
-		ifFalse: [
-			continueButton := self newButton
-				label: 'Continue setup';
-				action: [ self handleOk ];
-				yourself.
-
-			buttonRow := SpBoxLayout newHorizontal
-				spacing: 10;
-				add: backButton;
-				add: continueButton;
-				yourself ].
+	buttonRow := SpBoxLayout newHorizontal
+		spacing: 10;
+		add: backButton;
+		yourself.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 10;
@@ -602,33 +587,100 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 ]
 
 { #category : 'initialization' }
-PharoCopilotSetupPresenter >> showWelcomeStep [
+PharoCopilotSetupPresenter >> showScreenRecordingConsentStep [
 
-	titleLabel label: 'Welcome to Pharo-Copilot'.
-	descriptionLabel label: 'Local AI code completion for Pharo.'.
+	titleLabel label: 'Can we record your screen?'.
+	descriptionLabel label: 'Optional screen recordings help researchers understand how developers use AI code completion.'.
 	statusLabel label: ''.
 
-	CopilotSettings researchTelemetryNotAsked
-		ifTrue: [ ^ self showResearchTelemetryConsentChoiceStep ].
-	^ self showWelcomeStepAfterConsentDecision
+	contentContainer layout: (self consentLayoutWith: self screenRecordingButtonRow).
+
+	self layout: self defaultLayout
 ]
 
 { #category : 'initialization' }
-PharoCopilotSetupPresenter >> showWelcomeStepAfterConsentDecision [
+PharoCopilotSetupPresenter >> screenRecordingButtonRow [
 
-	| messageLabel learnMoreButton continueButton buttonRow |
-	messageLabel := self newLabel
-		label: (CopilotSettings researchTelemetryAccepted
-			ifTrue: [ CopilotSettings researchTelemetryEnabledStatusText ]
-			ifFalse: [ CopilotSettings researchTelemetryDisabledStatusText ]);
-		yourself.
-
+	| learnMoreButton noButton yesButton |
 	learnMoreButton := self newButton
 		label: 'Learn more';
 		action: [
 			self
-				showResearchTelemetryLearnMoreStepReturningTo: [ self showWelcomeStepAfterConsentDecision ]
-				includeConsentButtons: false ];
+				showScreenRecordingLearnMoreStepReturningTo: [ self showScreenRecordingConsentStep ] ];
+		yourself.
+
+	noButton := self newButton
+		label: 'No, thanks';
+		action: [
+			self handleScreenRecordingDeclined.
+			self showConsentSummaryStep ];
+		yourself.
+
+	yesButton := self newButton
+		label: 'Yes, allow recording';
+		action: [
+			self handleScreenRecordingAccepted.
+			self showConsentSummaryStep ];
+		yourself.
+
+	^ SpBoxLayout newHorizontal
+		spacing: 10;
+		add: learnMoreButton;
+		add: noButton;
+		add: yesButton;
+		yourself
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> showScreenRecordingLearnMoreStepReturningTo: returnBlock [
+
+	| detailsText backButton buttonRow |
+	titleLabel label: 'Screen Recording'.
+	descriptionLabel label: 'Details about screen recording for research.'.
+	statusLabel label: 'Use the scroll bar to read the full information.'.
+
+	detailsText := self newText.
+	detailsText
+		text: CopilotSettings screenRecordingLearnMoreText;
+		beNotEditable.
+
+	backButton := self newButton
+		label: 'Back';
+		action: [ returnBlock value ];
+		yourself.
+
+	buttonRow := SpBoxLayout newHorizontal
+		spacing: 10;
+		add: backButton;
+		yourself.
+
+	contentContainer layout: (SpBoxLayout newTopToBottom
+		spacing: 10;
+		add: detailsText expand: true;
+		add: buttonRow expand: false;
+		yourself).
+
+	self layout: self defaultLayout
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> showConsentSummaryStep [
+
+	| telemetryStatus recordingStatus continueButton |
+	titleLabel label: 'You''re ready to go'.
+	descriptionLabel label: 'Pharo Copilot setup is ready to continue.'.
+	statusLabel label: ''.
+
+	telemetryStatus := self newLabel
+		label: 'Anonymous usage data: ', (CopilotSettings researchTelemetryAccepted
+			ifTrue: [ 'Enabled' ]
+			ifFalse: [ 'Disabled' ]);
+		yourself.
+
+	recordingStatus := self newLabel
+		label: 'Screen recording: ', (CopilotSettings screenRecordingAccepted
+			ifTrue: [ 'Enabled' ]
+			ifFalse: [ 'Disabled' ]);
 		yourself.
 
 	continueButton := self newButton
@@ -636,16 +688,35 @@ PharoCopilotSetupPresenter >> showWelcomeStepAfterConsentDecision [
 		action: [ self handleOk ];
 		yourself.
 
-	buttonRow := SpBoxLayout newHorizontal
+	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 10;
-		add: learnMoreButton;
-		add: continueButton;
+		add: telemetryStatus expand: false;
+		add: recordingStatus expand: false;
+		add: continueButton expand: false;
+		yourself).
+
+	self layout: self defaultLayout
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> showWelcomeStep [
+
+	| continueButton |
+	titleLabel label: 'Welcome to Pharo-Copilot'.
+	descriptionLabel label: 'Local AI-powered code completion for Pharo.'.
+	statusLabel label: ''.
+
+	continueButton := self newButton
+		label: 'Continue';
+		action: [
+			CopilotSettings researchTelemetryNotAsked
+				ifTrue: [ self showResearchTelemetryConsentChoiceStep ]
+				ifFalse: [ self showConsentSummaryStep ] ];
 		yourself.
 
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 10;
-		add: messageLabel expand: true;
-		add: buttonRow expand: false;
+		add: continueButton expand: false;
 		yourself).
 
 	self layout: self defaultLayout
