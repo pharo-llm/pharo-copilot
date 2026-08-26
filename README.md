@@ -22,16 +22,14 @@ Metacello new
   load.
 ```
 
+## Consent to Collect Data
 On first launch, Pharo-Copilot asks whether you want to participate in anonymous
 Pharo usage research. Telemetry is off by default; choosing
 "No, don't collect data" or closing the dialog keeps telemetry disabled and
 still lets setup continue.
 
-If you explicitly agree, Pharo-Copilot can send anonymous IDE interaction events
-to the Inria-hosted research receiver configured by
-`CoPCSessionArchiveUploader`. The default public receiver is
-`http://193.49.213.134:9092/api/sessions`.
-
+**If you explicitly agree, Pharo-Copilot can send anonymous IDE interaction events
+to the Inria-hosted research.**
 
 ## Troubleshooting Ollama model downloads
 
