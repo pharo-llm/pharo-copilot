@@ -1934,7 +1934,9 @@ CopilotSettings class >> screenRecordingEnabledStatusText [
 
 	^ 'Screen recording is enabled.', String cr,
 	'Screen recordings may help researchers understand how developers work with AI code completion.',
-	'A recording may capture source code or other information visible in your Pharo environment.'
+	'A recording may capture source code or other information visible in your Pharo environment.',
+	String cr,
+	'Raw videos are stored on Inria-hosted research infrastructure and are not made public.'
 ]
 
 { #category : 'screen recording' }
@@ -1944,6 +1946,9 @@ CopilotSettings class >> screenRecordingFirstLaunchText [
 	String cr,
 	'- Screen recording is optional.', String cr,
 	'- A recording may capture source code or other information visible in your Pharo environment.', String cr,
+	'- If you agree, videos are stored on Inria-hosted research infrastructure.', String cr,
+	'- Access to raw videos is limited to authorized members of the Pharo Consortium and Inria EVREF team.', String cr,
+	'- Raw videos will not be made public.', String cr,
 	'- Screen recording is not enabled unless you explicitly agree.', String cr,
 	'- You can disable screen recording later in Settings.'
 ]
@@ -1962,8 +1967,11 @@ CopilotSettings class >> screenRecordingLearnMoreText [
 	'What is not intended to be collected?', String cr,
 	'Your name, email address, account credentials, passwords, or authentication tokens.', String cr,
 	String cr,
-	'Where does the data go?', String cr,
-	'If you agree, screen recordings are transmitted to infrastructure hosted by Inria. The recordings may be used for research analysis and may become part of a research dataset.', String cr,
+	'Where are recordings stored and who can see them?', String cr,
+	'If you agree, screen recordings are transmitted to and stored on Inria-hosted research infrastructure. Access to the raw video files is limited to authorized members of the Pharo Consortium and Inria EVREF team who need them for research analysis, data handling, or infrastructure operations.', String cr,
+	String cr,
+	'Will recordings be made public?', String cr,
+	'No. The raw screen recording videos will not be made public and will not be included in a public dataset. Research publications or shared datasets may use aggregated findings or anonymized derived data, but not the video files themselves.', String cr,
 	String cr,
 	'Can you withdraw?', String cr,
 	'Yes. You can disable screen recording at any time from Pharo Copilot settings. Disabling screen recording stops future recordings. Previously recorded sessions may already have been processed.', String cr,

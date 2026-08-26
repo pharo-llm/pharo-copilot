@@ -590,7 +590,7 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 PharoCopilotSetupPresenter >> showScreenRecordingConsentStep [
 
 	titleLabel label: 'Can we record your screen?'.
-	descriptionLabel label: 'Screen recordings help researchers understand better the AI code completion'.
+	descriptionLabel label: 'Optional screen recordings help researchers understand how developers use AI code completion.'.
 	statusLabel label: ''.
 
 	contentContainer layout: (self consentLayoutWith: self screenRecordingButtonRow).
