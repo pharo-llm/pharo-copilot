@@ -719,6 +719,7 @@ CopilotSettings class >> initializeDefaults [
 	installModelUserConsent := false.
 	imageCloseSurveyEnabled := true.
 	researchTelemetryConsentState := #notAsked.
+	screenRecordingConsentState := #notAsked.
 	ollamaClientFactory := [ CoPCOllamaClient new ].
 	modelMetadata := nil
 ]
@@ -2133,6 +2134,7 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	installModelUserConsent := self valueAt: #installModelUserConsent from: aDictionary default: installModelUserConsent.
 	imageCloseSurveyEnabled := self valueAt: #imageCloseSurveyEnabled from: aDictionary default: imageCloseSurveyEnabled.
 	researchTelemetryConsentState := self valueAt: #researchTelemetryConsentState from: aDictionary default: researchTelemetryConsentState.
+	screenRecordingConsentState := self valueAt: #screenRecordingConsentState from: aDictionary default: screenRecordingConsentState.
 
 	templatesPath := aDictionary at: #templatesDirectory ifAbsent: [ nil ].
 	templatesPath = nil ifFalse: [
@@ -2193,6 +2195,7 @@ backgroundColor := aDictionary at: #backgroundColor ifAbsent: [ aDictionary at: 
 installModelUserConsent := aDictionary at: #installModelUserConsent ifAbsent: [ aDictionary at: #InstallModelUserConsent ifAbsent: [ nil ] ].
 imageCloseSurveyEnabled := aDictionary at: #imageCloseSurveyEnabled ifAbsent: [ aDictionary at: #ImageCloseSurveyEnabled ifAbsent: [ nil ] ].
 researchTelemetryConsentState := aDictionary at: #researchTelemetryConsentState ifAbsent: [ aDictionary at: #ResearchTelemetryConsentState ifAbsent: [ nil ] ].
+screenRecordingConsentState := aDictionary at: #screenRecordingConsentState ifAbsent: [ aDictionary at: #ScreenRecordingConsentState ifAbsent: [ nil ] ].
 self useDefaultCompletionModelWhenSavedModelIsMissingOrNull
 ]
 
@@ -2294,6 +2297,7 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		at: #installModelUserConsent put: installModelUserConsent;
 		at: #imageCloseSurveyEnabled put: imageCloseSurveyEnabled;
 		at: #researchTelemetryConsentState put: self researchTelemetryConsentState;
+		at: #screenRecordingConsentState put: self screenRecordingConsentState;
 		            yourself.
 	templatesDirectory ifNotNil: [
 			templatesPath := [ templatesDirectory pathString ]
@@ -2623,6 +2627,7 @@ CopilotSettings class >> settingsSnapshot [
 		at: #installModelUserConsent put: installModelUserConsent;
 		at: #imageCloseSurveyEnabled put: imageCloseSurveyEnabled;
 		at: #researchTelemetryConsentState put: self researchTelemetryConsentState;
+		at: #screenRecordingConsentState put: self screenRecordingConsentState;
 		  yourself
 ]
 
