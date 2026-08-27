@@ -10,12 +10,6 @@ Class {
 }
 
 { #category : 'initialization' }
-CopilotCacheTestBuilder >> classDefinition: classDef instanceMethods: inst classMethods: cls [
-
-	^ classDef , '|' , inst , '|' , cls
-]
-
-{ #category : 'initialization' }
 CopilotCacheTestBuilder >> classStampFor: aBehavior [
 
 	"Constant stamp so caching should hit."

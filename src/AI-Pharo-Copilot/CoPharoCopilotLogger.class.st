@@ -300,8 +300,18 @@ CoPharoCopilotLogger class >> initialCompletionPayloadForContextInfo: contextInf
 		at: #timestamp put: (contextInfo at: #timestamp ifAbsent: [ DateAndTime now asString ]);
 		at: #userId put: self userId;
 		at: #loggerSessionId put: self currentSessionId;
+		at: #completionPath put: (contextInfo at: #completionPath ifAbsent: [ #unknown ]);
+		at: #completionRoute put: (contextInfo at: #completionRoute ifAbsent: [ #unknown ]);
+		at: #processingDurationMs put: (contextInfo at: #processingDurationMs ifAbsent: [ nil ]);
+		at: #ollamaDurationMs put: (contextInfo at: #ollamaDurationMs ifAbsent: [ nil ]);
 		at: #cache put: cacheStats;
 		at: #completionEnvironment put: (contextInfo at: #completionEnvironment ifAbsent: [ Dictionary new ]);
+		at: #telemetry put: (Dictionary new
+			at: #completionPath put: (contextInfo at: #completionPath ifAbsent: [ #unknown ]);
+			at: #completionRoute put: (contextInfo at: #completionRoute ifAbsent: [ #unknown ]);
+			at: #processingDurationMs put: (contextInfo at: #processingDurationMs ifAbsent: [ nil ]);
+			at: #ollamaDurationMs put: (contextInfo at: #ollamaDurationMs ifAbsent: [ nil ]);
+			yourself);
 		at: #context put: (Dictionary new
 			at: #fullSource put: (contextInfo at: #fullSource ifAbsent: [ '' ]);
 			at: #prefix put: prefixString;

@@ -84,9 +84,19 @@ CoPCImageCloseSurveyTest >> writeTelemetryFixtureIn: sessionDir evaluationLog: t
 		at: #timestamp put: '2026-08-11T10:00:00+02:00';
 		at: #userId put: 'user-test';
 		at: #loggerSessionId put: sessionDir basename;
+		at: #completionPath put: #ollama;
+		at: #completionRoute put: #selector;
+		at: #processingDurationMs put: 620;
+		at: #ollamaDurationMs put: 580;
 		at: #cache put: (Dictionary new
 			at: #hits put: 2;
 			at: #misses put: 3;
+			yourself);
+		at: #telemetry put: (Dictionary new
+			at: #completionPath put: #ollama;
+			at: #completionRoute put: #selector;
+			at: #processingDurationMs put: 620;
+			at: #ollamaDurationMs put: 580;
 			yourself);
 		at: #context put: (Dictionary new
 			at: #fullSource put: 'example', String cr, String tab, 'self as';
@@ -231,7 +241,7 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesJsonToJsonDirectoryAn
 
 	CopilotSettings withDefaultSettingsDo: [
 		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
-			| spy summaryFile payload session evaluation summary environmentCounts rerouteEnvironmentCounts oldLookupEnvironmentCounts environmentConfidence |
+			| spy summaryFile payload session evaluation summary environmentCounts rerouteEnvironmentCounts oldLookupEnvironmentCounts environmentConfidence pathCounts latencyByPath ollamaLatency |
 			self writeTelemetryFixtureIn: sessionDir evaluationLog: tempEvalFile.
 			spy := CoPCSessionArchiveUploaderSpy new.
 			CoPharoCopilotLogger rawSessionArchiveUploader: spy.
@@ -277,13 +287,24 @@ CoPCImageCloseSurveyTest >> testArchiveCurrentSessionWritesJsonToJsonDirectoryAn
 			self assert: (summary at: #prompt_tokens) equals: 10.
 			self assert: (summary at: #completion_tokens) equals: 2.
 			self assert: (summary at: #cache_hit_rate) equals: 40.0.
+			self assert: (summary at: #completion_latency_p50_ms) equals: 620.
+			self assert: (summary at: #completion_latency_p90_ms) equals: 620.
+			self assert: (summary at: #completion_under_200ms_rate) equals: 0.0.
+			self assert: (summary at: #completion_under_500ms_rate) equals: 0.0.
+			self assert: (summary at: #completion_under_1000ms_rate) equals: 100.0.
 			self assert: (summary at: #survey_feedback_comment) equals: 'Fixture feedback from image close'.
 			environmentCounts := summary at: #completion_environment_counts.
 			rerouteEnvironmentCounts := summary at: #complishon_reroute_environment_counts.
 			oldLookupEnvironmentCounts := summary at: #old_completion_lookup_environment_counts.
 			environmentConfidence := summary at: #completion_environment_avg_confidence.
+			pathCounts := summary at: #completion_path_counts.
+			latencyByPath := summary at: #completion_latency_by_path.
+			ollamaLatency := latencyByPath at: 'ollama'.
 			self assert: (environmentCounts at: 'systemBrowser') equals: 1.
 			self assert: (environmentConfidence at: 'systemBrowser') equals: 86.07.
+			self assert: (pathCounts at: 'ollama') equals: 1.
+			self assert: (ollamaLatency at: #p50_ms) equals: 620.
+			self assert: (ollamaLatency at: #under_1000ms_rate) equals: 100.0.
 			self assert: (summary at: #inspector_logprob_tokens) equals: 0.
 			self assert: (summary at: #inspector_avg_confidence) isNil.
 			self assert: ((summary at: #old_completion_environment_counts) at: 'playground') equals: 2.

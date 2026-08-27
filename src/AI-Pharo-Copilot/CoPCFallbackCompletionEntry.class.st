@@ -2,7 +2,8 @@ Class {
 	#name : 'CoPCFallbackCompletionEntry',
 	#superclass : 'Object',
 	#instVars : [
-		'entry'
+		'entry',
+		'sessionId'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -21,7 +22,15 @@ CoPCFallbackCompletionEntry >> activateOn: aCompletionContext [
 	"Delegate insertion to the original Complishon entry so token replacement,
 	keyword spacing, usage tracking, etc. keep their normal behavior."
 
-	^ entry activateOn: aCompletionContext
+	| applied |
+	applied := entry activateOn: aCompletionContext.
+	(applied = true and: [ self sessionId notNil ]) ifTrue: [
+		[ CoPharoCopilotLogger
+			updateCompletionSession: self sessionId
+			withAccepted: self contents ]
+			on: Error
+			do: [ :ex | ] ].
+	^ applied
 ]
 
 { #category : 'actions' }
@@ -72,4 +81,16 @@ CoPCFallbackCompletionEntry >> entry: anEntry [
 CoPCFallbackCompletionEntry >> label [
 
 	^ self contents
+]
+
+{ #category : 'actions' }
+CoPCFallbackCompletionEntry >> sessionId [
+
+	^ sessionId
+]
+
+{ #category : 'actions' }
+CoPCFallbackCompletionEntry >> sessionId: aString [
+
+	sessionId := aString
 ]

@@ -4,7 +4,8 @@ Class {
 	#instVars : [
 		'recentCodeChangesForPrompt',
 		'semanticCompletionContextForPrompt',
-		'interactionHistoryForPrompt'
+		'interactionHistoryForPrompt',
+		'relatedCodeContextForPrompt'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -23,9 +24,33 @@ CopilotRecentCodeChangesTestBuilder >> appendInteractionHistoryToContext: contex
 ]
 
 { #category : 'accessing' }
+CopilotRecentCodeChangesTestBuilder >> interactionHistoryForPrompt [
+
+	interactionHistoryForPrompt ifNil: [
+		^ super interactionHistoryForPrompt ].
+
+	^ interactionHistoryForPrompt
+]
+
+{ #category : 'accessing' }
 CopilotRecentCodeChangesTestBuilder >> interactionHistoryForPrompt: aString [
 
 	interactionHistoryForPrompt := aString
+]
+
+{ #category : 'accessing' }
+CopilotRecentCodeChangesTestBuilder >> relatedCodeContextFor: aContext prefix: prefixString [
+
+	relatedCodeContextForPrompt ifNil: [
+		^ super relatedCodeContextFor: aContext prefix: prefixString ].
+
+	^ relatedCodeContextForPrompt
+]
+
+{ #category : 'accessing' }
+CopilotRecentCodeChangesTestBuilder >> relatedCodeContextForPrompt: aString [
+
+	relatedCodeContextForPrompt := aString
 ]
 
 { #category : 'accessing' }

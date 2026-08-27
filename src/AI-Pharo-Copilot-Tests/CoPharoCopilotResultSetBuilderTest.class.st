@@ -7,26 +7,42 @@ Class {
 }
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testClassContextComposesSemanticRecentChangesBeforeInteractionHistory [
+CoPharoCopilotResultSetBuilderTest >> testClassContextComposesSemanticBeforeRepositoryAndRecentChangesLast [
 
-	| builder context result semanticIndex changesIndex historyIndex |
-	builder := CopilotRecentCodeChangesTestBuilder new.
-	builder
-		semanticCompletionContextForPrompt: 'semantic data';
-		recentCodeChangesForPrompt: 'EpMethodAddition: CoFoo>>bar [AI-Pharo-Copilot]';
-		interactionHistoryForPrompt: 'Browser navigation history (Calypso):'.
-	context := CoCopilotContextMock new.
+	| builder context source result headerIndex semanticIndex repoIndex relatedIndex historyIndex changesIndex previousHistoryEnabled |
+	previousHistoryEnabled := CoPCContextNavigationHistory enabled.
+	[
+		CoPCContextNavigationHistory enabled: true.
+		builder := CopilotRecentCodeChangesTestBuilder new.
+		builder
+			semanticCompletionContextForPrompt: 'semantic data';
+			relatedCodeContextForPrompt: '<|file_sep|>Related code: OrderedCollection>>add:', String lf, 'add: newObject';
+			recentCodeChangesForPrompt: 'EpMethodAddition: CoFoo>>bar [AI-Pharo-Copilot]';
+			interactionHistoryForPrompt: 'Browser navigation history (Calypso):'.
+		source := 'self as'.
+		context := CoCopilotContextMock new
+			behavior: Object;
+			source: source;
+			position: source size;
+			yourself.
 
-	result := builder classContextFor: context prefix: ''.
+		result := builder classContextFor: context prefix: source.
 
-	semanticIndex := result findString: '<|file_sep|>Semantic completion context' startingAt: 1.
-	changesIndex := result findString: '<|file_sep|>Recent code changes' startingAt: 1.
-	historyIndex := result findString: '<|file_sep|>IDE interaction history' startingAt: 1.
+		headerIndex := result findString: '<|repo_name|>Object' startingAt: 1.
+		semanticIndex := result findString: '<|file_sep|>Semantic completion context' startingAt: 1.
+		repoIndex := result findString: '<|file_sep|>Object' startingAt: 1.
+		relatedIndex := result findString: '<|file_sep|>Related code:' startingAt: 1.
+		changesIndex := result findString: '<|file_sep|>Recent code changes' startingAt: 1.
+		historyIndex := result findString: '<|file_sep|>IDE interaction history' startingAt: 1.
 
-	self assert: semanticIndex > 0.
-	self assert: changesIndex > semanticIndex.
-	self assert: historyIndex > changesIndex.
-	self deny: (result includesSubstring: '<|file_sep|>.pharo-completion-contract')
+		self assert: headerIndex equals: 1.
+		self assert: semanticIndex > 0.
+		self assert: repoIndex > semanticIndex.
+		self assert: relatedIndex > repoIndex.
+		self assert: historyIndex > relatedIndex.
+		self assert: changesIndex > historyIndex.
+		self deny: (result includesSubstring: '<|file_sep|>.pharo-completion-contract') ]
+		ensure: [ CoPCContextNavigationHistory enabled: previousHistoryEnabled ]
 ]
 
 { #category : 'tests' }
@@ -160,9 +176,9 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotBuildClassContex
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompletionWithLocalFallbackWithoutClassContext [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionIgnoresOldFastCacheAndSchedulesModelLane [
 
-	| b ctx entries |
+	| b ctx |
 	b := CopilotTestableBuilder new.
 	ctx := CoCopilotContextMock new
 		source: 'temporaryName';
@@ -172,40 +188,57 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompleti
 	b completionCache
 		at: 'temporaryName'
 		suffix: ''
-		context: (b fastCacheContextFor: ctx prefix: 'temporaryName')
+		context: 'fast|no-behavior'
 		put: { 'CompletedValue' }.
 
 	b buildCompletion.
 
-	entries := b openedEntries.
-	self assert: entries size equals: 1.
-	self assert: entries first contents equals: 'CompletedValue'.
-	self assert: b scheduledDelay isNil.
+	self assert: b openedEntries isNil.
+	self assert: b scheduledPrefix equals: 'temporaryName'.
+	self deny: b scheduledDelay isNil.
 	self assert: b classContextCallCount equals: 0.
 	self assert: b fallbackCallCount equals: 0.
 	self assert: b semanticAstCallCount equals: 0
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testFastCacheIgnoresNearMatchForImmediateCompletion [
+CoPharoCopilotResultSetBuilderTest >> testFullContextCacheStillSupportsNearMatch [
 
-	| b ctx contextInfo cached |
+	| b contextInfo cached |
 	b := CopilotTestableBuilder new.
-	ctx := CoCopilotContextMock new
-		source: 'self si';
-		position: 'self si' size;
-		yourself.
 	b completionCache
 		at: 'self s'
 		suffix: ''
-		context: (b fastCacheContextFor: ctx prefix: 'self s')
+		context: 'complete model context'
 		put: { 'inspect' }.
 
 	contextInfo := Dictionary new.
 	cached := b
-		fastCachedSuggestionsFor: ctx
-		prefix: 'self si'
+		cachedSuggestionsForPrefix: 'self si'
 		suffix: ''
+		classContext: 'complete model context'
+		contextInfo: contextInfo.
+
+	self assert: cached equals: { 'nspect' }.
+	self assert: (contextInfo at: #cacheHit)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testFullContextCacheDoesNotHitDifferentContext [
+
+	| b contextInfo cached |
+	b := CopilotTestableBuilder new.
+	b completionCache
+		at: 'self s'
+		suffix: ''
+		context: 'old context'
+		put: { 'inspect' }.
+
+	contextInfo := Dictionary new.
+	cached := b
+		cachedSuggestionsForPrefix: 'self si'
+		suffix: ''
+		classContext: 'new context'
 		contextInfo: contextInfo.
 
 	self assert: cached isNil.
@@ -213,7 +246,7 @@ CoPharoCopilotResultSetBuilderTest >> testFastCacheIgnoresNearMatchForImmediateC
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCacheBeforeSemanticRerank [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOldFastCacheDoesNotBypassSemanticFastPath [
 
 	| b ctx entries |
 	b := CopilotTestableBuilder new.
@@ -226,15 +259,37 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCacheBeforeSem
 	b completionCache
 		at: 'self as'
 		suffix: ''
-		context: (b fastCacheContextFor: ctx prefix: 'self as')
+		context: 'fast|stale'
 		put: { 'DefinitelyNotASelector' }.
 
 	b buildCompletion.
 
 	entries := b openedEntries.
-	self assert: b fallbackCallCount equals: 0.
-	self assert: entries first contents equals: 'DefinitelyNotASelector'.
+	self assert: b fallbackCallCount equals: 1.
+	self assert: entries first contents equals: 'fallbackCompletion'.
 	self assert: b scheduledDelay isNil
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testFullContextCacheIgnoresNearMatchForImmediateCompletion [
+
+	| b contextInfo cached |
+	b := CopilotTestableBuilder new.
+	b completionCache
+		at: 'self s'
+		suffix: ''
+		context: 'complete model context'
+		put: { 'storeString' }.
+
+	contextInfo := Dictionary new.
+	cached := b
+		cachedSuggestionsForPrefix: 'self si'
+		suffix: ''
+		classContext: 'complete model context'
+		contextInfo: contextInfo.
+
+	self assert: cached isNil.
+	self deny: (contextInfo at: #cacheHit)
 ]
 
 { #category : 'tests' }
@@ -404,7 +459,7 @@ CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromWithTextInput [
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesAppendFallbackWhenAISuggestionExists [
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesDoNotAppendFallbackWhenModelSuggestionExists [
 
 	| builder context entries |
 	builder := CopilotTestableBuilder new.
@@ -415,14 +470,13 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesAppendFallbackWhenAIS
 		inContext: context
 		contextInfo: Dictionary new.
 
-	self assert: entries size equals: 2.
+	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'aiCompletion'.
-	self assert: entries second contents equals: 'fallbackCompletion'.
-	self assert: builder fallbackCallCount equals: 1
+	self assert: builder fallbackCallCount equals: 0
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSuppressInvalidSemanticSelectorBehindFallback [
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesKeepModelSelectorLaneExplicit [
 
 	| builder context contextInfo entries |
 	builder := CopilotTestableBuilder new.
@@ -440,10 +494,10 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSuppressInvalidSemant
 		inContext: context
 		contextInfo: contextInfo.
 
-	self assert: builder fallbackCallCount equals: 1.
+	self assert: builder fallbackCallCount equals: 0.
 	self assert: entries size equals: 1.
-	self assert: entries first contents equals: 'fallbackCompletion'.
-	self assert: ((contextInfo at: #semanticGate) at: #status) equals: #low
+	self assert: entries first contents equals: 'DefinitelyNotASelector'.
+	self deny: (contextInfo includesKey: #semanticGate)
 ]
 
 { #category : 'tests' }
@@ -467,12 +521,11 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesDoNotFetchFallbackWhe
 
 	self assert: builder fallbackCallCount equals: 0.
 	self assert: entries size equals: 1.
-	self assert: entries first contents equals: 'String'.
-	self assert: ((contextInfo at: #semanticGate) at: #status) equals: #high
+	self assert: entries first contents equals: 'String'
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISuggestionExists [
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesReturnEmptyWhenNoModelSuggestionExists [
 
 	| builder context entries |
 	builder := CopilotTestableBuilder new.
@@ -483,65 +536,8 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISu
 		inContext: context
 		contextInfo: Dictionary new.
 
-	self assert: entries size equals: 1.
-	self assert: builder fallbackCallCount equals: 1
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testFuseModelTailMatchingSemanticSelectorKeepsModelFirst [
-
-	| builder context contextInfo result gate |
-	builder := CoPharoCopilotResultSetBuilder new.
-	context := CoCopilotContextMock new
-		behavior: Object;
-		source: 'self as';
-		position: 'self as' size;
-		yourself.
-	contextInfo := Dictionary new
-		at: #prefix put: 'self as';
-		yourself.
-
-	result := builder
-		fuseModelSuggestions: { 'String' }
-		semanticEntries: {
-			CoCopilotEntry contents: 'asString'.
-			CoCopilotEntry contents: 'asArray' }
-		context: context
-		contextInfo: contextInfo.
-
-	self assert: result equals: { 'String'. 'asArray' }.
-	self assert: (contextInfo at: #semanticFusionApplied).
-	gate := contextInfo at: #semanticGate.
-	self assert: (gate at: #status) equals: #high.
-	self assert: (gate at: #heuristicTop) equals: 'asString'
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testFuseInvalidModelSuggestionFallsBehindSemanticCandidates [
-
-	| builder context contextInfo result gate |
-	builder := CoPharoCopilotResultSetBuilder new.
-	context := CoCopilotContextMock new
-		behavior: Object;
-		source: 'self as';
-		position: 'self as' size;
-		yourself.
-	contextInfo := Dictionary new
-		at: #prefix put: 'self as';
-		yourself.
-
-	result := builder
-		fuseModelSuggestions: { 'DefinitelyNotASelector' }
-		semanticEntries: {
-			CoCopilotEntry contents: 'asString'.
-			CoCopilotEntry contents: 'asArray' }
-		context: context
-		contextInfo: contextInfo.
-
-	self assert: result equals: { 'asString'. 'asArray'. 'DefinitelyNotASelector' }.
-	self assert: (contextInfo at: #semanticFusionApplied).
-	gate := contextInfo at: #semanticGate.
-	self assert: (gate at: #status) equals: #semanticFirst
+	self assert: entries isEmpty.
+	self assert: builder fallbackCallCount equals: 0
 ]
 
 { #category : 'tests' }
@@ -723,6 +719,34 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionPayloadIncludesEnvironment [
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionPayloadIncludesPathAndDurations [
+
+	| contextInfo payload telemetry |
+	contextInfo := Dictionary new
+		at: #timestamp put: '2026-08-13T12:00:00+02:00';
+		at: #completionPath put: #ollama;
+		at: #completionRoute put: #selector;
+		at: #processingDurationMs put: 640;
+		at: #ollamaDurationMs put: 590;
+		yourself.
+
+	payload := CoPharoCopilotLogger
+		initialCompletionPayloadForContextInfo: contextInfo
+		prefix: 'self as'
+		suffix: ''
+		classContext: ''
+		cacheStats: Dictionary new.
+	telemetry := payload at: #telemetry.
+
+	self assert: (payload at: #completionPath) equals: #ollama.
+	self assert: (payload at: #completionRoute) equals: #selector.
+	self assert: (payload at: #processingDurationMs) equals: 640.
+	self assert: (payload at: #ollamaDurationMs) equals: 590.
+	self assert: (telemetry at: #completionPath) equals: #ollama.
+	self assert: (telemetry at: #processingDurationMs) equals: 640
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testSemanticContextUsesEngineDoItRequestorBinding [
 
 	| builder context requestor engine source semantic |
@@ -847,7 +871,7 @@ CoPharoCopilotResultSetBuilderTest >> testInitializeOnContextSetsCompletionConte
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testInteractionHistoryIsFinalContextSection [
+CoPharoCopilotResultSetBuilderTest >> testInteractionHistoryAppendsContextSection [
 
 	| builder base history result historyIndex sampleIndex |
 	builder := CoPharoCopilotResultSetBuilder new.
@@ -990,24 +1014,30 @@ CoPharoCopilotResultSetBuilderTest >> testRecentCodeChangesFormatsMethodAndClass
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testSemanticContextAppendsAfterStaticContext [
+CoPharoCopilotResultSetBuilderTest >> testSemanticContextComposesAfterRepoHeader [
 
-	| builder context base source result |
-	builder := CoPharoCopilotResultSetBuilder new.
+	| builder context source result headerIndex semanticIndex repoIndex |
+	builder := CopilotRecentCodeChangesTestBuilder new.
+	builder
+		semanticCompletionContextForPrompt: 'Completion class: Object';
+		recentCodeChangesForPrompt: '';
+		interactionHistoryForPrompt: ''.
 	source := 'semanticContextExample', String lf, String tab, 'self as'.
 	context := CoCopilotContextMock new
 		behavior: Object;
 		source: source;
 		position: source size;
 		yourself.
-	base := '<|repo_name|>Object', String lf.
 
-	result := builder
-		appendSemanticCompletionContextFor: context
-		prefix: source
-		toContext: base.
+	result := builder classContextFor: context prefix: source.
 
-	self assert: (result beginsWith: base).
+	headerIndex := result findString: '<|repo_name|>Object' startingAt: 1.
+	semanticIndex := result findString: '<|file_sep|>Semantic completion context' startingAt: 1.
+	repoIndex := result findString: '<|file_sep|>Object' startingAt: 1.
+
+	self assert: headerIndex equals: 1.
+	self assert: semanticIndex > headerIndex.
+	self assert: repoIndex > semanticIndex.
 	self assert: (result includesSubstring: '<|file_sep|>Semantic completion context').
 	self assert: (result includesSubstring: 'Completion class: Object')
 ]
@@ -1085,6 +1115,21 @@ CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorHintsAreLimitedAndFilt
 
 	self assert: hints size <= 5.
 	self assert: (hints allSatisfy: [ :each | each beginsWith: 'as' ])
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testRelatedCodeContextRendersBoundedRealMethods [
+
+	| related |
+	related := CoPCRelatedCodeContext new
+		gatherFor: nil
+		receiverTypes: { OrderedCollection }
+		selectorPrefix: 'add'.
+
+	self assert: related size <= 5000.
+	self assert: (related includesSubstring: '<|file_sep|>Related code:').
+	self assert: (related includesSubstring: '>>add').
+	self assert: (related includesSubstring: 'add')
 ]
 
 { #category : 'tests' }

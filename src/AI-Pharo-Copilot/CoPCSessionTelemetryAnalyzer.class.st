@@ -81,7 +81,7 @@ CoPCSessionTelemetryAnalyzer class >> payloadForSessionDirectory: sessionDirecto
 { #category : 'building' }
 CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions evaluationSummary: evaluation [
 
-	| requests acceptedRequests rejectedRequests ignoredRequests suggestionCandidates suggestionChars acceptedChars suggestionLines acceptedLines logprobTokens logprobSum logprobCompletions avgLogprob tokenAttempts hits misses evaluated acceptedSuggestions rejectedSuggestions ignoredSuggestions outcomeAccepted outcomeRejected outcomeIgnored outcomeDecided complishonReroutes completionAttempts selfReceiverLogprobTokens selfReceiverAvgLogprob environmentAvgLogprob environmentAvgConfidence inspectorLogprobTokens inspectorAvgLogprob rerouteEnvironmentCounts oldCompletionLookups oldLookupEnvironmentCounts |
+	| requests acceptedRequests rejectedRequests ignoredRequests suggestionCandidates suggestionChars acceptedChars suggestionLines acceptedLines logprobTokens logprobSum logprobCompletions avgLogprob tokenAttempts hits misses evaluated acceptedSuggestions rejectedSuggestions ignoredSuggestions outcomeAccepted outcomeRejected outcomeIgnored outcomeDecided complishonReroutes completionAttempts recordedComplishonRequests unrecordedComplishonReroutes selfReceiverLogprobTokens selfReceiverAvgLogprob environmentAvgLogprob environmentAvgConfidence inspectorLogprobTokens inspectorAvgLogprob rerouteEnvironmentCounts oldCompletionLookups oldLookupEnvironmentCounts latencyStats latencyByPathStats |
 	requests := completions at: #completionRequests.
 	acceptedRequests := completions at: #acceptedRequests.
 	rejectedRequests := completions at: #nullCompletionRequests.
@@ -122,7 +122,11 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 	outcomeIgnored := (requests - outcomeAccepted - outcomeRejected) max: 0.
 	outcomeDecided := outcomeAccepted + outcomeRejected.
 	complishonReroutes := evaluation at: #complishonReroutes.
-	completionAttempts := requests + complishonReroutes.
+	recordedComplishonRequests := (completions at: #completionPathCounts)
+		at: 'complishon'
+		ifAbsent: [ 0 ].
+	unrecordedComplishonReroutes := (complishonReroutes - recordedComplishonRequests) max: 0.
+	completionAttempts := requests + unrecordedComplishonReroutes.
 	rerouteEnvironmentCounts := self
 		resolvedRerouteEnvironmentCounts: (evaluation at: #complishonRerouteEnvironmentCounts)
 		completionEnvironmentCounts: (completions at: #completionEnvironmentCounts).
@@ -132,6 +136,8 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		completionEnvironmentCounts: (completions at: #completionEnvironmentCounts).
 	oldLookupEnvironmentCounts isEmpty ifTrue: [
 		oldLookupEnvironmentCounts := rerouteEnvironmentCounts copy ].
+	latencyStats := self latencyStatsFor: (completions at: #completionLatenciesMs).
+	latencyByPathStats := self latencyStatsByPathFor: (completions at: #completionLatenciesByPath).
 
 	^ Dictionary new
 		at: #completion_requests put: requests;
@@ -211,6 +217,14 @@ CoPCSessionTelemetryAnalyzer class >> summaryFromCompletionSummary: completions 
 		at: #avg_completion_tokens_per_attempt put: (self average: (completions at: #completionTokens) count: tokenAttempts);
 		at: #token_count_coverage_rate put: (self pct: (completions at: #tokenCountCompletions) total: requests);
 		at: #cache_hit_rate put: (self pct: hits total: hits + misses);
+		at: #completion_latency_p50_ms put: (latencyStats at: #p50_ms);
+		at: #completion_latency_p90_ms put: (latencyStats at: #p90_ms);
+		at: #completion_latency_p95_ms put: (latencyStats at: #p95_ms);
+		at: #completion_under_200ms_rate put: (latencyStats at: #under_200ms_rate);
+		at: #completion_under_500ms_rate put: (latencyStats at: #under_500ms_rate);
+		at: #completion_under_1000ms_rate put: (latencyStats at: #under_1000ms_rate);
+		at: #completion_path_counts put: (completions at: #completionPathCounts) copy;
+		at: #completion_latency_by_path put: latencyByPathStats;
 		at: #avg_local_context_chars put: (self averageCollection: (completions at: #localContextChars));
 		at: #avg_global_context_chars put: (self averageCollection: (completions at: #globalContextChars));
 		at: #completion_environment_counts put: (completions at: #completionEnvironmentCounts) copy;
@@ -268,6 +282,9 @@ CoPCSessionTelemetryAnalyzer class >> completionSummaryForSessionDirectory: sess
 		at: #completionTokens put: 0;
 		at: #cacheHits put: 0;
 		at: #cacheMisses put: 0;
+		at: #completionPathCounts put: Dictionary new;
+		at: #completionLatenciesMs put: OrderedCollection new;
+		at: #completionLatenciesByPath put: Dictionary new;
 		at: #completionEnvironmentCounts put: Dictionary new;
 		at: #localContextChars put: OrderedCollection new;
 		at: #globalContextChars put: OrderedCollection new;
@@ -313,7 +330,7 @@ CoPCSessionTelemetryAnalyzer class >> completionEnvironmentKindFrom: environment
 { #category : 'completion parsing' }
 CoPCSessionTelemetryAnalyzer class >> addCompletionFile: file toSummary: summary [
 
-	| data fim context cache environment environmentKind prefix suffix classContext fullSource suggestions acceptedText rejectedItems nullCompletion logprobStats tokenStats hits misses isSelfReceiver |
+	| data fim context cache environment environmentKind prefix suffix classContext fullSource suggestions acceptedText rejectedItems nullCompletion logprobStats tokenStats hits misses isSelfReceiver completionPath processingDuration |
 	data := self readJsonFile: file.
 	data isEmpty ifTrue: [ ^ self ].
 	fim := self dictionaryAt: #fim from: data.
@@ -328,6 +345,8 @@ CoPCSessionTelemetryAnalyzer class >> addCompletionFile: file toSummary: summary
 	suggestions := self completionSuggestionTextsFrom: data.
 	acceptedText := self stringAt: #accepted from: data.
 	rejectedItems := self arrayAt: #rejected from: data.
+	completionPath := self completionPathFrom: data.
+	processingDuration := self completionDurationFrom: data key: #processingDurationMs.
 
 	isSelfReceiver := self isSelfReceiverCompletionPrefix: prefix.
 	isSelfReceiver ifTrue: [
@@ -335,6 +354,13 @@ CoPCSessionTelemetryAnalyzer class >> addCompletionFile: file toSummary: summary
 	self
 		increment: environmentKind
 		in: (summary at: #completionEnvironmentCounts).
+	self increment: completionPath in: (summary at: #completionPathCounts).
+	processingDuration ifNotNil: [
+		(summary at: #completionLatenciesMs) add: processingDuration.
+		self
+			addLatency: processingDuration
+			path: completionPath
+			toSummary: summary ].
 	self addSuggestions: suggestions prefix: prefix suffix: suffix toSummary: summary.
 	acceptedText isEmpty ifFalse: [
 		self increment: #acceptedRequests in: summary.
@@ -384,6 +410,17 @@ CoPCSessionTelemetryAnalyzer class >> addCompletionFile: file toSummary: summary
 ]
 
 { #category : 'completion parsing' }
+CoPCSessionTelemetryAnalyzer class >> addLatency: duration path: pathString toSummary: summary [
+
+	| byPath samples |
+	byPath := summary at: #completionLatenciesByPath.
+	samples := byPath
+		at: pathString
+		ifAbsentPut: [ OrderedCollection new ].
+	samples add: duration
+]
+
+{ #category : 'completion parsing' }
 CoPCSessionTelemetryAnalyzer class >> addSuggestions: suggestions prefix: prefix suffix: suffix toSummary: summary [
 
 	| typeCounts |
@@ -397,6 +434,34 @@ CoPCSessionTelemetryAnalyzer class >> addSuggestions: suggestions prefix: prefix
 		lineCount > 1 ifTrue: [ self increment: #multilineSuggestionCandidates in: summary ].
 		type := self completionTypeForPrefix: prefix suggestion: suggestion suffix: suffix.
 		self increment: type in: typeCounts ]
+]
+
+{ #category : 'completion parsing' }
+CoPCSessionTelemetryAnalyzer class >> completionDurationFrom: data key: key [
+
+	| value telemetry number |
+	value := self valueAt: key from: data default: nil.
+	value ifNil: [
+		telemetry := self dictionaryAt: #telemetry from: data.
+		value := self valueAt: key from: telemetry default: nil ].
+
+	number := self numberOrNil: value.
+	number ifNil: [ ^ nil ].
+	^ number max: 0
+]
+
+{ #category : 'completion parsing' }
+CoPCSessionTelemetryAnalyzer class >> completionPathFrom: data [
+
+	| path telemetry |
+	path := self stringAt: #completionPath from: data.
+	path isEmpty ifFalse: [ ^ path ].
+
+	telemetry := self dictionaryAt: #telemetry from: data.
+	path := self stringAt: #completionPath from: telemetry.
+	path isEmpty ifFalse: [ ^ path ].
+
+	^ 'unknown'
 ]
 
 { #category : 'completion parsing' }
@@ -914,6 +979,53 @@ CoPCSessionTelemetryAnalyzer class >> averageCollection: values [
 ]
 
 { #category : 'private' }
+CoPCSessionTelemetryAnalyzer class >> latencyStatsByPathFor: latencyDictionary [
+
+	| result |
+	result := Dictionary new.
+	latencyDictionary keysAndValuesDo: [ :path :values |
+		result at: path put: (self latencyStatsFor: values) ].
+	^ result
+]
+
+{ #category : 'private' }
+CoPCSessionTelemetryAnalyzer class >> latencyStatsFor: values [
+
+	^ Dictionary new
+		at: #count put: values size;
+		at: #p50_ms put: (self percentile: 50 of: values);
+		at: #p90_ms put: (self percentile: 90 of: values);
+		at: #p95_ms put: (self percentile: 95 of: values);
+		at: #under_200ms_rate put: (self under: 200 rateFor: values);
+		at: #under_500ms_rate put: (self under: 500 rateFor: values);
+		at: #under_1000ms_rate put: (self under: 1000 rateFor: values);
+		yourself
+]
+
+{ #category : 'private' }
+CoPCSessionTelemetryAnalyzer class >> percentile: percentileNumber of: values [
+
+	| sorted position lowerIndex upperIndex lowerValue upperValue fraction |
+	values isEmpty ifTrue: [ ^ nil ].
+	sorted := values asSortedCollection asArray.
+	sorted size = 1 ifTrue: [
+		^ self round: sorted first digits: 2 ].
+
+	position := 1 + ((percentileNumber / 100.0) * (sorted size - 1)).
+	lowerIndex := position floor.
+	upperIndex := position ceiling.
+	lowerValue := sorted at: lowerIndex.
+	upperValue := sorted at: upperIndex.
+	lowerIndex = upperIndex ifTrue: [
+		^ self round: lowerValue digits: 2 ].
+
+	fraction := position - lowerIndex.
+	^ self
+		round: lowerValue + ((upperValue - lowerValue) * fraction)
+		digits: 2
+]
+
+{ #category : 'private' }
 CoPCSessionTelemetryAnalyzer class >> sumCollection: values [
 
 	^ values inject: 0.0 into: [ :total :each | total + each ]
@@ -992,4 +1104,13 @@ CoPCSessionTelemetryAnalyzer class >> round: value digits: digits [
 	value ifNil: [ ^ nil ].
 	scale := 10 raisedTo: digits.
 	^ (value * scale) rounded / scale asFloat
+]
+
+{ #category : 'private' }
+CoPCSessionTelemetryAnalyzer class >> under: threshold rateFor: values [
+
+	| count |
+	values isEmpty ifTrue: [ ^ 0.0 ].
+	count := values count: [ :each | each <= threshold ].
+	^ self pct: count total: values size
 ]

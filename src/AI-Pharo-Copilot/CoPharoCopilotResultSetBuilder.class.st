@@ -42,69 +42,9 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext [
-
-	^ self
-		appendFallbackCompletionEntriesTo: entryCollection
-		inContext: aContext
-		contextInfo: nil
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext contextInfo: contextInfo [
-
-	| combined fallback reranker topStatus prefix receiverName |
-	combined := OrderedCollection new.
-	entryCollection ifNotNil: [ combined addAll: entryCollection ].
-
-	contextInfo ifNotNil: [
-		(contextInfo at: #skipSemanticCompletionEnrichment ifAbsent: [ false ])
-			ifTrue: [ ^ combined asArray ].
-		(contextInfo at: #semanticFusionApplied ifAbsent: [ false ])
-			ifTrue: [ ^ combined asArray ] ].
-
-	combined isEmpty ifTrue: [
-		fallback := self
-			fallbackCompletionEntriesFor: aContext
-			excluding: combined.
-		^ fallback asArray ].
-
-	prefix := self completionPrefixFor: aContext contextInfo: contextInfo.
-	receiverName := self textualReceiverBeforeCompletionIn: prefix.
-	receiverName isEmpty ifTrue: [
-		fallback := self
-			fallbackCompletionEntriesFor: aContext
-			excluding: combined.
-		combined addAll: fallback.
-		^ combined asArray ].
-
-	reranker := CoPCSemanticReranker
-		builder: self
-		context: aContext
-		contextInfo: contextInfo.
-	(reranker shouldUseSemanticGate) ifFalse: [ ^ combined asArray ].
-
-	topStatus := reranker classificationForEntry: combined first.
-	topStatus = #high ifTrue: [
-		^ reranker
-			rerankModelEntries: combined
-			fallbackEntries: #() ].
-
-	fallback := self
-		fallbackCompletionEntriesFor: aContext
-		excluding: combined.
-
-	^ reranker
-		rerankModelEntries: combined
-		fallbackEntries: fallback
-
-]
-
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> appendInteractionHistory: historyString toContext: contextString [
-	"Append IDE/user interaction history as the final repo-style context section.
-	The FIM tail is added later by the Ollama client, so this section lands immediately
-	before <|fim_prefix|> without appearing after <|fim_middle|>."
+	"Append IDE/user interaction history as a repo-style context section.
+	Full prompt composition places recent code changes after history."
 
 	| history base lf |
 	history := historyString ifNil: [ '' ] ifNotNil: [ historyString asString ].
@@ -210,6 +150,18 @@ CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aC
 	self openCompletionMenuFor: aContext entries: entries position: position
 ]
 
+{ #category : 'telemetry' }
+CoPharoCopilotResultSetBuilder >> assignSessionIdFrom: contextInfo toEntries: entries [
+
+	| sessionId |
+	contextInfo ifNil: [ ^ self ].
+	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
+	sessionId ifNil: [ ^ self ].
+	entries do: [ :entry |
+		(entry respondsTo: #sessionId:) ifTrue: [
+			entry sessionId: sessionId ] ]
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> behaviorFor: aContext [
 
@@ -243,7 +195,7 @@ CoPharoCopilotResultSetBuilder >> engineFor: aContext [
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: selector prefix: prefixString [
-	"Answer the STATIC repo-level context for the class being edited — never the FIM
+	"Answer the static repository body for the class being edited — never the FIM
 	tail with the user prefix. The result is cached per class, and a baked-in prefix
 	would poison every later completion; the FIM tail is composed per request by the
 	Ollama client. methodClass comes from the editor and is authoritative: resolving
@@ -263,7 +215,7 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 		limit: CopilotSettings maxClassMethods.
 
 	^ self
-		repoContextForClass: methodClass
+		repoBodyForClass: methodClass
 		definition: classDefinition
 		instanceMethods: instanceSide
 		classMethods: classSide
@@ -272,7 +224,7 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
 
-	| context snapshot prefix suffix contextInfo delay cached |
+	| context snapshot prefix suffix contextInfo delay loggingOn startMillis entries position result |
 	context := completionContext.
 
 	(self shouldRequestCompletionForContext: context) ifFalse: [ ^ self emptyResultSet ].
@@ -280,37 +232,60 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	snapshot := self contextSnapshotFor: context.
 	prefix := snapshot at: #prefix.
 	suffix := snapshot at: #suffix.
+	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
+	loggingOn := self isLoggingEnabled.
+	contextInfo
+		at: #completionRoute
+		put: (self completionRouter
+			classifyContext: context
+			prefix: prefix
+			builder: self).
+	loggingOn ifTrue: [
+		contextInfo
+			at: #sessionId put: CoPharoCopilotLogger completionSessionId;
+			at: #timestamp put: DateAndTime now asString;
+			at: #rejected put: OrderedCollection new].
+
 	(self
 		shouldUseFallbackCompletionForContext: context
 		prefix: prefix)
 			ifTrue: [
+				startMillis := Time millisecondClockValue.
 				self
 					logCompletionReroutedToComplishonFor: context
 					prefix: prefix
 					suffix: suffix.
-				^ (self fallbackResultSetFor: context)
-					ifNil: [ self emptyResultSet ] ].
-	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
-
-	self isLoggingEnabled ifTrue: [
-	contextInfo
-		at: #sessionId put: CoPharoCopilotLogger completionSessionId;
-		at: #timestamp put: DateAndTime now asString;
-		at: #rejected put: OrderedCollection new].
-
-	cached := self
-		fastCachedSuggestionsFor: context
-		prefix: prefix
-		suffix: suffix
-		contextInfo: contextInfo.
-	cached ifNotNil: [
-		(self openCachedSuggestions: cached for: context prefix: prefix suffix: suffix contextInfo: contextInfo)
-			ifTrue: [ ^ self emptyResultSet ] ].
+				result := self fallbackResultSetFor: context.
+				loggingOn ifTrue: [
+					self
+						recordCompletionPath: #complishon
+						startedAt: startMillis
+						ollamaDurationMs: 0
+						contextInfo: contextInfo.
+					self
+						writeCompletionSessionForContextInfo: contextInfo
+						prefix: prefix
+						suffix: suffix
+						classContext: '' ].
+				^ result ifNil: [ self emptyResultSet ] ].
 
 	(self shouldOpenSemanticSelectorFastPathFor: context prefix: prefix) ifTrue: [
-		| entries position |
+		startMillis := Time millisecondClockValue.
 		entries := self semanticSelectorFastPathEntriesFor: context contextInfo: contextInfo.
 		entries isEmpty ifFalse: [
+			self assignSessionIdFrom: contextInfo toEntries: entries.
+			self recordRawSuggestionsFromEntries: entries contextInfo: contextInfo.
+			loggingOn ifTrue: [
+				self
+					recordCompletionPath: #semantic
+					startedAt: startMillis
+					ollamaDurationMs: 0
+					contextInfo: contextInfo.
+				self
+					writeCompletionSessionForContextInfo: contextInfo
+					prefix: prefix
+					suffix: suffix
+					classContext: '' ].
 			position := self menuPositionForContextOrDefault: context.
 			self openCompletionMenuFor: context entries: entries position: position.
 			^ self emptyResultSet ] ].
@@ -357,18 +332,6 @@ CoPharoCopilotResultSetBuilder >> cacheSuggestions: suggestions prefix: prefixSt
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> cacheFastSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString [
-
-	suggestions isEmpty ifTrue: [ ^ self ].
-
-	self completionCache
-		at: prefixString
-		suffix: suffixString
-		context: (self fastCacheContextFor: aContext prefix: prefixString)
-		put: suggestions asArray
-]
-
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> cachedClassContextFor: methodClass [
 
 	| cached stamp |
@@ -395,7 +358,8 @@ CoPharoCopilotResultSetBuilder >> cachedSuggestionsForPrefix: prefixString suffi
 		cachedContent := self nearMatchCachedSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext
 	].
 
-	contextInfo at: #cacheHit put: cachedContent notNil.
+	contextInfo ifNotNil: [
+		contextInfo at: #cacheHit put: cachedContent notNil ].
 	^ cachedContent
 ]
 
@@ -412,31 +376,38 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext [
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString [
 
-	| behavior selector methodClass cachedContext builtContext classContext |
+	| behavior selector methodClass cachedContext builtContext repoHeader repositoryBody semanticContext relatedCode history recentChanges |
 	behavior := self behaviorFor: aContext.
-	classContext := ''.
+	repoHeader := ''.
+	repositoryBody := ''.
 
 	behavior ifNotNil: [
 		selector := self selectorFromPrefix: prefixString.
 		methodClass := self methodClassForBehavior: behavior selector: selector.
+		repoHeader := self repoHeaderForClass: methodClass.
 
 		cachedContext := self cachedClassContextFor: methodClass.
-		classContext := cachedContext
+		repositoryBody := cachedContext
 			ifNotNil: [ cachedContext ]
 			ifNil: [
 				builtContext := self buildClassContextFor: methodClass selector: selector prefix: prefixString.
 				self cacheClassContext: builtContext for: methodClass.
 				builtContext ] ].
 
-	classContext := self
-		appendSemanticCompletionContextFor: aContext
-		prefix: prefixString
-		toContext: classContext.
+	semanticContext := self semanticCompletionContextFor: aContext prefix: prefixString.
+	relatedCode := self relatedCodeContextFor: aContext prefix: prefixString.
+	history := CoPCContextNavigationHistory enabled
+		ifTrue: [ self interactionHistoryForPrompt ]
+		ifFalse: [ '' ].
+	recentChanges := self recentCodeChangesForPrompt.
 
-	classContext := self appendRecentCodeChangesToContext: classContext.
-
-	"Comment the next line to disconnect IDE interaction history from the model context."
-	^ self appendInteractionHistoryToContext: classContext
+	^ self promptContextComposer
+		composeHeader: repoHeader
+		semanticContext: semanticContext
+		repositoryBody: repositoryBody
+		relatedCode: relatedCode
+		interactionHistory: history
+		recentCodeChanges: recentChanges
 ]
 
 { #category : 'initialization' }
@@ -445,40 +416,6 @@ CoPharoCopilotResultSetBuilder >> classContextTick [
 	classContextClock ifNil: [ classContextClock := 0 ].
 	classContextClock := classContextClock + 1.
 	^ classContextClock
-]
-
-{ #category : 'initialization' }
-CoPharoCopilotResultSetBuilder >> classDefinition: classDefinitionString instanceMethods: instanceMethodsString classMethods: classMethodsString [
-	"Format the class context (definition and methods) into a single string suitable for passing to the model."
-
-	| hasDefinition hasInstance hasClass |
-	hasDefinition := classDefinitionString isEmpty not.
-	hasInstance := instanceMethodsString isEmpty not.
-	hasClass := classMethodsString isEmpty not.
-
-	(hasDefinition or: [ hasInstance or: hasClass ]) ifFalse: [ ^ '' ].
-
-	^ String streamContents: [ :stream |
-		hasDefinition ifTrue: [
-			stream
-				nextPutAll: 'Class Definition:';
-				cr;
-				nextPutAll: classDefinitionString;
-				cr;
-				cr ].
-
-		hasInstance ifTrue: [
-			stream
-				nextPutAll: 'Instance Side Methods:';
-				cr;
-				nextPutAll: instanceMethodsString;
-				cr ].
-
-		hasClass ifTrue: [
-			stream
-				nextPutAll: 'Class Side Methods:';
-				cr;
-				nextPutAll: classMethodsString ] ]
 ]
 
 { #category : 'new' }
@@ -633,10 +570,7 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 		entry label: (self menuLabelForSuggestion: each contextInfo: fakeContextInfo).
 		entry ].
 
-	^ self
-		appendFallbackCompletionEntriesTo: copilotEntries
-		inContext: aContext
-		contextInfo: fakeContextInfo
+	^ copilotEntries
 ]
 
 { #category : 'new' }
@@ -648,7 +582,9 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 		inContext: aContext
 		contextInfo: contextInfo.
 
-	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
+	sessionId := contextInfo
+		ifNil: [ nil ]
+		ifNotNil: [ contextInfo at: #sessionId ifAbsent: [ nil ] ].
 
 	copilotEntries := cleaned collect: [ :each |
 		| entry |
@@ -663,10 +599,7 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 
 		entry ].
 
-	^ self
-		appendFallbackCompletionEntriesTo: copilotEntries
-		inContext: aContext
-		contextInfo: contextInfo
+	^ copilotEntries
 ]
 
 { #category : 'new' }
@@ -1061,6 +994,16 @@ CoPharoCopilotResultSetBuilder >> emptyResultSet [
 	^ CoResultSet fetcher: (CoCollectionFetcher onCollection: #())
 ]
 
+{ #category : 'telemetry' }
+CoPharoCopilotResultSetBuilder >> elapsedMillisecondsSince: startMilliseconds [
+
+	| doneMilliseconds |
+	doneMilliseconds := Time millisecondClockValue.
+	^ doneMilliseconds >= startMilliseconds
+		ifTrue: [ doneMilliseconds - startMilliseconds ]
+		ifFalse: [ 0 ]
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> ensureClassContextCacheCapacity [ 
 	"Counter-based LRU: cache oldest key between evictions; scan only when unknown."
@@ -1227,36 +1170,6 @@ CoPharoCopilotResultSetBuilder >> semanticEntriesFor: aContext [
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> fastCacheContextFor: aContext prefix: prefixString [
-
-	| behavior stamp |
-	behavior := self behaviorFor: aContext.
-	behavior ifNil: [ ^ 'fast|no-behavior' ].
-
-	stamp := self classStampFor: behavior.
-	^ String streamContents: [ :stream |
-		stream
-			nextPutAll: 'fast|';
-			nextPutAll: behavior identityHash asString;
-			nextPut: $|;
-			nextPutAll: stamp first asString;
-			nextPut: $|;
-			nextPutAll: stamp second asString ]
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> fastCachedSuggestionsFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
-
-	| cachedContent |
-	cachedContent := self
-		exactCachedSuggestionsForPrefix: prefixString
-		suffix: suffixString
-		classContext: (self fastCacheContextFor: aContext prefix: prefixString).
-	contextInfo at: #cacheHit put: cachedContent notNil.
-	^ cachedContent
-]
-
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo [
 
 	^ self
@@ -1309,146 +1222,9 @@ CoPharoCopilotResultSetBuilder >> filteredNearMatchSuggestions: cachedSuggestion
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> finalizeCollectedSuggestions: collected contextInfo: contextInfo [
 
-	contextInfo at: #rawSuggestions put: collected asArray.
+	contextInfo ifNotNil: [
+		contextInfo at: #rawSuggestions put: collected asArray ].
 	^ collected asArray
-]
-
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> fuseModelSuggestions: modelSuggestions semanticEntries: semanticEntries context: aContext contextInfo: contextInfo [
-
-	| modelArray semanticArray semanticStrings semanticSelectors reranker exactModels modelOnly result seenStrings seenSelectors |
-	modelArray := modelSuggestions ifNil: [ #() ] ifNotNil: [ modelSuggestions asArray ].
-	semanticArray := semanticEntries ifNil: [ #() ] ifNotNil: [ semanticEntries asArray ].
-	semanticStrings := self semanticStringsFrom: semanticArray.
-	semanticStrings isEmpty ifTrue: [ ^ modelArray ].
-
-	reranker := CoPCSemanticReranker
-		builder: self
-		context: aContext
-		contextInfo: contextInfo.
-	semanticSelectors := Set new.
-	semanticArray do: [ :entry |
-		| selector |
-		selector := self semanticSelectorForEntry: entry reranker: reranker.
-		selector isEmpty ifFalse: [ semanticSelectors add: selector ] ].
-
-	exactModels := OrderedCollection new.
-	modelOnly := OrderedCollection new.
-	modelArray do: [ :model |
-		| selector |
-		selector := reranker selectorForCompletionString: model.
-		(selector isEmpty not and: [ semanticSelectors includes: selector ])
-			ifTrue: [ exactModels add: model -> selector ]
-			ifFalse: [ modelOnly add: model -> selector ] ].
-
-	result := OrderedCollection new.
-	seenStrings := Set new.
-	seenSelectors := Set new.
-	exactModels do: [ :assoc |
-		self
-			addFusedSuggestion: assoc key
-			selector: assoc value
-			to: result
-			seenStrings: seenStrings
-			seenSelectors: seenSelectors ].
-	semanticArray do: [ :entry |
-		| contents selector |
-		contents := self entryContentsFor: entry.
-		selector := self semanticSelectorForEntry: entry reranker: reranker.
-		self
-			addFusedSuggestion: contents
-			selector: selector
-			to: result
-			seenStrings: seenStrings
-			seenSelectors: seenSelectors ].
-	modelOnly do: [ :assoc |
-		self
-			addFusedSuggestion: assoc key
-			selector: assoc value
-			to: result
-			seenStrings: seenStrings
-			seenSelectors: seenSelectors ].
-
-	self
-		recordSemanticFusionForModelSuggestions: modelArray
-		semanticStrings: semanticStrings
-		exactModels: exactModels
-		result: result
-		contextInfo: contextInfo.
-	^ result asArray
-]
-
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> addFusedSuggestion: suggestionString selector: selectorString to: result seenStrings: seenStrings seenSelectors: seenSelectors [
-
-	| suggestion selector |
-	suggestion := suggestionString ifNil: [ '' ] ifNotNil: [ suggestionString asString ].
-	suggestion isEmpty ifTrue: [ ^ self ].
-	selector := selectorString ifNil: [ '' ] ifNotNil: [ selectorString asString ].
-	(selector isEmpty not and: [ seenSelectors includes: selector ]) ifTrue: [ ^ self ].
-	(seenStrings includes: suggestion) ifTrue: [ ^ self ].
-
-	result add: suggestion.
-	seenStrings add: suggestion.
-	selector isEmpty ifFalse: [ seenSelectors add: selector ]
-]
-
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> semanticStringsFrom: entries [
-
-	| strings |
-	strings := OrderedCollection new.
-	(entries ifNil: [ #() ]) do: [ :each |
-		| contents |
-		contents := self entryContentsFor: each.
-		contents isEmpty ifFalse: [ strings add: contents ] ].
-	^ strings asArray
-]
-
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> semanticSelectorForEntry: anEntry reranker: reranker [
-
-	| candidate |
-	candidate := reranker selectorCandidateFrom: (self entryContentsFor: anEntry).
-	^ candidate at: #selector ifAbsent: [ '' ]
-]
-
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> recordSemanticFusionForModelSuggestions: modelSuggestions semanticStrings: semanticStrings exactModels: exactModels result: result contextInfo: contextInfo [
-
-	| payload status |
-	contextInfo ifNil: [ ^ self ].
-	contextInfo at: #semanticFusionApplied put: true.
-	status := exactModels isEmpty
-		ifTrue: [
-			modelSuggestions isEmpty
-				ifTrue: [ #semanticOnly ]
-				ifFalse: [ #semanticFirst ] ]
-		ifFalse: [ #high ].
-	payload := Dictionary new
-		at: #status put: status;
-		at: #modelTop put: (modelSuggestions isEmpty
-			ifTrue: [ '' ]
-			ifFalse: [ modelSuggestions first asString ]);
-		at: #heuristicTop put: (semanticStrings isEmpty
-			ifTrue: [ '' ]
-			ifFalse: [ semanticStrings first ]);
-		at: #modelStatuses put: ((modelSuggestions collect: [ :each |
-			Dictionary new
-				at: #contents put: each asString;
-				at: #status put: ((exactModels anySatisfy: [ :assoc | assoc key = each ])
-					ifTrue: [ #high ]
-					ifFalse: [ #modelOnly ]);
-				yourself ]) asArray);
-		at: #shownOrder put: ((result collect: [ :each |
-			((modelSuggestions includes: each) and: [ semanticStrings includes: each ])
-				ifTrue: [ #both ]
-				ifFalse: [
-					(modelSuggestions includes: each)
-						ifTrue: [ #copilot ]
-						ifFalse: [ #semantic ] ] ]) asArray);
-		yourself.
-	contextInfo at: #semanticGate put: payload
 ]
 
 { #category : 'new' }
@@ -1947,6 +1723,7 @@ CoPharoCopilotResultSetBuilder >> logCompletionReroutedToComplishonFor: aContext
 	CoPharoCopilotLogger logCompletionReroutedToComplishon: (
 		Dictionary new
 			at: #reason put: #standaloneScriptingContext;
+			at: #completionPath put: #complishon;
 			at: #completionRoute put: route;
 			at: #oldEngine put: #Complishon;
 			at: #oldEngineBuilder put: #CoASTHeuristicsResultSetBuilder;
@@ -1989,6 +1766,11 @@ CoPharoCopilotResultSetBuilder >> logRejectedSuggestionFrom: rawResponse attempt
 
 	| rejected sessionId |
 	self isLoggingEnabled ifFalse: [ ^ self ].
+	contextInfo ifNil: [
+		^ self
+			logRejectedSuggestionFrom: rawResponse
+			attempt: attempt
+			prefix: prefixString ].
 	CoPharoCopilotLogger logBackEndEvent: 'Suggestion rejected after normalization' details: (Dictionary new
 			 at: #attempt put: attempt;
 			 at: #rawResponse put: rawResponse asString;
@@ -2341,6 +2123,29 @@ CoPharoCopilotResultSetBuilder >> recordGenerationAttempt: attempt metadata: met
 	attempts add: attemptPayload
 ]
 
+{ #category : 'telemetry' }
+CoPharoCopilotResultSetBuilder >> recordCompletionPath: pathSymbol startedAt: startMilliseconds ollamaDurationMs: ollamaMilliseconds contextInfo: contextInfo [
+
+	contextInfo ifNil: [ ^ self ].
+	contextInfo
+		at: #completionPath put: pathSymbol;
+		at: #processingDurationMs put: (self elapsedMillisecondsSince: startMilliseconds);
+		at: #ollamaDurationMs put: (ollamaMilliseconds ifNil: [ 0 ])
+]
+
+{ #category : 'telemetry' }
+CoPharoCopilotResultSetBuilder >> recordRawSuggestionsFromEntries: entries contextInfo: contextInfo [
+
+	| suggestions |
+	contextInfo ifNil: [ ^ self ].
+	suggestions := OrderedCollection new.
+	(entries ifNil: [ #() ]) do: [ :entry |
+		| contents |
+		contents := self entryContentsFor: entry.
+		contents isEmpty ifFalse: [ suggestions add: contents ] ].
+	contextInfo at: #rawSuggestions put: suggestions asArray
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entries position: position [ 
 
@@ -2367,29 +2172,6 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> openCachedSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
-
-	| entries position info previousSkip |
-	info := contextInfo ifNil: [ Dictionary new ].
-	previousSkip := info
-		at: #skipSemanticCompletionEnrichment
-		ifAbsent: [ false ].
-	info at: #skipSemanticCompletionEnrichment put: true.
-	entries := self
-		completionEntriesFrom: suggestions
-		inContext: aContext
-		contextInfo: info.
-	previousSkip
-		ifTrue: [ info at: #skipSemanticCompletionEnrichment put: true ]
-		ifFalse: [ info removeKey: #skipSemanticCompletionEnrichment ifAbsent: [ ] ].
-	entries isEmpty ifTrue: [ ^ false ].
-
-	position := self menuPositionForContextOrDefault: aContext.
-	self openCompletionMenuFor: aContext entries: entries position: position.
-	^ true
-]
-
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> positionFromSnapshot: snapshot [
 
 	^ snapshot at: #position ifAbsent: [ 0 ]
@@ -2398,9 +2180,15 @@ CoPharoCopilotResultSetBuilder >> positionFromSnapshot: snapshot [
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> prependNavigationHistoryTo: contextString [
 	"Compatibility wrapper for old callers. The behavior is append, not prepend:
-	history belongs at the end of the context block just before the FIM tail."
+	history belongs after repository context; recent code changes are the final section."
 
 	^ self appendInteractionHistoryToContext: contextString
+]
+
+{ #category : 'context' }
+CoPharoCopilotResultSetBuilder >> promptContextComposer [
+
+	^ CoPCPromptContextComposer new
 ]
 
 { #category : 'context' }
@@ -2411,20 +2199,27 @@ CoPharoCopilotResultSetBuilder >> recentCodeChangesForPrompt [
 		gather
 ]
 
+{ #category : 'context' }
+CoPharoCopilotResultSetBuilder >> relatedCodeContextFor: aContext prefix: prefixString [
+
+	| receiverInfo receiverTypes selectorPrefix |
+	receiverInfo := self semanticReceiverInfoFor: aContext prefix: prefixString.
+	receiverTypes := receiverInfo at: #types ifAbsent: [ #() ].
+	selectorPrefix := self completionTokenFor: aContext prefix: prefixString.
+
+	^ CoPCRelatedCodeContext new
+		gatherFor: aContext
+		receiverTypes: receiverTypes
+		selectorPrefix: selectorPrefix
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
 	[
-		| classContext suggestions semanticEntries semanticDone combined sessionId sessionPayload loggingOn |
+		| classContext suggestions loggingOn startMillis fetchStartMillis ollamaDuration path |
 
-		semanticEntries := #().
-		semanticDone := Semaphore new.
-		[
-			[
-				semanticEntries := self semanticEntriesFor: aContext
-			] ensure: [
-				semanticDone signal ]
-		] forkAt: Processor userBackgroundPriority.
+		startMillis := Time millisecondClockValue.
 
 		contextInfo ifNotNil: [
 			contextInfo
@@ -2436,38 +2231,40 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 
 		classContext := self classContextFor: aContext prefix: prefixString.
 		loggingOn := self isLoggingEnabled.
-		loggingOn ifTrue: [
+		(loggingOn and: [ contextInfo notNil ]) ifTrue: [
 			self updateContextInfo: contextInfo withClassContext: classContext.
 			contextInfo at: #classContext put: classContext ].
 
 		suggestions := self cachedSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
 		suggestions ifNil: [
+			path := #ollama.
+			fetchStartMillis := Time millisecondClockValue.
 			suggestions := self fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
+			ollamaDuration := self elapsedMillisecondsSince: fetchStartMillis.
 			self cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext
-		].
-		semanticDone wait.
-		combined := self
-			fuseModelSuggestions: suggestions
-			semanticEntries: semanticEntries
-			context: aContext
-			contextInfo: contextInfo.
-		self cacheFastSuggestions: combined for: aContext prefix: prefixString suffix: suffixString.
-
-		loggingOn ifTrue: [
-			sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
-			sessionId ifNotNil: [
-				sessionPayload := CoPharoCopilotLogger
-					initialCompletionPayloadForContextInfo: contextInfo
-					prefix: prefixString
-					suffix: suffixString
-					classContext: classContext
-					cacheStats: self completionCache statisticsDictionary.
-				CoPharoCopilotLogger
-					writeCompletionSession: sessionPayload
-					sessionId: sessionId ] ].
+		] ifNotNil: [
+			path := #cache.
+			ollamaDuration := 0 ].
 
 		self
-			applyContents: combined
+			recordCompletionPath: path
+			startedAt: startMillis
+			ollamaDurationMs: ollamaDuration
+			contextInfo: contextInfo.
+		contextInfo ifNotNil: [
+			contextInfo
+				at: #rawSuggestions
+				ifAbsentPut: [ suggestions asArray ] ].
+
+		(loggingOn and: [ contextInfo notNil ]) ifTrue: [
+			self
+				writeCompletionSessionForContextInfo: contextInfo
+				prefix: prefixString
+				suffix: suffixString
+				classContext: classContext ].
+
+		self
+			applyContents: suggestions
 			toContext: aContext
 			expectedPrefix: prefixString
 			suffix: suffixString
@@ -2515,7 +2312,33 @@ CoPharoCopilotResultSetBuilder >> repoContextForClass: aClass definition: classD
 	fine-tuned on (<|repo_name|> / <|file_sep|> sections), instead of English prose
 	headers the models never saw during training."
 
+	^ (self repoHeaderForClass: aClass) ,
+		(self
+			repoBodyForClass: aClass
+			definition: classDefinitionString
+			instanceMethods: instanceMethodsString
+			classMethods: classMethodsString)
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> repoHeaderForClass: aClass [
+
+	aClass ifNil: [ ^ '' ].
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: '<|repo_name|>';
+			nextPutAll: aClass name;
+			nextPut: Character lf;
+			nextPut: Character lf ]
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> repoBodyForClass: aClass definition: classDefinitionString instanceMethods: instanceMethodsString classMethods: classMethodsString [
+	"Format only the repository file sections. The repo_name header is composed separately
+	so semantic context can be placed immediately after it."
+
 	| hasDefinition hasInstance hasClass lf |
+	aClass ifNil: [ ^ '' ].
 	hasDefinition := classDefinitionString isEmpty not.
 	hasInstance := instanceMethodsString isEmpty not.
 	hasClass := classMethodsString isEmpty not.
@@ -2524,11 +2347,6 @@ CoPharoCopilotResultSetBuilder >> repoContextForClass: aClass definition: classD
 
 	lf := Character lf.
 	^ String streamContents: [ :stream |
-		stream
-			nextPutAll: '<|repo_name|>';
-			nextPutAll: aClass name;
-			nextPut: lf.
-
 		hasDefinition ifTrue: [
 			stream
 				nextPutAll: '<|file_sep|>';
@@ -3549,4 +3367,24 @@ CoPharoCopilotResultSetBuilder >> visibleBindingTypeDescriptionsFor: aContext li
 				descriptions add: name , ' -> ' , (self typeNameFor: value class) ] ].
 
 	^ descriptions asArray
+]
+
+{ #category : 'telemetry' }
+CoPharoCopilotResultSetBuilder >> writeCompletionSessionForContextInfo: contextInfo prefix: prefixString suffix: suffixString classContext: classContext [
+
+	| sessionId sessionPayload |
+	contextInfo ifNil: [ ^ self ].
+	sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
+	sessionId ifNil: [ ^ self ].
+
+	sessionPayload := CoPharoCopilotLogger
+		initialCompletionPayloadForContextInfo: contextInfo
+		prefix: prefixString
+		suffix: suffixString
+		classContext: classContext
+		cacheStats: self completionCache statisticsDictionary.
+
+	CoPharoCopilotLogger
+		writeCompletionSession: sessionPayload
+		sessionId: sessionId
 ]
