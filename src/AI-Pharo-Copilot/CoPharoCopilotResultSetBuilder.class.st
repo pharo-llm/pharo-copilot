@@ -26,8 +26,7 @@ Class {
 		'lastSemanticReceiverValue',
 		'completionRouter',
 		'generationPolicy',
-		'semanticProvider',
-		'promptContextComposer'
+		'semanticProvider'
 	],
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
@@ -2245,6 +2244,8 @@ CoPharoCopilotResultSetBuilder >> appendPromptSectionNamed: sectionName contents
 	text := contentString ifNil: [ '' ] ifNotNil: [ contentString asString ].
 	text isEmpty ifTrue: [ ^ self ].
 
+	stream position > 0 ifTrue: [
+		self ensurePromptStreamLineFeedOn: stream ].
 	stream
 		nextPutAll: '<|file_sep|>';
 		nextPutAll: sectionName;
@@ -2261,6 +2262,8 @@ CoPharoCopilotResultSetBuilder >> appendRawPromptPart: contentString to: stream 
 	text := contentString ifNil: [ '' ] ifNotNil: [ contentString asString ].
 	text isEmpty ifTrue: [ ^ self ].
 
+	stream position > 0 ifTrue: [
+		self ensurePromptStreamLineFeedOn: stream ].
 	stream nextPutAll: text.
 	text last = Character lf ifFalse: [
 		stream nextPut: Character lf ]
@@ -2304,13 +2307,12 @@ CoPharoCopilotResultSetBuilder >> ensurePromptStreamLineFeedOn: stream [
 CoPharoCopilotResultSetBuilder >> promptContextComposer [
 
 	| composerClass |
-	promptContextComposer ifNotNil: [ ^ promptContextComposer ].
 	composerClass := Smalltalk globals
 		at: #CoPCPromptContextComposer
 		ifAbsent: [ nil ].
 	^ composerClass
 		ifNil: [ nil ]
-		ifNotNil: [ promptContextComposer := composerClass new ]
+		ifNotNil: [ composerClass new ]
 ]
 
 { #category : 'context' }
@@ -2358,10 +2360,10 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 		contextInfo ifNotNil: [
 			contextInfo
 				at: #completionRoute
-				ifAbsentPut: [ self completionRouter
+				put: (self completionRouter
 					classifyContext: aContext
 					prefix: prefixString
-					builder: self ] ].
+					builder: self) ].
 
 		classContext := self classContextFor: aContext prefix: prefixString.
 		loggingOn := self isLoggingEnabled.
@@ -2514,14 +2516,10 @@ CoPharoCopilotResultSetBuilder >> repoBodyForClass: aClass definition: classDefi
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> requestDelayForSnapshot: snapshot [
 
-	| prefix before |
-	prefix := snapshot at: #prefix ifAbsent: [ '' ].
-	before := prefix isEmpty
-		ifTrue: [ nil ]
-		ifFalse: [ prefix last ].
-
-	(self isTriggerBoundaryChar: before) ifTrue: [ ^ self debounceMilliseconds ].
-	^ self idleMilliseconds
+	| source position |
+	source := self sourceFromSnapshot: snapshot.
+	position := self positionFromSnapshot: snapshot.
+	^ self requestDelayForSource: source position: position
 ]
 
 { #category : 'private' }

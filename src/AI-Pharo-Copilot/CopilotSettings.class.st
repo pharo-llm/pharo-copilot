@@ -735,6 +735,49 @@ CopilotSettings class >> installCompletionEngineIfAvailable [
 	(editorClass respondsTo: #completionEngineClass:) ifFalse: [ ^ false ].
 
 	editorClass completionEngineClass: engineClass.
+	self resetCompletionStateIfAvailable.
+	^ true
+]
+
+{ #category : 'settings' }
+CopilotSettings class >> resetCompletionStateIfAvailable [
+	"Discard live completion state after installing or reloading the engine.
+	This keeps an open image from continuing to use stale builders."
+
+	| builderClass engineClass contextClass |
+	builderClass := Smalltalk globals
+		at: #CoPharoCopilotResultSetBuilder
+		ifAbsent: [ nil ].
+	builderClass ifNotNil: [
+		builderClass allInstancesDo: [ :builder |
+			[
+				(builder instVarNamed: #debounceProcess)
+					ifNotNil: [ :process |
+						process == Processor activeProcess ifFalse: [
+							process terminate ] ].
+				builder instVarNamed: #debounceProcess put: nil ]
+					on: Error
+					do: [ :ignored | ] ] ].
+
+	engineClass := Smalltalk globals
+		at: #CoPharoCopilotCompletionEngine
+		ifAbsent: [ nil ].
+	engineClass ifNotNil: [
+		engineClass allInstancesDo: [ :engine |
+			[
+				engine instVarNamed: #completionBuilder put: nil ]
+					on: Error
+					do: [ :ignored | ] ] ].
+
+	contextClass := Smalltalk globals
+		at: #CoPCContext
+		ifAbsent: [ nil ].
+	(contextClass notNil and: [ builderClass notNil ]) ifTrue: [
+		contextClass allInstancesDo: [ :context |
+			[
+				context initializeCompletionBuilder ]
+					on: Error
+					do: [ :ignored | ] ] ].
 	^ true
 ]
 

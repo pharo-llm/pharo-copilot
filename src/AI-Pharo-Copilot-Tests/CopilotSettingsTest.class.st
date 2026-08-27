@@ -132,6 +132,24 @@ CopilotSettingsTest >> testDefaultCompletionModelIsQuantizedPharoQwen [
 ]
 
 { #category : 'tests' }
+CopilotSettingsTest >> testInstallCompletionEngineClearsExistingBuilder [
+
+	| editorClass oldEngineClass engine builder |
+	editorClass := Smalltalk globals at: #RubSmalltalkEditor ifAbsent: [ ^ self ].
+	(editorClass respondsTo: #completionEngineClass:) ifFalse: [ ^ self ].
+	oldEngineClass := editorClass completionEngineClass.
+	[
+		engine := CoPharoCopilotCompletionEngine new.
+		builder := engine completionBuilder.
+		self assert: (engine instVarNamed: #completionBuilder) identicalTo: builder.
+
+		self assert: CopilotSettings installCompletionEngineIfAvailable.
+		self assert: (engine instVarNamed: #completionBuilder) isNil ]
+			ensure: [
+				editorClass completionEngineClass: oldEngineClass ]
+]
+
+{ #category : 'tests' }
 CopilotSettingsTest >> testDisablingLoggingPreventsFileCreation [
 
 	CopilotSettings withDefaultSettingsDo: [
