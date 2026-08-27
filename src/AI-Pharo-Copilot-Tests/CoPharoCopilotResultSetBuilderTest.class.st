@@ -506,33 +506,6 @@ CoPharoCopilotResultSetBuilderTest >> testFuseInvalidModelSuggestionFallsBehindS
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionContractAppendsStrictSection [
-
-	| builder context base source result |
-	builder := CoPharoCopilotResultSetBuilder new.
-	source := 'semanticContextExample', String lf, String tab, 'self as'.
-	context := CoCopilotContextMock new
-		behavior: Object;
-		source: source;
-		position: source size;
-		yourself.
-	base := '<|repo_name|>Object', String lf.
-
-	result := builder
-		appendCompletionContractFor: context
-		prefix: source
-		toContext: base.
-
-	self assert: (result beginsWith: base).
-	self assert: (result includesSubstring: '<|file_sep|>.pharo-completion-contract').
-	self assert: (result includesSubstring: 'completionKind=messageTail').
-	self assert: (result includesSubstring: 'insertOnlyTail=true').
-	self assert: (result includesSubstring: 'forbidden=methodHeader').
-	self assert: (result includesSubstring: 'receiver=self').
-	self assert: (result includesSubstring: 'receiverTypes=Object')
-]
-
-{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetadata [
 
 	CopilotSettings withDefaultSettingsDo: [

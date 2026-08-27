@@ -133,26 +133,6 @@ CoPharoCopilotResultSetBuilder >> appendInteractionHistoryToContext: contextStri
 ]
 
 { #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> appendCompletionContractFor: aContext prefix: prefixString toContext: contextString [
-
-	| contract base lf |
-	contract := self completionContractFor: aContext prefix: prefixString.
-	contract isEmpty ifTrue: [ ^ contextString ifNil: [ '' ] ].
-
-	base := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
-	lf := Character lf.
-	^ String streamContents: [ :stream |
-		base isEmpty ifFalse: [
-			stream nextPutAll: base.
-			base last = lf ifFalse: [ stream nextPut: lf ] ].
-		stream
-			nextPutAll: '<|file_sep|>.pharo-completion-contract';
-			nextPut: lf;
-			nextPutAll: contract.
-		contract last = lf ifFalse: [ stream nextPut: lf ] ]
-]
-
-{ #category : 'semantic context' }
 CoPharoCopilotResultSetBuilder >> appendSemanticCompletionContextFor: aContext prefix: prefixString toContext: contextString [
 
 	| semantic base lf |
@@ -429,11 +409,6 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 				builtContext ] ].
 
 	classContext := self
-		appendCompletionContractFor: aContext
-		prefix: prefixString
-		toContext: classContext.
-
-	classContext := self
 		appendSemanticCompletionContextFor: aContext
 		prefix: prefixString
 		toContext: classContext.
@@ -686,46 +661,6 @@ CoPharoCopilotResultSetBuilder >> completionPrefixFor: aContext contextInfo: con
 	^ aContext
 		ifNil: [ '' ]
 		ifNotNil: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ]
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> completionContractFor: aContext prefix: prefixString [
-
-	| source kind token receiverInfo receiverName receiverTypes selectorHints lines |
-	aContext ifNil: [ ^ '' ].
-
-	source := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
-	kind := self completionKindFor: aContext prefix: source.
-	token := self completionTokenFor: aContext prefix: source.
-	receiverInfo := self semanticReceiverInfoFor: aContext prefix: source.
-	receiverName := receiverInfo at: #receiver ifAbsent: [ '' ].
-	receiverTypes := receiverInfo at: #types ifAbsent: [ #() ].
-
-	lines := OrderedCollection new.
-	lines add: 'language=Pharo Smalltalk'.
-	lines add: 'completionKind=' , kind asString.
-	lines add: 'insertOnlyTail=true'.
-	lines add: 'output=codeOnly'.
-	lines add: 'forbidden=methodHeader, classDefinition, markdownFence, explanation, receiverEcho, promptEcho'.
-
-	token isEmpty ifFalse: [
-		lines add: 'typedToken=' , token ].
-	receiverName isEmpty ifFalse: [
-		lines add: 'receiver=' , receiverName ].
-	receiverTypes isEmpty ifFalse: [
-		lines add: 'receiverTypes=' , (self typeNamesStringFor: receiverTypes) ].
-
-	selectorHints := self
-		semanticSelectorHintsForTypes: receiverTypes
-		token: token
-		limit: 8.
-	selectorHints isEmpty ifFalse: [
-		lines add: 'allowedSelectors=' , (self commaSeparatedStrings: selectorHints) ].
-
-	^ String streamContents: [ :stream |
-		lines
-			do: [ :line | stream nextPutAll: line ]
-			separatedBy: [ stream nextPut: Character lf ] ]
 ]
 
 { #category : 'semantic context' }
