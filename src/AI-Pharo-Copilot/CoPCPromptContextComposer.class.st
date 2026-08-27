@@ -16,8 +16,6 @@ CoPCPromptContextComposer >> appendRaw: aString to: stream [
 	text := self normalizedString: aString.
 	text isEmpty ifTrue: [ ^ self ].
 
-	stream position > 0 ifTrue: [
-		self ensureLineFeedOn: stream ].
 	stream nextPutAll: text.
 	text last = Character lf ifFalse: [
 		stream nextPut: Character lf ]
@@ -30,8 +28,6 @@ CoPCPromptContextComposer >> appendSectionNamed: sectionName contents: contentSt
 	text := self normalizedString: contentString.
 	text isEmpty ifTrue: [ ^ self ].
 
-	stream position > 0 ifTrue: [
-		self ensureLineFeedOn: stream ].
 	stream
 		nextPutAll: '<|file_sep|>';
 		nextPutAll: sectionName;

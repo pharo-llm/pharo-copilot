@@ -126,6 +126,48 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionGenerationPolicyUsesSmallBud
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionCacheEvictsLeastRecentlyUsedEntry [
+
+	| cache |
+	cache := CoPharoCopilotCompletionCache withMaxSize: 2.
+	cache at: 'a' suffix: '' context: 'ctx' put: { 'A' }.
+	cache at: 'b' suffix: '' context: 'ctx' put: { 'B' }.
+
+	self
+		assert: (cache
+			at: 'a'
+			suffix: ''
+			context: 'ctx'
+			ifPresent: [ :value | value ])
+		equals: { 'A' }.
+
+	cache at: 'c' suffix: '' context: 'ctx' put: { 'C' }.
+
+	self
+		assert: (cache
+			at: 'a'
+			suffix: ''
+			context: 'ctx'
+			ifPresent: [ :value | value ])
+		equals: { 'A' }.
+	self
+		assert: (cache
+			at: 'b'
+			suffix: ''
+			context: 'ctx'
+			ifPresent: [ :value | value ])
+		isNil.
+	self
+		assert: (cache
+			at: 'c'
+			suffix: ''
+			context: 'ctx'
+			ifPresent: [ :value | value ])
+		equals: { 'C' }.
+	self assert: cache evictions equals: 1
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testApplyContentDoesNothingOnSnapshotMismatch [
 	| b ctx ed |
 	b := CopilotTestableBuilder new.

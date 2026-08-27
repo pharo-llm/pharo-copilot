@@ -264,7 +264,11 @@ CoPharoCopilotCompletionCache >> touchKey: aKey [
 	clock := clock + 1.
 	timestamps at: aKey put: clock.
 
-	(oldestKey isNil or: [ oldestTime isNil ]) ifFalse: [ ^ self ].
-	oldestKey := aKey.
-	oldestTime := clock
+	oldestKey = aKey ifTrue: [
+		self resetOldestTracking.
+		^ self ].
+
+	(oldestKey isNil or: [ oldestTime isNil ]) ifTrue: [
+		oldestKey := aKey.
+		oldestTime := clock ]
 ]
