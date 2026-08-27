@@ -353,6 +353,67 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesEmptyResultSetWhenS
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testProcessCompletionCacheHitOpensCachedModelLane [
+
+	| b ctx contextInfo classContext entries |
+	b := CopilotTestableBuilder new.
+	ctx := CoCopilotContextMock new
+		behavior: Object;
+		source: 'temporaryName';
+		position: 'temporaryName' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'temporaryName';
+		yourself.
+	classContext := b classContextFor: ctx prefix: 'temporaryName'.
+	b completionCache
+		at: 'temporaryName'
+		suffix: ''
+		context: classContext
+		put: { 'cachedCompletion' }.
+
+	b
+		processCompletionFor: ctx
+		prefix: 'temporaryName'
+		suffix: ''
+		contextInfo: contextInfo.
+
+	entries := b openedEntries.
+	self assert: entries size equals: 1.
+	self assert: entries first contents equals: 'cachedCompletion'.
+	self assert: b fetchCallCount equals: 0.
+	self assert: (contextInfo at: #completionPath) equals: #cache
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testProcessCompletionMissOpensOllamaModelLane [
+
+	| b ctx contextInfo entries |
+	b := CopilotTestableBuilder new.
+	b fetchedSuggestions: { 'modelCompletion' }.
+	ctx := CoCopilotContextMock new
+		behavior: Object;
+		source: 'temporaryName';
+		position: 'temporaryName' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'temporaryName';
+		yourself.
+
+	b
+		processCompletionFor: ctx
+		prefix: 'temporaryName'
+		suffix: ''
+		contextInfo: contextInfo.
+
+	entries := b openedEntries.
+	self assert: entries size equals: 1.
+	self assert: entries first contents equals: 'modelCompletion'.
+	self assert: b fetchCallCount equals: 1.
+	self assert: (contextInfo at: #completionPath) equals: #ollama
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testClassContextIsCached [
 
 	| b ctx first second |

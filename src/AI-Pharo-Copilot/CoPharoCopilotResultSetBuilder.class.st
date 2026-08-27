@@ -401,8 +401,8 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 		ifFalse: [ '' ].
 	recentChanges := self recentCodeChangesForPrompt.
 
-	^ self promptContextComposer
-		composeHeader: repoHeader
+	^ self
+		composePromptHeader: repoHeader
 		semanticContext: semanticContext
 		repositoryBody: repositoryBody
 		relatedCode: relatedCode
@@ -1704,6 +1704,38 @@ CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollectio
 ]
 
 { #category : 'new' }
+CoPharoCopilotResultSetBuilder >> logCompletionProcessingFailure: exception prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+
+	[
+		Transcript
+			show: 'Pharo Copilot completion failed: ', exception description;
+			cr ]
+		on: Error
+		do: [ :ignored | ].
+
+	self isLoggingEnabled ifFalse: [ ^ self ].
+	[
+		CoPharoCopilotLogger
+			logBackEndEvent: 'Completion processing failed'
+			details: (Dictionary new
+				at: #errorClass put: exception class name;
+				at: #error put: exception description;
+				at: #completionRoute put: (contextInfo
+					ifNil: [ #unknown ]
+					ifNotNil: [ contextInfo at: #completionRoute ifAbsent: [ #unknown ] ]);
+				at: #completionPath put: (contextInfo
+					ifNil: [ #unknown ]
+					ifNotNil: [ contextInfo at: #completionPath ifAbsent: [ #unknown ] ]);
+				at: #prefixTail put: ((prefixString ifNil: [ '' ]) size > 80
+					ifTrue: [ (prefixString ifNil: [ '' ]) last: 80 ]
+					ifFalse: [ prefixString ifNil: [ '' ] ]);
+				at: #suffixSize put: (suffixString ifNil: [ '' ] ifNotNil: [ suffixString asString ]) size;
+				yourself) ]
+		on: Error
+		do: [ :ignored | ]
+]
+
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> logCompletionReroutedToComplishonFor: aContext prefix: prefixString suffix: suffixString [
 
 	| prefix suffix route environment |
@@ -1815,6 +1847,24 @@ CoPharoCopilotResultSetBuilder >> logStaleContextForExpectedPrefix: expectedPref
 	).
 
 	^ self
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> logRelatedCodeContextFailure: exception prefix: prefixString [
+
+	self isLoggingEnabled ifFalse: [ ^ self ].
+	[
+		CoPharoCopilotLogger
+			logBackEndEvent: 'Related code context failed'
+			details: (Dictionary new
+				at: #errorClass put: exception class name;
+				at: #error put: exception description;
+				at: #prefixTail put: ((prefixString ifNil: [ '' ]) size > 80
+					ifTrue: [ (prefixString ifNil: [ '' ]) last: 80 ]
+					ifFalse: [ prefixString ifNil: [ '' ] ]);
+				yourself) ]
+		on: Error
+		do: [ :ignored | ]
 ]
 
 { #category : 'initialization' }
@@ -2186,9 +2236,81 @@ CoPharoCopilotResultSetBuilder >> prependNavigationHistoryTo: contextString [
 ]
 
 { #category : 'context' }
+CoPharoCopilotResultSetBuilder >> appendPromptSectionNamed: sectionName contents: contentString to: stream [
+
+	| text |
+	text := contentString ifNil: [ '' ] ifNotNil: [ contentString asString ].
+	text isEmpty ifTrue: [ ^ self ].
+
+	stream position > 0 ifTrue: [
+		self ensurePromptStreamLineFeedOn: stream ].
+	stream
+		nextPutAll: '<|file_sep|>';
+		nextPutAll: sectionName;
+		nextPut: Character lf;
+		nextPutAll: text.
+	text last = Character lf ifFalse: [
+		stream nextPut: Character lf ]
+]
+
+{ #category : 'context' }
+CoPharoCopilotResultSetBuilder >> appendRawPromptPart: contentString to: stream [
+
+	| text |
+	text := contentString ifNil: [ '' ] ifNotNil: [ contentString asString ].
+	text isEmpty ifTrue: [ ^ self ].
+
+	stream position > 0 ifTrue: [
+		self ensurePromptStreamLineFeedOn: stream ].
+	stream nextPutAll: text.
+	text last = Character lf ifFalse: [
+		stream nextPut: Character lf ]
+]
+
+{ #category : 'context' }
+CoPharoCopilotResultSetBuilder >> composePromptHeader: headerString semanticContext: semanticString repositoryBody: repositoryBodyString relatedCode: relatedCodeString interactionHistory: historyString recentCodeChanges: recentChangesString [
+
+	| composer |
+	composer := self promptContextComposer.
+	composer ifNotNil: [
+		^ composer
+			composeHeader: headerString
+			semanticContext: semanticString
+			repositoryBody: repositoryBodyString
+			relatedCode: relatedCodeString
+			interactionHistory: historyString
+			recentCodeChanges: recentChangesString ].
+
+	^ String streamContents: [ :stream |
+		self appendRawPromptPart: headerString to: stream.
+		self appendPromptSectionNamed: 'Semantic completion context' contents: semanticString to: stream.
+		self appendRawPromptPart: repositoryBodyString to: stream.
+		self appendRawPromptPart: relatedCodeString to: stream.
+		self appendPromptSectionNamed: 'IDE interaction history' contents: historyString to: stream.
+		self appendPromptSectionNamed: 'Recent code changes' contents: recentChangesString to: stream ]
+]
+
+{ #category : 'context' }
+CoPharoCopilotResultSetBuilder >> ensurePromptStreamLineFeedOn: stream [
+
+	| contents |
+	stream position = 0 ifTrue: [ ^ self ].
+	contents := stream contents.
+	contents isEmpty ifTrue: [ ^ self ].
+	contents last = Character lf ifFalse: [
+		stream nextPut: Character lf ]
+]
+
+{ #category : 'context' }
 CoPharoCopilotResultSetBuilder >> promptContextComposer [
 
-	^ CoPCPromptContextComposer new
+	| composerClass |
+	composerClass := Smalltalk globals
+		at: #CoPCPromptContextComposer
+		ifAbsent: [ nil ].
+	^ composerClass
+		ifNil: [ nil ]
+		ifNotNil: [ composerClass new ]
 ]
 
 { #category : 'context' }
@@ -2202,15 +2324,27 @@ CoPharoCopilotResultSetBuilder >> recentCodeChangesForPrompt [
 { #category : 'context' }
 CoPharoCopilotResultSetBuilder >> relatedCodeContextFor: aContext prefix: prefixString [
 
-	| receiverInfo receiverTypes selectorPrefix |
-	receiverInfo := self semanticReceiverInfoFor: aContext prefix: prefixString.
-	receiverTypes := receiverInfo at: #types ifAbsent: [ #() ].
-	selectorPrefix := self completionTokenFor: aContext prefix: prefixString.
+	^ [
+		| receiverInfo receiverTypes selectorPrefix relatedCodeClass |
+		relatedCodeClass := Smalltalk globals
+			at: #CoPCRelatedCodeContext
+			ifAbsent: [ nil ].
+		relatedCodeClass ifNil: [ ^ '' ].
 
-	^ CoPCRelatedCodeContext new
-		gatherFor: aContext
-		receiverTypes: receiverTypes
-		selectorPrefix: selectorPrefix
+		receiverInfo := self semanticReceiverInfoFor: aContext prefix: prefixString.
+		receiverTypes := receiverInfo at: #types ifAbsent: [ #() ].
+		selectorPrefix := self completionTokenFor: aContext prefix: prefixString.
+
+		relatedCodeClass new
+			gatherFor: aContext
+			receiverTypes: receiverTypes
+			selectorPrefix: selectorPrefix ]
+		on: Error
+		do: [ :ex |
+			self
+				logRelatedCodeContextFailure: ex
+				prefix: prefixString.
+			'' ]
 ]
 
 { #category : 'new' }
@@ -2271,7 +2405,12 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			contextInfo: contextInfo
 	]
 		on: Error
-		do: [ :ex |  ]
+		do: [ :ex |
+			self
+				logCompletionProcessingFailure: ex
+				prefix: prefixString
+				suffix: suffixString
+				contextInfo: contextInfo ]
 
 ]
 

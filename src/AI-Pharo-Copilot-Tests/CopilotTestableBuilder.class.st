@@ -10,7 +10,9 @@ Class {
 		'fallbackCallCount',
 		'openedEntries',
 		'classContextCallCount',
-		'semanticAstCallCount'
+		'semanticAstCallCount',
+		'fetchCallCount',
+		'fetchedSuggestions'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -90,6 +92,25 @@ CopilotTestableBuilder >> deferUI: aBlock [
 
 	"Run immediately in tests."
 	^ aBlock value
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> fetchedSuggestions: aCollection [
+
+	fetchedSuggestions := aCollection
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> fetchCallCount [
+
+	^ fetchCallCount ifNil: [ 0 ]
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo [
+
+	fetchCallCount := self fetchCallCount + 1.
+	^ fetchedSuggestions ifNil: [ { 'modelCompletion' } ]
 ]
 
 { #category : 'accessing' }
