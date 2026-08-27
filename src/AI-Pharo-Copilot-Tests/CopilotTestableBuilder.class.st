@@ -132,6 +132,12 @@ CopilotTestableBuilder >> openedEntries [
 ]
 
 { #category : 'accessing' }
+CopilotTestableBuilder >> recentCodeChangesForPrompt [
+
+	^ ''
+]
+
+{ #category : 'accessing' }
 CopilotTestableBuilder >> scheduleCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo delayMilliseconds: delayMs [
 	"Don't fork in buildCompletion tests; just record."
 	scheduledDelay := delayMs.

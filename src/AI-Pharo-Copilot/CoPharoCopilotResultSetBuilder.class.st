@@ -152,6 +152,16 @@ CoPharoCopilotResultSetBuilder >> appendSemanticCompletionContextFor: aContext p
 		semantic last = lf ifFalse: [ stream nextPut: lf ] ]
 ]
 
+{ #category : 'context' }
+CoPharoCopilotResultSetBuilder >> appendRecentCodeChangesToContext: contextString [
+	"Insert recency after the repo header so it stays near the top while the
+	static class context can remain cached separately."
+
+	^ self
+		context: contextString
+		withRecentCodeChanges: self recentCodeChangesForPrompt
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [ 
 
@@ -408,6 +418,7 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 				self cacheClassContext: builtContext for: methodClass.
 				builtContext ] ].
 
+	classContext := self appendRecentCodeChangesToContext: classContext.
 	classContext := self
 		appendSemanticCompletionContextFor: aContext
 		prefix: prefixString
@@ -457,6 +468,50 @@ CoPharoCopilotResultSetBuilder >> classDefinition: classDefinitionString instanc
 				nextPutAll: 'Class Side Methods:';
 				cr;
 				nextPutAll: classMethodsString ] ]
+]
+
+{ #category : 'context' }
+CoPharoCopilotResultSetBuilder >> context: contextString withRecentCodeChanges: recentChangesString [
+
+	| base changes section lf headerEnd |
+	base := contextString ifNil: [ '' ] ifNotNil: [ contextString asString ].
+	changes := recentChangesString ifNil: [ '' ] ifNotNil: [ recentChangesString asString ].
+	changes isEmpty ifTrue: [ ^ base ].
+
+	section := self
+		promptSectionNamed: 'Recent code changes'
+		contents: changes.
+	base isEmpty ifTrue: [ ^ section ].
+
+	lf := Character lf.
+	(base beginsWith: '<|repo_name|>') ifTrue: [
+		headerEnd := base indexOf: lf ifAbsent: [ 0 ].
+		headerEnd > 0 ifTrue: [
+			^ (base copyFrom: 1 to: headerEnd) ,
+				section ,
+				(headerEnd < base size
+					ifTrue: [ base copyFrom: headerEnd + 1 to: base size ]
+					ifFalse: [ '' ]) ].
+		^ base , (String with: lf) , section ].
+
+	^ section , base
+]
+
+{ #category : 'context' }
+CoPharoCopilotResultSetBuilder >> promptSectionNamed: sectionName contents: contentString [
+
+	| text lf |
+	text := contentString ifNil: [ '' ] ifNotNil: [ contentString asString ].
+	text isEmpty ifTrue: [ ^ '' ].
+
+	lf := Character lf.
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: '<|file_sep|>';
+			nextPutAll: sectionName;
+			nextPut: lf;
+			nextPutAll: text.
+		text last = lf ifFalse: [ stream nextPut: lf ] ]
 ]
 
 { #category : 'new' }
@@ -2379,6 +2434,14 @@ CoPharoCopilotResultSetBuilder >> prependNavigationHistoryTo: contextString [
 	history belongs at the end of the context block just before the FIM tail."
 
 	^ self appendInteractionHistoryToContext: contextString
+]
+
+{ #category : 'context' }
+CoPharoCopilotResultSetBuilder >> recentCodeChangesForPrompt [
+
+	^ CoPCRecentCodeChanges new
+		limit: 5;
+		gather
 ]
 
 { #category : 'new' }

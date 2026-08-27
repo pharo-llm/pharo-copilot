@@ -275,6 +275,35 @@ CoPharoCopilotResultSetBuilderTest >> testClassContextIsCached [
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testClassContextPlacesRecentCodeChangesBeforeStaticContext [
+
+	| builder context source result headerIndex changesIndex staticIndex previousHistoryEnabled |
+	previousHistoryEnabled := CoPCContextNavigationHistory enabled.
+	[
+		CoPCContextNavigationHistory enabled: false.
+		builder := CopilotCacheTestBuilder new.
+		builder recentCodeChangesForPrompt: 'EpMethodModification: Object>>printString [Kernel]'.
+		source := 'self as'.
+		context := CoCopilotContextMock new
+			behavior: Object;
+			source: source;
+			position: source size;
+			yourself.
+
+		result := builder classContextFor: context prefix: source.
+
+		headerIndex := result findString: '<|repo_name|>Object' startingAt: 1.
+		changesIndex := result findString: '<|file_sep|>Recent code changes' startingAt: 1.
+		staticIndex := result findString: '<|file_sep|>Object' startingAt: 1.
+
+		self assert: headerIndex equals: 1.
+		self assert: changesIndex > headerIndex.
+		self assert: staticIndex > changesIndex.
+		self assert: (result includesSubstring: 'EpMethodModification: Object>>printString [Kernel]') ]
+		ensure: [ CoPCContextNavigationHistory enabled: previousHistoryEnabled ]
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromEmptyResponse [
 	| builder context |
 	context := CoPCContext new.
@@ -913,6 +942,27 @@ CoPharoCopilotResultSetBuilderTest >> testSemanticContextAppendsAfterStaticConte
 	self assert: (result beginsWith: base).
 	self assert: (result includesSubstring: '<|file_sep|>Semantic completion context').
 	self assert: (result includesSubstring: 'Completion class: Object')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testRecentCodeChangesFormatsMethodAndClassChanges [
+
+	| provider methodChange classChange result |
+	provider := CoPCTestRecentCodeChanges new.
+	methodChange := CoPCTestEpMethodChange
+		behavior: 'CoFoo'
+		selector: #bar
+		package: 'AI-Pharo-Copilot'.
+	classChange := CoPCTestEpClassChange
+		affectedName: 'CoSomething'
+		package: 'AI-Pharo-Copilot'.
+	provider recentChanges: { methodChange. classChange }.
+
+	result := provider gather.
+
+	self assert: (result includesSubstring: 'CoPCTestEpMethodChange: CoFoo>>bar [AI-Pharo-Copilot]').
+	self assert: (result includesSubstring: 'CoPCTestEpClassChange: CoSomething [AI-Pharo-Copilot]').
+	self deny: (result includesSubstring: '<|file_sep|>Recent code changes')
 ]
 
 { #category : 'tests' }

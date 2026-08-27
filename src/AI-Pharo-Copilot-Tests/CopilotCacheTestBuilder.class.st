@@ -2,7 +2,8 @@ Class {
 	#name : 'CopilotCacheTestBuilder',
 	#superclass : 'CoPharoCopilotResultSetBuilder',
 	#instVars : [
-		'methodSourcesCallCount'
+		'methodSourcesCallCount',
+		'recentCodeChangesForPrompt'
 	],
 	#category : 'AI-Pharo-Copilot-Tests-Mock',
 	#package : 'AI-Pharo-Copilot-Tests',
@@ -45,6 +46,18 @@ CopilotCacheTestBuilder >> methodSourcesCallCount [
 CopilotCacheTestBuilder >> methodSourcesFor: aBehavior around: aSelector limit: limitInteger [
 	methodSourcesCallCount := methodSourcesCallCount + 1.
 	^ 'METHODS'
+]
+
+{ #category : 'initialization' }
+CopilotCacheTestBuilder >> recentCodeChangesForPrompt [
+
+	^ recentCodeChangesForPrompt ifNil: [ '' ]
+]
+
+{ #category : 'initialization' }
+CopilotCacheTestBuilder >> recentCodeChangesForPrompt: aString [
+
+	recentCodeChangesForPrompt := aString
 ]
 
 { #category : 'initialization' }
