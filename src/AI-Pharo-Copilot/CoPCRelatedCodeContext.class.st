@@ -55,8 +55,11 @@ CoPCRelatedCodeContext >> addHierarchyCandidatesFor: aBehavior prefix: selectorP
 { #category : 'gathering' }
 CoPCRelatedCodeContext >> addImplementorCandidatesForSelectorsFrom: receiverTypes prefix: selectorPrefix to: candidates seen: seen [
 
-	| selectors seenSelectors |
+	| selectors seenSelectors classes prefix |
 	candidates size >= self candidateLimit ifTrue: [ ^ self ].
+	prefix := selectorPrefix ifNil: [ '' ] ifNotNil: [ selectorPrefix asString ].
+	prefix size < 3 ifTrue: [ ^ self ].
+
 	selectors := OrderedCollection new.
 	seenSelectors := Set new.
 
@@ -66,8 +69,10 @@ CoPCRelatedCodeContext >> addImplementorCandidatesForSelectorsFrom: receiverType
 				seenSelectors add: selector.
 				selectors add: selector ] ] ].
 
+	selectors isEmpty ifTrue: [ ^ self ].
+	classes := self allClasses.
 	selectors do: [ :selector |
-		self allClasses do: [ :class |
+		classes do: [ :class |
 			candidates size >= self candidateLimit ifTrue: [ ^ self ].
 			([ class includesSelector: selector ] on: Error do: [ false ]) ifTrue: [
 				self addCandidateBehavior: class selector: selector score: 65 to: candidates seen: seen ].
@@ -78,17 +83,15 @@ CoPCRelatedCodeContext >> addImplementorCandidatesForSelectorsFrom: receiverType
 { #category : 'gathering' }
 CoPCRelatedCodeContext >> addSamePackageCandidatesFor: aBehavior prefix: selectorPrefix to: candidates seen: seen [
 
-	| packageName |
+	| classes |
 	aBehavior ifNil: [ ^ self ].
-	packageName := self packageNameForBehavior: aBehavior.
-	packageName isEmpty ifTrue: [ ^ self ].
+	classes := self classesInPackageOfBehavior: aBehavior.
+	classes isEmpty ifTrue: [ ^ self ].
 
-	self allClasses do: [ :class |
+	classes do: [ :class |
 		candidates size >= self candidateLimit ifTrue: [ ^ self ].
-		((self packageNameForBehavior: class) = packageName) ifTrue: [
-			self addSelectorsFromBehavior: class prefix: selectorPrefix score: 85 to: candidates seen: seen ].
-		((self packageNameForBehavior: class class) = packageName) ifTrue: [
-			self addSelectorsFromBehavior: class class prefix: selectorPrefix score: 85 to: candidates seen: seen ] ]
+		self addSelectorsFromBehavior: class prefix: selectorPrefix score: 85 to: candidates seen: seen.
+		self addSelectorsFromBehavior: class class prefix: selectorPrefix score: 85 to: candidates seen: seen ]
 ]
 
 { #category : 'gathering' }
@@ -114,6 +117,33 @@ CoPCRelatedCodeContext >> allClasses [
 ]
 
 { #category : 'accessing' }
+CoPCRelatedCodeContext >> classesFromPackage: package [
+
+	package ifNil: [ ^ #() ].
+	^ [
+		(package respondsTo: #definedClasses) ifTrue: [
+			^ package definedClasses asArray ].
+		(package respondsTo: #classes) ifTrue: [
+			^ package classes asArray ].
+		#() ]
+		on: Error
+		do: [ #() ]
+]
+
+{ #category : 'accessing' }
+CoPCRelatedCodeContext >> classesInPackageOfBehavior: aBehavior [
+
+	| classes limit |
+	classes := self classesFromPackage: (self packageForBehavior: aBehavior).
+	classes isEmpty ifTrue: [ ^ #() ].
+
+	limit := self samePackageClassLimit.
+	^ classes size > limit
+		ifTrue: [ classes copyFrom: 1 to: limit ]
+		ifFalse: [ classes ]
+]
+
+{ #category : 'accessing' }
 CoPCRelatedCodeContext >> behaviorForContext: aContext [
 
 	| behavior |
@@ -131,7 +161,7 @@ CoPCRelatedCodeContext >> behaviorForContext: aContext [
 { #category : 'accessing' }
 CoPCRelatedCodeContext >> candidateLimit [
 
-	^ 40
+	^ 15
 ]
 
 { #category : 'sorting' }
@@ -173,11 +203,27 @@ CoPCRelatedCodeContext >> gatherFor: aContext receiverTypes: receiverTypes selec
 	seen := Set new.
 
 	self addCandidatesFromReceiverTypes: types prefix: prefix to: candidates seen: seen.
-	self addSamePackageCandidatesFor: contextBehavior prefix: prefix to: candidates seen: seen.
+	(self hasEnoughCandidates: candidates) ifTrue: [
+		^ self renderCandidates: candidates ].
+
+	prefix size >= 3 ifTrue: [
+		self addSamePackageCandidatesFor: contextBehavior prefix: prefix to: candidates seen: seen.
+		(self hasEnoughCandidates: candidates) ifTrue: [
+			^ self renderCandidates: candidates ] ].
+
 	self addHierarchyCandidatesFor: contextBehavior prefix: prefix to: candidates seen: seen.
+	(self hasEnoughCandidates: candidates) ifTrue: [
+		^ self renderCandidates: candidates ].
+
 	self addImplementorCandidatesForSelectorsFrom: types prefix: prefix to: candidates seen: seen.
 
 	^ self renderCandidates: candidates
+]
+
+{ #category : 'testing' }
+CoPCRelatedCodeContext >> hasEnoughCandidates: candidates [
+
+	^ candidates size >= self maxMethods
 ]
 
 { #category : 'testing' }
@@ -191,21 +237,29 @@ CoPCRelatedCodeContext >> isBehaviorLike: anObject [
 { #category : 'accessing' }
 CoPCRelatedCodeContext >> matchingSelectorsFrom: aBehavior prefix: selectorPrefix limit: limitInteger do: aBlock [
 
-	| selectors prefix count |
+	| matches prefix limit |
 	(self isBehaviorLike: aBehavior) ifFalse: [ ^ self ].
 	prefix := selectorPrefix ifNil: [ '' ] ifNotNil: [ selectorPrefix asString ].
 	prefix isEmpty ifTrue: [ ^ self ].
-	count := 0.
+	limit := limitInteger ifNil: [ self candidateLimit ].
 
-	selectors := [
-		aBehavior selectors asSortedCollection asArray ]
+	matches := OrderedCollection new.
+	[
+		(aBehavior respondsTo: #selectorsDo:)
+			ifTrue: [
+				aBehavior selectorsDo: [ :selector |
+					(selector asString beginsWith: prefix) ifTrue: [
+						matches add: selector ] ] ]
+			ifFalse: [
+				aBehavior selectors do: [ :selector |
+					(selector asString beginsWith: prefix) ifTrue: [
+						matches add: selector ] ] ] ]
 		on: Error
-		do: [ #() ].
-	selectors do: [ :selector |
-		(count >= limitInteger) ifTrue: [ ^ self ].
-		(selector asString beginsWith: prefix) ifTrue: [
-			aBlock value: selector.
-			count := count + 1 ] ]
+		do: [ ^ self ].
+
+	matches := matches asSortedCollection asArray.
+	1 to: (matches size min: limit) do: [ :index |
+		aBlock value: (matches at: index) ]
 ]
 
 { #category : 'accessing' }
@@ -236,27 +290,11 @@ CoPCRelatedCodeContext >> normalizedBehaviorsFrom: typeCollection [
 { #category : 'accessing' }
 CoPCRelatedCodeContext >> packageNameForBehavior: aBehavior [
 
-	| behavior package organizer |
-	aBehavior ifNil: [ ^ '' ].
-	behavior := self packageOwnerForBehavior: aBehavior.
-
-	package := [
-		(behavior respondsTo: #package)
-			ifTrue: [ behavior package ]
-			ifFalse: [ nil ] ]
-		on: Error
-		do: [ nil ].
-	package ifNotNil: [ ^ self packageNameFrom: package ].
-
-	organizer := Smalltalk globals at: #RPackageOrganizer ifAbsent: [ nil ].
-	(organizer notNil and: [ organizer respondsTo: #default ]) ifTrue: [
-		package := [
-			organizer default packageOfClass: behavior ]
-			on: Error
-			do: [ nil ].
-		package ifNotNil: [ ^ self packageNameFrom: package ] ].
-
-	^ ''
+	| package |
+	package := self packageForBehavior: aBehavior.
+	^ package
+		ifNil: [ '' ]
+		ifNotNil: [ self packageNameFrom: package ]
 ]
 
 { #category : 'accessing' }
@@ -277,6 +315,31 @@ CoPCRelatedCodeContext >> packageOwnerForBehavior: aBehavior [
 					ifTrue: [ [ aBehavior instanceSide ] on: Error do: [ aBehavior ] ]
 					ifFalse: [ aBehavior ] ]
 			ifFalse: [ aBehavior ]
+]
+
+{ #category : 'accessing' }
+CoPCRelatedCodeContext >> packageForBehavior: aBehavior [
+
+	| behavior package organizer |
+	aBehavior ifNil: [ ^ nil ].
+	behavior := self packageOwnerForBehavior: aBehavior.
+
+	package := [
+		(behavior respondsTo: #package)
+			ifTrue: [ behavior package ]
+			ifFalse: [ nil ] ]
+		on: Error
+		do: [ nil ].
+	package ifNotNil: [ ^ package ].
+
+	organizer := Smalltalk globals at: #RPackageOrganizer ifAbsent: [ nil ].
+	(organizer notNil and: [ organizer respondsTo: #default ]) ifTrue: [
+		^ [
+			organizer default packageOfClass: behavior ]
+			on: Error
+			do: [ nil ] ].
+
+	^ nil
 ]
 
 { #category : 'rendering' }
@@ -336,6 +399,12 @@ CoPCRelatedCodeContext >> sourceForBehavior: aBehavior selector: aSelector [
 		(aBehavior sourceCodeAt: aSelector) asString trimBoth ]
 		on: Error
 		do: [ '' ]
+]
+
+{ #category : 'accessing' }
+CoPCRelatedCodeContext >> samePackageClassLimit [
+
+	^ 24
 ]
 
 { #category : 'accessing' }

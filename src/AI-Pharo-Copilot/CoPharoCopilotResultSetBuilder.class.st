@@ -395,7 +395,9 @@ CoPharoCopilotResultSetBuilder >> classContextFor: aContext prefix: prefixString
 				builtContext ] ].
 
 	semanticContext := self semanticCompletionContextFor: aContext prefix: prefixString.
-	relatedCode := self relatedCodeContextFor: aContext prefix: prefixString.
+	relatedCode := (self shouldIncludeRelatedCodeFor: aContext prefix: prefixString)
+		ifTrue: [ self relatedCodeContextFor: aContext prefix: prefixString ]
+		ifFalse: [ '' ].
 	history := CoPCContextNavigationHistory enabled
 		ifTrue: [ self interactionHistoryForPrompt ]
 		ifFalse: [ '' ].
@@ -3280,6 +3282,15 @@ CoPharoCopilotResultSetBuilder >> shouldOpenSemanticSelectorFastPathFor: aContex
 		behavior: behavior.
 
 	^ receiverTypes isEmpty not
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> shouldIncludeRelatedCodeFor: aContext prefix: prefixString [
+
+	^ (self completionRouter
+		classifyContext: aContext
+		prefix: prefixString
+		builder: self) = #selector
 ]
 
 { #category : 'initialization' }

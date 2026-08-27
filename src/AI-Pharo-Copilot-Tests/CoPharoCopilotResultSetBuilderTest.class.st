@@ -46,6 +46,27 @@ CoPharoCopilotResultSetBuilderTest >> testClassContextComposesSemanticBeforeRepo
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testClassContextSkipsRelatedCodeForVariableRoute [
+
+	| builder context source result |
+	builder := CopilotRecentCodeChangesTestBuilder new.
+	builder
+		semanticCompletionContextForPrompt: 'semantic data';
+		relatedCodeContextForPrompt: '<|file_sep|>Related code: Object>>asString';
+		recentCodeChangesForPrompt: '';
+		interactionHistoryForPrompt: ''.
+	source := 'temporaryName'.
+	context := CoCopilotContextMock new
+		source: source;
+		position: source size;
+		yourself.
+
+	result := builder classContextFor: context prefix: source.
+
+	self deny: (result includesSubstring: '<|file_sep|>Related code:')
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionKindForMessageTailRemainsAvailable [
 
 	| builder context source |
