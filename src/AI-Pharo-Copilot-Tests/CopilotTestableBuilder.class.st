@@ -113,6 +113,12 @@ CopilotTestableBuilder >> fallbackResultSetFor: aContext [
 ]
 
 { #category : 'accessing' }
+CopilotTestableBuilder >> fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo [
+
+	^ { 'modelCompletion' }
+]
+
+{ #category : 'accessing' }
 CopilotTestableBuilder >> semanticEntriesFor: aContext [
 
 	fallbackCallCount := self fallbackCallCount + 1.

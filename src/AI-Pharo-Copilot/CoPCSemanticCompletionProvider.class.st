@@ -1,7 +1,6 @@
 "
-Thin adapter around Complishon's AST heuristic completion builder.
-This is the local semantic lane for Pharo Copilot; callers should not reach
-directly into CoASTHeuristicsResultSetBuilder unless they need compatibility.
+Compatibility shell for the former local semantic completion lane.
+Complishon-backed entries are disabled so Copilot suggestions stay model-only.
 "
 Class {
 	#name : 'CoPCSemanticCompletionProvider',
@@ -50,22 +49,7 @@ CoPCSemanticCompletionProvider >> cacheEntries: entries locationKey: locationKey
 { #category : 'completion' }
 CoPCSemanticCompletionProvider >> entriesFor: aContext [
 
-	| locationKey token cacheKey cached result count entries |
-	locationKey := self locationKeyFor: aContext.
-	token := self tokenFor: aContext locationKey: locationKey.
-	cacheKey := self entryCacheKeyForLocationKey: locationKey token: token.
-	cached := self entryCache at: cacheKey ifAbsent: [ nil ].
-	cached ifNotNil: [ ^ cached ].
-
-	result := self resultSetFor: aContext locationKey: locationKey token: token.
-	result ifNil: [ ^ #() ].
-
-	count := self limit.
-	entries := [ result first: count ]
-		on: Error
-		do: [ #() ].
-	entries := self rankedEntries: entries.
-	^ self cacheEntries: entries locationKey: locationKey token: token
+	^ #()
 ]
 
 { #category : 'completion' }
@@ -166,26 +150,7 @@ CoPCSemanticCompletionProvider >> receiverFor: aContext prefix: prefixString [
 { #category : 'completion' }
 CoPCSemanticCompletionProvider >> resultSetFor: aContext locationKey: locationKey token: tokenString [
 
-	((lastResultSet notNil and: [ lastLocationKey = locationKey ])
-		and: [ lastResultSet respondsTo: #replaceFilterWith: ])
-			ifTrue: [
-				[
-					lastResultSet replaceFilterWith: tokenString.
-					^ lastResultSet ]
-					on: Error
-					do: [ ] ].
-
-	builder ifNotNil: [
-		builder
-			logOldCompletionLookupFor: aContext
-			reason: #semanticHelperLookup ].
-	lastResultSet := [
-		(CoASTHeuristicsResultSetBuilder initializeOnContext: aContext)
-			buildCompletion ]
-		on: Error
-		do: [ nil ].
-	lastLocationKey := locationKey.
-	^ lastResultSet
+	^ nil
 ]
 
 { #category : 'completion' }

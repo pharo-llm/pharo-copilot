@@ -121,7 +121,7 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotBuildClassContex
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompletionWithLocalFallbackWithoutClassContext [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCachedCompletionWithoutClassContext [
 
 	| b ctx entries |
 	b := CopilotTestableBuilder new.
@@ -174,7 +174,7 @@ CoPharoCopilotResultSetBuilderTest >> testFastCacheIgnoresNearMatchForImmediateC
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCacheBeforeSemanticRerank [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCacheWithoutSemanticRerank [
 
 	| b ctx entries |
 	b := CopilotTestableBuilder new.
@@ -199,9 +199,9 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCacheBeforeSem
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalFastPathForSemanticSelectorTail [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionSchedulesCopilotForSemanticSelectorTail [
 
-	| b ctx entries |
+	| b ctx result |
 	b := CopilotTestableBuilder new.
 	ctx := CoCopilotContextMock new
 		behavior: Object;
@@ -210,17 +210,18 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalFastPathForSem
 		yourself.
 	b completionContext: ctx.
 
-	b buildCompletion.
+	result := b buildCompletion.
 
-	entries := b openedEntries.
-	self assert: b fallbackCallCount equals: 1.
-	self assert: entries size equals: 1.
-	self assert: entries first contents equals: 'fallbackCompletion'.
-	self assert: b scheduledDelay isNil
+	self assert: (result isKindOf: CoResultSet).
+	self assert: b fallbackCallCount equals: 0.
+	self assert: b openedEntries isNil.
+	self assert: b scheduledPrefix equals: 'self as'.
+	self deny: b scheduledDelay isNil.
+	self assert: b semanticAstCallCount equals: 0
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesStandaloneFallbackInScriptingContext [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionSchedulesCopilotForStandaloneTokenInScriptingContext [
 
 	| b ctx result |
 	b := CopilotTestableBuilder new.
@@ -233,13 +234,14 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesStandaloneFallbackI
 
 	result := b buildCompletion.
 
-	self assert: result equals: #fallbackResultSet.
-	self assert: b fallbackCallCount equals: 1.
-	self assert: b scheduledDelay isNil
+	self assert: (result isKindOf: CoResultSet).
+	self assert: b fallbackCallCount equals: 0.
+	self assert: b scheduledPrefix equals: 'Ord'.
+	self deny: b scheduledDelay isNil
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesEmptyResultSetWhenStandaloneFallbackFails [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotCallFallbackResultSetForStandaloneToken [
 
 	| b ctx result |
 	b := CopilotNilFallbackTestBuilder new.
@@ -254,8 +256,9 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesEmptyResultSetWhenS
 
 	self deny: result isNil.
 	self assert: (result isKindOf: CoResultSet).
-	self assert: b fallbackCallCount equals: 1.
-	self assert: b scheduledDelay isNil
+	self assert: b fallbackCallCount equals: 0.
+	self assert: b scheduledPrefix equals: 'Ord'.
+	self deny: b scheduledDelay isNil
 ]
 
 { #category : 'tests' }
@@ -365,7 +368,7 @@ CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromWithTextInput [
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesAppendFallbackWhenAISuggestionExists [
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseOnlyAISuggestion [
 
 	| builder context entries |
 	builder := CopilotTestableBuilder new.
@@ -376,14 +379,13 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesAppendFallbackWhenAIS
 		inContext: context
 		contextInfo: Dictionary new.
 
-	self assert: entries size equals: 2.
+	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'aiCompletion'.
-	self assert: entries second contents equals: 'fallbackCompletion'.
-	self assert: builder fallbackCallCount equals: 1
+	self assert: builder fallbackCallCount equals: 0
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSuppressInvalidSemanticSelectorBehindFallback [
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesKeepModelSuggestionWithoutSemanticFallback [
 
 	| builder context contextInfo entries |
 	builder := CopilotTestableBuilder new.
@@ -401,14 +403,14 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesSuppressInvalidSemant
 		inContext: context
 		contextInfo: contextInfo.
 
-	self assert: builder fallbackCallCount equals: 1.
+	self assert: builder fallbackCallCount equals: 0.
 	self assert: entries size equals: 1.
-	self assert: entries first contents equals: 'fallbackCompletion'.
-	self assert: ((contextInfo at: #semanticGate) at: #status) equals: #low
+	self assert: entries first contents equals: 'DefinitelyNotASelector'.
+	self deny: (contextInfo includesKey: #semanticGate)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesDoNotFetchFallbackWhenSemanticSelectorIsValid [
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesKeepValidModelSuggestionWithoutSemanticGate [
 
 	| builder context contextInfo entries |
 	builder := CopilotTestableBuilder new.
@@ -429,11 +431,11 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesDoNotFetchFallbackWhe
 	self assert: builder fallbackCallCount equals: 0.
 	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'String'.
-	self assert: ((contextInfo at: #semanticGate) at: #status) equals: #high
+	self deny: (contextInfo includesKey: #semanticGate)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISuggestionExists [
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesAreEmptyWhenNoAISuggestionExists [
 
 	| builder context entries |
 	builder := CopilotTestableBuilder new.
@@ -444,65 +446,36 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISu
 		inContext: context
 		contextInfo: Dictionary new.
 
+	self assert: entries isEmpty.
+	self assert: builder fallbackCallCount equals: 0
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testProcessCompletionUsesModelSuggestionsWithoutSemanticFusion [
+
+	| builder context contextInfo entries |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		source: 'self ';
+		position: 'self ' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'self ';
+		at: #suffix put: '';
+		yourself.
+
+	builder
+		processCompletionFor: context
+		prefix: 'self '
+		suffix: ''
+		contextInfo: contextInfo.
+
+	entries := builder openedEntries.
+	self assert: builder fallbackCallCount equals: 0.
 	self assert: entries size equals: 1.
-	self assert: builder fallbackCallCount equals: 1
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testFuseModelTailMatchingSemanticSelectorKeepsModelFirst [
-
-	| builder context contextInfo result gate |
-	builder := CoPharoCopilotResultSetBuilder new.
-	context := CoCopilotContextMock new
-		behavior: Object;
-		source: 'self as';
-		position: 'self as' size;
-		yourself.
-	contextInfo := Dictionary new
-		at: #prefix put: 'self as';
-		yourself.
-
-	result := builder
-		fuseModelSuggestions: { 'String' }
-		semanticEntries: {
-			CoCopilotEntry contents: 'asString'.
-			CoCopilotEntry contents: 'asArray' }
-		context: context
-		contextInfo: contextInfo.
-
-	self assert: result equals: { 'String'. 'asArray' }.
-	self assert: (contextInfo at: #semanticFusionApplied).
-	gate := contextInfo at: #semanticGate.
-	self assert: (gate at: #status) equals: #high.
-	self assert: (gate at: #heuristicTop) equals: 'asString'
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testFuseInvalidModelSuggestionFallsBehindSemanticCandidates [
-
-	| builder context contextInfo result gate |
-	builder := CoPharoCopilotResultSetBuilder new.
-	context := CoCopilotContextMock new
-		behavior: Object;
-		source: 'self as';
-		position: 'self as' size;
-		yourself.
-	contextInfo := Dictionary new
-		at: #prefix put: 'self as';
-		yourself.
-
-	result := builder
-		fuseModelSuggestions: { 'DefinitelyNotASelector' }
-		semanticEntries: {
-			CoCopilotEntry contents: 'asString'.
-			CoCopilotEntry contents: 'asArray' }
-		context: context
-		contextInfo: contextInfo.
-
-	self assert: result equals: { 'asString'. 'asArray'. 'DefinitelyNotASelector' }.
-	self assert: (contextInfo at: #semanticFusionApplied).
-	gate := contextInfo at: #semanticGate.
-	self assert: (gate at: #status) equals: #semanticFirst
+	self assert: entries first contents equals: 'modelCompletion'.
+	self deny: (contextInfo includesKey: #semanticFusionApplied).
+	self deny: (contextInfo includesKey: #semanticGate)
 ]
 
 { #category : 'tests' }
@@ -873,7 +846,7 @@ CoPharoCopilotResultSetBuilderTest >> testLiveEditorTypedAheadDoesNotCountAsStal
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorFastPathRequiresTwoCharacterToken [
+CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorFastPathIsDisabled [
 
 	| builder oneCharacter twoCharacters |
 	builder := CoPharoCopilotResultSetBuilder new.
@@ -889,7 +862,7 @@ CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorFastPathRequiresTwoCha
 		yourself.
 
 	self deny: (builder shouldOpenSemanticSelectorFastPathFor: oneCharacter prefix: oneCharacter source).
-	self assert: (builder shouldOpenSemanticSelectorFastPathFor: twoCharacters prefix: twoCharacters source)
+	self deny: (builder shouldOpenSemanticSelectorFastPathFor: twoCharacters prefix: twoCharacters source)
 ]
 
 { #category : 'tests' }
@@ -1117,7 +1090,7 @@ CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenOutsideScriptingContext
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterAssignmentUsesFallbackCompletion [
+CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterAssignmentDoesNotUseFallbackCompletion [
 
 	| builder context source |
 	builder := CopilotTestableBuilder new.
@@ -1128,13 +1101,13 @@ CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterAssignmentUsesFall
 		position: source size;
 		yourself.
 
-	self assert: (builder
+	self deny: (builder
 		shouldUseFallbackCompletionForContext: context
 		prefix: source)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterKeywordArgumentUsesFallbackCompletion [
+CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterKeywordArgumentDoesNotUseFallbackCompletion [
 
 	| builder context source |
 	builder := CopilotTestableBuilder new.
@@ -1145,13 +1118,13 @@ CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterKeywordArgumentUse
 		position: source size;
 		yourself.
 
-	self assert: (builder
+	self deny: (builder
 		shouldUseFallbackCompletionForContext: context
 		prefix: source)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterStatementSeparatorUsesFallbackCompletion [
+CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterStatementSeparatorDoesNotUseFallbackCompletion [
 
 	| builder context source |
 	builder := CopilotTestableBuilder new.
@@ -1162,13 +1135,13 @@ CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenAfterStatementSeparator
 		position: source size;
 		yourself.
 
-	self assert: (builder
+	self deny: (builder
 		shouldUseFallbackCompletionForContext: context
 		prefix: source)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenUsesFallbackCompletion [
+CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenDoesNotUseFallbackCompletion [
 
 	| builder context |
 	builder := CopilotTestableBuilder new.
@@ -1178,7 +1151,7 @@ CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenUsesFallbackCompletion 
 		position: 3;
 		yourself.
 
-	self assert: (builder
+	self deny: (builder
 		shouldUseFallbackCompletionForContext: context
 		prefix: 'Ord')
 ]
