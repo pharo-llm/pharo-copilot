@@ -1,6 +1,7 @@
 "
-Compatibility shell for the former local semantic completion lane.
-Complishon-backed entries are disabled so Copilot suggestions stay model-only.
+Thin adapter over Complishon's local AST/heuristic completion lane.
+It lets Pharo Copilot keep normal local completions available while model
+suggestions are requested in the background.
 "
 Class {
 	#name : 'CoPCSemanticCompletionProvider',
@@ -49,7 +50,26 @@ CoPCSemanticCompletionProvider >> cacheEntries: entries locationKey: locationKey
 { #category : 'completion' }
 CoPCSemanticCompletionProvider >> entriesFor: aContext [
 
-	^ #()
+	| locationKey token key cached result rawEntries entries |
+	aContext ifNil: [ ^ #() ].
+
+	locationKey := self locationKeyFor: aContext.
+	token := self tokenFor: aContext locationKey: locationKey.
+	key := self entryCacheKeyForLocationKey: locationKey token: token.
+	cached := self entryCache at: key ifAbsent: [ nil ].
+	cached ifNotNil: [ ^ cached ].
+
+	result := self
+		resultSetFor: aContext
+		locationKey: locationKey
+		token: token.
+	result ifNil: [ ^ self cacheEntries: #() locationKey: locationKey token: token ].
+
+	rawEntries := [ result first: self limit ]
+		on: Error
+		do: [ #() ].
+	entries := self rankedEntries: rawEntries.
+	^ self cacheEntries: entries locationKey: locationKey token: token
 ]
 
 { #category : 'completion' }
@@ -150,7 +170,11 @@ CoPCSemanticCompletionProvider >> receiverFor: aContext prefix: prefixString [
 { #category : 'completion' }
 CoPCSemanticCompletionProvider >> resultSetFor: aContext locationKey: locationKey token: tokenString [
 
-	^ nil
+	^ [
+		(CoASTHeuristicsResultSetBuilder initializeOnContext: aContext)
+			buildCompletion ]
+		on: Error
+		do: [ nil ]
 ]
 
 { #category : 'completion' }

@@ -53,10 +53,17 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext contextInfo: contextInfo [
 
-	"Compatibility no-op: Copilot completions are no longer enriched with Complishon entries."
-	| combined |
+	| combined fallback |
 	combined := OrderedCollection new.
 	entryCollection ifNotNil: [ combined addAll: entryCollection ].
+	fallback := self
+		fallbackCompletionEntriesFor: aContext
+		excluding: combined.
+	contextInfo ifNotNil: [
+		contextInfo
+			at: #fallbackCompletionCount put: fallback size;
+			at: #fallbackCompletionPresent put: fallback isEmpty not ].
+	combined addAll: fallback.
 	^ combined asArray
 ]
 
@@ -215,7 +222,8 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	| context snapshot prefix suffix contextInfo delay cached |
 	context := completionContext.
 
-	(self shouldRequestCompletionForContext: context) ifFalse: [ ^ self emptyResultSet ].
+	(self shouldRequestCompletionForContext: context) ifFalse: [
+		^ self localCompletionResultSetFor: context ].
 
 	snapshot := self contextSnapshotFor: context.
 	prefix := snapshot at: #prefix.
@@ -246,7 +254,7 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		contextInfo: contextInfo
 		delayMilliseconds: delay.
 
-	^ self emptyResultSet
+	^ self localCompletionResultSetFor: context
 ]
 
 { #category : 'new' }
@@ -553,7 +561,10 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 		entry label: (self menuLabelForSuggestion: each contextInfo: fakeContextInfo).
 		entry ].
 
-	^ copilotEntries asArray
+	^ self
+		appendFallbackCompletionEntriesTo: copilotEntries
+		inContext: aContext
+		contextInfo: fakeContextInfo
 ]
 
 { #category : 'new' }
@@ -580,7 +591,10 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 
 		entry ].
 
-	^ copilotEntries asArray
+	^ self
+		appendFallbackCompletionEntriesTo: copilotEntries
+		inContext: aContext
+		contextInfo: contextInfo
 ]
 
 { #category : 'new' }
@@ -1028,7 +1042,10 @@ CoPharoCopilotResultSetBuilder >> extractResponseContentFromRaw: rawResponseStri
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> fallbackCompletionEntriesFor: aContext excluding: existingEntries [
 
-	^ #()
+	self logOldCompletionLookupFor: aContext reason: #menuFusion.
+	^ self
+		semanticFallbackEntriesFrom: (self semanticEntriesFor: aContext)
+		excluding: existingEntries
 ]
 
 { #category : 'new' }
@@ -1036,7 +1053,7 @@ CoPharoCopilotResultSetBuilder >> semanticFallbackEntriesFrom: rawEntries exclud
 
 	| seen |
 	seen := Set new.
-	existingEntries do: [ :each |
+	(existingEntries ifNil: [ #() ]) do: [ :each |
 		| contents |
 		contents := self entryContentsFor: each.
 		contents isEmpty ifFalse: [ seen add: contents ] ].
@@ -1104,16 +1121,24 @@ CoPharoCopilotResultSetBuilder >> fallbackMenuPositionFor: aContext [
 
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> fallbackResultSetFor: aContext [
-	"Compatibility hook. Full Complishon reroutes are disabled."
+	"Build the same AST/heuristic result set used by CoCompletionEngine in Complishon."
 
-	^ nil
+	self logOldCompletionLookupFor: aContext reason: #localResultSet.
+	^ [
+		(CoASTHeuristicsResultSetBuilder initializeOnContext: aContext)
+			buildCompletion ]
+		on: Error
+		do: [ nil ]
 ]
 
 { #category : 'semantic completion' }
 CoPharoCopilotResultSetBuilder >> semanticProvider [
-	"Compatibility accessor. The builder no longer creates the Complishon-backed provider."
 
-	^ semanticProvider
+	^ semanticProvider ifNil: [
+		semanticProvider := CoPCSemanticCompletionProvider new
+			builder: self;
+			limit: self fallbackCompletionLimit;
+			yourself ]
 ]
 
 { #category : 'semantic completion' }
@@ -1125,7 +1150,7 @@ CoPharoCopilotResultSetBuilder >> semanticProvider: aProvider [
 { #category : 'semantic completion' }
 CoPharoCopilotResultSetBuilder >> semanticEntriesFor: aContext [
 
-	^ #()
+	^ self semanticProvider entriesFor: aContext
 ]
 
 { #category : 'new' }
@@ -1365,6 +1390,18 @@ CoPharoCopilotResultSetBuilder >> hasStaleContextFor: aContext expectedPrefix: e
 
 	^ (currentPrefix beginsWith: expectedPrefix) not
 		or: [ currentSuffix ~= expectedSuffix ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> hasEnoughSourceOnlyDataForCopilot: sourceString position: positionInteger [
+	"Source-only editors such as Playground/Workspace do not provide class context.
+	Only ask the model when the local source itself is large enough to be useful."
+
+	| source |
+	source := (sourceString ifNil: [ '' ]) asString trimBoth.
+	source size < self minimumSourceOnlyCompletionLength ifTrue: [ ^ false ].
+	positionInteger < self minimumPrefixLength ifTrue: [ ^ false ].
+	^ true
 ]
 
 { #category : 'initialization' }
@@ -1937,6 +1974,14 @@ CoPharoCopilotResultSetBuilder >> logStaleContextForExpectedPrefix: expectedPref
 	^ self
 ]
 
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> localCompletionResultSetFor: aContext [
+	"Return the regular Complishon result set. This keeps local completions available
+	immediately while Copilot is scheduled in the background."
+
+	^ (self fallbackResultSetFor: aContext) ifNil: [ self emptyResultSet ]
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> menuClosed [
 	"Called when the menu is closed externally."
@@ -2066,6 +2111,13 @@ CoPharoCopilotResultSetBuilder >> minimumPrefixLength [
 	"Minimum prefix length required before we request a completion."
 
 	^ CopilotSettings minimumPrefixLength
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> minimumSourceOnlyCompletionLength [
+	"Minimum source size before Copilot is allowed in editors without class context."
+
+	^ 120
 ]
 
 { #category : 'new' }
@@ -2252,6 +2304,20 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 ]
 
 { #category : 'new' }
+CoPharoCopilotResultSetBuilder >> openFallbackCompletionMenuFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix [
+
+	| entries position |
+	(self hasStaleContextFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix)
+		ifTrue: [ ^ self ].
+
+	entries := self fallbackCompletionEntriesFor: aContext excluding: #().
+	entries isEmpty ifTrue: [ ^ self ].
+
+	position := self menuPositionForContextOrDefault: aContext.
+	self openCompletionMenuFor: aContext entries: entries position: position
+]
+
+{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> openCachedSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
 	| entries position info |
@@ -2328,8 +2394,15 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			suffix: suffixString
 			contextInfo: contextInfo
 	]
-		on: Error
-		do: [ :ex |  ]
+	on: Error
+	do: [ :ex |
+		[
+			self
+				openFallbackCompletionMenuFor: aContext
+				expectedPrefix: prefixString
+				suffix: suffixString ]
+			on: Error
+			do: [ :ignored | ] ]
 
 ]
 
@@ -3124,8 +3197,10 @@ CoPharoCopilotResultSetBuilder >> selectorHeaderFor: aString [
 
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
-	"NO trigger while cursor is inside the same word."
-	| pair source pos before after |
+	"Request Copilot for normal method contexts, and for source-only editors only
+	when the typed source is large enough to be useful."
+	| pair source pos before after hasBehavior |
+	self shouldUseCopilotSuggestions ifFalse: [ ^ false ].
 	aContext ifNil: [ ^ false ].
 
 	pair := self safeSourceAndPositionFor: aContext.
@@ -3142,13 +3217,19 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
 
 	(self isInsideCommentOrStringIn: source position: pos) ifTrue: [ ^ false ].
 
+	hasBehavior := (self behaviorFor: aContext) notNil.
+	((self isScriptingContext: aContext) or: [ hasBehavior not ]) ifTrue: [
+		^ self
+			hasEnoughSourceOnlyDataForCopilot: source
+			position: pos ].
+
 	^ true
 ]
 
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> shouldUseFallbackCompletionForContext: aContext prefix: prefixString [
 
-	^ false
+	^ aContext notNil
 ]
 
 { #category : 'private' }
@@ -3161,9 +3242,22 @@ CoPharoCopilotResultSetBuilder >> shouldOpenSemanticSelectorFastPathFor: aContex
 CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForPrefix: prefixString suffix: suffixString [
 	"Decide whether it's worth requesting a completion for the current prefix/suffix."
 
+	self shouldUseCopilotSuggestions ifFalse: [ ^ false ].
 	prefixString ifNil: [ ^ false ].
 	(prefixString size < self minimumPrefixLength) ifTrue: [ ^ false ].
 	^ true
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> shouldUseCopilotSuggestions [
+	"Answer whether AI suggestions should be requested at all. The completion engine
+	can still stay installed when this is false; it delegates to Complishon."
+
+	^ [
+		CopilotSettings copilotEnabled and: [
+			(CopilotSettings isNullModelName: CopilotSettings modelName) not ] ]
+		on: Error
+		do: [ false ]
 ]
 
 CoPharoCopilotResultSetBuilder >> sortedSelectorsFor: aBehavior [
