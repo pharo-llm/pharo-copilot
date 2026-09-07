@@ -133,24 +133,16 @@ CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContex
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
 
-	| adjustedContents entries position typedAhead |
+	| entries position |
 
 	(self hasStaleContextFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix)
 		ifTrue: [ ^ self logStaleContextForExpectedPrefix: expectedPrefix suffix: expectedSuffix context: aContext ].
 
-	typedAhead := self
-		typedAheadIn: aContext
-		expectedPrefix: expectedPrefix
-		suffix: expectedSuffix.
-	adjustedContents := self
-		stripAlreadyTyped: typedAhead
-		fromSuggestions: contentCollection.
-
 	entries := self
-		completionEntriesFrom: adjustedContents
+		completionEntriesFrom: contentCollection
 		inContext: aContext
 		contextInfo: contextInfo.
-	entries isEmpty ifTrue: [ ^ self logNoEntriesAfterCleaningFor: adjustedContents ].
+	entries isEmpty ifTrue: [ ^ self logNoEntriesAfterCleaningFor: contentCollection ].
 
 	position := self menuPositionForContextOrDefault: aContext.
 
@@ -2138,7 +2130,7 @@ CoPharoCopilotResultSetBuilder >> normalizeSuggestion: rawResponse forPrefix: pr
 	text := self removeEchoedPrefix: raw prefix: prefixString. 
 	cleaned := self cleanedContentFrom: text. 
 	typedFragment := self trailingWordFragmentIn: prefixString.
-	cleaned := self stripTypedFragment: typedFragment fromSuggestion: cleaned. 
+	cleaned := self wholeTokenSuggestion: cleaned typedFragment: typedFragment.
 	(self isTemplateLeakOrPromptEcho: cleaned rawResponse: raw prefix: prefixString) ifTrue: [ ^ '' ].
 
 	(self isLikelyContextEcho: cleaned forPrefix: prefixString typedFragment: typedFragment) ifTrue: [ ^ '' ].
@@ -2168,8 +2160,8 @@ CoPharoCopilotResultSetBuilder >> normalizedCompletionContentsFrom: contentColle
 
 	^ ((contentCollection ifNil: [ #() ]) collect: [ :each |
 			self
-				stripTypedFragment: typedFragment
-				fromSuggestion: (self cleanedContentFrom: each) ])
+				wholeTokenSuggestion: (self cleanedContentFrom: each)
+				typedFragment: typedFragment ])
 		select: [ :each |
 			each isEmpty not and: [
 				self
@@ -3340,6 +3332,28 @@ CoPharoCopilotResultSetBuilder >> stripTypedFragment: typedFragment fromSuggesti
 		^ (trimmed allButFirst: fragment size) trimLeft ].
 
 	^ suggestion
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> wholeTokenSuggestion: suggestionString typedFragment: typedFragment [
+
+	| suggestion fragment trimmed first |
+	suggestion := (suggestionString ifNil: [ '' ]) asString.
+	fragment := (typedFragment ifNil: [ '' ]) asString.
+
+	(suggestion isEmpty or: [ fragment isEmpty ]) ifTrue: [ ^ suggestion ].
+	((suggestion beginsWith: fragment) or: [
+		suggestion asLowercase beginsWith: fragment asLowercase ])
+			ifTrue: [ ^ suggestion ].
+
+	trimmed := suggestion trimLeft.
+	trimmed size ~= suggestion size ifTrue: [ ^ suggestion ].
+
+	first := suggestion first.
+	((self isWordChar: first) or: [ first = $: ])
+		ifFalse: [ ^ suggestion ].
+
+	^ fragment , suggestion
 ]
 
 { #category : 'private' }
