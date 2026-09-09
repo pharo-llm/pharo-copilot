@@ -17,13 +17,6 @@ Class {
 	#package : 'AI-Pharo-Copilot'
 }
 
-{ #category : 'initialization' }
-CoPCSemanticCompletionProvider >> initialize [
-
-	super initialize.
-	limit := 10
-]
-
 { #category : 'accessing' }
 CoPCSemanticCompletionProvider >> builder [
 
@@ -85,6 +78,13 @@ CoPCSemanticCompletionProvider >> entryCacheKeyForLocationKey: locationKey token
 	^ {
 		locationKey.
 		tokenString ifNil: [ '' ] ifNotNil: [ tokenString asString ] }
+]
+
+{ #category : 'initialization' }
+CoPCSemanticCompletionProvider >> initialize [
+
+	super initialize.
+	limit := 10
 ]
 
 { #category : 'accessing' }

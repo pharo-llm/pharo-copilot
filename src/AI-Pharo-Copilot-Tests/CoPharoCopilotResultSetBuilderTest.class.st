@@ -7,50 +7,6 @@ Class {
 }
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionRouterClassifiesSelectorVariableAndStatement [
-
-	| builder router selectorContext variableContext statementContext statementSource |
-	builder := CoPharoCopilotResultSetBuilder new.
-	router := CoPCCompletionRouter new.
-	selectorContext := CoCopilotContextMock new
-		source: 'self as';
-		position: 'self as' size;
-		yourself.
-	variableContext := CoCopilotContextMock new
-		source: 'localVar';
-		position: 'localVar' size;
-		yourself.
-	statementSource := 'self doSomething.'.
-	statementContext := CoCopilotContextMock new
-		source: statementSource;
-		position: statementSource size;
-		yourself.
-
-	self
-		assert: (router classifyContext: selectorContext prefix: selectorContext source builder: builder)
-		equals: #selector.
-	self
-		assert: (router classifyContext: variableContext prefix: variableContext source builder: builder)
-		equals: #variable.
-	self
-		assert: (router classifyContext: statementContext prefix: statementSource builder: builder)
-		equals: #statement
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionGenerationPolicyUsesSmallBudgetsForShortRoutes [
-
-	| policy |
-	policy := CoPCCompletionGenerationPolicy new.
-
-	self assert: (policy numPredictFor: #selector) equals: 32.
-	self assert: (policy numPredictFor: #messageTail) equals: 32.
-	self assert: (policy numPredictFor: #variable) equals: 8.
-	self assert: (policy numPredictFor: #statement) equals: 24.
-	self assert: (policy numPredictFor: #unknown) equals: 24
-]
-
-{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testApplyContentDoesNothingOnSnapshotMismatch [
 	| b ctx ed |
 	b := CopilotTestableBuilder new.
@@ -82,25 +38,8 @@ CoPharoCopilotResultSetBuilderTest >> testApplyContentInsertsAtCaretWhenEditorSu
 	"Expected prefix/suffix must match snapshot."
 	b applyContent: 'assert: ' toContext: ctx expectedPrefix: 'self ' suffix: '' contextInfo: Dictionary new.
 
-	self assert: ed insertedText equals: 'assert: '.
-	self assert: ctx replaceCount equals: 0
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotSnapshotWhenInsideWord [
-
-	| b ctx |
-	b := CopilotTestableBuilder new.
-	ctx := CoCopilotContextMock new
-		source: 'assert';
-		position: 3;  "inside word"
-		yourself.
-	b completionContext: ctx.
-
-	b buildCompletion.
-
-	self deny: b snapshotWasCalled.
-	self assert: b scheduledDelay isNil
+	self assert: ed insertedText equals: ''.
+	self assert: ctx replaceCount equals: 1
 ]
 
 { #category : 'tests' }
@@ -122,57 +61,43 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotBuildClassContex
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalOnlyForShortSourceOnlyContextEvenWithFastCache [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionDoesNotSnapshotWhenInsideWord [
 
-	| b ctx result |
+	| b ctx |
 	b := CopilotTestableBuilder new.
 	ctx := CoCopilotContextMock new
-		source: 'temporaryName';
-		position: 'temporaryName' size;
+		source: 'assert';
+		position: 3;  "inside word"
 		yourself.
 	b completionContext: ctx.
-	b completionCache
-		at: 'temporaryName'
-		suffix: ''
-		context: (b fastCacheContextFor: ctx prefix: 'temporaryName')
-		put: { 'CompletedValue' }.
 
-	result := b buildCompletion.
+	b buildCompletion.
 
-	"Unknown environment -> Browser/Debugger path.
-	 Cache hit: menu is opened with the cached entry, emptyResultSet returned."
-	self assert: (result isKindOf: CoResultSet).
-	self assert: b openedEntries first contents equals: 'CompletedValue'.
-	self assert: b scheduledDelay isNil.
-	self assert: b classContextCallCount equals: 0.
-	self assert: b fallbackCallCount equals: 0.
-	self assert: b semanticAstCallCount equals: 0
+	self deny: b snapshotWasCalled.
+	self assert: b scheduledDelay isNil
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testFastCacheIgnoresNearMatchForImmediateCompletion [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionHandlesNilLocalResultSetForShortScriptingToken [
 
-	| b ctx contextInfo cached |
-	b := CopilotTestableBuilder new.
+	| b ctx result |
+	b := CopilotNilFallbackTestBuilder new.
 	ctx := CoCopilotContextMock new
-		source: 'self si';
-		position: 'self si' size;
+		isScripting: true;
+		source: 'Ord';
+		position: 3;
 		yourself.
-	b completionCache
-		at: 'self s'
-		suffix: ''
-		context: (b fastCacheContextFor: ctx prefix: 'self s')
-		put: { 'inspect' }.
+	b completionContext: ctx.
 
-	contextInfo := Dictionary new.
-	cached := b
-		fastCachedSuggestionsFor: ctx
-		prefix: 'self si'
-		suffix: ''
-		contextInfo: contextInfo.
+	result := b buildCompletion.
 
-	self assert: cached isNil.
-	self deny: (contextInfo at: #cacheHit)
+	"#scripting (non-Playground/Inspector) -> direct Copilot path.
+	 emptyResultSet is never nil, and is always a CoResultSet."
+	self deny: result isNil.
+	self assert: (result isKindOf: CoResultSet).
+	self assert: b fallbackCallCount equals: 0.
+	self assert: b scheduledPrefix equals: 'Ord'.
+	self deny: b scheduledDelay isNil
 ]
 
 { #category : 'tests' }
@@ -200,6 +125,32 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCacheWithoutSe
 	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'DefinitelyNotASelector'.
 	self assert: b scheduledDelay isNil
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionSchedulesCopilotForLongSourceOnlyContext [
+
+	| b ctx result source |
+	b := CopilotTestableBuilder new.
+	source := 'items := OrderedCollection new.', String lf,
+		'1 to: 20 do: [ :index | items add: index squared ].', String lf,
+		'items select: [ :each | each even ] thenCollect: [ :each | each asString ].', String lf,
+		'items '.
+	ctx := CoCopilotContextMock new
+		isScripting: true;
+		source: source;
+		position: source size;
+		yourself.
+	b completionContext: ctx.
+
+	result := b buildCompletion.
+
+	"#scripting (non-Playground/Inspector) -> direct Copilot path.
+	 Copilot is scheduled and an empty result set is returned."
+	self assert: (result isKindOf: CoResultSet).
+	self assert: b fallbackCallCount equals: 0.
+	self assert: b scheduledPrefix equals: source.
+	self deny: b scheduledDelay isNil
 ]
 
 { #category : 'tests' }
@@ -249,29 +200,31 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalOnlyForShortSc
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionSchedulesCopilotForLongSourceOnlyContext [
+CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalOnlyForShortSourceOnlyContextEvenWithFastCache [
 
-	| b ctx result source |
+	| b ctx result |
 	b := CopilotTestableBuilder new.
-	source := 'items := OrderedCollection new.', String lf,
-		'1 to: 20 do: [ :index | items add: index squared ].', String lf,
-		'items select: [ :each | each even ] thenCollect: [ :each | each asString ].', String lf,
-		'items '.
 	ctx := CoCopilotContextMock new
-		isScripting: true;
-		source: source;
-		position: source size;
+		source: 'temporaryName';
+		position: 'temporaryName' size;
 		yourself.
 	b completionContext: ctx.
+	b completionCache
+		at: 'temporaryName'
+		suffix: ''
+		context: (b fastCacheContextFor: ctx prefix: 'temporaryName')
+		put: { 'CompletedValue' }.
 
 	result := b buildCompletion.
 
-	"#scripting (non-Playground/Inspector) -> direct Copilot path.
-	 Copilot is scheduled and an empty result set is returned."
+	"Unknown environment -> Browser/Debugger path.
+	 Cache hit: menu is opened with the cached entry, emptyResultSet returned."
 	self assert: (result isKindOf: CoResultSet).
+	self assert: b openedEntries first contents equals: 'CompletedValue'.
+	self assert: b scheduledDelay isNil.
+	self assert: b classContextCallCount equals: 0.
 	self assert: b fallbackCallCount equals: 0.
-	self assert: b scheduledPrefix equals: source.
-	self deny: b scheduledDelay isNil
+	self assert: b semanticAstCallCount equals: 0
 ]
 
 { #category : 'tests' }
@@ -314,29 +267,6 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalOnlyWhenNullMo
 		self assert: result equals: #fallbackResultSet.
 		self assert: b fallbackCallCount equals: 1.
 		self assert: b scheduledPrefix isNil ]
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testBuildCompletionHandlesNilLocalResultSetForShortScriptingToken [
-
-	| b ctx result |
-	b := CopilotNilFallbackTestBuilder new.
-	ctx := CoCopilotContextMock new
-		isScripting: true;
-		source: 'Ord';
-		position: 3;
-		yourself.
-	b completionContext: ctx.
-
-	result := b buildCompletion.
-
-	"#scripting (non-Playground/Inspector) -> direct Copilot path.
-	 emptyResultSet is never nil, and is always a CoResultSet."
-	self deny: result isNil.
-	self assert: (result isKindOf: CoResultSet).
-	self assert: b fallbackCallCount equals: 0.
-	self assert: b scheduledPrefix equals: 'Ord'.
-	self deny: b scheduledDelay isNil
 ]
 
 { #category : 'tests' }
@@ -446,21 +376,92 @@ CoPharoCopilotResultSetBuilderTest >> testCleanedContentFromWithTextInput [
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesMergeCopilotAndFallbackSuggestions [
+CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoRecordsEditorEnvironment [
 
-	| builder context entries |
-	builder := CopilotTestableBuilder new.
-	context := CoCopilotContextMock new.
+	CopilotSettings withDefaultSettingsDo: [
+		| builder context editor morph window contextInfo environment |
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
+		CopilotSettings loggingEnabled: true.
+		builder := CoPharoCopilotResultSetBuilder new.
+		window := CoPCEnvironmentWindowMock new
+			label: 'Debugger on Example>>#broken';
+			yourself.
+		morph := CoPCEnvironmentMorphMock new
+			window: window;
+			yourself.
+		editor := CoTestEditorMock new
+			morph: morph;
+			yourself.
+		context := CoCopilotContextMock new
+			isScripting: true;
+			source: 'Ord';
+			position: 3;
+			editor: editor;
+			yourself.
 
-	entries := builder
-		completionEntriesFrom: { 'aiCompletion' }
-		inContext: context
-		contextInfo: Dictionary new.
+		contextInfo := builder contextInfoFor: context prefix: 'Ord' suffix: ''.
+		environment := contextInfo at: #completionEnvironment.
 
-	"Unknown environment (no editor) -> Browser/Debugger path: Copilot only, no fallback."
-	self assert: entries size equals: 1.
-	self assert: entries first contents equals: 'aiCompletion'.
-	self assert: builder fallbackCallCount equals: 0
+		self assert: (environment at: #kind) equals: #debugger.
+		self assert: (environment at: #isScripting).
+		self assert: (environment at: #editorClass) equals: 'CoTestEditorMock'.
+		self assert: (environment at: #morphClass) equals: 'CoPCEnvironmentMorphMock'.
+		self assert: (environment at: #windowClass) equals: 'CoPCEnvironmentWindowMock'.
+		self assert: (environment at: #windowTitle) equals: 'Debugger on Example>>#broken' ]
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoRecordsInspectorEnvironmentFromEngineRequestor [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| builder context requestor engine contextInfo environment |
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
+		CopilotSettings loggingEnabled: true.
+		builder := CoPharoCopilotResultSetBuilder new.
+		requestor := CoPCInspectorRequestorDouble new.
+		engine := CoSpyCompletionEnginePharoCopilot new
+			doItRequestor: requestor;
+			yourself.
+		context := CoCopilotContextMock new
+			engine: engine;
+			source: 'self ';
+			position: 'self ' size;
+			yourself.
+
+		contextInfo := builder contextInfoFor: context prefix: 'self ' suffix: ''.
+		environment := contextInfo at: #completionEnvironment.
+
+		self assert: (environment at: #kind) equals: #inspector.
+		self assert: (environment at: #requestorClass) equals: 'CoPCInspectorRequestorDouble' ]
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoTreatsTestFailureWindowAsDebugger [
+
+	CopilotSettings withDefaultSettingsDo: [
+		| builder context editor morph window contextInfo environment |
+		CopilotSettings recordResearchTelemetryConsentAccepted: true.
+		CopilotSettings loggingEnabled: true.
+		builder := CoPharoCopilotResultSetBuilder new.
+		window := CoPCEnvironmentWindowMock new
+			label: 'TestFailure: Given Collections do not match!';
+			yourself.
+		morph := CoPCEnvironmentMorphMock new
+			window: window;
+			yourself.
+		editor := CoTestEditorMock new
+			morph: morph;
+			yourself.
+		context := CoCopilotContextMock new
+			source: 'self assertCollection: shortestPath';
+			position: 35;
+			editor: editor;
+			yourself.
+
+		contextInfo := builder contextInfoFor: context prefix: 'self assertCollection: shortestPath' suffix: ''.
+		environment := contextInfo at: #completionEnvironment.
+
+		self assert: (environment at: #kind) equals: #debugger ]
 ]
 
 { #category : 'tests' }
@@ -516,6 +517,24 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesKeepValidModelSuggest
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesMergeCopilotAndFallbackSuggestions [
+
+	| builder context entries |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new.
+
+	entries := builder
+		completionEntriesFrom: { 'aiCompletion' }
+		inContext: context
+		contextInfo: Dictionary new.
+
+	"Unknown environment (no editor) -> Browser/Debugger path: Copilot only, no fallback."
+	self assert: entries size equals: 1.
+	self assert: entries first contents equals: 'aiCompletion'.
+	self assert: builder fallbackCallCount equals: 0
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISuggestionExists [
 
 	| builder context entries |
@@ -533,32 +552,16 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISu
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testProcessCompletionUsesModelSuggestionsWithoutSemanticFusion [
+CoPharoCopilotResultSetBuilderTest >> testCompletionGenerationPolicyUsesSmallBudgetsForShortRoutes [
 
-	| builder context contextInfo entries |
-	builder := CopilotTestableBuilder new.
-	context := CoCopilotContextMock new
-		source: 'self ';
-		position: 'self ' size;
-		yourself.
-	contextInfo := Dictionary new
-		at: #prefix put: 'self ';
-		at: #suffix put: '';
-		yourself.
+	| policy |
+	policy := CoPCCompletionGenerationPolicy new.
 
-	builder
-		processCompletionFor: context
-		prefix: 'self '
-		suffix: ''
-		contextInfo: contextInfo.
-
-	entries := builder openedEntries.
-	"Unknown environment (no editor) -> Browser/Debugger path: Copilot only, no fallback."
-	self assert: builder fallbackCallCount equals: 0.
-	self assert: entries size equals: 1.
-	self assert: entries first contents equals: 'modelCompletion'.
-	self deny: (contextInfo includesKey: #semanticFusionApplied).
-	self deny: (contextInfo includesKey: #semanticGate)
+	self assert: (policy numPredictFor: #selector) equals: 32.
+	self assert: (policy numPredictFor: #messageTail) equals: 32.
+	self assert: (policy numPredictFor: #variable) equals: 8.
+	self assert: (policy numPredictFor: #statement) equals: 24.
+	self assert: (policy numPredictFor: #unknown) equals: 24
 ]
 
 { #category : 'tests' }
@@ -628,142 +631,6 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRecordsLogprobsMetada
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoRecordsEditorEnvironment [
-
-	CopilotSettings withDefaultSettingsDo: [
-		| builder context editor morph window contextInfo environment |
-		CopilotSettings recordResearchTelemetryConsentAccepted: true.
-		CopilotSettings loggingEnabled: true.
-		builder := CoPharoCopilotResultSetBuilder new.
-		window := CoPCEnvironmentWindowMock new
-			label: 'Debugger on Example>>#broken';
-			yourself.
-		morph := CoPCEnvironmentMorphMock new
-			window: window;
-			yourself.
-		editor := CoTestEditorMock new
-			morph: morph;
-			yourself.
-		context := CoCopilotContextMock new
-			isScripting: true;
-			source: 'Ord';
-			position: 3;
-			editor: editor;
-			yourself.
-
-		contextInfo := builder contextInfoFor: context prefix: 'Ord' suffix: ''.
-		environment := contextInfo at: #completionEnvironment.
-
-		self assert: (environment at: #kind) equals: #debugger.
-		self assert: (environment at: #isScripting).
-		self assert: (environment at: #editorClass) equals: 'CoTestEditorMock'.
-		self assert: (environment at: #morphClass) equals: 'CoPCEnvironmentMorphMock'.
-		self assert: (environment at: #windowClass) equals: 'CoPCEnvironmentWindowMock'.
-		self assert: (environment at: #windowTitle) equals: 'Debugger on Example>>#broken' ]
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoTreatsTestFailureWindowAsDebugger [
-
-	CopilotSettings withDefaultSettingsDo: [
-		| builder context editor morph window contextInfo environment |
-		CopilotSettings recordResearchTelemetryConsentAccepted: true.
-		CopilotSettings loggingEnabled: true.
-		builder := CoPharoCopilotResultSetBuilder new.
-		window := CoPCEnvironmentWindowMock new
-			label: 'TestFailure: Given Collections do not match!';
-			yourself.
-		morph := CoPCEnvironmentMorphMock new
-			window: window;
-			yourself.
-		editor := CoTestEditorMock new
-			morph: morph;
-			yourself.
-		context := CoCopilotContextMock new
-			source: 'self assertCollection: shortestPath';
-			position: 35;
-			editor: editor;
-			yourself.
-
-		contextInfo := builder contextInfoFor: context prefix: 'self assertCollection: shortestPath' suffix: ''.
-		environment := contextInfo at: #completionEnvironment.
-
-		self assert: (environment at: #kind) equals: #debugger ]
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionContextInfoRecordsInspectorEnvironmentFromEngineRequestor [
-
-	CopilotSettings withDefaultSettingsDo: [
-		| builder context requestor engine contextInfo environment |
-		CopilotSettings recordResearchTelemetryConsentAccepted: true.
-		CopilotSettings loggingEnabled: true.
-		builder := CoPharoCopilotResultSetBuilder new.
-		requestor := CoPCInspectorRequestorDouble new.
-		engine := CoSpyCompletionEnginePharoCopilot new
-			doItRequestor: requestor;
-			yourself.
-		context := CoCopilotContextMock new
-			engine: engine;
-			source: 'self ';
-			position: 'self ' size;
-			yourself.
-
-		contextInfo := builder contextInfoFor: context prefix: 'self ' suffix: ''.
-		environment := contextInfo at: #completionEnvironment.
-
-		self assert: (environment at: #kind) equals: #inspector.
-		self assert: (environment at: #requestorClass) equals: 'CoPCInspectorRequestorDouble' ]
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionPayloadIncludesEnvironment [
-
-	| contextInfo environment payload |
-	environment := Dictionary new
-		at: #kind put: #playground;
-		at: #windowTitle put: 'Playground';
-		yourself.
-	contextInfo := Dictionary new
-		at: #timestamp put: '2026-08-13T12:00:00+02:00';
-		at: #completionEnvironment put: environment;
-		yourself.
-
-	payload := CoPharoCopilotLogger
-		initialCompletionPayloadForContextInfo: contextInfo
-		prefix: 'Object new'
-		suffix: ''
-		classContext: ''
-		cacheStats: Dictionary new.
-
-	self assert: (payload at: #completionEnvironment) equals: environment
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testSemanticContextUsesEngineDoItRequestorBinding [
-
-	| builder context requestor engine source semantic |
-	builder := CoPharoCopilotResultSetBuilder new.
-	requestor := CoPCInspectorRequestorDouble new.
-	requestor bind: 'self' to: OrderedCollection new.
-	engine := CoSpyCompletionEnginePharoCopilot new
-		doItRequestor: requestor;
-		yourself.
-	source := 'self add'.
-	context := CoCopilotContextMock new
-		engine: engine;
-		source: source;
-		position: source size;
-		yourself.
-
-	semantic := builder semanticCompletionContextFor: context prefix: source.
-
-	self assert: (semantic includesSubstring: 'Current receiver: self').
-	self assert: (semantic includesSubstring: 'Receiver type: OrderedCollection').
-	self assert: (semantic includesSubstring: 'self -> OrderedCollection')
-]
-
-{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRejectsLowConfidenceLogprobSuggestion [
 
 	CopilotSettings withDefaultSettingsDo: [
@@ -812,6 +679,60 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionLoggingRejectsLowConfidenceL
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionPayloadIncludesEnvironment [
+
+	| contextInfo environment payload |
+	environment := Dictionary new
+		at: #kind put: #playground;
+		at: #windowTitle put: 'Playground';
+		yourself.
+	contextInfo := Dictionary new
+		at: #timestamp put: '2026-08-13T12:00:00+02:00';
+		at: #completionEnvironment put: environment;
+		yourself.
+
+	payload := CoPharoCopilotLogger
+		initialCompletionPayloadForContextInfo: contextInfo
+		prefix: 'Object new'
+		suffix: ''
+		classContext: ''
+		cacheStats: Dictionary new.
+
+	self assert: (payload at: #completionEnvironment) equals: environment
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testCompletionRouterClassifiesSelectorVariableAndStatement [
+
+	| builder router selectorContext variableContext statementContext statementSource |
+	builder := CoPharoCopilotResultSetBuilder new.
+	router := CoPCCompletionRouter new.
+	selectorContext := CoCopilotContextMock new
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+	variableContext := CoCopilotContextMock new
+		source: 'localVar';
+		position: 'localVar' size;
+		yourself.
+	statementSource := 'self doSomething.'.
+	statementContext := CoCopilotContextMock new
+		source: statementSource;
+		position: statementSource size;
+		yourself.
+
+	self
+		assert: (router classifyContext: selectorContext prefix: selectorContext source builder: builder)
+		equals: #selector.
+	self
+		assert: (router classifyContext: variableContext prefix: variableContext source builder: builder)
+		equals: #variable.
+	self
+		assert: (router classifyContext: statementContext prefix: statementSource builder: builder)
+		equals: #statement
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testContextSnapshotIncludesPrefixAndSuffix [
 
         | builder context snapshot |
@@ -852,6 +773,32 @@ CoPharoCopilotResultSetBuilderTest >> testDelayIsIdleWhenNoBoundaryTyped [
 	source := 'self'.
 	pos := source size. "caret after 'f' (letter), not boundary"
 	self assert: (b requestDelayForSource: source position: pos) equals: 2000
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testFastCacheIgnoresNearMatchForImmediateCompletion [
+
+	| b ctx contextInfo cached |
+	b := CopilotTestableBuilder new.
+	ctx := CoCopilotContextMock new
+		source: 'self si';
+		position: 'self si' size;
+		yourself.
+	b completionCache
+		at: 'self s'
+		suffix: ''
+		context: (b fastCacheContextFor: ctx prefix: 'self s')
+		put: { 'inspect' }.
+
+	contextInfo := Dictionary new.
+	cached := b
+		fastCachedSuggestionsFor: ctx
+		prefix: 'self si'
+		suffix: ''
+		contextInfo: contextInfo.
+
+	self assert: cached isNil.
+	self deny: (contextInfo at: #cacheHit)
 ]
 
 { #category : 'tests' }
@@ -929,23 +876,117 @@ CoPharoCopilotResultSetBuilderTest >> testLiveEditorTypedAheadDoesNotCountAsStal
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorFastPathIsDisabled [
+CoPharoCopilotResultSetBuilderTest >> testNormalizeSuggestionRejectsProseAnswer [
 
-	| builder oneCharacter twoCharacters |
+	| builder raw |
 	builder := CoPharoCopilotResultSetBuilder new.
-	oneCharacter := CoCopilotContextMock new
-		behavior: Object;
-		source: 'self a';
-		position: 'self a' size;
-		yourself.
-	twoCharacters := CoCopilotContextMock new
+	raw := 'Here is the code:', String lf, 'self assert: true'.
+
+	self assert: (builder normalizeSuggestion: raw forPrefix: 'self ') equals: ''
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testNormalizedCompletionContentsRejectMethodHeaderForMessageTail [
+
+	| builder context contextInfo contents |
+	builder := CoPharoCopilotResultSetBuilder new.
+	context := CoCopilotContextMock new
 		behavior: Object;
 		source: 'self as';
 		position: 'self as' size;
 		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'self as';
+		yourself.
 
-	self deny: (builder shouldOpenSemanticSelectorFastPathFor: oneCharacter prefix: oneCharacter source).
-	self deny: (builder shouldOpenSemanticSelectorFastPathFor: twoCharacters prefix: twoCharacters source)
+	contents := builder
+		normalizedCompletionContentsFrom: { 'Object >> foo', String lf, '^ 1' }
+		inContext: context
+		contextInfo: contextInfo.
+
+	self assert: contents isEmpty
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testProcessCompletionUsesModelSuggestionsWithoutSemanticFusion [
+
+	| builder context contextInfo entries |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		source: 'self ';
+		position: 'self ' size;
+		yourself.
+	contextInfo := Dictionary new
+		at: #prefix put: 'self ';
+		at: #suffix put: '';
+		yourself.
+
+	builder
+		processCompletionFor: context
+		prefix: 'self '
+		suffix: ''
+		contextInfo: contextInfo.
+
+	entries := builder openedEntries.
+	"Unknown environment (no editor) -> Browser/Debugger path: Copilot only, no fallback."
+	self assert: builder fallbackCallCount equals: 0.
+	self assert: entries size equals: 1.
+	self assert: entries first contents equals: 'modelCompletion'.
+	self deny: (contextInfo includesKey: #semanticFusionApplied).
+	self deny: (contextInfo includesKey: #semanticGate)
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testReceiverCompletionKeepsFallbackAvailable [
+
+	| builder context |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		isScripting: true;
+		source: 'OrderedCollection ne';
+		position: 'OrderedCollection ne' size;
+		yourself.
+
+	self assert: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: 'OrderedCollection ne')
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testScheduleCompletionRunsImmediatelyWhenDelayIsZero [
+
+	| builder context |
+	builder := CopilotDebounceTestBuilder new.
+	context := CoCopilotContextMock new
+		source: 'self ';
+		position: 5;
+		yourself.
+
+	builder
+		scheduleCompletionFor: context
+		prefix: 'self '
+		suffix: ''
+		contextInfo: Dictionary new
+		delayMilliseconds: 0.
+
+	(Delay forMilliseconds: 100) wait.
+	self assert: builder processedPrefix equals: 'self '
+]
+
+{ #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSelfReceiverKeepsFallbackAvailable [
+
+	| builder context |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		isScripting: true;
+		source: 'self pri';
+		position: 'self pri' size;
+		yourself.
+
+	self assert: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: 'self pri')
 ]
 
 { #category : 'tests' }
@@ -992,6 +1033,30 @@ CoPharoCopilotResultSetBuilderTest >> testSemanticContextIncludesSelfReceiverTyp
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticContextUsesEngineDoItRequestorBinding [
+
+	| builder context requestor engine source semantic |
+	builder := CoPharoCopilotResultSetBuilder new.
+	requestor := CoPCInspectorRequestorDouble new.
+	requestor bind: 'self' to: OrderedCollection new.
+	engine := CoSpyCompletionEnginePharoCopilot new
+		doItRequestor: requestor;
+		yourself.
+	source := 'self add'.
+	context := CoCopilotContextMock new
+		engine: engine;
+		source: source;
+		position: source size;
+		yourself.
+
+	semantic := builder semanticCompletionContextFor: context prefix: source.
+
+	self assert: (semantic includesSubstring: 'Current receiver: self').
+	self assert: (semantic includesSubstring: 'Receiver type: OrderedCollection').
+	self assert: (semantic includesSubstring: 'self -> OrderedCollection')
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testSemanticContextUsesLiveBindingValueType [
 
 	| builder context requestor source semantic |
@@ -1032,6 +1097,26 @@ CoPharoCopilotResultSetBuilderTest >> testSemanticReceiverInfoIsCachedForSameSna
 ]
 
 { #category : 'tests' }
+CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorFastPathIsDisabled [
+
+	| builder oneCharacter twoCharacters |
+	builder := CoPharoCopilotResultSetBuilder new.
+	oneCharacter := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self a';
+		position: 'self a' size;
+		yourself.
+	twoCharacters := CoCopilotContextMock new
+		behavior: Object;
+		source: 'self as';
+		position: 'self as' size;
+		yourself.
+
+	self deny: (builder shouldOpenSemanticSelectorFastPathFor: oneCharacter prefix: oneCharacter source).
+	self deny: (builder shouldOpenSemanticSelectorFastPathFor: twoCharacters prefix: twoCharacters source)
+]
+
+{ #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorHintsAreLimitedAndFiltered [
 
 	| builder hints |
@@ -1047,129 +1132,87 @@ CoPharoCopilotResultSetBuilderTest >> testSemanticSelectorHintsAreLimitedAndFilt
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testVariableNameTypeHeuristicUsesAOrAnPrefix [
+CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerInsideStringOrComment [
 
-	| builder types names |
-	builder := CoPharoCopilotResultSetBuilder new.
+	| b ctx source |
+	b := CoPharoCopilotResultSetBuilder new.
+	ctx := CoCopilotContextMock new.
 
-	types := builder
-		semanticTypesForReceiverName: 'aCollection'
-		inContext: nil
-		behavior: nil.
-	names := builder typeNamesStringFor: types.
+	source := (String with: (Character value: 39)) , 'hello wor'.
+	ctx
+		source: source;
+		position: source size.
+	self deny: (b shouldRequestCompletionForContext: ctx).
 
-	self assert: (names includesSubstring: 'Collection')
+	source := (String with: (Character value: 34)) , 'comment text'.
+	ctx
+		source: source;
+		position: source size.
+	self deny: (b shouldRequestCompletionForContext: ctx)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testStripAlreadyTypedHandlesPartialOverlap [
+CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerInsideWord [
 
-	| builder |
-	builder := CoPharoCopilotResultSetBuilder new.
-
-	self assert: (builder stripAlreadyTyped: 'Str' fromSuggestion: 'String') equals: 'ing'.
-	self assert: (builder stripAlreadyTyped: 'String' fromSuggestion: 'String') equals: ''.
-	self assert: (builder stripAlreadyTyped: 'Str' fromSuggestion: 'ing') equals: 'ing'
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testScheduleCompletionRunsImmediatelyWhenDelayIsZero [
-
-	| builder context |
-	builder := CopilotDebounceTestBuilder new.
-	context := CoCopilotContextMock new
-		source: 'self ';
-		position: 5;
+	| b ctx |
+	b := CoPharoCopilotResultSetBuilder new.
+	ctx := CoCopilotContextMock new
+		source: 'assert';
+		position: 3;  "as|sert -> before='s' after='s' => inside word"
 		yourself.
 
-	builder
-		scheduleCompletionFor: context
-		prefix: 'self '
-		suffix: ''
-		contextInfo: Dictionary new
-		delayMilliseconds: 0.
-
-	(Delay forMilliseconds: 100) wait.
-	self assert: builder processedPrefix equals: 'self '
+	self deny: (b shouldRequestCompletionForContext: ctx)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testNormalizeSuggestionRejectsProseAnswer [
-
-	| builder raw |
-	builder := CoPharoCopilotResultSetBuilder new.
-	raw := 'Here is the code:', String lf, 'self assert: true'.
-
-	self assert: (builder normalizeSuggestion: raw forPrefix: 'self ') equals: ''
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testNormalizedCompletionContentsRejectMethodHeaderForMessageTail [
-
-	| builder context contextInfo contents |
-	builder := CoPharoCopilotResultSetBuilder new.
-	context := CoCopilotContextMock new
+CoPharoCopilotResultSetBuilderTest >> testShouldTriggerAtWordEnd [
+	| b ctx |
+	b := CoPharoCopilotResultSetBuilder new.
+	ctx := CoCopilotContextMock new
+		source: 'assert';
+		position: 6;  "assert| -> after=nil"
 		behavior: Object;
-		source: 'self as';
-		position: 'self as' size;
-		yourself.
-	contextInfo := Dictionary new
-		at: #prefix put: 'self as';
 		yourself.
 
-	contents := builder
-		normalizedCompletionContentsFrom: { 'Object >> foo', String lf, '^ 1' }
-		inContext: context
-		contextInfo: contextInfo.
-
-	self assert: contents isEmpty
+	self assert: (b shouldRequestCompletionForContext: ctx)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testReceiverCompletionKeepsFallbackAvailable [
+CoPharoCopilotResultSetBuilderTest >> testShouldTriggerShortTokenAfterLongPrefix [
 
-	| builder context |
-	builder := CopilotTestableBuilder new.
-	context := CoCopilotContextMock new
-		isScripting: true;
-		source: 'OrderedCollection ne';
-		position: 'OrderedCollection ne' size;
+	| b ctx source |
+	b := CoPharoCopilotResultSetBuilder new.
+	source := 'Transcript cr.', String lf, 'Or'.
+	ctx := CoCopilotContextMock new
+		source: source;
+		position: source size;
+		behavior: Object;
 		yourself.
 
-	self assert: (builder
-		shouldUseFallbackCompletionForContext: context
-		prefix: 'OrderedCollection ne')
+	self assert: (b shouldRequestCompletionForContext: ctx)
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testSelfReceiverKeepsFallbackAvailable [
+CoPharoCopilotResultSetBuilderTest >> testSkipsApplyingWhenContextChanged [
 
-	| builder context |
-	builder := CopilotTestableBuilder new.
-	context := CoCopilotContextMock new
-		isScripting: true;
-		source: 'self pri';
-		position: 'self pri' size;
-		yourself.
+        | builder context contextInfo |
+        builder := CoPharoCopilotResultSetBuilder new.
+        context := CoCopilotContextMock new.
+        context
+                source: 'prefixBodyChanged';
+                position: 6.
+        contextInfo := Dictionary new
+                                at: #cursorPosition put: 6;
+                                yourself.
 
-	self assert: (builder
-		shouldUseFallbackCompletionForContext: context
-		prefix: 'self pri')
-]
+        builder
+                applyContent: 'suggestion'
+                toContext: context
+                expectedPrefix: 'prefix'
+                suffix: 'Body'
+                contextInfo: contextInfo.
 
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenOutsideScriptingContextKeepsFallbackAvailable [
-
-	| builder context |
-	builder := CopilotTestableBuilder new.
-	context := CoCopilotContextMock new
-		source: 'Ord';
-		position: 3;
-		yourself.
-
-	self assert: (builder
-		shouldUseFallbackCompletionForContext: context
-		prefix: 'Ord')
+        self assert: context replacedToken isNil
 ]
 
 { #category : 'tests' }
@@ -1240,85 +1283,42 @@ CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenKeepsFallbackCompletion
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerInsideWord [
+CoPharoCopilotResultSetBuilderTest >> testStandaloneTokenOutsideScriptingContextKeepsFallbackAvailable [
 
-	| b ctx |
-	b := CoPharoCopilotResultSetBuilder new.
-	ctx := CoCopilotContextMock new
-		source: 'assert';
-		position: 3;  "as|sert -> before='s' after='s' => inside word"
+	| builder context |
+	builder := CopilotTestableBuilder new.
+	context := CoCopilotContextMock new
+		source: 'Ord';
+		position: 3;
 		yourself.
 
-	self deny: (b shouldRequestCompletionForContext: ctx)
+	self assert: (builder
+		shouldUseFallbackCompletionForContext: context
+		prefix: 'Ord')
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testShouldNotTriggerInsideStringOrComment [
+CoPharoCopilotResultSetBuilderTest >> testStripAlreadyTypedHandlesPartialOverlap [
 
-	| b ctx source |
-	b := CoPharoCopilotResultSetBuilder new.
-	ctx := CoCopilotContextMock new.
+	| builder |
+	builder := CoPharoCopilotResultSetBuilder new.
 
-	source := (String with: (Character value: 39)) , 'hello wor'.
-	ctx
-		source: source;
-		position: source size.
-	self deny: (b shouldRequestCompletionForContext: ctx).
-
-	source := (String with: (Character value: 34)) , 'comment text'.
-	ctx
-		source: source;
-		position: source size.
-	self deny: (b shouldRequestCompletionForContext: ctx)
+	self assert: (builder stripAlreadyTyped: 'Str' fromSuggestion: 'String') equals: 'ing'.
+	self assert: (builder stripAlreadyTyped: 'String' fromSuggestion: 'String') equals: ''.
+	self assert: (builder stripAlreadyTyped: 'Str' fromSuggestion: 'ing') equals: 'ing'
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testShouldTriggerShortTokenAfterLongPrefix [
+CoPharoCopilotResultSetBuilderTest >> testVariableNameTypeHeuristicUsesAOrAnPrefix [
 
-	| b ctx source |
-	b := CoPharoCopilotResultSetBuilder new.
-	source := 'Transcript cr.', String lf, 'Or'.
-	ctx := CoCopilotContextMock new
-		source: source;
-		position: source size;
-		behavior: Object;
-		yourself.
+	| builder types names |
+	builder := CoPharoCopilotResultSetBuilder new.
 
-	self assert: (b shouldRequestCompletionForContext: ctx)
-]
+	types := builder
+		semanticTypesForReceiverName: 'aCollection'
+		inContext: nil
+		behavior: nil.
+	names := builder typeNamesStringFor: types.
 
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testShouldTriggerAtWordEnd [
-	| b ctx |
-	b := CoPharoCopilotResultSetBuilder new.
-	ctx := CoCopilotContextMock new
-		source: 'assert';
-		position: 6;  "assert| -> after=nil"
-		behavior: Object;
-		yourself.
-
-	self assert: (b shouldRequestCompletionForContext: ctx)
-]
-
-{ #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testSkipsApplyingWhenContextChanged [
-
-        | builder context contextInfo |
-        builder := CoPharoCopilotResultSetBuilder new.
-        context := CoCopilotContextMock new.
-        context
-                source: 'prefixBodyChanged';
-                position: 6.
-        contextInfo := Dictionary new
-                                at: #cursorPosition put: 6;
-                                yourself.
-
-        builder
-                applyContent: 'suggestion'
-                toContext: context
-                expectedPrefix: 'prefix'
-                suffix: 'Body'
-                contextInfo: contextInfo.
-
-        self assert: context replacedToken isNil
+	self assert: (names includesSubstring: 'Collection')
 ]

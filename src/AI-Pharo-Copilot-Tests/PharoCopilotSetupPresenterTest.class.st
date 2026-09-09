@@ -23,15 +23,16 @@ PharoCopilotSetupPresenterTest >> testSetupButtonLayoutsDoNotUseFixedWidths [
 ]
 
 { #category : 'tests' }
-PharoCopilotSetupPresenterTest >> testTelemetryLearnMoreUsesReadOnlyTextForLineBreaks [
+PharoCopilotSetupPresenterTest >> testShowWelcomeStepDoesNotRecordScreenRecordingDecisionWhenNotAsked [
 
-	| source |
-	source := PharoCopilotSetupPresenter
-		sourceCodeAt: #showResearchTelemetryLearnMoreStepReturningTo:.
+	CopilotSettings withDefaultSettingsDo: [
+		| presenter |
+		presenter := PharoCopilotSetupPresenter new.
+		presenter showWelcomeStep.
 
-	self assert: CopilotSettings researchTelemetryLearnMoreText lines size > 1.
-	self assert: (source includesSubstring: 'newText').
-	self assert: (source includesSubstring: 'beNotEditable')
+		self assert: CopilotSettings screenRecordingConsentState equals: #notAsked.
+		self deny: CopilotSettings screenRecordingAccepted.
+		self deny: CopilotSettings screenRecordingDeclined ]
 ]
 
 { #category : 'tests' }
@@ -48,14 +49,13 @@ PharoCopilotSetupPresenterTest >> testShowWelcomeStepDoesNotRecordTelemetryDecis
 ]
 
 { #category : 'tests' }
-PharoCopilotSetupPresenterTest >> testShowWelcomeStepDoesNotRecordScreenRecordingDecisionWhenNotAsked [
+PharoCopilotSetupPresenterTest >> testTelemetryLearnMoreUsesReadOnlyTextForLineBreaks [
 
-	CopilotSettings withDefaultSettingsDo: [
-		| presenter |
-		presenter := PharoCopilotSetupPresenter new.
-		presenter showWelcomeStep.
+	| source |
+	source := PharoCopilotSetupPresenter
+		sourceCodeAt: #showResearchTelemetryLearnMoreStepReturningTo:.
 
-		self assert: CopilotSettings screenRecordingConsentState equals: #notAsked.
-		self deny: CopilotSettings screenRecordingAccepted.
-		self deny: CopilotSettings screenRecordingDeclined ]
+	self assert: CopilotSettings researchTelemetryLearnMoreText lines size > 1.
+	self assert: (source includesSubstring: 'newText').
+	self assert: (source includesSubstring: 'beNotEditable')
 ]

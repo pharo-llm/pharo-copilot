@@ -25,6 +25,12 @@ CoPCImageCloseSurveyUIManagerDouble >> chooseFrom: labelList values: valueList t
 ]
 
 { #category : 'accessing' }
+CoPCImageCloseSurveyUIManagerDouble >> comments: aCollection [
+
+	comments := OrderedCollection withAll: aCollection
+]
+
+{ #category : 'accessing' }
 CoPCImageCloseSurveyUIManagerDouble >> imageCloseSurveyFormWithSpec: surveySpec [
 
 	| requiredAnswerCount response ratingAnswers task experience comment |
@@ -53,12 +59,6 @@ CoPCImageCloseSurveyUIManagerDouble >> imageCloseSurveyFormWithSpec: surveySpec 
 	^ response
 ]
 
-{ #category : 'accessing' }
-CoPCImageCloseSurveyUIManagerDouble >> comments: aCollection [
-
-	comments := OrderedCollection withAll: aCollection
-]
-
 { #category : 'initialization' }
 CoPCImageCloseSurveyUIManagerDouble >> initialize [
 
@@ -82,6 +82,12 @@ CoPCImageCloseSurveyUIManagerDouble >> multiLineRequest: requestString initialAn
 ]
 
 { #category : 'accessing' }
+CoPCImageCloseSurveyUIManagerDouble >> ratings: aCollection [
+
+	ratings := OrderedCollection withAll: aCollection
+]
+
+{ #category : 'accessing' }
 CoPCImageCloseSurveyUIManagerDouble >> request: requestString initialAnswer: initialAnswerString title: titleString [
 
 	requests add: (Dictionary new
@@ -92,12 +98,6 @@ CoPCImageCloseSurveyUIManagerDouble >> request: requestString initialAnswer: ini
 
 	comments isEmpty ifTrue: [ ^ '' ].
 	^ comments removeFirst
-]
-
-{ #category : 'accessing' }
-CoPCImageCloseSurveyUIManagerDouble >> ratings: aCollection [
-
-	ratings := OrderedCollection withAll: aCollection
 ]
 
 { #category : 'accessing' }

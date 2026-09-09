@@ -36,19 +36,6 @@ CopilotTestableBuilder >> applyContent: contentString toContext: aContext expect
 ]
 
 { #category : 'accessing' }
-CopilotTestableBuilder >> completionContext [
-
-	^ completionContext
-]
-
-{ #category : 'accessing' }
-CopilotTestableBuilder >> completionContext: aContext [
-
-	completionContext := aContext.
-	^ testContext := aContext
-]
-
-{ #category : 'accessing' }
 CopilotTestableBuilder >> classContextCallCount [
 
 	^ classContextCallCount ifNil: [ 0 ]
@@ -59,6 +46,19 @@ CopilotTestableBuilder >> classContextFor: aContext prefix: prefixString [
 
 	classContextCallCount := self classContextCallCount + 1.
 	^ super classContextFor: aContext prefix: prefixString
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> completionContext [
+
+	^ completionContext
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> completionContext: aContext [
+
+	completionContext := aContext.
+	^ testContext := aContext
 ]
 
 { #category : 'accessing' }
@@ -119,13 +119,6 @@ CopilotTestableBuilder >> fetchSuggestionsForPrefix: prefixString suffix: suffix
 ]
 
 { #category : 'accessing' }
-CopilotTestableBuilder >> semanticEntriesFor: aContext [
-
-	fallbackCallCount := self fallbackCallCount + 1.
-	^ { CoCopilotEntry contents: 'fallbackCompletion' }
-]
-
-{ #category : 'accessing' }
 CopilotTestableBuilder >> openCompletionMenuFor: aContext entries: entries position: position [
 
 	openedEntries := entries
@@ -177,6 +170,13 @@ CopilotTestableBuilder >> semanticAstNodeFor: aContext source: sourceString posi
 		semanticAstNodeFor: aContext
 		source: sourceString
 		position: positionInteger
+]
+
+{ #category : 'accessing' }
+CopilotTestableBuilder >> semanticEntriesFor: aContext [
+
+	fallbackCallCount := self fallbackCallCount + 1.
+	^ { CoCopilotEntry contents: 'fallbackCompletion' }
 ]
 
 { #category : 'accessing' }
