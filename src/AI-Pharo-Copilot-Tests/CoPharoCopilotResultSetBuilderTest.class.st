@@ -28,7 +28,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionRouterClassifiesSelectorVari
 
 	self
 		assert: (router classifyContext: selectorContext prefix: selectorContext source builder: builder)
-		equals: #selector.
+		equals: #messageTail.
 	self
 		assert: (router classifyContext: variableContext prefix: variableContext source builder: builder)
 		equals: #variable.
@@ -44,6 +44,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionGenerationPolicyUsesSmallBud
 	policy := CoPCCompletionGenerationPolicy new.
 
 	self assert: (policy numPredictFor: #selector) equals: 8.
+	self assert: (policy numPredictFor: #messageTail) equals: 32.
 	self assert: (policy numPredictFor: #variable) equals: 8.
 	self assert: (policy numPredictFor: #statement) equals: 24.
 	self assert: (policy numPredictFor: #unknown) equals: 24

@@ -31,8 +31,11 @@ CoPCCompletionRouter >> classifyContext: aContext prefix: prefixString builder: 
 
 	token := builder completionTokenFor: aContext prefix: prefixString.
 	receiver := builder textualReceiverBeforeCompletionIn: prefixString.
+	"A partial message after an explicit receiver (for example `self ass`) is not
+	 just a selector-name lookup. Route it separately so the model can finish the
+	 whole message tail while normal token completion keeps its tiny budget."
 	(receiver isEmpty not and: [ receiver ~= token ]) ifTrue: [
-		^ #selector ].
+		^ #messageTail ].
 
 	token isEmpty not ifTrue: [ ^ #variable ].
 	^ #statement
