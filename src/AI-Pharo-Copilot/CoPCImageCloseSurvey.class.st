@@ -13,34 +13,19 @@ Class {
 	#package : 'AI-Pharo-Copilot'
 }
 
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> askQuestion: anAssociation using: uiManager [
+{ #category : 'session management' }
+CoPCImageCloseSurvey class >> archiveCurrentSessionAfterPromptUsing: uiManager [
 
-	| rating |
-	uiManager ifNil: [ ^ nil ].
-	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ nil ].
+	CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ nil ].
 
-	rating := uiManager
-		chooseFrom: self ratingLabels
-		values: self ratingValues
-		title: anAssociation value.
+	(self shouldShowArchiveProgressWindowUsing: uiManager) ifFalse: [
+		^ CoPharoCopilotLogger archiveCurrentSession ].
 
-	^ self validatedRating: rating
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> askTaskUsing: uiManager [
-
-	| task |
-	uiManager ifNil: [ ^ nil ].
-	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ nil ].
-
-	task := uiManager
-		chooseFrom: self taskLabels
-		values: self taskValues
-		title: self taskQuestionTitle.
-
-	^ self validatedTask: task
+	^ [
+		CoPCSessionArchiveProgressPresenter openForCurrentSessionAndWait
+	] on: Error do: [ :ex |
+		self logSurveyError: ex.
+		CoPharoCopilotLogger archiveCurrentSession ]
 ]
 
 { #category : 'survey' }
@@ -65,18 +50,18 @@ CoPCImageCloseSurvey class >> askOptionalCommentUsing: uiManager [
 ]
 
 { #category : 'survey' }
-CoPCImageCloseSurvey class >> askUserExperienceUsing: uiManager [
+CoPCImageCloseSurvey class >> askQuestion: anAssociation using: uiManager [
 
-	| experience |
+	| rating |
 	uiManager ifNil: [ ^ nil ].
 	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ nil ].
 
-	experience := uiManager
-		chooseFrom: self userExperienceLabels
-		values: self userExperienceValues
-		title: self userExperienceQuestionTitle.
+	rating := uiManager
+		chooseFrom: self ratingLabels
+		values: self ratingValues
+		title: anAssociation value.
 
-	^ self validatedUserExperience: experience
+	^ self validatedRating: rating
 ]
 
 { #category : 'survey' }
@@ -100,6 +85,36 @@ CoPCImageCloseSurvey class >> askSurveyFormUsing: uiManager [
 ]
 
 { #category : 'survey' }
+CoPCImageCloseSurvey class >> askTaskUsing: uiManager [
+
+	| task |
+	uiManager ifNil: [ ^ nil ].
+	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ nil ].
+
+	task := uiManager
+		chooseFrom: self taskLabels
+		values: self taskValues
+		title: self taskQuestionTitle.
+
+	^ self validatedTask: task
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> askUserExperienceUsing: uiManager [
+
+	| experience |
+	uiManager ifNil: [ ^ nil ].
+	(uiManager respondsTo: #chooseFrom:values:title:) ifFalse: [ ^ nil ].
+
+	experience := uiManager
+		chooseFrom: self userExperienceLabels
+		values: self userExperienceValues
+		title: self userExperienceQuestionTitle.
+
+	^ self validatedUserExperience: experience
+]
+
+{ #category : 'survey' }
 CoPCImageCloseSurvey class >> availableTaskLabelsByKey [
 
 	| labels |
@@ -119,21 +134,6 @@ CoPCImageCloseSurvey class >> availableUserExperienceLabelsByValue [
 	^ labels
 ]
 
-{ #category : 'session management' }
-CoPCImageCloseSurvey class >> archiveCurrentSessionAfterPromptUsing: uiManager [
-
-	CoPharoCopilotLogger loggingEnabled ifFalse: [ ^ nil ].
-
-	(self shouldShowArchiveProgressWindowUsing: uiManager) ifFalse: [
-		^ CoPharoCopilotLogger archiveCurrentSession ].
-
-	^ [
-		CoPCSessionArchiveProgressPresenter openForCurrentSessionAndWait
-	] on: Error do: [ :ex |
-		self logSurveyError: ex.
-		CoPharoCopilotLogger archiveCurrentSession ]
-]
-
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 
@@ -144,26 +144,6 @@ CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 		rating ifNil: [ ^ nil ].
 		ratings at: question key put: rating ].
 	^ ratings
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> collectUserProfileUsing: uiManager [
-
-	| experience profile |
-	profile := Dictionary new.
-	experience := self askUserExperienceUsing: uiManager.
-	experience ifNotNil: [ profile at: #experienceYears put: experience ].
-	^ profile
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> collectTasksUsing: uiManager [
-
-	| task |
-	task := self askTaskUsing: uiManager.
-	^ task
-		ifNil: [ #() ]
-		ifNotNil: [ { task } ]
 ]
 
 { #category : 'survey' }
@@ -188,6 +168,26 @@ CoPCImageCloseSurvey class >> collectSurveyResponseSequentiallyUsing: uiManager 
 CoPCImageCloseSurvey class >> collectSurveyResponseUsing: uiManager [
 
 	^ self validatedSurveyResponse: (self askSurveyFormUsing: uiManager)
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> collectTasksUsing: uiManager [
+
+	| task |
+	task := self askTaskUsing: uiManager.
+	^ task
+		ifNil: [ #() ]
+		ifNotNil: [ { task } ]
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> collectUserProfileUsing: uiManager [
+
+	| experience profile |
+	profile := Dictionary new.
+	experience := self askUserExperienceUsing: uiManager.
+	experience ifNotNil: [ profile at: #experienceYears put: experience ].
+	^ profile
 ]
 
 { #category : 'private' }
@@ -223,6 +223,30 @@ CoPCImageCloseSurvey class >> logSurveyError: anException [
 			at: #errorClass put: anException class name;
 			at: #error put: anException description;
 			yourself)
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> optionalCommentAnswerHeight [
+
+	^ 180
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> optionalCommentFormTitle [
+
+	^ 'Additional feedback (optional)'
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> optionalCommentQuestionTitle [
+
+	^ 'Do you have any thoughts or feedback to share, positive or negative? (Optional - you can leave this blank and continue.)'
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> optionalCommentWindowTitle [
+
+	^ 'Pharo Copilot feedback'
 ]
 
 { #category : 'survey' }
@@ -279,33 +303,9 @@ CoPCImageCloseSurvey class >> questionLabelsByKey [
 ]
 
 { #category : 'survey' }
-CoPCImageCloseSurvey class >> requiredQuestionTitle: aString [
+CoPCImageCloseSurvey class >> ratingHighAnchorLabel [
 
-	^ aString , ' *'
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> optionalCommentAnswerHeight [
-
-	^ 180
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> optionalCommentFormTitle [
-
-	^ 'Additional feedback (optional)'
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> optionalCommentQuestionTitle [
-
-	^ 'Do you have any thoughts or feedback to share, positive or negative? (Optional - you can leave this blank and continue.)'
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> optionalCommentWindowTitle [
-
-	^ 'Pharo Copilot feedback'
+	^ 'Extremely useful'
 ]
 
 { #category : 'survey' }
@@ -318,12 +318,6 @@ CoPCImageCloseSurvey class >> ratingLabels [
 		'4 stars - Very good'
 		'5 stars - Excellent'
 	)
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> ratingHighAnchorLabel [
-
-	^ 'Extremely useful'
 ]
 
 { #category : 'survey' }
@@ -389,6 +383,27 @@ CoPCImageCloseSurvey class >> registerSessionHandler [
 	^ true
 ]
 
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> requiredQuestionTitle: aString [
+
+	^ aString , ' *'
+]
+
+{ #category : 'private' }
+CoPCImageCloseSurvey class >> resetPromptState [
+
+	promptInProgress := false.
+	promptedForCurrentQuit := false
+]
+
+{ #category : 'session management' }
+CoPCImageCloseSurvey class >> shouldPromptBeforeImageQuit [
+
+	CopilotSettings loggingEnabled ifFalse: [ ^ false ].
+	CopilotSettings imageCloseSurveyEnabled ifFalse: [ ^ false ].
+	^ self hasInteractiveUI
+]
+
 { #category : 'session management' }
 CoPCImageCloseSurvey class >> shouldPromptForImageQuitting: aBoolean [
 
@@ -400,11 +415,17 @@ CoPCImageCloseSurvey class >> shouldPromptForImageQuitting: aBoolean [
 ]
 
 { #category : 'session management' }
-CoPCImageCloseSurvey class >> shouldPromptBeforeImageQuit [
+CoPCImageCloseSurvey class >> shouldShowArchiveProgressWindowUsing: uiManager [
 
-	CopilotSettings loggingEnabled ifFalse: [ ^ false ].
-	CopilotSettings imageCloseSurveyEnabled ifFalse: [ ^ false ].
-	^ self hasInteractiveUI
+	| presenterClass |
+	uiManager ifNil: [ ^ false ].
+	uiManager class name = #NonInteractiveUIManager ifTrue: [ ^ false ].
+	(uiManager respondsTo: #defer:) ifFalse: [ ^ false ].
+
+	presenterClass := Smalltalk globals
+		at: #CoPCSessionArchiveProgressPresenter
+		ifAbsent: [ nil ].
+	^ presenterClass notNil
 ]
 
 { #category : 'session management' }
@@ -424,20 +445,6 @@ CoPCImageCloseSurvey class >> shutDown: isImageQuitting [
 		promptInProgress := false ]
 ]
 
-{ #category : 'session management' }
-CoPCImageCloseSurvey class >> shouldShowArchiveProgressWindowUsing: uiManager [
-
-	| presenterClass |
-	uiManager ifNil: [ ^ false ].
-	uiManager class name = #NonInteractiveUIManager ifTrue: [ ^ false ].
-	(uiManager respondsTo: #defer:) ifFalse: [ ^ false ].
-
-	presenterClass := Smalltalk globals
-		at: #CoPCSessionArchiveProgressPresenter
-		ifAbsent: [ nil ].
-	^ presenterClass notNil
-]
-
 { #category : 'private' }
 CoPCImageCloseSurvey class >> singleFormPresenterClass [
 
@@ -452,11 +459,42 @@ CoPCImageCloseSurvey class >> startUp: isImageStarting [
 	self resetPromptState
 ]
 
-{ #category : 'private' }
-CoPCImageCloseSurvey class >> resetPromptState [
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> surveyFormDescription [
 
-	promptInProgress := false.
-	promptedForCurrentQuit := false
+	^ 'Questions marked * are required. Comment is optional.'
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> surveyFormSpec [
+
+	^ Dictionary new
+		at: #title put: self surveyFormWindowTitle;
+		at: #heading put: self surveyFormTitle;
+		at: #description put: self surveyFormDescription;
+		at: #questions put: self surveyQuestions;
+		at: #ratingValues put: self ratingValues;
+		at: #ratingLowLabel put: self ratingLowAnchorLabel;
+		at: #ratingHighLabel put: self ratingHighAnchorLabel;
+		at: #taskQuestion put: (self requiredQuestionTitle: self taskQuestionTitle);
+		at: #taskChoices put: self taskChoices;
+		at: #experienceQuestion put: (self requiredQuestionTitle: self userExperienceQuestionTitle);
+		at: #experienceChoices put: self userExperienceChoices;
+		at: #commentQuestion put: self optionalCommentFormTitle;
+		at: #requiredMessage put: self surveyRequiredMessage;
+		yourself
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> surveyFormTitle [
+
+	^ 'Pharo-Copilot feedback'
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> surveyFormWindowTitle [
+
+	^ 'Pharo-Copilot Feedback'
 ]
 
 { #category : 'survey' }
@@ -506,44 +544,6 @@ CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary tasks: taskCo
 ]
 
 { #category : 'survey' }
-CoPCImageCloseSurvey class >> surveyFormDescription [
-
-	^ 'Questions marked * are required. Comment is optional.'
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> surveyFormSpec [
-
-	^ Dictionary new
-		at: #title put: self surveyFormWindowTitle;
-		at: #heading put: self surveyFormTitle;
-		at: #description put: self surveyFormDescription;
-		at: #questions put: self surveyQuestions;
-		at: #ratingValues put: self ratingValues;
-		at: #ratingLowLabel put: self ratingLowAnchorLabel;
-		at: #ratingHighLabel put: self ratingHighAnchorLabel;
-		at: #taskQuestion put: (self requiredQuestionTitle: self taskQuestionTitle);
-		at: #taskChoices put: self taskChoices;
-		at: #experienceQuestion put: (self requiredQuestionTitle: self userExperienceQuestionTitle);
-		at: #experienceChoices put: self userExperienceChoices;
-		at: #commentQuestion put: self optionalCommentFormTitle;
-		at: #requiredMessage put: self surveyRequiredMessage;
-		yourself
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> surveyFormTitle [
-
-	^ 'Pharo-Copilot feedback'
-]
-
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> surveyFormWindowTitle [
-
-	^ 'Pharo-Copilot Feedback'
-]
-
-{ #category : 'survey' }
 CoPCImageCloseSurvey class >> surveyQuestions [
 
 	^ {
@@ -576,12 +576,6 @@ CoPCImageCloseSurvey class >> taskChoices [
 ]
 
 { #category : 'survey' }
-CoPCImageCloseSurvey class >> taskLabels [
-
-	^ self taskChoices collect: [ :task | task value ]
-]
-
-{ #category : 'survey' }
 CoPCImageCloseSurvey class >> taskLabelFor: aSymbol [
 
 	^ self availableTaskLabelsByKey
@@ -590,15 +584,15 @@ CoPCImageCloseSurvey class >> taskLabelFor: aSymbol [
 ]
 
 { #category : 'survey' }
-CoPCImageCloseSurvey class >> taskQuestionTitle [
+CoPCImageCloseSurvey class >> taskLabels [
 
-	^ 'Which task did you perform this session?'
+	^ self taskChoices collect: [ :task | task value ]
 ]
 
 { #category : 'survey' }
-CoPCImageCloseSurvey class >> taskValues [
+CoPCImageCloseSurvey class >> taskQuestionTitle [
 
-	^ self taskChoices collect: [ :task | task key ]
+	^ 'Which task did you perform this session?'
 ]
 
 { #category : 'private' }
@@ -612,6 +606,34 @@ CoPCImageCloseSurvey class >> taskValueFromSurveyResponse: aDictionary [
 	(tasks respondsTo: #isEmpty) ifFalse: [ ^ nil ].
 	tasks isEmpty ifTrue: [ ^ nil ].
 	^ tasks first
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> taskValues [
+
+	^ self taskChoices collect: [ :task | task key ]
+]
+
+{ #category : 'private' }
+CoPCImageCloseSurvey class >> uiManager [
+
+	| uiClass |
+	uiClass := Smalltalk globals at: #UIManager ifAbsent: [ ^ nil ].
+	(uiClass respondsTo: #default) ifFalse: [ ^ nil ].
+	^ [ uiClass default ] on: Error do: [ :ex | nil ]
+]
+
+{ #category : 'session management' }
+CoPCImageCloseSurvey class >> unregisterSessionHandler [
+
+	| sessionManagerClass manager |
+	sessionManagerClass := Smalltalk globals at: #SessionManager ifAbsent: [ ^ false ].
+	(sessionManagerClass respondsTo: #default) ifFalse: [ ^ false ].
+	manager := sessionManagerClass default.
+	(manager respondsTo: #unregisterClassNamed:) ifFalse: [ ^ false ].
+
+	manager unregisterClassNamed: self name.
+	^ true
 ]
 
 { #category : 'survey' }
@@ -637,12 +659,6 @@ CoPCImageCloseSurvey class >> userExperienceQuestionTitle [
 	^ 'How many years of programming experience do you have?'
 ]
 
-{ #category : 'survey' }
-CoPCImageCloseSurvey class >> userExperienceValues [
-
-	^ self userExperienceChoices collect: [ :choice | choice key ]
-]
-
 { #category : 'private' }
 CoPCImageCloseSurvey class >> userExperienceValueFromSurveyResponse: aDictionary [
 
@@ -655,26 +671,18 @@ CoPCImageCloseSurvey class >> userExperienceValueFromSurveyResponse: aDictionary
 	^ userProfile at: #experienceYears ifAbsent: [ nil ]
 ]
 
-{ #category : 'session management' }
-CoPCImageCloseSurvey class >> unregisterSessionHandler [
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> userExperienceValues [
 
-	| sessionManagerClass manager |
-	sessionManagerClass := Smalltalk globals at: #SessionManager ifAbsent: [ ^ false ].
-	(sessionManagerClass respondsTo: #default) ifFalse: [ ^ false ].
-	manager := sessionManagerClass default.
-	(manager respondsTo: #unregisterClassNamed:) ifFalse: [ ^ false ].
-
-	manager unregisterClassNamed: self name.
-	^ true
+	^ self userExperienceChoices collect: [ :choice | choice key ]
 ]
 
 { #category : 'private' }
-CoPCImageCloseSurvey class >> uiManager [
+CoPCImageCloseSurvey class >> validatedOptionalComment: anObject [
 
-	| uiClass |
-	uiClass := Smalltalk globals at: #UIManager ifAbsent: [ ^ nil ].
-	(uiClass respondsTo: #default) ifFalse: [ ^ nil ].
-	^ [ uiClass default ] on: Error do: [ :ex | nil ]
+	anObject ifNil: [ ^ nil ].
+	(anObject respondsTo: #asString) ifFalse: [ ^ nil ].
+	^ anObject asString
 ]
 
 { #category : 'private' }
@@ -694,14 +702,6 @@ CoPCImageCloseSurvey class >> validatedRating: anObject [
 	^ (self ratingValues includes: rating)
 		ifTrue: [ rating ]
 		ifFalse: [ nil ]
-]
-
-{ #category : 'private' }
-CoPCImageCloseSurvey class >> validatedOptionalComment: anObject [
-
-	anObject ifNil: [ ^ nil ].
-	(anObject respondsTo: #asString) ifFalse: [ ^ nil ].
-	^ anObject asString
 ]
 
 { #category : 'private' }

@@ -7,39 +7,6 @@ Class {
 }
 
 { #category : 'tests' }
-CoPCSessionArchiveUploaderTest >> testConnectionEndpointsAreDerivedFromSessionUploadEndpoint [
-
-	| originalUrl |
-	originalUrl := CoPCSessionArchiveUploader uploadUrl.
-	[
-		CoPCSessionArchiveUploader uploadUrl: 'http://example.com:3000/api/sessions'.
-
-		self
-			assert: CoPCSessionArchiveUploader connectionRegistrationUrl
-			equals: 'http://example.com:3000/api/connections/register'.
-		self
-			assert: CoPCSessionArchiveUploader connectionPingUrl
-			equals: 'http://example.com:3000/api/connections/ping'
-	] ensure: [
-		CoPCSessionArchiveUploader uploadUrl: originalUrl ]
-]
-
-{ #category : 'tests' }
-CoPCSessionArchiveUploaderTest >> testTelemetrySummaryEndpointIsDerivedFromSessionUploadEndpoint [
-
-	| originalUrl |
-	originalUrl := CoPCSessionArchiveUploader uploadUrl.
-	[
-		CoPCSessionArchiveUploader uploadUrl: 'http://example.com:3000/api/sessions'.
-
-		self
-			assert: CoPCSessionArchiveUploader telemetrySummaryUploadUrl
-			equals: 'http://example.com:3000/api/session-telemetry'
-	] ensure: [
-		CoPCSessionArchiveUploader uploadUrl: originalUrl ]
-]
-
-{ #category : 'tests' }
 CoPCSessionArchiveUploaderTest >> testCandidateUploadUrlsPreferPublicReceiverAndKeepLegacyFallbacks [
 
 	| originalUrl urls |
@@ -55,6 +22,24 @@ CoPCSessionArchiveUploaderTest >> testCandidateUploadUrlsPreferPublicReceiverAnd
 				'http://rmod-xp.lille.inria.fr:9092/api/sessions'
 				'http://193.49.213.134:9093/api/sessions'
 				'http://193.49.213.134:3000/api/sessions' )
+	] ensure: [
+		CoPCSessionArchiveUploader uploadUrl: originalUrl ]
+]
+
+{ #category : 'tests' }
+CoPCSessionArchiveUploaderTest >> testConnectionEndpointsAreDerivedFromSessionUploadEndpoint [
+
+	| originalUrl |
+	originalUrl := CoPCSessionArchiveUploader uploadUrl.
+	[
+		CoPCSessionArchiveUploader uploadUrl: 'http://example.com:3000/api/sessions'.
+
+		self
+			assert: CoPCSessionArchiveUploader connectionRegistrationUrl
+			equals: 'http://example.com:3000/api/connections/register'.
+		self
+			assert: CoPCSessionArchiveUploader connectionPingUrl
+			equals: 'http://example.com:3000/api/connections/ping'
 	] ensure: [
 		CoPCSessionArchiveUploader uploadUrl: originalUrl ]
 ]
@@ -93,6 +78,21 @@ CoPCSessionArchiveUploaderTest >> testEnsureInternetUploadUrlReplacesKnownLocalO
 		self
 			assert: CoPCSessionArchiveUploader ensureInternetUploadUrl
 			equals: CoPCSessionArchiveUploader defaultPublicUploadUrl
+	] ensure: [
+		CoPCSessionArchiveUploader uploadUrl: originalUrl ]
+]
+
+{ #category : 'tests' }
+CoPCSessionArchiveUploaderTest >> testTelemetrySummaryEndpointIsDerivedFromSessionUploadEndpoint [
+
+	| originalUrl |
+	originalUrl := CoPCSessionArchiveUploader uploadUrl.
+	[
+		CoPCSessionArchiveUploader uploadUrl: 'http://example.com:3000/api/sessions'.
+
+		self
+			assert: CoPCSessionArchiveUploader telemetrySummaryUploadUrl
+			equals: 'http://example.com:3000/api/session-telemetry'
 	] ensure: [
 		CoPCSessionArchiveUploader uploadUrl: originalUrl ]
 ]

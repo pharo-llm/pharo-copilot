@@ -41,6 +41,48 @@ CoPharoCopilotResultSetBuilder class >> initializeOnContext: aSystemCompletionCo
 		yourself
 ]
 
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> addFusedSuggestion: suggestionString selector: selectorString to: result seenStrings: seenStrings seenSelectors: seenSelectors [
+
+	| suggestion selector |
+	suggestion := suggestionString ifNil: [ '' ] ifNotNil: [ suggestionString asString ].
+	suggestion isEmpty ifTrue: [ ^ self ].
+	selector := selectorString ifNil: [ '' ] ifNotNil: [ selectorString asString ].
+	(selector isEmpty not and: [ seenSelectors includes: selector ]) ifTrue: [ ^ self ].
+	(seenStrings includes: suggestion) ifTrue: [ ^ self ].
+
+	result add: suggestion.
+	seenStrings add: suggestion.
+	selector isEmpty ifFalse: [ seenSelectors add: selector ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> annotatedSemanticAstFor: aContext source: sourceString [
+
+	| behavior compiler ast visitorClass |
+	behavior := self behaviorFor: aContext.
+	behavior ifNil: [ ^ nil ].
+	(behavior respondsTo: #compiler) ifFalse: [ ^ nil ].
+
+	ast := [
+		compiler := behavior compiler.
+		compiler source: sourceString.
+		(compiler respondsTo: #isScripting:) ifTrue: [
+			compiler isScripting: (self isScriptingContext: aContext) ].
+		compiler parse ]
+		on: Error
+		do: [ nil ].
+	ast ifNil: [ ^ nil ].
+
+	visitorClass := self typeAnnotationVisitorClass.
+	visitorClass ifNotNil: [
+		[ visitorClass new visit: ast ]
+			on: Error
+			do: [ ] ].
+
+	^ ast
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext [
 
@@ -53,51 +95,18 @@ CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollec
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> appendFallbackCompletionEntriesTo: entryCollection inContext: aContext contextInfo: contextInfo [
 
-	| combined fallback reranker topStatus prefix receiverName |
+	| combined fallback |
 	combined := OrderedCollection new.
 	entryCollection ifNotNil: [ combined addAll: entryCollection ].
-
-	contextInfo ifNotNil: [
-		(contextInfo at: #skipSemanticCompletionEnrichment ifAbsent: [ false ])
-			ifTrue: [ ^ combined asArray ].
-		(contextInfo at: #semanticFusionApplied ifAbsent: [ false ])
-			ifTrue: [ ^ combined asArray ] ].
-
-	combined isEmpty ifTrue: [
-		fallback := self
-			fallbackCompletionEntriesFor: aContext
-			excluding: combined.
-		^ fallback asArray ].
-
-	prefix := self completionPrefixFor: aContext contextInfo: contextInfo.
-	receiverName := self textualReceiverBeforeCompletionIn: prefix.
-	receiverName isEmpty ifTrue: [
-		fallback := self
-			fallbackCompletionEntriesFor: aContext
-			excluding: combined.
-		combined addAll: fallback.
-		^ combined asArray ].
-
-	reranker := CoPCSemanticReranker
-		builder: self
-		context: aContext
-		contextInfo: contextInfo.
-	(reranker shouldUseSemanticGate) ifFalse: [ ^ combined asArray ].
-
-	topStatus := reranker classificationForEntry: combined first.
-	topStatus = #high ifTrue: [
-		^ reranker
-			rerankModelEntries: combined
-			fallbackEntries: #() ].
-
 	fallback := self
 		fallbackCompletionEntriesFor: aContext
 		excluding: combined.
-
-	^ reranker
-		rerankModelEntries: combined
-		fallbackEntries: fallback
-
+	contextInfo ifNotNil: [
+		contextInfo
+			at: #fallbackCompletionCount put: fallback size;
+			at: #fallbackCompletionPresent put: fallback isEmpty not ].
+	combined addAll: fallback.
+	^ combined asArray
 ]
 
 { #category : 'new' }
@@ -166,28 +175,32 @@ CoPharoCopilotResultSetBuilder >> applyContent: contentString toContext: aContex
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> applyContents: contentCollection toContext: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix contextInfo: contextInfo [
 
-	| adjustedContents entries position typedAhead |
+	| entries position |
 
 	(self hasStaleContextFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix)
 		ifTrue: [ ^ self logStaleContextForExpectedPrefix: expectedPrefix suffix: expectedSuffix context: aContext ].
 
-	typedAhead := self
-		typedAheadIn: aContext
-		expectedPrefix: expectedPrefix
-		suffix: expectedSuffix.
-	adjustedContents := self
-		stripAlreadyTyped: typedAhead
-		fromSuggestions: contentCollection.
-
 	entries := self
-		completionEntriesFrom: adjustedContents
+		completionEntriesFrom: contentCollection
 		inContext: aContext
 		contextInfo: contextInfo.
-	entries isEmpty ifTrue: [ ^ self logNoEntriesAfterCleaningFor: adjustedContents ].
+	entries isEmpty ifTrue: [ ^ self logNoEntriesAfterCleaningFor: contentCollection ].
 
 	position := self menuPositionForContextOrDefault: aContext.
 
 	self openCompletionMenuFor: aContext entries: entries position: position
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> averageLogprobFromMetadata: metadata [
+
+	| numbers total |
+	numbers := self logprobNumbersFromMetadata: metadata.
+	numbers isEmpty ifTrue: [ ^ nil ].
+
+	total := 0.
+	numbers do: [ :each | total := total + each ].
+	^ total / numbers size
 ]
 
 { #category : 'new' }
@@ -209,15 +222,6 @@ CoPharoCopilotResultSetBuilder >> behaviorFor: aContext [
 	engine := self engineFor: aContext.
 	^ (engine notNil and: [ engine respondsTo: #completionClass ])
 		ifTrue: [ [ engine completionClass ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ]
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> engineFor: aContext [
-
-	aContext ifNil: [ ^ nil ].
-	^ (aContext respondsTo: #engine)
-		ifTrue: [ [ aContext engine ] on: Error do: [ nil ] ]
 		ifFalse: [ nil ]
 ]
 
@@ -252,31 +256,22 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
 
-	| context snapshot prefix suffix contextInfo delay cached |
+	| context snapshot prefix suffix contextInfo delay cached environment kind |
 	context := completionContext.
 
-	(self shouldRequestCompletionForContext: context) ifFalse: [ ^ self emptyResultSet ].
+	(self shouldRequestCompletionForContext: context) ifFalse: [
+		^ self localCompletionResultSetFor: context ].
 
 	snapshot := self contextSnapshotFor: context.
 	prefix := snapshot at: #prefix.
 	suffix := snapshot at: #suffix.
-	(self
-		shouldUseFallbackCompletionForContext: context
-		prefix: prefix)
-			ifTrue: [
-				self
-					logCompletionReroutedToComplishonFor: context
-					prefix: prefix
-					suffix: suffix.
-				^ (self fallbackResultSetFor: context)
-					ifNil: [ self emptyResultSet ] ].
 	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
 
 	self isLoggingEnabled ifTrue: [
-	contextInfo
-		at: #sessionId put: CoPharoCopilotLogger completionSessionId;
-		at: #timestamp put: DateAndTime now asString;
-		at: #rejected put: OrderedCollection new].
+		contextInfo
+			at: #sessionId put: CoPharoCopilotLogger completionSessionId;
+			at: #timestamp put: DateAndTime now asString;
+			at: #rejected put: OrderedCollection new ].
 
 	cached := self
 		fastCachedSuggestionsFor: context
@@ -287,14 +282,6 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		(self openCachedSuggestions: cached for: context prefix: prefix suffix: suffix contextInfo: contextInfo)
 			ifTrue: [ ^ self emptyResultSet ] ].
 
-	(self shouldOpenSemanticSelectorFastPathFor: context prefix: prefix) ifTrue: [
-		| entries position |
-		entries := self semanticSelectorFastPathEntriesFor: context contextInfo: contextInfo.
-		entries isEmpty ifFalse: [
-			position := self menuPositionForContextOrDefault: context.
-			self openCompletionMenuFor: context entries: entries position: position.
-			^ self emptyResultSet ] ].
-	
 	delay := self requestDelayForSnapshot: snapshot.
 
 	self
@@ -304,6 +291,14 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		contextInfo: contextInfo
 		delayMilliseconds: delay.
 
+	environment := self completionEnvironmentFor: context.
+	kind := environment at: #kind ifAbsent: [ #unknown ].
+
+	"Playground and Inspector keep the normal completion engine."
+	((kind = #playground) or: [ kind = #inspector ]) ifTrue: [
+		^ self localCompletionResultSetFor: context ].
+
+	"Browser, Debugger, etc: Ollama owns this completion."
 	^ self emptyResultSet
 ]
 
@@ -325,18 +320,6 @@ CoPharoCopilotResultSetBuilder >> cacheClassContext: contextString for: methodCl
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext [
-
-	suggestions isEmpty ifTrue: [ ^ self ].
-
-	self completionCache
-		at: prefixString
-		suffix: suffixString
-		context: classContext
-		put: suggestions asArray
-]
-
-{ #category : 'new' }
 CoPharoCopilotResultSetBuilder >> cacheFastSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString [
 
 	suggestions isEmpty ifTrue: [ ^ self ].
@@ -345,6 +328,26 @@ CoPharoCopilotResultSetBuilder >> cacheFastSuggestions: suggestions for: aContex
 		at: prefixString
 		suffix: suffixString
 		context: (self fastCacheContextFor: aContext prefix: prefixString)
+		put: suggestions asArray
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> cacheSemanticReceiverInfo: info forKey: key [
+
+	lastSemanticReceiverKey := key.
+	lastSemanticReceiverValue := info.
+	^ info
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext [
+
+	suggestions isEmpty ifTrue: [ ^ self ].
+
+	self completionCache
+		at: prefixString
+		suffix: suffixString
+		context: classContext
 		put: suggestions asArray
 ]
 
@@ -363,6 +366,14 @@ CoPharoCopilotResultSetBuilder >> cachedClassContextFor: methodClass [
 
 	cached at: #accessTime put: self classContextTick.
 	^ cached at: #context ifAbsent: [ '' ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> cachedSemanticReceiverInfoForKey: key [
+
+	(lastSemanticReceiverKey notNil and: [ lastSemanticReceiverKey = key ])
+		ifTrue: [ ^ lastSemanticReceiverValue ].
+	^ nil
 ]
 
 { #category : 'new' }
@@ -568,11 +579,13 @@ CoPharoCopilotResultSetBuilder >> collectNormalizedSuggestionsFor: client prefix
 	^ self finalizeCollectedSuggestions: collected contextInfo: contextInfo
 ]
 
-{ #category : 'routing' }
-CoPharoCopilotResultSetBuilder >> completionRouter [
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> commaSeparatedStrings: aCollection [
 
-	^ completionRouter ifNil: [
-		completionRouter := CoPCCompletionRouter new ]
+	^ String streamContents: [ :stream |
+		aCollection
+			do: [ :each | stream nextPutAll: each asString ]
+			separatedBy: [ stream nextPutAll: ', ' ] ]
 ]
 
 { #category : 'initialization' }
@@ -620,7 +633,7 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext contextInfo: contextInfo [
 
-	| cleaned sessionId copilotEntries |
+	| cleaned sessionId copilotEntries environment kind |
 	cleaned := self
 		normalizedCompletionContentsFrom: contentCollection
 		inContext: aContext
@@ -641,112 +654,18 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 
 		entry ].
 
-	^ self
-		appendFallbackCompletionEntriesTo: copilotEntries
-		inContext: aContext
-		contextInfo: contextInfo
-]
+	environment := self completionEnvironmentFor: aContext.
+	kind := environment at: #kind ifAbsent: [ #unknown ].
 
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> completionPrefixFor: aContext contextInfo: contextInfo [
+	"Only Playground and Inspector fuse Complishon fallback."
+	((kind = #playground) or: [ kind = #inspector ]) ifTrue: [
+		^ self
+			appendFallbackCompletionEntriesTo: copilotEntries
+			inContext: aContext
+			contextInfo: contextInfo ].
 
-	contextInfo ifNotNil: [
-		^ contextInfo
-			at: #prefix
-			ifAbsent: [
-				aContext
-					ifNil: [ '' ]
-					ifNotNil: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ] ] ].
-
-	^ aContext
-		ifNil: [ '' ]
-		ifNotNil: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ]
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> completionKindFor: aContext prefix: prefixString [
-
-	| source position |
-	source := [ aContext source ifNil: [ prefixString ifNil: [ '' ] ] ]
-		on: Error
-		do: [ prefixString ifNil: [ '' ] ].
-	position := [ aContext position ifNil: [ source size ] ]
-		on: Error
-		do: [ source size ].
-	position := (position max: 0) min: source size.
-
-	^ self
-		completionKindForSource: source
-		position: position
-		prefix: prefixString
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> completionKindForSource: sourceString position: positionInteger prefix: prefixString [
-
-	| prefix token receiver last |
-	prefix := prefixString
-		ifNil: [
-			positionInteger <= 0
-				ifTrue: [ '' ]
-				ifFalse: [ sourceString copyFrom: 1 to: positionInteger ] ]
-		ifNotNil: [ prefixString asString ].
-	prefix := prefix ifNil: [ '' ].
-
-	token := self trailingWordFragmentIn: prefix.
-	receiver := self textualReceiverBeforeCompletionIn: prefix.
-	(token isEmpty not and: [
-		receiver isEmpty not and: [ receiver ~= token ] ])
-			ifTrue: [ ^ #messageTail ].
-
-	last := self lastNonSeparatorCharacterIn: prefix.
-	last ifNil: [ ^ #statement ].
-	last = $^ ifTrue: [ ^ #returnExpression ].
-	((prefix trimRight) endsWith: ':=') ifTrue: [ ^ #assignmentRHS ].
-	last = $[ ifTrue: [ ^ #blockBody ].
-	last = $. ifTrue: [ ^ #statement ].
-
-	^ #expression
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> commaSeparatedStrings: aCollection [
-
-	^ String streamContents: [ :stream |
-		aCollection
-			do: [ :each | stream nextPutAll: each asString ]
-			separatedBy: [ stream nextPutAll: ', ' ] ]
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> computeAndCacheSelectorFromPrefix: prefixString header: header [
-
-	| extractor ast result |
-	extractor := CNSelectorExtractor new.
-	ast := OCParser parseFaultyMethod: prefixString.
-	result := extractor extractSelectorFromAST: ast atPosition: 1.
-
-	lastSelectorPrefix := header.
-	lastSelectorResult := result.
-	^ result
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> contextInfoFor: aContext prefix: prefixString suffix: suffixString [
-
-	| info |
-	info := Dictionary new
-		at: #prefix put: prefixString;
-		at: #suffix put: suffixString;
-		yourself.
-	self isLoggingEnabled ifTrue: [
-		info
-			at: #contextClass put: aContext class name;
-			at: #cursorPosition put: aContext position;
-			at: #sourceSize put: aContext source size;
-			at: #fullSource put: aContext source;
-			at: #completionEnvironment put: (self completionEnvironmentFor: aContext) ].
-	^ info
+	"Browser / Debugger / normal editors: Copilot entries only."
+	^ copilotEntries asArray
 ]
 
 { #category : 'private' }
@@ -821,111 +740,116 @@ CoPharoCopilotResultSetBuilder >> completionEnvironmentKindForContext: aContext 
 	^ #unknown
 ]
 
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> morphForEditor: editor [
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> completionKindFor: aContext prefix: prefixString [
+
+	| source position |
+	source := [ aContext source ifNil: [ prefixString ifNil: [ '' ] ] ]
+		on: Error
+		do: [ prefixString ifNil: [ '' ] ].
+	position := [ aContext position ifNil: [ source size ] ]
+		on: Error
+		do: [ source size ].
+	position := (position max: 0) min: source size.
 
 	^ self
-		morphFrom: editor
-		selectors: #(morph textArea widget view)
+		completionKindForSource: source
+		position: position
+		prefix: prefixString
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> completionKindForSource: sourceString position: positionInteger prefix: prefixString [
+
+	| prefix token receiver last |
+	prefix := prefixString
+		ifNil: [
+			positionInteger <= 0
+				ifTrue: [ '' ]
+				ifFalse: [ sourceString copyFrom: 1 to: positionInteger ] ]
+		ifNotNil: [ prefixString asString ].
+	prefix := prefix ifNil: [ '' ].
+
+	token := self trailingWordFragmentIn: prefix.
+	receiver := self textualReceiverBeforeCompletionIn: prefix.
+	(token isEmpty not and: [
+		receiver isEmpty not and: [ receiver ~= token ] ])
+			ifTrue: [ ^ #messageTail ].
+
+	last := self lastNonSeparatorCharacterIn: prefix.
+	last ifNil: [ ^ #statement ].
+	last = $^ ifTrue: [ ^ #returnExpression ].
+	((prefix trimRight) endsWith: ':=') ifTrue: [ ^ #assignmentRHS ].
+	last = $[ ifTrue: [ ^ #blockBody ].
+	last = $. ifTrue: [ ^ #statement ].
+
+	^ #expression
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> completionPrefixFor: aContext contextInfo: contextInfo [
+
+	contextInfo ifNotNil: [
+		^ contextInfo
+			at: #prefix
+			ifAbsent: [
+				aContext
+					ifNil: [ '' ]
+					ifNotNil: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ] ] ].
+
+	^ aContext
+		ifNil: [ '' ]
+		ifNotNil: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ]
+]
+
+{ #category : 'routing' }
+CoPharoCopilotResultSetBuilder >> completionRouter [
+
+	^ completionRouter ifNil: [
+		completionRouter := CoPCCompletionRouter new ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> completionTokenFor: aContext prefix: prefixString [
+
+	| token |
+	token := (aContext notNil and: [ aContext respondsTo: #completionToken ])
+		ifTrue: [ [ aContext completionToken ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ].
+
+	(token isNil or: [ token asString isEmpty ]) ifFalse: [ ^ token asString ].
+	^ self trailingWordFragmentIn: prefixString
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> computeAndCacheSelectorFromPrefix: prefixString header: header [
+
+	| extractor ast result |
+	extractor := CNSelectorExtractor new.
+	ast := OCParser parseFaultyMethod: prefixString.
+	result := extractor extractSelectorFromAST: ast atPosition: 1.
+
+	lastSelectorPrefix := header.
+	lastSelectorResult := result.
+	^ result
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> morphForRequestor: requestor [
+CoPharoCopilotResultSetBuilder >> contextInfoFor: aContext prefix: prefixString suffix: suffixString [
 
-	| morph model |
-	morph := self
-		morphFrom: requestor
-		selectors: #(morph window widget view).
-	morph ifNotNil: [ ^ morph ].
-
-	model := self modelForRequestor: requestor.
-	^ self
-		morphFrom: model
-		selectors: #(morph window widget view)
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> morphFrom: anObject selectors: selectorCollection [
-
-	| candidate |
-	anObject ifNil: [ ^ nil ].
-	selectorCollection do: [ :selector |
-		(anObject respondsTo: selector) ifTrue: [
-			candidate := [ anObject perform: selector ] on: Error do: [ nil ].
-			candidate ifNotNil: [ ^ candidate ] ] ].
-	^ nil
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> ownerClassNamesForMorph: morph limit: limitInteger [
-
-	| classes current limit |
-	classes := OrderedCollection new.
-	current := morph.
-	limit := limitInteger ifNil: [ 12 ].
-	[ current notNil and: [ classes size < limit ] ] whileTrue: [
-		classes add: (self telemetryClassNameFor: current).
-		current := (current respondsTo: #owner)
-			ifTrue: [ [ current owner ] on: Error do: [ nil ] ]
-			ifFalse: [ nil ] ].
-	^ classes asArray
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> telemetryClassNameFor: anObject [
-
-	anObject ifNil: [ ^ '' ].
-	^ [ anObject class name asString ] on: Error do: [ '' ]
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> telemetryStringFor: anObject max: maxLength [
-
-	| text limit |
-	anObject ifNil: [ ^ '' ].
-	text := [ anObject asString ] on: Error do: [ '' ].
-	text ifNil: [ ^ '' ].
-	limit := maxLength ifNil: [ 120 ].
-	^ text size > limit
-		ifTrue: [ text copyFrom: 1 to: limit ]
-		ifFalse: [ text ]
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> titleForWindow: window [
-
-	#(label labelString title titleString name) do: [ :selector |
-		(window notNil and: [ window respondsTo: selector ]) ifTrue: [
-			| value title |
-			value := [ window perform: selector ] on: Error do: [ nil ].
-			title := self telemetryStringFor: value max: 120.
-			title isEmpty ifFalse: [ ^ title ] ] ].
-	^ ''
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> windowForMorph: morph [
-
-	morph ifNil: [ ^ nil ].
-	(morph respondsTo: #window) ifTrue: [
-		| window |
-		window := [ morph window ] on: Error do: [ nil ].
-		window ifNotNil: [ ^ window ] ].
-	^ self windowInOwnerChainForMorph: morph
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> windowInOwnerChainForMorph: morph [
-
-	| current |
-	current := morph.
-	[ current notNil ] whileTrue: [
-		((self telemetryClassNameFor: current) asLowercase includesSubstring: 'window')
-			ifTrue: [ ^ current ].
-		current := (current respondsTo: #owner)
-			ifTrue: [ [ current owner ] on: Error do: [ nil ] ]
-			ifFalse: [ nil ] ].
-	^ nil
+	| info |
+	info := Dictionary new
+		at: #prefix put: prefixString;
+		at: #suffix put: suffixString;
+		yourself.
+	self isLoggingEnabled ifTrue: [
+		info
+			at: #contextClass put: aContext class name;
+			at: #cursorPosition put: aContext position;
+			at: #sourceSize put: aContext source size;
+			at: #fullSource put: aContext source;
+			at: #completionEnvironment put: (self completionEnvironmentFor: aContext) ].
+	^ info
 ]
 
 { #category : 'new' }
@@ -979,14 +903,6 @@ lastSnapshotKey := { source. position }.
 	^ lastSnapshotValue
 ]
 
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> cachedSemanticReceiverInfoForKey: key [
-
-	(lastSemanticReceiverKey notNil and: [ lastSemanticReceiverKey = key ])
-		ifTrue: [ ^ lastSemanticReceiverValue ].
-	^ nil
-]
-
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> debounceMilliseconds [
 	"Return the current debounce delay used before firing a completion request."
@@ -1033,10 +949,51 @@ CoPharoCopilotResultSetBuilder >> descriptionForSuggestion: suggestionString inC
 	^ 'Preview: ' , firstLine
 ]
 
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> doItContextFor: aContext [
+
+	| engine |
+	aContext ifNil: [ ^ nil ].
+	(aContext respondsTo: #doItContext) ifTrue: [
+		| context |
+		context := [ aContext doItContext ] on: Error do: [ nil ].
+		context ifNotNil: [ ^ context ] ].
+
+	engine := self engineFor: aContext.
+	^ (engine notNil and: [ engine respondsTo: #doItContext ])
+		ifTrue: [ [ engine doItContext ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> doItRequestorFor: aContext [
+
+	| engine |
+	aContext ifNil: [ ^ nil ].
+	(aContext respondsTo: #doItRequestor) ifTrue: [
+		| requestor |
+		requestor := [ aContext doItRequestor ] on: Error do: [ nil ].
+		requestor ifNotNil: [ ^ requestor ] ].
+
+	engine := self engineFor: aContext.
+	^ (engine notNil and: [ engine respondsTo: #doItRequestor ])
+		ifTrue: [ [ engine doItRequestor ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> emptyResultSet [
 
 	^ CoResultSet fetcher: (CoCollectionFetcher onCollection: #())
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> engineFor: aContext [
+
+	aContext ifNil: [ ^ nil ].
+	^ (aContext respondsTo: #engine)
+		ifTrue: [ [ aContext engine ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
 ]
 
 { #category : 'initialization' }
@@ -1069,6 +1026,32 @@ CoPharoCopilotResultSetBuilder >> entryContentsFor: anEntry [
 		do: [ '' ]
 ]
 
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> environmentValueNamed: variableName inContext: aContext ifPresent: aBlock [
+
+	| symbol value found |
+	variableName ifNil: [ ^ self ].
+	variableName asString isEmpty ifTrue: [ ^ self ].
+	symbol := variableName asString asSymbol.
+
+	(aContext notNil and: [ aContext respondsTo: #environmentAt:ifPresent: ]) ifTrue: [
+		found := false.
+		[
+			aContext
+				environmentAt: symbol
+				ifPresent: [ :global |
+					value := global.
+					found := true ] ]
+			on: Error
+			do: [ ].
+		found ifTrue: [ ^ aBlock value: value ] ].
+
+	value := [ Smalltalk globals at: symbol ifAbsent: [ nil ] ]
+		on: Error
+		do: [ nil ].
+	value ifNotNil: [ ^ aBlock value: value ]
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> exactCachedSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext [
 
@@ -1092,30 +1075,10 @@ CoPharoCopilotResultSetBuilder >> extractResponseContentFromRaw: rawResponseStri
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> fallbackCompletionEntriesFor: aContext excluding: existingEntries [
 
+	self logOldCompletionLookupFor: aContext reason: #menuFusion.
 	^ self
 		semanticFallbackEntriesFrom: (self semanticEntriesFor: aContext)
 		excluding: existingEntries
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> semanticFallbackEntriesFrom: rawEntries excluding: existingEntries [
-
-	| seen |
-	seen := Set new.
-	existingEntries do: [ :each |
-		| contents |
-		contents := self entryContentsFor: each.
-		contents isEmpty ifFalse: [ seen add: contents ] ].
-
-	^ ((rawEntries ifNil: [ #() ]) select: [ :each |
-			| contents |
-			contents := self entryContentsFor: each.
-			(contents isEmpty or: [ seen includes: contents ])
-				ifTrue: [ false ]
-				ifFalse: [
-					seen add: contents.
-					true ] ])
-		collect: [ :each | CoPCFallbackCompletionEntry on: each ]
 ]
 
 { #category : 'new' }
@@ -1172,36 +1135,12 @@ CoPharoCopilotResultSetBuilder >> fallbackMenuPositionFor: aContext [
 CoPharoCopilotResultSetBuilder >> fallbackResultSetFor: aContext [
 	"Build the same AST/heuristic result set used by CoCompletionEngine in Complishon."
 
-	self
-		logOldCompletionLookupFor: aContext
-		reason: #fullFallbackReroute.
+	self logOldCompletionLookupFor: aContext reason: #localResultSet.
 	^ [
 		(CoASTHeuristicsResultSetBuilder initializeOnContext: aContext)
 			buildCompletion ]
 		on: Error
 		do: [ nil ]
-]
-
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> semanticProvider [
-
-	^ semanticProvider ifNil: [
-		semanticProvider := CoPCSemanticCompletionProvider new
-			builder: self;
-			limit: self fallbackCompletionLimit;
-			yourself ]
-]
-
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> semanticProvider: aProvider [
-
-	semanticProvider := aProvider
-]
-
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> semanticEntriesFor: aContext [
-
-	^ self semanticProvider entriesFor: aContext
 ]
 
 { #category : 'new' }
@@ -1244,25 +1183,6 @@ CoPharoCopilotResultSetBuilder >> fetchSuggestionsForPrefix: prefixString suffix
 		context: classContext
 		contextInfo: contextInfo
 		requestOptions: (self generationOptionsForContextInfo: contextInfo)
-]
-
-{ #category : 'generation' }
-CoPharoCopilotResultSetBuilder >> generationOptionsForContextInfo: contextInfo [
-
-	| route |
-	route := contextInfo
-		ifNil: [ #unknown ]
-		ifNotNil: [ contextInfo at: #completionRoute ifAbsent: [ #unknown ] ].
-	^ Dictionary new
-		at: #num_predict put: (self generationPolicy numPredictFor: route);
-		yourself
-]
-
-{ #category : 'generation' }
-CoPharoCopilotResultSetBuilder >> generationPolicy [
-
-	^ generationPolicy ifNil: [
-		generationPolicy := CoPCCompletionGenerationPolicy new ]
 ]
 
 { #category : 'new' }
@@ -1356,77 +1276,35 @@ CoPharoCopilotResultSetBuilder >> fuseModelSuggestions: modelSuggestions semanti
 	^ result asArray
 ]
 
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> addFusedSuggestion: suggestionString selector: selectorString to: result seenStrings: seenStrings seenSelectors: seenSelectors [
+{ #category : 'generation' }
+CoPharoCopilotResultSetBuilder >> generationOptionsForContextInfo: contextInfo [
 
-	| suggestion selector |
-	suggestion := suggestionString ifNil: [ '' ] ifNotNil: [ suggestionString asString ].
-	suggestion isEmpty ifTrue: [ ^ self ].
-	selector := selectorString ifNil: [ '' ] ifNotNil: [ selectorString asString ].
-	(selector isEmpty not and: [ seenSelectors includes: selector ]) ifTrue: [ ^ self ].
-	(seenStrings includes: suggestion) ifTrue: [ ^ self ].
-
-	result add: suggestion.
-	seenStrings add: suggestion.
-	selector isEmpty ifFalse: [ seenSelectors add: selector ]
+	| route |
+	route := contextInfo
+		ifNil: [ #unknown ]
+		ifNotNil: [ contextInfo at: #completionRoute ifAbsent: [ #unknown ] ].
+	^ Dictionary new
+		at: #num_predict put: (self generationPolicy numPredictFor: route);
+		yourself
 ]
 
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> semanticStringsFrom: entries [
+{ #category : 'generation' }
+CoPharoCopilotResultSetBuilder >> generationPolicy [
 
-	| strings |
-	strings := OrderedCollection new.
-	(entries ifNil: [ #() ]) do: [ :each |
-		| contents |
-		contents := self entryContentsFor: each.
-		contents isEmpty ifFalse: [ strings add: contents ] ].
-	^ strings asArray
+	^ generationPolicy ifNil: [
+		generationPolicy := CoPCCompletionGenerationPolicy new ]
 ]
 
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> semanticSelectorForEntry: anEntry reranker: reranker [
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> hasEnoughSourceOnlyDataForCopilot: sourceString position: positionInteger [
+	"Source-only editors such as Playground/Workspace do not provide class context.
+	Only ask the model when the local source itself is large enough to be useful."
 
-	| candidate |
-	candidate := reranker selectorCandidateFrom: (self entryContentsFor: anEntry).
-	^ candidate at: #selector ifAbsent: [ '' ]
-]
-
-{ #category : 'semantic completion' }
-CoPharoCopilotResultSetBuilder >> recordSemanticFusionForModelSuggestions: modelSuggestions semanticStrings: semanticStrings exactModels: exactModels result: result contextInfo: contextInfo [
-
-	| payload status |
-	contextInfo ifNil: [ ^ self ].
-	contextInfo at: #semanticFusionApplied put: true.
-	status := exactModels isEmpty
-		ifTrue: [
-			modelSuggestions isEmpty
-				ifTrue: [ #semanticOnly ]
-				ifFalse: [ #semanticFirst ] ]
-		ifFalse: [ #high ].
-	payload := Dictionary new
-		at: #status put: status;
-		at: #modelTop put: (modelSuggestions isEmpty
-			ifTrue: [ '' ]
-			ifFalse: [ modelSuggestions first asString ]);
-		at: #heuristicTop put: (semanticStrings isEmpty
-			ifTrue: [ '' ]
-			ifFalse: [ semanticStrings first ]);
-		at: #modelStatuses put: ((modelSuggestions collect: [ :each |
-			Dictionary new
-				at: #contents put: each asString;
-				at: #status put: ((exactModels anySatisfy: [ :assoc | assoc key = each ])
-					ifTrue: [ #high ]
-					ifFalse: [ #modelOnly ]);
-				yourself ]) asArray);
-		at: #shownOrder put: ((result collect: [ :each |
-			((modelSuggestions includes: each) and: [ semanticStrings includes: each ])
-				ifTrue: [ #both ]
-				ifFalse: [
-					(modelSuggestions includes: each)
-						ifTrue: [ #copilot ]
-						ifFalse: [ #semantic ] ] ]) asArray);
-		yourself.
-	contextInfo at: #semanticGate put: payload
+	| source |
+	source := (sourceString ifNil: [ '' ]) asString trimBoth.
+	source size < self minimumSourceOnlyCompletionLength ifTrue: [ ^ false ].
+	positionInteger < self minimumPrefixLength ifTrue: [ ^ false ].
+	^ true
 ]
 
 { #category : 'new' }
@@ -1441,6 +1319,19 @@ CoPharoCopilotResultSetBuilder >> hasStaleContextFor: aContext expectedPrefix: e
 
 	^ (currentPrefix beginsWith: expectedPrefix) not
 		or: [ currentSuffix ~= expectedSuffix ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> hasStandaloneCompletionBoundaryBeforeTokenIn: prefixString [
+
+	| prefix last boundaryCharacters |
+	prefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString trimRight ].
+	prefix isEmpty ifTrue: [ ^ true ].
+	(prefix endsWith: ':=') ifTrue: [ ^ true ].
+
+	last := prefix last.
+	boundaryCharacters := '.^([{:|,+-*/\~<>=@%&?!'.
+	^ boundaryCharacters includes: last
 ]
 
 { #category : 'initialization' }
@@ -1484,6 +1375,28 @@ CoPharoCopilotResultSetBuilder >> indexOfClosingFenceIn: text startingAt: startI
 	].
 
 	^ lastValid
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> inferredInstanceVariableTypesNamed: variableName inBehavior: aBehavior [
+
+	| inferencerClass variables |
+	(aBehavior isNil or: [ variableName isNil ]) ifTrue: [ ^ #() ].
+
+	inferencerClass := Smalltalk globals
+		at: #CoTypeInferencer
+		ifAbsent: [ nil ].
+	inferencerClass ifNil: [ ^ #() ].
+
+	variables := [
+		inferencerClass new
+			inferFrom: aBehavior;
+			variables ]
+		on: Error
+		do: [ nil ].
+	variables ifNil: [ ^ #() ].
+
+	^ variables at: variableName asString ifAbsent: [ #() ]
 ]
 
 { #category : 'initialization' }
@@ -1539,63 +1452,88 @@ CoPharoCopilotResultSetBuilder >> interactionHistoryForPrompt [
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> liveContextSnapshotFor: aContext [
+CoPharoCopilotResultSetBuilder >> isBadCompletionShape: suggestionString [
 
-	| pair source position prefix suffix |
-	pair := self liveSourceAndPositionFor: aContext.
-	pair ifNil: [ ^ self contextSnapshotFor: aContext ].
+	| suggestion lower firstLine badPrefixes |
+	suggestion := (suggestionString ifNil: [ '' ]) asString trimBoth.
+	suggestion isEmpty ifTrue: [ ^ true ].
+	lower := suggestion asLowercase.
 
-	source := pair first.
-	position := pair second.
-	prefix := position > 0
-		ifTrue: [ source copyFrom: 1 to: position ]
-		ifFalse: [ '' ].
-	suffix := position < source size
-		ifTrue: [ source copyFrom: position + 1 to: source size ]
-		ifFalse: [ '' ].
+	((suggestion includesSubstring: '```') or: [
+		(suggestion includesSubstring: '<|fim_') or: [
+			(suggestion includesSubstring: '<|file_sep|') or: [
+				suggestion includesSubstring: '<|repo_name|' ] ] ])
+		ifTrue: [ ^ true ].
 
-	^ Dictionary new
-		at: #prefix put: prefix;
-		at: #suffix put: suffix;
-		at: #position put: position;
-		at: #sourceLength put: source size;
-		yourself
+	((suggestion beginsWith: 'Class {') or: [
+		suggestion beginsWith: 'Trait {'])
+			ifTrue: [ ^ true ].
+
+	firstLine := suggestion lines
+		ifEmpty: [ suggestion ]
+		ifNotEmpty: [ :lines | lines first trimBoth ].
+	(firstLine includesSubstring: '>>') ifTrue: [ ^ true ].
+
+	badPrefixes := #(
+		'here is'
+		'here''s'
+		'sure'
+		'the completion'
+		'this completion'
+		'i would'
+		'you can'
+	).
+
+	^ badPrefixes anySatisfy: [ :each | lower beginsWith: each ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> isClassOrTrait: anObject [
+
+	anObject ifNil: [ ^ false ].
+	((anObject respondsTo: #isClassOrTrait) and: [
+		[ anObject isClassOrTrait ] on: Error do: [ false ] ])
+			ifTrue: [ ^ true ].
+	^ [ anObject isBehavior ] on: Error do: [ false ]
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> liveEditorFor: aContext [
+CoPharoCopilotResultSetBuilder >> isInsideCommentOrStringIn: sourceString position: positionInteger [
 
-	| engine editor |
-	aContext ifNil: [ ^ nil ].
+	| source limit stringQuote commentQuote inString inComment index character |
+	source := (sourceString ifNil: [ '' ]) asString.
+	limit := ((positionInteger ifNil: [ 0 ]) max: 0) min: source size.
+	stringQuote := Character value: 39.
+	commentQuote := Character value: 34.
+	inString := false.
+	inComment := false.
+	index := 1.
 
-	engine := self engineFor: aContext.
-	editor := engine
-		ifNotNil: [ [ engine editor ] on: Error do: [ nil ] ]
-		ifNil: [ nil ].
-	editor ifNotNil: [ ^ editor ].
+	[ index <= limit ] whileTrue: [
+		character := source at: index.
+		inComment
+			ifTrue: [
+				character = commentQuote ifTrue: [ inComment := false ].
+				index := index + 1 ]
+			ifFalse: [
+				inString
+					ifTrue: [
+						character = stringQuote
+							ifTrue: [
+								(index < limit and: [ (source at: index + 1) = stringQuote ])
+									ifTrue: [ index := index + 2 ]
+									ifFalse: [
+										inString := false.
+										index := index + 1 ] ]
+							ifFalse: [ index := index + 1 ] ]
+					ifFalse: [
+						character = commentQuote
+							ifTrue: [ inComment := true ]
+							ifFalse: [
+								character = stringQuote ifTrue: [ inString := true ] ].
+						index := index + 1 ] ] ].
 
-	^ (aContext respondsTo: #editor)
-		ifTrue: [ [ aContext editor ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ]
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> liveSourceAndPositionFor: aContext [
-
-	| editor source caret position |
-	editor := self liveEditorFor: aContext.
-	editor ifNil: [ ^ nil ].
-	((editor respondsTo: #text) and: [ editor respondsTo: #caret ]) ifFalse: [ ^ nil ].
-
-	source := [ editor text ifNil: [ nil ] ] on: Error do: [ nil ].
-	source ifNil: [ ^ nil ].
-	source := source asString.
-
-	caret := [ editor caret ] on: Error do: [ nil ].
-	caret ifNil: [ ^ nil ].
-	position := (caret - 1 max: 0) min: source size.
-
-	^ { source. position }
+	^ inString or: [ inComment ]
 ]
 
 { #category : 'initialization' }
@@ -1660,21 +1598,60 @@ CoPharoCopilotResultSetBuilder >> isLikelyContextEcho: suggestionString forPrefi
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> averageLogprobFromMetadata: metadata [
-
-	| numbers total |
-	numbers := self logprobNumbersFromMetadata: metadata.
-	numbers isEmpty ifTrue: [ ^ nil ].
-
-	total := 0.
-	numbers do: [ :each | total := total + each ].
-	^ total / numbers size
-]
-
-{ #category : 'private' }
 CoPharoCopilotResultSetBuilder >> isLoggingEnabled [
 
 	^ [ CopilotSettings loggingEnabled ] on: Error do: [ false ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> isLowConfidenceMetadata: metadata [
+
+	| average |
+	average := self averageLogprobFromMetadata: metadata.
+	average ifNil: [ ^ false ].
+	^ average < self lowConfidenceAverageLogprobThreshold
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> isScriptingContext: aContext [
+
+	| engine |
+	aContext ifNil: [ ^ false ].
+
+	(aContext respondsTo: #isScripting) ifTrue: [
+		^ [ aContext isScripting ] on: Error do: [ false ] ].
+
+	engine := self engineFor: aContext.
+
+	^ (engine notNil and: [ engine respondsTo: #isScripting ])
+		and: [ [ engine isScripting ] on: Error do: [ false ] ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> isSemanticMessageNode: aNode [
+
+	aNode ifNil: [ ^ false ].
+	((aNode respondsTo: #isMessage) and: [
+		[ aNode isMessage ] on: Error do: [ false ] ])
+			ifTrue: [ ^ true ].
+	^ (aNode respondsTo: #receiver) and: [ aNode respondsTo: #selector ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> isSuggestion: suggestionString acceptableForCompletionKind: completionKind [
+
+	| suggestion kind |
+	(self isBadCompletionShape: suggestionString) ifTrue: [ ^ false ].
+
+	suggestion := suggestionString asString trimBoth.
+	kind := completionKind ifNil: [ #expression ].
+
+	kind = #messageTail ifTrue: [
+		"Allow a complete Smalltalk expression/sentence.
+		 Only reject multiline output here."
+		^ (suggestion includes: Character lf) not ].
+
+	^ true
 ]
 
 { #category : 'initialization' }
@@ -1712,111 +1689,19 @@ CoPharoCopilotResultSetBuilder >> isTemplateLeakOrPromptEcho: cleanedString rawR
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> isBadCompletionShape: suggestionString [
-
-	| suggestion lower firstLine badPrefixes |
-	suggestion := (suggestionString ifNil: [ '' ]) asString trimBoth.
-	suggestion isEmpty ifTrue: [ ^ true ].
-	lower := suggestion asLowercase.
-
-	((suggestion includesSubstring: '```') or: [
-		(suggestion includesSubstring: '<|fim_') or: [
-			(suggestion includesSubstring: '<|file_sep|') or: [
-				suggestion includesSubstring: '<|repo_name|' ] ] ])
-		ifTrue: [ ^ true ].
-
-	((suggestion beginsWith: 'Class {') or: [
-		suggestion beginsWith: 'Trait {'])
-			ifTrue: [ ^ true ].
-
-	firstLine := suggestion lines
-		ifEmpty: [ suggestion ]
-		ifNotEmpty: [ :lines | lines first trimBoth ].
-	(firstLine includesSubstring: '>>') ifTrue: [ ^ true ].
-
-	badPrefixes := #(
-		'here is'
-		'here''s'
-		'sure'
-		'the completion'
-		'this completion'
-		'i would'
-		'you can'
-	).
-
-	^ badPrefixes anySatisfy: [ :each | lower beginsWith: each ]
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> isLowConfidenceMetadata: metadata [
-
-	| average |
-	average := self averageLogprobFromMetadata: metadata.
-	average ifNil: [ ^ false ].
-	^ average < self lowConfidenceAverageLogprobThreshold
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> isSuggestion: suggestionString acceptableForCompletionKind: completionKind [
-
-	| suggestion kind |
-	(self isBadCompletionShape: suggestionString) ifTrue: [ ^ false ].
-
-	suggestion := suggestionString asString trimBoth.
-	kind := completionKind ifNil: [ #expression ].
-
-	kind = #messageTail ifTrue: [
-		^ (suggestion includes: Character lf) not
-			and: [ (suggestion includes: $.) not ] ].
-
-	^ true
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> isInsideCommentOrStringIn: sourceString position: positionInteger [
-
-	| source limit stringQuote commentQuote inString inComment index character |
-	source := (sourceString ifNil: [ '' ]) asString.
-	limit := ((positionInteger ifNil: [ 0 ]) max: 0) min: source size.
-	stringQuote := Character value: 39.
-	commentQuote := Character value: 34.
-	inString := false.
-	inComment := false.
-	index := 1.
-
-	[ index <= limit ] whileTrue: [
-		character := source at: index.
-		inComment
-			ifTrue: [
-				character = commentQuote ifTrue: [ inComment := false ].
-				index := index + 1 ]
-			ifFalse: [
-				inString
-					ifTrue: [
-						character = stringQuote
-							ifTrue: [
-								(index < limit and: [ (source at: index + 1) = stringQuote ])
-									ifTrue: [ index := index + 2 ]
-									ifFalse: [
-										inString := false.
-										index := index + 1 ] ]
-							ifFalse: [ index := index + 1 ] ]
-					ifFalse: [
-						character = commentQuote
-							ifTrue: [ inComment := true ]
-							ifFalse: [
-								character = stringQuote ifTrue: [ inString := true ] ].
-						index := index + 1 ] ] ].
-
-	^ inString or: [ inComment ]
-]
-
-{ #category : 'private' }
 CoPharoCopilotResultSetBuilder >> isTriggerBoundaryChar: ch [
 	"Characters that indicate a boundary (space/newline/punct)."
 	ch ifNil: [ ^ true ].
 	(ch isSeparator) ifTrue: [ ^ true ].
 	^ '.;:,()[]{}' includes: ch
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> isUnknownSemanticType: aType [
+
+	aType ifNil: [ ^ true ].
+	aType class name = #CoUnknownType ifTrue: [ ^ true ].
+	^ (self typeNameFor: aType) = 'CoUnknownType'
 ]
 
 { #category : 'initialization' }
@@ -1842,67 +1727,108 @@ CoPharoCopilotResultSetBuilder >> lastNonSeparatorCharacterIn: aString [
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> logprobNumbersFromMetadata: metadata [
+CoPharoCopilotResultSetBuilder >> liveContextSnapshotFor: aContext [
 
-	| response raw numbers |
-	metadata ifNil: [ ^ #() ].
-	response := metadata at: #response ifAbsent: [ ^ #() ].
-	raw := response
-		at: #logprobs
-		ifAbsent: [ response at: 'logprobs' ifAbsent: [ ^ #() ] ].
+	| pair source position prefix suffix |
+	pair := self liveSourceAndPositionFor: aContext.
+	pair ifNil: [ ^ self contextSnapshotFor: aContext ].
 
-	(raw respondsTo: #do:) ifFalse: [ ^ #() ].
+	source := pair first.
+	position := pair second.
+	prefix := position > 0
+		ifTrue: [ source copyFrom: 1 to: position ]
+		ifFalse: [ '' ].
+	suffix := position < source size
+		ifTrue: [ source copyFrom: position + 1 to: source size ]
+		ifFalse: [ '' ].
 
-	numbers := OrderedCollection new.
-	raw do: [ :entry |
-		| value |
-		value := self logprobValueFrom: entry.
-		value ifNotNil: [ numbers add: value ].
-		numbers size >= self lowConfidenceLogprobTokenLimit ifTrue: [ ^ numbers asArray ] ].
-
-	^ numbers asArray
+	^ Dictionary new
+		at: #prefix put: prefix;
+		at: #suffix put: suffix;
+		at: #position put: position;
+		at: #sourceLength put: source size;
+		yourself
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> logprobValueFrom: anObject [
+CoPharoCopilotResultSetBuilder >> liveEditorFor: aContext [
 
-	| value |
-	anObject ifNil: [ ^ nil ].
-	value := (anObject respondsTo: #at:ifAbsent:)
-		ifTrue: [
-			anObject
-				at: #logprob
-				ifAbsent: [ anObject at: 'logprob' ifAbsent: [ nil ] ] ]
-		ifFalse: [ anObject ].
+	| engine editor |
+	aContext ifNil: [ ^ nil ].
 
-	value ifNil: [ ^ nil ].
-	(value isKindOf: Number) ifTrue: [ ^ value ].
-	^ [ value asNumber ]
+	engine := self engineFor: aContext.
+	editor := engine
+		ifNotNil: [ [ engine editor ] on: Error do: [ nil ] ]
+		ifNil: [ nil ].
+	editor ifNotNil: [ ^ editor ].
+
+	^ (aContext respondsTo: #editor)
+		ifTrue: [ [ aContext editor ] on: Error do: [ nil ] ]
+		ifFalse: [ nil ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> liveSourceAndPositionFor: aContext [
+
+	| editor source caret position |
+	editor := self liveEditorFor: aContext.
+	editor ifNil: [ ^ nil ].
+	((editor respondsTo: #text) and: [ editor respondsTo: #caret ]) ifFalse: [ ^ nil ].
+
+	source := [ editor text ifNil: [ nil ] ] on: Error do: [ nil ].
+	source ifNil: [ ^ nil ].
+	source := source asString.
+
+	caret := [ editor caret ] on: Error do: [ nil ].
+	caret ifNil: [ ^ nil ].
+	position := (caret - 1 max: 0) min: source size.
+
+	^ { source. position }
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> liveVariableValueNamed: variableName inContext: aContext ifPresent: aBlock [
+
+	| name doItContext variable requestor binding |
+	(aContext isNil or: [ variableName isNil ]) ifTrue: [ ^ self ].
+	name := variableName asString.
+	name isEmpty ifTrue: [ ^ self ].
+
+	doItContext := self doItContextFor: aContext.
+	doItContext ifNotNil: [
+		variable := [
+			(doItContext respondsTo: #lookupVar:)
+				ifTrue: [ doItContext lookupVar: name ]
+				ifFalse: [ nil ] ]
+			on: Error
+			do: [ nil ].
+		variable ifNotNil: [
+			^ aBlock value: ([ variable readInContext: doItContext ] on: Error do: [ nil ]) ] ].
+
+	requestor := self doItRequestorFor: aContext.
+	requestor ifNil: [ ^ self ].
+
+	((requestor respondsTo: #hasBindingOf:) and: [
+		[ requestor hasBindingOf: name ] on: Error do: [ false ] ])
+			ifFalse: [ ^ self ].
+
+	binding := [
+		(requestor respondsTo: #bindingOf:)
+			ifTrue: [ requestor bindingOf: name ]
+			ifFalse: [ nil ] ]
 		on: Error
-		do: [ nil ]
-]
+		do: [ nil ].
+	binding ifNil: [ ^ self ].
 
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> lowConfidenceAverageLogprobThreshold [
-
-	^ -3.0
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> lowConfidenceLogprobTokenLimit [
-
-	^ 5
+	^ aBlock value: ([ binding value ] on: Error do: [ nil ])
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollection [
+CoPharoCopilotResultSetBuilder >> localCompletionResultSetFor: aContext [
+	"Return the regular Complishon result set. This keeps local completions available
+	immediately while Copilot is scheduled in the background."
 
-	self isLoggingEnabled ifFalse: [ ^ self ].
-	CoPharoCopilotLogger logFrontEndEvent: 'Skipping completion menu: no entries after cleaning' details: (
-		Dictionary new
-			at: #rawSuggestionCount put: contentCollection size;
-			yourself
-	)
+	^ (self fallbackResultSetFor: aContext) ifNil: [ self emptyResultSet ]
 ]
 
 { #category : 'new' }
@@ -1932,6 +1858,17 @@ CoPharoCopilotResultSetBuilder >> logCompletionReroutedToComplishonFor: aContext
 			at: #suffixSize put: suffix size;
 			at: #completionEnvironment put: environment;
 			yourself)
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> logNoEntriesAfterCleaningFor: contentCollection [
+
+	self isLoggingEnabled ifFalse: [ ^ self ].
+	CoPharoCopilotLogger logFrontEndEvent: 'Skipping completion menu: no entries after cleaning' details: (
+		Dictionary new
+			at: #rawSuggestionCount put: contentCollection size;
+			yourself
+	)
 ]
 
 { #category : 'new' }
@@ -2013,6 +1950,59 @@ CoPharoCopilotResultSetBuilder >> logStaleContextForExpectedPrefix: expectedPref
 	^ self
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> logprobNumbersFromMetadata: metadata [
+
+	| response raw numbers |
+	metadata ifNil: [ ^ #() ].
+	response := metadata at: #response ifAbsent: [ ^ #() ].
+	raw := response
+		at: #logprobs
+		ifAbsent: [ response at: 'logprobs' ifAbsent: [ ^ #() ] ].
+
+	(raw respondsTo: #do:) ifFalse: [ ^ #() ].
+
+	numbers := OrderedCollection new.
+	raw do: [ :entry |
+		| value |
+		value := self logprobValueFrom: entry.
+		value ifNotNil: [ numbers add: value ].
+		numbers size >= self lowConfidenceLogprobTokenLimit ifTrue: [ ^ numbers asArray ] ].
+
+	^ numbers asArray
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> logprobValueFrom: anObject [
+
+	| value |
+	anObject ifNil: [ ^ nil ].
+	value := (anObject respondsTo: #at:ifAbsent:)
+		ifTrue: [
+			anObject
+				at: #logprob
+				ifAbsent: [ anObject at: 'logprob' ifAbsent: [ nil ] ] ]
+		ifFalse: [ anObject ].
+
+	value ifNil: [ ^ nil ].
+	(value isKindOf: Number) ifTrue: [ ^ value ].
+	^ [ value asNumber ]
+		on: Error
+		do: [ nil ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> lowConfidenceAverageLogprobThreshold [
+
+	^ -3.0
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> lowConfidenceLogprobTokenLimit [
+
+	^ 5
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> menuClosed [
 	"Called when the menu is closed externally."
@@ -2077,6 +2067,7 @@ CoPharoCopilotResultSetBuilder >> menuPositionForContextOrDefault: aContext [
 	^ position
 ]
 
+{ #category : 'as yet unclassified' }
 CoPharoCopilotResultSetBuilder >> methodClassForBehavior: behavior selector: selector [
 
 	| compiledMethod |
@@ -2144,6 +2135,57 @@ CoPharoCopilotResultSetBuilder >> minimumPrefixLength [
 	^ CopilotSettings minimumPrefixLength
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> minimumSourceOnlyCompletionLength [
+	"Minimum source size before Copilot is allowed in editors without class context."
+
+	^ 120
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> modelForRequestor: requestor [
+
+	requestor ifNil: [ ^ nil ].
+	^ (requestor respondsTo: #model)
+		ifTrue: [ [ requestor model ] on: Error do: [ requestor ] ]
+		ifFalse: [ requestor ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> morphForEditor: editor [
+
+	^ self
+		morphFrom: editor
+		selectors: #(morph textArea widget view)
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> morphForRequestor: requestor [
+
+	| morph model |
+	morph := self
+		morphFrom: requestor
+		selectors: #(morph window widget view).
+	morph ifNotNil: [ ^ morph ].
+
+	model := self modelForRequestor: requestor.
+	^ self
+		morphFrom: model
+		selectors: #(morph window widget view)
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> morphFrom: anObject selectors: selectorCollection [
+
+	| candidate |
+	anObject ifNil: [ ^ nil ].
+	selectorCollection do: [ :selector |
+		(anObject respondsTo: selector) ifTrue: [
+			candidate := [ anObject perform: selector ] on: Error do: [ nil ].
+			candidate ifNotNil: [ ^ candidate ] ] ].
+	^ nil
+]
+
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> nearMatchCachedSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext [
 
@@ -2154,6 +2196,25 @@ CoPharoCopilotResultSetBuilder >> nearMatchCachedSuggestionsForPrefix: prefixStr
 		ifPresent: [ :cached | self filteredNearMatchSuggestions: cached forPrefix: prefixString ]
 ]
 
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> normalizeSemanticTypes: typeCollection [
+
+	| normalized seen |
+	normalized := OrderedCollection new.
+	seen := Set new.
+	typeCollection ifNil: [ ^ #() ].
+
+	typeCollection do: [ :type |
+		| name |
+		(self isUnknownSemanticType: type) ifFalse: [
+			name := self typeNameFor: type.
+			(name isEmpty or: [ seen includes: name ]) ifFalse: [
+				seen add: name.
+				normalized add: type ] ] ].
+
+	^ normalized asArray
+]
+
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> normalizeSuggestion: rawResponse forPrefix: prefixString [
 
@@ -2162,7 +2223,7 @@ CoPharoCopilotResultSetBuilder >> normalizeSuggestion: rawResponse forPrefix: pr
 	text := self removeEchoedPrefix: raw prefix: prefixString. 
 	cleaned := self cleanedContentFrom: text. 
 	typedFragment := self trailingWordFragmentIn: prefixString.
-	cleaned := self stripTypedFragment: typedFragment fromSuggestion: cleaned. 
+	cleaned := self wholeTokenSuggestion: cleaned typedFragment: typedFragment.
 	(self isTemplateLeakOrPromptEcho: cleaned rawResponse: raw prefix: prefixString) ifTrue: [ ^ '' ].
 
 	(self isLikelyContextEcho: cleaned forPrefix: prefixString typedFragment: typedFragment) ifTrue: [ ^ '' ].
@@ -2171,10 +2232,10 @@ CoPharoCopilotResultSetBuilder >> normalizeSuggestion: rawResponse forPrefix: pr
 	^ cleaned trimBoth
 ]
 
-{ #category : 'new' }
+{ #category : 'semantic context' }
 CoPharoCopilotResultSetBuilder >> normalizedCompletionContentsFrom: contentCollection inContext: aContext contextInfo: contextInfo [
 
-	| prefix typedFragment completionKind |
+	| prefix completionKind |
 	prefix := contextInfo
 		ifNil: [
 			(aContext isNil)
@@ -2187,41 +2248,14 @@ CoPharoCopilotResultSetBuilder >> normalizedCompletionContentsFrom: contentColle
 					(aContext isNil)
 						ifTrue: [ '' ]
 						ifFalse: [ (self contextSnapshotFor: aContext) at: #prefix ifAbsent: [ '' ] ] ] ].
-	typedFragment := self completionTokenFor: aContext prefix: prefix.
 	completionKind := self completionKindFor: aContext prefix: prefix.
-
 	^ ((contentCollection ifNil: [ #() ]) collect: [ :each |
-			self
-				stripTypedFragment: typedFragment
-				fromSuggestion: (self cleanedContentFrom: each) ])
+			self cleanedContentFrom: each ])
 		select: [ :each |
 			each isEmpty not and: [
 				self
 					isSuggestion: each
 					acceptableForCompletionKind: completionKind ] ]
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> semanticSelectorFastPathEntriesFor: aContext contextInfo: contextInfo [
-
-	| rawEntries entries gate |
-	rawEntries := self semanticEntriesFor: aContext.
-	entries := self
-		semanticFallbackEntriesFrom: rawEntries
-		excluding: #().
-
-	contextInfo ifNotNil: [
-		gate := Dictionary new
-			at: #status put: #localFastPath;
-			at: #modelTop put: '';
-			at: #heuristicTop put: (entries isEmpty
-				ifTrue: [ '' ]
-				ifFalse: [ self entryContentsFor: entries first ]);
-			at: #shownOrder put: ((entries collect: [ :each | #semantic ]) asArray);
-			yourself.
-		contextInfo at: #semanticGate put: gate ].
-
-	^ entries
 ]
 
 { #category : 'new' }
@@ -2298,25 +2332,19 @@ CoPharoCopilotResultSetBuilder >> ollamaClient [
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> recordGenerationAttempt: attempt metadata: metadata normalizedSuggestion: content contextInfo: contextInfo [
+CoPharoCopilotResultSetBuilder >> openCachedSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
-	| attempts attemptPayload average |
-	self isLoggingEnabled ifFalse: [ ^ self ].
-	contextInfo ifNil: [ ^ self ].
+	| entries position info |
+	info := contextInfo ifNil: [ Dictionary new ].
+	entries := self
+		completionEntriesFrom: suggestions
+		inContext: aContext
+		contextInfo: info.
+	entries isEmpty ifTrue: [ ^ false ].
 
-	attempts := contextInfo at: #generationAttempts ifAbsentPut: [ OrderedCollection new ].
-	attemptPayload := Dictionary new
-		at: #attempt put: attempt;
-		at: #suggestion put: content;
-		at: #request put: (metadata at: #request ifAbsent: [ Dictionary new ]);
-		at: #response put: (metadata at: #response ifAbsent: [ Dictionary new ]);
-		yourself.
-	average := self averageLogprobFromMetadata: metadata.
-	average ifNotNil: [
-		attemptPayload
-			at: #averageLogprob put: average;
-			at: #lowConfidence put: average < self lowConfidenceAverageLogprobThreshold ].
-	attempts add: attemptPayload
+	position := self menuPositionForContextOrDefault: aContext.
+	self openCompletionMenuFor: aContext entries: entries position: position.
+	^ true
 ]
 
 { #category : 'new' }
@@ -2345,26 +2373,32 @@ CoPharoCopilotResultSetBuilder >> openCompletionMenuFor: aContext entries: entri
 ]
 
 { #category : 'new' }
-CoPharoCopilotResultSetBuilder >> openCachedSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
+CoPharoCopilotResultSetBuilder >> openFallbackCompletionMenuFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix [
 
-	| entries position info previousSkip |
-	info := contextInfo ifNil: [ Dictionary new ].
-	previousSkip := info
-		at: #skipSemanticCompletionEnrichment
-		ifAbsent: [ false ].
-	info at: #skipSemanticCompletionEnrichment put: true.
-	entries := self
-		completionEntriesFrom: suggestions
-		inContext: aContext
-		contextInfo: info.
-	previousSkip
-		ifTrue: [ info at: #skipSemanticCompletionEnrichment put: true ]
-		ifFalse: [ info removeKey: #skipSemanticCompletionEnrichment ifAbsent: [ ] ].
-	entries isEmpty ifTrue: [ ^ false ].
+	| entries position |
+	(self hasStaleContextFor: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix)
+		ifTrue: [ ^ self ].
+
+	entries := self fallbackCompletionEntriesFor: aContext excluding: #().
+	entries isEmpty ifTrue: [ ^ self ].
 
 	position := self menuPositionForContextOrDefault: aContext.
-	self openCompletionMenuFor: aContext entries: entries position: position.
-	^ true
+	self openCompletionMenuFor: aContext entries: entries position: position
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> ownerClassNamesForMorph: morph limit: limitInteger [
+
+	| classes current limit |
+	classes := OrderedCollection new.
+	current := morph.
+	limit := limitInteger ifNil: [ 12 ].
+	[ current notNil and: [ classes size < limit ] ] whileTrue: [
+		classes add: (self telemetryClassNameFor: current).
+		current := (current respondsTo: #owner)
+			ifTrue: [ [ current owner ] on: Error do: [ nil ] ]
+			ifFalse: [ nil ] ].
+	^ classes asArray
 ]
 
 { #category : 'new' }
@@ -2385,16 +2419,7 @@ CoPharoCopilotResultSetBuilder >> prependNavigationHistoryTo: contextString [
 CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 
 	[
-		| classContext suggestions semanticEntries semanticDone combined sessionId sessionPayload loggingOn |
-
-		semanticEntries := #().
-		semanticDone := Semaphore new.
-		[
-			[
-				semanticEntries := self semanticEntriesFor: aContext
-			] ensure: [
-				semanticDone signal ]
-		] forkAt: Processor userBackgroundPriority.
+		| classContext suggestions sessionId sessionPayload loggingOn |
 
 		contextInfo ifNotNil: [
 			contextInfo
@@ -2415,13 +2440,7 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 			suggestions := self fetchSuggestionsForPrefix: prefixString suffix: suffixString classContext: classContext contextInfo: contextInfo.
 			self cacheSuggestions: suggestions prefix: prefixString suffix: suffixString classContext: classContext
 		].
-		semanticDone wait.
-		combined := self
-			fuseModelSuggestions: suggestions
-			semanticEntries: semanticEntries
-			context: aContext
-			contextInfo: contextInfo.
-		self cacheFastSuggestions: combined for: aContext prefix: prefixString suffix: suffixString.
+		self cacheFastSuggestions: suggestions for: aContext prefix: prefixString suffix: suffixString.
 
 		loggingOn ifTrue: [
 			sessionId := contextInfo at: #sessionId ifAbsent: [ nil ].
@@ -2437,15 +2456,119 @@ CoPharoCopilotResultSetBuilder >> processCompletionFor: aContext prefix: prefixS
 					sessionId: sessionId ] ].
 
 		self
-			applyContents: combined
+			applyContents: suggestions
 			toContext: aContext
 			expectedPrefix: prefixString
 			suffix: suffixString
 			contextInfo: contextInfo
 	]
-		on: Error
-		do: [ :ex |  ]
+	on: Error
+	do: [ :ex |
+		[
+			self
+				openFallbackCompletionMenuFor: aContext
+				expectedPrefix: prefixString
+				suffix: suffixString ]
+			on: Error
+			do: [ :ignored | ] ]
 
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> receiverNameForNode: aNode source: sourceString [
+
+	| sourceName |
+	aNode ifNil: [ ^ '' ].
+
+	sourceName := self sourceSubstringForNode: aNode in: sourceString.
+	sourceName isEmpty ifFalse: [ ^ sourceName ].
+
+	((aNode respondsTo: #isSelfVariable) and: [
+		[ aNode isSelfVariable ] on: Error do: [ false ] ])
+			ifTrue: [ ^ 'self' ].
+	((aNode respondsTo: #isSuperVariable) and: [
+		[ aNode isSuperVariable ] on: Error do: [ false ] ])
+			ifTrue: [ ^ 'super' ].
+	(aNode respondsTo: #name) ifTrue: [
+		^ [ aNode name asString ] on: Error do: [ '' ] ].
+	(aNode respondsTo: #value) ifTrue: [
+		^ [ aNode value printString ] on: Error do: [ '' ] ].
+
+	^ ''
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> receiverNodeForSemanticNode: aNode [
+
+	aNode ifNil: [ ^ nil ].
+	(self isSemanticMessageNode: aNode) ifTrue: [
+		^ [ aNode receiver ] on: Error do: [ nil ] ].
+
+	((aNode respondsTo: #propertyAt:ifAbsent:) or: [
+		(aNode respondsTo: #name) or: [ aNode respondsTo: #value ] ])
+			ifTrue: [ ^ aNode ].
+
+	^ nil
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> recordGenerationAttempt: attempt metadata: metadata normalizedSuggestion: content contextInfo: contextInfo [
+
+	| attempts attemptPayload average |
+	self isLoggingEnabled ifFalse: [ ^ self ].
+	contextInfo ifNil: [ ^ self ].
+
+	attempts := contextInfo at: #generationAttempts ifAbsentPut: [ OrderedCollection new ].
+	attemptPayload := Dictionary new
+		at: #attempt put: attempt;
+		at: #suggestion put: content;
+		at: #request put: (metadata at: #request ifAbsent: [ Dictionary new ]);
+		at: #response put: (metadata at: #response ifAbsent: [ Dictionary new ]);
+		yourself.
+	average := self averageLogprobFromMetadata: metadata.
+	average ifNotNil: [
+		attemptPayload
+			at: #averageLogprob put: average;
+			at: #lowConfidence put: average < self lowConfidenceAverageLogprobThreshold ].
+	attempts add: attemptPayload
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> recordSemanticFusionForModelSuggestions: modelSuggestions semanticStrings: semanticStrings exactModels: exactModels result: result contextInfo: contextInfo [
+
+	| payload status |
+	contextInfo ifNil: [ ^ self ].
+	contextInfo at: #semanticFusionApplied put: true.
+	status := exactModels isEmpty
+		ifTrue: [
+			modelSuggestions isEmpty
+				ifTrue: [ #semanticOnly ]
+				ifFalse: [ #semanticFirst ] ]
+		ifFalse: [ #high ].
+	payload := Dictionary new
+		at: #status put: status;
+		at: #modelTop put: (modelSuggestions isEmpty
+			ifTrue: [ '' ]
+			ifFalse: [ modelSuggestions first asString ]);
+		at: #heuristicTop put: (semanticStrings isEmpty
+			ifTrue: [ '' ]
+			ifFalse: [ semanticStrings first ]);
+		at: #modelStatuses put: ((modelSuggestions collect: [ :each |
+			Dictionary new
+				at: #contents put: each asString;
+				at: #status put: ((exactModels anySatisfy: [ :assoc | assoc key = each ])
+					ifTrue: [ #high ]
+					ifFalse: [ #modelOnly ]);
+				yourself ]) asArray);
+		at: #shownOrder put: ((result collect: [ :each |
+			((modelSuggestions includes: each) and: [ semanticStrings includes: each ])
+				ifTrue: [ #both ]
+				ifFalse: [
+					(modelSuggestions includes: each)
+						ifTrue: [ #copilot ]
+						ifFalse: [ #semantic ] ] ]) asArray);
+		yourself.
+	contextInfo at: #semanticGate put: payload
 ]
 
 { #category : 'initialization' }
@@ -2579,233 +2702,6 @@ CoPharoCopilotResultSetBuilder >> scanClassContextOldestKey [
 	^ bestKey
 ]
 
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> annotatedSemanticAstFor: aContext source: sourceString [
-
-	| behavior compiler ast visitorClass |
-	behavior := self behaviorFor: aContext.
-	behavior ifNil: [ ^ nil ].
-	(behavior respondsTo: #compiler) ifFalse: [ ^ nil ].
-
-	ast := [
-		compiler := behavior compiler.
-		compiler source: sourceString.
-		(compiler respondsTo: #isScripting:) ifTrue: [
-			compiler isScripting: (self isScriptingContext: aContext) ].
-		compiler parse ]
-		on: Error
-		do: [ nil ].
-	ast ifNil: [ ^ nil ].
-
-	visitorClass := self typeAnnotationVisitorClass.
-	visitorClass ifNotNil: [
-		[ visitorClass new visit: ast ]
-			on: Error
-			do: [ ] ].
-
-	^ ast
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> completionTokenFor: aContext prefix: prefixString [
-
-	| token |
-	token := (aContext notNil and: [ aContext respondsTo: #completionToken ])
-		ifTrue: [ [ aContext completionToken ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ].
-
-	(token isNil or: [ token asString isEmpty ]) ifFalse: [ ^ token asString ].
-	^ self trailingWordFragmentIn: prefixString
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> environmentValueNamed: variableName inContext: aContext ifPresent: aBlock [
-
-	| symbol value found |
-	variableName ifNil: [ ^ self ].
-	variableName asString isEmpty ifTrue: [ ^ self ].
-	symbol := variableName asString asSymbol.
-
-	(aContext notNil and: [ aContext respondsTo: #environmentAt:ifPresent: ]) ifTrue: [
-		found := false.
-		[
-			aContext
-				environmentAt: symbol
-				ifPresent: [ :global |
-					value := global.
-					found := true ] ]
-			on: Error
-			do: [ ].
-		found ifTrue: [ ^ aBlock value: value ] ].
-
-	value := [ Smalltalk globals at: symbol ifAbsent: [ nil ] ]
-		on: Error
-		do: [ nil ].
-	value ifNotNil: [ ^ aBlock value: value ]
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> inferredInstanceVariableTypesNamed: variableName inBehavior: aBehavior [
-
-	| inferencerClass variables |
-	(aBehavior isNil or: [ variableName isNil ]) ifTrue: [ ^ #() ].
-
-	inferencerClass := Smalltalk globals
-		at: #CoTypeInferencer
-		ifAbsent: [ nil ].
-	inferencerClass ifNil: [ ^ #() ].
-
-	variables := [
-		inferencerClass new
-			inferFrom: aBehavior;
-			variables ]
-		on: Error
-		do: [ nil ].
-	variables ifNil: [ ^ #() ].
-
-	^ variables at: variableName asString ifAbsent: [ #() ]
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> isClassOrTrait: anObject [
-
-	anObject ifNil: [ ^ false ].
-	((anObject respondsTo: #isClassOrTrait) and: [
-		[ anObject isClassOrTrait ] on: Error do: [ false ] ])
-			ifTrue: [ ^ true ].
-	^ [ anObject isBehavior ] on: Error do: [ false ]
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> isScriptingContext: aContext [
-
-	| engine |
-	aContext ifNil: [ ^ false ].
-
-	(aContext respondsTo: #isScripting) ifTrue: [
-		^ [ aContext isScripting ] on: Error do: [ false ] ].
-
-	engine := self engineFor: aContext.
-
-	^ (engine notNil and: [ engine respondsTo: #isScripting ])
-		and: [ [ engine isScripting ] on: Error do: [ false ] ]
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> doItContextFor: aContext [
-
-	| engine |
-	aContext ifNil: [ ^ nil ].
-	(aContext respondsTo: #doItContext) ifTrue: [
-		| context |
-		context := [ aContext doItContext ] on: Error do: [ nil ].
-		context ifNotNil: [ ^ context ] ].
-
-	engine := self engineFor: aContext.
-	^ (engine notNil and: [ engine respondsTo: #doItContext ])
-		ifTrue: [ [ engine doItContext ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ]
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> doItRequestorFor: aContext [
-
-	| engine |
-	aContext ifNil: [ ^ nil ].
-	(aContext respondsTo: #doItRequestor) ifTrue: [
-		| requestor |
-		requestor := [ aContext doItRequestor ] on: Error do: [ nil ].
-		requestor ifNotNil: [ ^ requestor ] ].
-
-	engine := self engineFor: aContext.
-	^ (engine notNil and: [ engine respondsTo: #doItRequestor ])
-		ifTrue: [ [ engine doItRequestor ] on: Error do: [ nil ] ]
-		ifFalse: [ nil ]
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> isSemanticMessageNode: aNode [
-
-	aNode ifNil: [ ^ false ].
-	((aNode respondsTo: #isMessage) and: [
-		[ aNode isMessage ] on: Error do: [ false ] ])
-			ifTrue: [ ^ true ].
-	^ (aNode respondsTo: #receiver) and: [ aNode respondsTo: #selector ]
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> isUnknownSemanticType: aType [
-
-	aType ifNil: [ ^ true ].
-	aType class name = #CoUnknownType ifTrue: [ ^ true ].
-	^ (self typeNameFor: aType) = 'CoUnknownType'
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> liveVariableValueNamed: variableName inContext: aContext ifPresent: aBlock [
-
-	| name doItContext variable requestor binding |
-	(aContext isNil or: [ variableName isNil ]) ifTrue: [ ^ self ].
-	name := variableName asString.
-	name isEmpty ifTrue: [ ^ self ].
-
-	doItContext := self doItContextFor: aContext.
-	doItContext ifNotNil: [
-		variable := [
-			(doItContext respondsTo: #lookupVar:)
-				ifTrue: [ doItContext lookupVar: name ]
-				ifFalse: [ nil ] ]
-			on: Error
-			do: [ nil ].
-		variable ifNotNil: [
-			^ aBlock value: ([ variable readInContext: doItContext ] on: Error do: [ nil ]) ] ].
-
-	requestor := self doItRequestorFor: aContext.
-	requestor ifNil: [ ^ self ].
-
-	((requestor respondsTo: #hasBindingOf:) and: [
-		[ requestor hasBindingOf: name ] on: Error do: [ false ] ])
-			ifFalse: [ ^ self ].
-
-	binding := [
-		(requestor respondsTo: #bindingOf:)
-			ifTrue: [ requestor bindingOf: name ]
-			ifFalse: [ nil ] ]
-		on: Error
-		do: [ nil ].
-	binding ifNil: [ ^ self ].
-
-	^ aBlock value: ([ binding value ] on: Error do: [ nil ])
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> modelForRequestor: requestor [
-
-	requestor ifNil: [ ^ nil ].
-	^ (requestor respondsTo: #model)
-		ifTrue: [ [ requestor model ] on: Error do: [ requestor ] ]
-		ifFalse: [ requestor ]
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> normalizeSemanticTypes: typeCollection [
-
-	| normalized seen |
-	normalized := OrderedCollection new.
-	seen := Set new.
-	typeCollection ifNil: [ ^ #() ].
-
-	typeCollection do: [ :type |
-		| name |
-		(self isUnknownSemanticType: type) ifFalse: [
-			name := self typeNameFor: type.
-			(name isEmpty or: [ seen includes: name ]) ifFalse: [
-				seen add: name.
-				normalized add: type ] ] ].
-
-	^ normalized asArray
-]
-
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefixString suffix: suffixString contextInfo: contextInfo [
 	^ self
@@ -2843,41 +2739,37 @@ CoPharoCopilotResultSetBuilder >> scheduleCompletionFor: aContext prefix: prefix
 				contextInfo: contextInfo ] ] forkAt: priority
 ]
 
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> receiverNameForNode: aNode source: sourceString [
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> selectorFromPrefix: prefixString [
+	"The selector is determined by the method header (the first non-empty line up to the first
+	statement separator). While the user types in the body the header is stable, so we cache
+	the (header -> selector) mapping to skip the AST parse on every keystroke."
 
-	| sourceName |
-	aNode ifNil: [ ^ '' ].
+	| header |
+	prefixString ifNil: [ ^ nil ].
 
-	sourceName := self sourceSubstringForNode: aNode in: sourceString.
-	sourceName isEmpty ifFalse: [ ^ sourceName ].
+	header := self selectorHeaderFor: prefixString.
+	(lastSelectorPrefix notNil and: [ lastSelectorPrefix = header ]) ifTrue: [
+		^ lastSelectorResult ].
 
-	((aNode respondsTo: #isSelfVariable) and: [
-		[ aNode isSelfVariable ] on: Error do: [ false ] ])
-			ifTrue: [ ^ 'self' ].
-	((aNode respondsTo: #isSuperVariable) and: [
-		[ aNode isSuperVariable ] on: Error do: [ false ] ])
-			ifTrue: [ ^ 'super' ].
-	(aNode respondsTo: #name) ifTrue: [
-		^ [ aNode name asString ] on: Error do: [ '' ] ].
-	(aNode respondsTo: #value) ifTrue: [
-		^ [ aNode value printString ] on: Error do: [ '' ] ].
-
-	^ ''
+	^ self computeAndCacheSelectorFromPrefix: prefixString header: header
 ]
 
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> receiverNodeForSemanticNode: aNode [
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> selectorHeaderFor: aString [
+	"Return the method-header substring (everything p to the first newline, capped at 256
+	characters). Cheap to compute and stable while the user edits the method body."
 
-	aNode ifNil: [ ^ nil ].
-	(self isSemanticMessageNode: aNode) ifTrue: [
-		^ [ aNode receiver ] on: Error do: [ nil ] ].
-
-	((aNode respondsTo: #propertyAt:ifAbsent:) or: [
-		(aNode respondsTo: #name) or: [ aNode respondsTo: #value ] ])
-			ifTrue: [ ^ aNode ].
-
-	^ nil
+	| size limit i ch |
+	size := aString size.
+	limit := size min: 256.
+	i := 1.
+	[ i <= limit ] whileTrue: [
+		ch := aString at: i.
+		(ch = Character lf or: [ ch = Character cr ])
+			ifTrue: [ ^ aString copyFrom: 1 to: i - 1 ].
+		i := i + 1 ].
+	^ aString copyFrom: 1 to: limit
 ]
 
 { #category : 'semantic context' }
@@ -2944,6 +2836,59 @@ CoPharoCopilotResultSetBuilder >> semanticCompletionContextFor: aContext prefix:
 			separatedBy: [ stream nextPut: lf ] ]
 ]
 
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> semanticEntriesFor: aContext [
+
+	^ self semanticProvider entriesFor: aContext
+]
+
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> semanticFallbackEntriesFrom: rawEntries excluding: existingEntries [
+
+	| seen |
+	seen := Set new.
+	(existingEntries ifNil: [ #() ]) do: [ :each |
+		| contents |
+		contents := self entryContentsFor: each.
+		contents isEmpty ifFalse: [ seen add: contents ] ].
+
+	^ ((rawEntries ifNil: [ #() ]) select: [ :each |
+			| contents |
+			contents := self entryContentsFor: each.
+			(contents isEmpty or: [ seen includes: contents ])
+				ifTrue: [ false ]
+				ifFalse: [
+					seen add: contents.
+					true ] ])
+		collect: [ :each | CoPCFallbackCompletionEntry on: each ]
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> semanticProvider [
+
+	^ semanticProvider ifNil: [
+		semanticProvider := CoPCSemanticCompletionProvider new
+			builder: self;
+			limit: self fallbackCompletionLimit;
+			yourself ]
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> semanticProvider: aProvider [
+
+	semanticProvider := aProvider
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> semanticReceiverInfoCacheKeyForSource: sourceString position: positionInteger behavior: aBehavior prefix: prefixString [
+
+	^ {
+		sourceString.
+		positionInteger.
+		aBehavior.
+		prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ] }
+]
+
 { #category : 'semantic context' }
 CoPharoCopilotResultSetBuilder >> semanticReceiverInfoFor: aContext prefix: prefixString [
 
@@ -3007,22 +2952,18 @@ CoPharoCopilotResultSetBuilder >> semanticReceiverInfoFor: aContext prefix: pref
 	^ self cacheSemanticReceiverInfo: info forKey: key
 ]
 
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> cacheSemanticReceiverInfo: info forKey: key [
+{ #category : 'new' }
+CoPharoCopilotResultSetBuilder >> semanticSelectorFastPathEntriesFor: aContext contextInfo: contextInfo [
 
-	lastSemanticReceiverKey := key.
-	lastSemanticReceiverValue := info.
-	^ info
+	^ #()
 ]
 
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> semanticReceiverInfoCacheKeyForSource: sourceString position: positionInteger behavior: aBehavior prefix: prefixString [
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> semanticSelectorForEntry: anEntry reranker: reranker [
 
-	^ {
-		sourceString.
-		positionInteger.
-		aBehavior.
-		prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ] }
+	| candidate |
+	candidate := reranker selectorCandidateFrom: (self entryContentsFor: anEntry).
+	^ candidate at: #selector ifAbsent: [ '' ]
 ]
 
 { #category : 'semantic context' }
@@ -3050,6 +2991,18 @@ CoPharoCopilotResultSetBuilder >> semanticSelectorHintsForTypes: typeCollection 
 	sorted := selectors asArray asSortedCollection asArray.
 	sorted size <= limit ifTrue: [ ^ sorted ].
 	^ sorted copyFrom: 1 to: limit
+]
+
+{ #category : 'semantic completion' }
+CoPharoCopilotResultSetBuilder >> semanticStringsFrom: entries [
+
+	| strings |
+	strings := OrderedCollection new.
+	(entries ifNil: [ #() ]) do: [ :each |
+		| contents |
+		contents := self entryContentsFor: each.
+		contents isEmpty ifFalse: [ strings add: contents ] ].
+	^ strings asArray
 ]
 
 { #category : 'semantic context' }
@@ -3136,111 +3089,19 @@ CoPharoCopilotResultSetBuilder >> semanticTypesForReceiverNode: receiverNode inC
 	^ self normalizeSemanticTypes: types
 ]
 
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> sourceSubstringForNode: aNode in: sourceString [
-
-	| source start stop |
-	(aNode isNil or: [ sourceString isNil ]) ifTrue: [ ^ '' ].
-	source := sourceString asString.
-	source isEmpty ifTrue: [ ^ '' ].
-
-	start := [ aNode start ] on: Error do: [ nil ].
-	stop := [
-		(aNode respondsTo: #stopWithoutParentheses)
-			ifTrue: [ aNode stopWithoutParentheses ]
-			ifFalse: [ aNode stop ] ]
-		on: Error
-		do: [ nil ].
-
-	(start isNil or: [ stop isNil ]) ifTrue: [ ^ '' ].
-	start := start max: 1.
-	stop := stop min: source size.
-	start > stop ifTrue: [ ^ '' ].
-
-	^ (source copyFrom: start to: stop) trimBoth
-]
-
-{ #category : 'semantic context' }
-CoPharoCopilotResultSetBuilder >> textualReceiverBeforeCompletionIn: prefixString [
-
-	| prefix fragment base end start |
-	prefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
-	prefix isEmpty ifTrue: [ ^ '' ].
-
-	fragment := self trailingWordFragmentIn: prefix.
-	base := prefix.
-	(fragment isEmpty not and: [ base size >= fragment size ]) ifTrue: [
-		((base copyFrom: base size - fragment size + 1 to: base size) = fragment)
-			ifTrue: [
-				base := base size = fragment size
-					ifTrue: [ '' ]
-					ifFalse: [ base copyFrom: 1 to: base size - fragment size ] ] ].
-	base := base trimRight.
-	base isEmpty ifTrue: [ ^ '' ].
-	(self hasStandaloneCompletionBoundaryBeforeTokenIn: base) ifTrue: [ ^ '' ].
-
-	end := base size.
-	[ end > 0 and: [ (self isWordChar: (base at: end)) not ] ] whileTrue: [
-		end := end - 1 ].
-	end = 0 ifTrue: [ ^ '' ].
-
-	start := end.
-	[ start > 0 and: [ self isWordChar: (base at: start) ] ] whileTrue: [
-		start := start - 1 ].
-
-	^ base copyFrom: start + 1 to: end
-]
-
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> hasStandaloneCompletionBoundaryBeforeTokenIn: prefixString [
+CoPharoCopilotResultSetBuilder >> shouldOpenSemanticSelectorFastPathFor: aContext prefix: prefixString [
 
-	| prefix last boundaryCharacters |
-	prefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString trimRight ].
-	prefix isEmpty ifTrue: [ ^ true ].
-	(prefix endsWith: ':=') ifTrue: [ ^ true ].
-
-	last := prefix last.
-	boundaryCharacters := '.^([{:|,+-*/\~<>=@%&?!'.
-	^ boundaryCharacters includes: last
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> selectorFromPrefix: prefixString [
-	"The selector is determined by the method header (the first non-empty line up to the first
-	statement separator). While the user types in the body the header is stable, so we cache
-	the (header -> selector) mapping to skip the AST parse on every keystroke."
-
-	| header |
-	prefixString ifNil: [ ^ nil ].
-
-	header := self selectorHeaderFor: prefixString.
-	(lastSelectorPrefix notNil and: [ lastSelectorPrefix = header ]) ifTrue: [
-		^ lastSelectorResult ].
-
-	^ self computeAndCacheSelectorFromPrefix: prefixString header: header
-]
-
-{ #category : 'new' }
-CoPharoCopilotResultSetBuilder >> selectorHeaderFor: aString [
-	"Return the method-header substring (everything p to the first newline, capped at 256
-	characters). Cheap to compute and stable while the user edits the method body."
-
-	| size limit i ch |
-	size := aString size.
-	limit := size min: 256.
-	i := 1.
-	[ i <= limit ] whileTrue: [
-		ch := aString at: i.
-		(ch = Character lf or: [ ch = Character cr ])
-			ifTrue: [ ^ aString copyFrom: 1 to: i - 1 ].
-		i := i + 1 ].
-	^ aString copyFrom: 1 to: limit
+	^ false
 ]
 
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
-	"NO trigger while cursor is inside the same word."
-	| pair source pos before after |
+	"Playground and Inspector keep the 120-character restriction.
+	 Browser, Debugger, and every other environment launch Copilot immediately
+	 (as soon as minimumPrefixLength characters have been typed)."
+	| pair source pos before after environment kind |
+	self shouldUseCopilotSuggestions ifFalse: [ ^ false ].
 	aContext ifNil: [ ^ false ].
 
 	pair := self safeSourceAndPositionFor: aContext.
@@ -3252,58 +3113,53 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
 	before := pos > 0 ifTrue: [ source at: pos ] ifFalse: [ nil ].
 	after := pos < source size ifTrue: [ source at: pos + 1 ] ifFalse: [ nil ].
 
-	"Cursor inside a word => do NOT initialize completion engine."
+	"Do not trigger while cursor is inside an existing word."
 	((self isWordChar: before) and: [ self isWordChar: after ]) ifTrue: [ ^ false ].
 
 	(self isInsideCommentOrStringIn: source position: pos) ifTrue: [ ^ false ].
 
+	environment := self completionEnvironmentFor: aContext.
+	kind := environment at: #kind ifAbsent: [ #unknown ].
+
+	"Playground and Inspector keep the old 120-character restriction."
+	((kind = #playground) or: [ kind = #inspector ]) ifTrue: [
+		^ self
+			hasEnoughSourceOnlyDataForCopilot: source
+			position: pos ].
+
+	"Browser, Debugger and every other environment use Copilot immediately."
 	^ true
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> shouldUseFallbackCompletionForContext: aContext prefix: prefixString [
-
-	| receiver |
-	(self isScriptingContext: aContext) ifFalse: [ ^ false ].
-
-	receiver := self textualReceiverBeforeCompletionIn: prefixString.
-	^ receiver isEmpty
-]
-
-{ #category : 'private' }
-CoPharoCopilotResultSetBuilder >> shouldOpenSemanticSelectorFastPathFor: aContext prefix: prefixString [
-
-	| route token receiverName behavior receiverTypes |
-	route := self completionRouter
-		classifyContext: aContext
-		prefix: prefixString
-		builder: self.
-	route = #selector ifFalse: [ ^ false ].
-
-	token := self completionTokenFor: aContext prefix: prefixString.
-	token size < 2 ifTrue: [ ^ false ].
-
-	receiverName := self textualReceiverBeforeCompletionIn: prefixString.
-	(receiverName isEmpty or: [ receiverName = token ]) ifTrue: [ ^ false ].
-
-	behavior := self behaviorFor: aContext.
-	receiverTypes := self
-		semanticTypesForReceiverName: receiverName
-		inContext: aContext
-		behavior: behavior.
-
-	^ receiverTypes isEmpty not
 ]
 
 { #category : 'initialization' }
 CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForPrefix: prefixString suffix: suffixString [
 	"Decide whether it's worth requesting a completion for the current prefix/suffix."
 
+	self shouldUseCopilotSuggestions ifFalse: [ ^ false ].
 	prefixString ifNil: [ ^ false ].
 	(prefixString size < self minimumPrefixLength) ifTrue: [ ^ false ].
 	^ true
 ]
 
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> shouldUseCopilotSuggestions [
+	"Answer whether AI suggestions should be requested at all. The completion engine
+	can still stay installed when this is false; it delegates to Complishon."
+
+	^ [
+		CopilotSettings copilotEnabled and: [
+			(CopilotSettings isNullModelName: CopilotSettings modelName) not ] ]
+		on: Error
+		do: [ false ]
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> shouldUseFallbackCompletionForContext: aContext prefix: prefixString [
+
+	^ aContext notNil
+]
+
+{ #category : 'as yet unclassified' }
 CoPharoCopilotResultSetBuilder >> sortedSelectorsFor: aBehavior [
 	"Return a cached sorted-selectors array for aBehavior. Invalidates when the methodDict
 	identity or size changes."
@@ -3328,6 +3184,30 @@ CoPharoCopilotResultSetBuilder >> sourceFromSnapshot: snapshot [
 	prefix := snapshot at: #prefix ifAbsent: [ '' ].
 	suffix := snapshot at: #suffix ifAbsent: [ '' ].
 	^ prefix , suffix
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> sourceSubstringForNode: aNode in: sourceString [
+
+	| source start stop |
+	(aNode isNil or: [ sourceString isNil ]) ifTrue: [ ^ '' ].
+	source := sourceString asString.
+	source isEmpty ifTrue: [ ^ '' ].
+
+	start := [ aNode start ] on: Error do: [ nil ].
+	stop := [
+		(aNode respondsTo: #stopWithoutParentheses)
+			ifTrue: [ aNode stopWithoutParentheses ]
+			ifFalse: [ aNode stop ] ]
+		on: Error
+		do: [ nil ].
+
+	(start isNil or: [ stop isNil ]) ifTrue: [ ^ '' ].
+	start := start max: 1.
+	stop := stop min: source size.
+	start > stop ifTrue: [ ^ '' ].
+
+	^ (source copyFrom: start to: stop) trimBoth
 ]
 
 { #category : 'initialization' }
@@ -3387,17 +3267,66 @@ CoPharoCopilotResultSetBuilder >> stripTypedFragment: typedFragment fromSuggesti
 ]
 
 { #category : 'private' }
-CoPharoCopilotResultSetBuilder >> typedAheadIn: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix [
+CoPharoCopilotResultSetBuilder >> telemetryClassNameFor: anObject [
 
-	| snapshot currentPrefix currentSuffix |
-	snapshot := self liveContextSnapshotFor: aContext.
-	currentPrefix := snapshot at: #prefix ifAbsent: [ '' ].
-	currentSuffix := snapshot at: #suffix ifAbsent: [ '' ].
+	anObject ifNil: [ ^ '' ].
+	^ [ anObject class name asString ] on: Error do: [ '' ]
+]
 
-	((currentPrefix beginsWith: expectedPrefix) and: [ currentSuffix = expectedSuffix ])
-		ifFalse: [ ^ nil ].
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> telemetryStringFor: anObject max: maxLength [
 
-	^ currentPrefix allButFirst: expectedPrefix size
+	| text limit |
+	anObject ifNil: [ ^ '' ].
+	text := [ anObject asString ] on: Error do: [ '' ].
+	text ifNil: [ ^ '' ].
+	limit := maxLength ifNil: [ 120 ].
+	^ text size > limit
+		ifTrue: [ text copyFrom: 1 to: limit ]
+		ifFalse: [ text ]
+]
+
+{ #category : 'semantic context' }
+CoPharoCopilotResultSetBuilder >> textualReceiverBeforeCompletionIn: prefixString [
+
+	| prefix fragment base end start |
+	prefix := prefixString ifNil: [ '' ] ifNotNil: [ prefixString asString ].
+	prefix isEmpty ifTrue: [ ^ '' ].
+
+	fragment := self trailingWordFragmentIn: prefix.
+	base := prefix.
+	(fragment isEmpty not and: [ base size >= fragment size ]) ifTrue: [
+		((base copyFrom: base size - fragment size + 1 to: base size) = fragment)
+			ifTrue: [
+				base := base size = fragment size
+					ifTrue: [ '' ]
+					ifFalse: [ base copyFrom: 1 to: base size - fragment size ] ] ].
+	base := base trimRight.
+	base isEmpty ifTrue: [ ^ '' ].
+	(self hasStandaloneCompletionBoundaryBeforeTokenIn: base) ifTrue: [ ^ '' ].
+
+	end := base size.
+	[ end > 0 and: [ (self isWordChar: (base at: end)) not ] ] whileTrue: [
+		end := end - 1 ].
+	end = 0 ifTrue: [ ^ '' ].
+
+	start := end.
+	[ start > 0 and: [ self isWordChar: (base at: start) ] ] whileTrue: [
+		start := start - 1 ].
+
+	^ base copyFrom: start + 1 to: end
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> titleForWindow: window [
+
+	#(label labelString title titleString name) do: [ :selector |
+		(window notNil and: [ window respondsTo: selector ]) ifTrue: [
+			| value title |
+			value := [ window perform: selector ] on: Error do: [ nil ].
+			title := self telemetryStringFor: value max: 120.
+			title isEmpty ifFalse: [ ^ title ] ] ].
+	^ ''
 ]
 
 { #category : 'initialization' }
@@ -3455,6 +3384,20 @@ CoPharoCopilotResultSetBuilder >> typePropertyOfNode: aNode [
 			on: Error
 			do: [ nil ] ].
 	^ nil
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> typedAheadIn: aContext expectedPrefix: expectedPrefix suffix: expectedSuffix [
+
+	| snapshot currentPrefix currentSuffix |
+	snapshot := self liveContextSnapshotFor: aContext.
+	currentPrefix := snapshot at: #prefix ifAbsent: [ '' ].
+	currentSuffix := snapshot at: #suffix ifAbsent: [ '' ].
+
+	((currentPrefix beginsWith: expectedPrefix) and: [ currentSuffix = expectedSuffix ])
+		ifFalse: [ ^ nil ].
+
+	^ currentPrefix allButFirst: expectedPrefix size
 ]
 
 { #category : 'new' }
@@ -3519,4 +3462,51 @@ CoPharoCopilotResultSetBuilder >> visibleBindingTypeDescriptionsFor: aContext li
 				descriptions add: name , ' -> ' , (self typeNameFor: value class) ] ].
 
 	^ descriptions asArray
+]
+
+{ #category : 'initialization' }
+CoPharoCopilotResultSetBuilder >> wholeTokenSuggestion: suggestionString typedFragment: typedFragment [
+
+	| suggestion fragment trimmed first |
+	suggestion := (suggestionString ifNil: [ '' ]) asString.
+	fragment := (typedFragment ifNil: [ '' ]) asString.
+
+	(suggestion isEmpty or: [ fragment isEmpty ]) ifTrue: [ ^ suggestion ].
+	((suggestion beginsWith: fragment) or: [
+		suggestion asLowercase beginsWith: fragment asLowercase ])
+			ifTrue: [ ^ suggestion ].
+
+	trimmed := suggestion trimLeft.
+	trimmed size ~= suggestion size ifTrue: [ ^ suggestion ].
+
+	first := suggestion first.
+	((self isWordChar: first) or: [ first = $: ])
+		ifFalse: [ ^ suggestion ].
+
+	^ fragment , suggestion
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> windowForMorph: morph [
+
+	morph ifNil: [ ^ nil ].
+	(morph respondsTo: #window) ifTrue: [
+		| window |
+		window := [ morph window ] on: Error do: [ nil ].
+		window ifNotNil: [ ^ window ] ].
+	^ self windowInOwnerChainForMorph: morph
+]
+
+{ #category : 'private' }
+CoPharoCopilotResultSetBuilder >> windowInOwnerChainForMorph: morph [
+
+	| current |
+	current := morph.
+	[ current notNil ] whileTrue: [
+		((self telemetryClassNameFor: current) asLowercase includesSubstring: 'window')
+			ifTrue: [ ^ current ].
+		current := (current respondsTo: #owner)
+			ifTrue: [ [ current owner ] on: Error do: [ nil ] ]
+			ifFalse: [ nil ] ].
+	^ nil
 ]

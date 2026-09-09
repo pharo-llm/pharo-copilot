@@ -27,6 +27,24 @@ CoPCSessionArchiveUploaderSpy >> initialize [
 	uploadSawExistingTelemetrySummary := false
 ]
 
+{ #category : 'accessing' }
+CoPCSessionArchiveUploaderSpy >> telemetryPayload [
+
+	^ telemetryPayload
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploaderSpy >> telemetrySession [
+
+	^ telemetrySession
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploaderSpy >> telemetryUser [
+
+	^ telemetryUser
+]
+
 { #category : 'uploading' }
 CoPCSessionArchiveUploaderSpy >> uploadArchive: archiveFile sessionId: sessionId userId: userId [
 
@@ -35,6 +53,24 @@ CoPCSessionArchiveUploaderSpy >> uploadArchive: archiveFile sessionId: sessionId
 	uploadedUser := userId.
 	uploadSawExistingArchive := archiveFile exists.
 	uploadSawZipArchive := ZipArchive isZipArchive: archiveFile
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploaderSpy >> uploadSawExistingArchive [
+
+	^ uploadSawExistingArchive
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploaderSpy >> uploadSawExistingTelemetrySummary [
+
+	^ uploadSawExistingTelemetrySummary
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploaderSpy >> uploadSawZipArchive [
+
+	^ uploadSawZipArchive
 ]
 
 { #category : 'uploading' }
@@ -54,55 +90,19 @@ CoPCSessionArchiveUploaderSpy >> uploadedArchive [
 ]
 
 { #category : 'accessing' }
-CoPCSessionArchiveUploaderSpy >> uploadedTelemetrySummary [
-
-	^ uploadedTelemetrySummary
-]
-
-{ #category : 'accessing' }
 CoPCSessionArchiveUploaderSpy >> uploadedSession [
 
 	^ uploadedSession
 ]
 
 { #category : 'accessing' }
+CoPCSessionArchiveUploaderSpy >> uploadedTelemetrySummary [
+
+	^ uploadedTelemetrySummary
+]
+
+{ #category : 'accessing' }
 CoPCSessionArchiveUploaderSpy >> uploadedUser [
 
 	^ uploadedUser
-]
-
-{ #category : 'accessing' }
-CoPCSessionArchiveUploaderSpy >> telemetrySession [
-
-	^ telemetrySession
-]
-
-{ #category : 'accessing' }
-CoPCSessionArchiveUploaderSpy >> telemetryUser [
-
-	^ telemetryUser
-]
-
-{ #category : 'accessing' }
-CoPCSessionArchiveUploaderSpy >> uploadSawExistingArchive [
-
-	^ uploadSawExistingArchive
-]
-
-{ #category : 'accessing' }
-CoPCSessionArchiveUploaderSpy >> uploadSawZipArchive [
-
-	^ uploadSawZipArchive
-]
-
-{ #category : 'accessing' }
-CoPCSessionArchiveUploaderSpy >> uploadSawExistingTelemetrySummary [
-
-	^ uploadSawExistingTelemetrySummary
-]
-
-{ #category : 'accessing' }
-CoPCSessionArchiveUploaderSpy >> telemetryPayload [
-
-	^ telemetryPayload
 ]

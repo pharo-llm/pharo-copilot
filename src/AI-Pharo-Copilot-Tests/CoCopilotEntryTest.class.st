@@ -13,7 +13,7 @@ CoCopilotEntryTest >> testActivateOnCollapsesSelectionAtEndOfInsertedText [
     suggestion := 'foo'.
     editor := CoCopilotMockEditor new.
     editor startIndex: 5.
-    context := CoCopilotContextMock new
+    context := CoCopilotEditorOnlyContext new
         editor: editor;
         yourself.
     entry := CoCopilotEntry contents: suggestion.
@@ -23,6 +23,23 @@ CoCopilotEntryTest >> testActivateOnCollapsesSelectionAtEndOfInsertedText [
     self assert: editor insertedText equals: suggestion.
     self assert: editor selectionIsCollapsed.
     self assert: editor startIndex equals: 5 + suggestion size
+]
+
+{ #category : 'tests' }
+CoCopilotEntryTest >> testActivateOnPrefersTokenReplacementWhenEditorIsAvailable [
+
+    | entry context editor suggestion |
+    suggestion := 'assert:'.
+    editor := CoCopilotMockEditor new.
+    context := CoCopilotContextMock new
+        editor: editor;
+        yourself.
+    entry := CoCopilotEntry contents: suggestion.
+
+    entry activateOn: context.
+
+    self assert: context lastReplacement equals: suggestion.
+    self assert: editor insertedText equals: ''
 ]
 
 { #category : 'tests' }

@@ -25,73 +25,6 @@ Class {
 }
 
 { #category : 'class initialization' }
-CoPharoCopilotLogger class >> appendDetailAssociation: anAssociation to: lines [
-
-	| keyString valueString valueLines |
-	keyString := self formatValue: anAssociation key.
-	valueString := self formatValue: anAssociation value.
-	valueLines := valueString lines.
-
-	valueLines size = 1
-		ifTrue: [ lines add: '  - ', keyString, ': ', valueLines first ]
-		ifFalse: [
-			lines add: '  - ', keyString, ':'.
-			valueLines do: [ :line | lines add: '      ', line ] ]
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> appendLines: lines [
-
-    self loggingEnabled ifFalse: [ ^ self ].
-
-    [
-        [
-            | file |
-            file := self logFileReference.
-            self ensureFileExists: file.
-
-            file writeStreamDo: [ :stream |
-                stream setToEnd.
-                lines do: [ :line |
-                    stream nextPutAll: line.
-                    stream nextPut: Character lf ] ] ]
-        on: Error
-        do: [ :ex |
-            Transcript
-                show: 'Copilot logging failed: ', ex messageText;
-                cr ]
-    ] forkAt: Processor userBackgroundPriority named: 'Copilot log write'
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> appendEvaluationEvent: eventName data: aDictionary [
-	"Append a structured event to the evaluation JSONL file synchronously."
-
-	| event file |
-	self loggingEnabled ifFalse: [ ^ self ].
-
-	event := Dictionary new
-		at: #event put: eventName;
-		at: #userId put: self userId;
-		at: #sessionId put: self currentSessionId;
-		at: #data put: (aDictionary ifNil: [ Dictionary new ]);
-		yourself.
-
-	[
-		self ensureEvaluationLogFileInitialized.
-		file := self evaluationLogFileReference.
-		file writeStreamDo: [ :stream |
-			stream setToEnd.
-			stream
-				nextPutAll: (STONJSON toString: event);
-				nextPut: Character lf ]
-	] on: Error do: [ :ex |
-		Transcript
-			show: 'Could not append Copilot evaluation event: ', ex messageText;
-			cr ]
-]
-
-{ #category : 'class initialization' }
 CoPharoCopilotLogger class >> appendConsentEvent: eventName data: aDictionary [
 	"Append an explicit consent decision to the evaluation JSONL file.
 	Consent decisions are audit records, so declined decisions are written even when
@@ -131,6 +64,182 @@ CoPharoCopilotLogger class >> appendConsentEvent: eventName data: aDictionary [
 ]
 
 { #category : 'class initialization' }
+CoPharoCopilotLogger class >> appendDetailAssociation: anAssociation to: lines [
+
+	| keyString valueString valueLines |
+	keyString := self formatValue: anAssociation key.
+	valueString := self formatValue: anAssociation value.
+	valueLines := valueString lines.
+
+	valueLines size = 1
+		ifTrue: [ lines add: '  - ', keyString, ': ', valueLines first ]
+		ifFalse: [
+			lines add: '  - ', keyString, ':'.
+			valueLines do: [ :line | lines add: '      ', line ] ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> appendEvaluationEvent: eventName data: aDictionary [
+	"Append a structured event to the evaluation JSONL file synchronously."
+
+	| event file |
+	self loggingEnabled ifFalse: [ ^ self ].
+
+	event := Dictionary new
+		at: #event put: eventName;
+		at: #userId put: self userId;
+		at: #sessionId put: self currentSessionId;
+		at: #data put: (aDictionary ifNil: [ Dictionary new ]);
+		yourself.
+
+	[
+		self ensureEvaluationLogFileInitialized.
+		file := self evaluationLogFileReference.
+		file writeStreamDo: [ :stream |
+			stream setToEnd.
+			stream
+				nextPutAll: (STONJSON toString: event);
+				nextPut: Character lf ]
+	] on: Error do: [ :ex |
+		Transcript
+			show: 'Could not append Copilot evaluation event: ', ex messageText;
+			cr ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> appendLines: lines [
+
+    self loggingEnabled ifFalse: [ ^ self ].
+
+    [
+        [
+            | file |
+            file := self logFileReference.
+            self ensureFileExists: file.
+
+            file writeStreamDo: [ :stream |
+                stream setToEnd.
+                lines do: [ :line |
+                    stream nextPutAll: line.
+                    stream nextPut: Character lf ] ] ]
+        on: Error
+        do: [ :ex |
+            Transcript
+                show: 'Copilot logging failed: ', ex messageText;
+                cr ]
+    ] forkAt: Processor userBackgroundPriority named: 'Copilot log write'
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> archiveCurrentSession [
+
+	^ self archiveCurrentSessionReportingProgress: nil
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> archiveCurrentSessionReportingProgress: aProgressBlock [
+
+	| directory archiveFile archiveClass archive archivedAt telemetryFile |
+	self loggingEnabled ifFalse: [ ^ nil ].
+
+	self
+		reportArchiveProgress: aProgressBlock
+		status: 'Preparing session archive...'
+		percent: 5.
+
+	directory := self ensureSessionDirectory.
+	(directory isNil or: [ directory exists not ]) ifTrue: [ ^ nil ].
+	archiveFile := self sessionArchiveFileReference.
+	archiveFile ifNil: [ ^ nil ].
+	archiveClass := Smalltalk globals at: #ZipArchive ifAbsent: [
+		self
+			reportArchiveProgress: aProgressBlock
+			status: 'Cannot archive session: ZipArchive is unavailable.'
+			percent: 0.
+		self
+			logBackEndEvent: 'Could not archive Copilot session'
+			details: (Dictionary new
+				at: #reason put: 'ZipArchive class is not available';
+				at: #sessionDirectory put: directory fullName;
+				yourself).
+		^ nil ].
+
+	archivedAt := DateAndTime now.
+	self
+		writeSessionMetadataClosedAt: archivedAt
+		archivedAt: archivedAt
+		archiveFile: archiveFile.
+
+	^ [
+		self
+			reportArchiveProgress: aProgressBlock
+			status: 'Creating zip archive...'
+			percent: 15.
+		archiveFile parent ensureCreateDirectory.
+		archiveFile exists ifTrue: [ archiveFile ensureDelete ].
+		archive := archiveClass new.
+		[
+			self
+				reportArchiveProgress: aProgressBlock
+				status: 'Adding session files to archive...'
+				percent: 35.
+			archive
+				addTree: directory
+				relativeTo: directory parent
+				match: [ :entry | true ].
+			self
+				reportArchiveProgress: aProgressBlock
+				status: 'Writing zip archive...'
+				percent: 70.
+			archive writeToFile: archiveFile.
+			sessionArchived := true.
+			self
+				reportArchiveProgress: aProgressBlock
+				status: 'Writing telemetry summary...'
+				percent: 82.
+			telemetryFile := self
+				writeSessionTelemetrySummaryFor: directory
+				archiveFile: archiveFile.
+			telemetryFile ifNotNil: [
+				self
+					reportArchiveProgress: aProgressBlock
+					status: 'Uploading telemetry JSON...'
+					percent: 90.
+				self uploadSessionTelemetrySummary: telemetryFile ].
+			self
+				reportArchiveProgress: aProgressBlock
+				status: 'Session telemetry JSON is complete.'
+				percent: 100.
+			archiveFile
+		] ensure: [
+			archive ifNotNil: [ archive close ] ] ]
+		on: Error
+		do: [ :ex |
+			self
+				reportArchiveProgress: aProgressBlock
+				status: 'Could not archive Copilot session.'
+				percent: 0.
+			Transcript
+				show: 'Could not archive Copilot session: ', ex messageText;
+				cr.
+			self
+				logBackEndEvent: 'Could not archive Copilot session'
+				details: (Dictionary new
+					at: #errorClass put: ex class name;
+					at: #error put: ex description;
+					at: #sessionDirectory put: directory fullName;
+					yourself).
+			nil ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> archiveFileReferenceForSessionDirectory: aDirectoryReference [
+
+	aDirectoryReference ifNil: [ ^ nil ].
+	^ aDirectoryReference parent / (aDirectoryReference basename , '.zip')
+]
+
+{ #category : 'class initialization' }
 CoPharoCopilotLogger class >> completionFileReferenceFor: aSessionId [
 	^ self ensureCompletionsDirectory / ('completion-', aSessionId, '.json')
 ]
@@ -143,6 +252,20 @@ CoPharoCopilotLogger class >> completionSessionId [
 { #category : 'class initialization' }
 CoPharoCopilotLogger class >> completionsDirectoryReference [
 	^ (self ensureSessionDirectory) / 'completions'
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> complishonRerouteCount [
+
+	^ complishonRerouteCount ifNil: [ complishonRerouteCount := 0 ]
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> currentSessionId [
+
+	^ sessionId ifNil: [
+		self startNewSession.
+		sessionId ]
 ]
 
 { #category : 'class initialization' }
@@ -392,40 +515,9 @@ CoPharoCopilotLogger class >> instVarNamed: aStringOrSymbol put: aValue [
 ]
 
 { #category : 'class initialization' }
-CoPharoCopilotLogger class >> complishonRerouteCount [
-
-	^ complishonRerouteCount ifNil: [ complishonRerouteCount := 0 ]
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> oldCompletionLookupCount [
-
-	^ oldCompletionLookupCount ifNil: [ oldCompletionLookupCount := 0 ]
-]
-
-{ #category : 'class initialization' }
 CoPharoCopilotLogger class >> logBackEndEvent: eventName details: aDictionary [
 
 	self logSection: 'BACKEND' event: eventName details: aDictionary
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> logFileName [
-
-	^ 'copilot.log'
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> logFileReference [
-
-	^ logFileReference ifNil: [
-		logFileReference := (self ensureSessionDirectory) / self logFileName ]
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> logFrontEndEvent: eventName details: aDictionary [
-
-	self logSection: 'FRONTEND' event: eventName details: aDictionary
 ]
 
 { #category : 'class initialization' }
@@ -451,6 +543,25 @@ CoPharoCopilotLogger class >> logCompletionReroutedToComplishon: aDictionary [
 	self
 		appendEvaluationEvent: 'completion-rerouted-to-complishon'
 		data: details
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> logFileName [
+
+	^ 'copilot.log'
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> logFileReference [
+
+	^ logFileReference ifNil: [
+		logFileReference := (self ensureSessionDirectory) / self logFileName ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> logFrontEndEvent: eventName details: aDictionary [
+
+	self logSection: 'FRONTEND' event: eventName details: aDictionary
 ]
 
 { #category : 'class initialization' }
@@ -528,158 +639,28 @@ CoPharoCopilotLogger class >> logsDirectoryReference [
 		logsDirectoryReference := FileLocator imageDirectory / self pharoCopilotDirectoryName ]
 ]
 
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> newSessionIdAt: aDateAndTime [
+
+	^ 'session-' , aDateAndTime asUnixTime asString , '-' , UUID new asString36
+]
+
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> newUserIdAt: aDateAndTime [
+
+	^ 'user-' , UUID new asString36 , '-' , aDateAndTime asUnixTime asString
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> oldCompletionLookupCount [
+
+	^ oldCompletionLookupCount ifNil: [ oldCompletionLookupCount := 0 ]
+]
+
 { #category : 'class initialization' }
 CoPharoCopilotLogger class >> pharoCopilotDirectoryName [
 
 	^ 'pharo-copilot'
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> telemetryJsonDirectoryName [
-
-	^ 'pharo-copilot-json'
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> telemetryJsonDirectoryReference [
-
-	| parent |
-	parent := self logsDirectoryReference parent.
-	parent ifNil: [ parent := FileLocator imageDirectory ].
-	^ parent / self telemetryJsonDirectoryName
-]
-
-{ #category : 'session management' }
-CoPharoCopilotLogger class >> archiveCurrentSession [
-
-	^ self archiveCurrentSessionReportingProgress: nil
-]
-
-{ #category : 'session management' }
-CoPharoCopilotLogger class >> archiveCurrentSessionReportingProgress: aProgressBlock [
-
-	| directory archiveFile archiveClass archive archivedAt telemetryFile |
-	self loggingEnabled ifFalse: [ ^ nil ].
-
-	self
-		reportArchiveProgress: aProgressBlock
-		status: 'Preparing session archive...'
-		percent: 5.
-
-	directory := self ensureSessionDirectory.
-	(directory isNil or: [ directory exists not ]) ifTrue: [ ^ nil ].
-	archiveFile := self sessionArchiveFileReference.
-	archiveFile ifNil: [ ^ nil ].
-	archiveClass := Smalltalk globals at: #ZipArchive ifAbsent: [
-		self
-			reportArchiveProgress: aProgressBlock
-			status: 'Cannot archive session: ZipArchive is unavailable.'
-			percent: 0.
-		self
-			logBackEndEvent: 'Could not archive Copilot session'
-			details: (Dictionary new
-				at: #reason put: 'ZipArchive class is not available';
-				at: #sessionDirectory put: directory fullName;
-				yourself).
-		^ nil ].
-
-	archivedAt := DateAndTime now.
-	self
-		writeSessionMetadataClosedAt: archivedAt
-		archivedAt: archivedAt
-		archiveFile: archiveFile.
-
-	^ [
-		self
-			reportArchiveProgress: aProgressBlock
-			status: 'Creating zip archive...'
-			percent: 15.
-		archiveFile parent ensureCreateDirectory.
-		archiveFile exists ifTrue: [ archiveFile ensureDelete ].
-		archive := archiveClass new.
-		[
-			self
-				reportArchiveProgress: aProgressBlock
-				status: 'Adding session files to archive...'
-				percent: 35.
-			archive
-				addTree: directory
-				relativeTo: directory parent
-				match: [ :entry | true ].
-			self
-				reportArchiveProgress: aProgressBlock
-				status: 'Writing zip archive...'
-				percent: 70.
-			archive writeToFile: archiveFile.
-			sessionArchived := true.
-			self
-				reportArchiveProgress: aProgressBlock
-				status: 'Writing telemetry summary...'
-				percent: 82.
-			telemetryFile := self
-				writeSessionTelemetrySummaryFor: directory
-				archiveFile: archiveFile.
-			telemetryFile ifNotNil: [
-				self
-					reportArchiveProgress: aProgressBlock
-					status: 'Uploading telemetry JSON...'
-					percent: 90.
-				self uploadSessionTelemetrySummary: telemetryFile ].
-			self
-				reportArchiveProgress: aProgressBlock
-				status: 'Session telemetry JSON is complete.'
-				percent: 100.
-			archiveFile
-		] ensure: [
-			archive ifNotNil: [ archive close ] ] ]
-		on: Error
-		do: [ :ex |
-			self
-				reportArchiveProgress: aProgressBlock
-				status: 'Could not archive Copilot session.'
-				percent: 0.
-			Transcript
-				show: 'Could not archive Copilot session: ', ex messageText;
-				cr.
-			self
-				logBackEndEvent: 'Could not archive Copilot session'
-				details: (Dictionary new
-					at: #errorClass put: ex class name;
-					at: #error put: ex description;
-					at: #sessionDirectory put: directory fullName;
-					yourself).
-			nil ]
-]
-
-{ #category : 'session management' }
-CoPharoCopilotLogger class >> reportArchiveProgress: aProgressBlock status: statusString percent: percentNumber [
-
-	aProgressBlock ifNil: [ ^ self ].
-
-	[
-		aProgressBlock value: (Dictionary new
-			at: #status put: statusString;
-			at: #percent put: percentNumber;
-			yourself)
-	] on: Error do: [ :ex |
-		Transcript
-			show: 'Copilot archive progress callback failed: ', ex messageText;
-			cr ]
-]
-
-{ #category : 'session management' }
-CoPharoCopilotLogger class >> archiveFileReferenceForSessionDirectory: aDirectoryReference [
-
-	aDirectoryReference ifNil: [ ^ nil ].
-	^ aDirectoryReference parent / (aDirectoryReference basename , '.zip')
-]
-
-{ #category : 'session management' }
-CoPharoCopilotLogger class >> currentSessionId [
-
-	^ sessionId ifNil: [
-		self startNewSession.
-		sessionId ]
 ]
 
 { #category : 'class initialization' }
@@ -792,6 +773,22 @@ CoPharoCopilotLogger class >> registerSessionHandler [
 ]
 
 { #category : 'session management' }
+CoPharoCopilotLogger class >> reportArchiveProgress: aProgressBlock status: statusString percent: percentNumber [
+
+	aProgressBlock ifNil: [ ^ self ].
+
+	[
+		aProgressBlock value: (Dictionary new
+			at: #status put: statusString;
+			at: #percent put: percentNumber;
+			yourself)
+	] on: Error do: [ :ex |
+		Transcript
+			show: 'Copilot archive progress callback failed: ', ex messageText;
+			cr ]
+]
+
+{ #category : 'session management' }
 CoPharoCopilotLogger class >> sessionArchiveFileReference [
 
 	^ sessionArchiveFileReference ifNil: [
@@ -848,6 +845,12 @@ CoPharoCopilotLogger class >> sessionsRootDirectoryReference [
 ]
 
 { #category : 'session management' }
+CoPharoCopilotLogger class >> shutDown: isImageQuitting [
+
+	isImageQuitting ifTrue: [ self archiveCurrentSession ]
+]
+
+{ #category : 'session management' }
 CoPharoCopilotLogger class >> startNewSession [
 
 	| startedAt newSessionId root |
@@ -884,10 +887,19 @@ CoPharoCopilotLogger class >> startUp: isImageStarting [
 	isImageStarting ifTrue: [ self startNewSession ]
 ]
 
-{ #category : 'session management' }
-CoPharoCopilotLogger class >> shutDown: isImageQuitting [
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> telemetryJsonDirectoryName [
 
-	isImageQuitting ifTrue: [ self archiveCurrentSession ]
+	^ 'pharo-copilot-json'
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> telemetryJsonDirectoryReference [
+
+	| parent |
+	parent := self logsDirectoryReference parent.
+	parent ifNil: [ parent := FileLocator imageDirectory ].
+	^ parent / self telemetryJsonDirectoryName
 ]
 
 { #category : 'session management' }
@@ -901,6 +913,56 @@ CoPharoCopilotLogger class >> unregisterSessionHandler [
 
 	manager unregisterClassNamed: self name.
 	^ true
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> updateCompletionSession: aSessionId addRejected: rejectedString [
+	| file payload rejected |
+	self loggingEnabled ifFalse: [ ^ self ].
+	file := self completionFileReferenceFor: aSessionId.
+	file exists ifFalse: [ ^ self ].
+	payload := STONJSON fromString: file contents.
+	rejected := payload at: #rejected ifAbsent: [ OrderedCollection new ].
+	rejected add: rejectedString.
+	payload at: #rejected put: rejected asArray.
+	file writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: payload) ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withAccepted: acceptedString [
+	| file payload |
+	self loggingEnabled ifFalse: [ ^ self ].
+	file := self completionFileReferenceFor: aSessionId.
+	file exists ifFalse: [ ^ self ].
+	payload := STONJSON fromString: file contents.
+	payload at: #accepted put: acceptedString.
+	payload at: #acceptedAt put: DateAndTime now asString.
+	payload at: #nullCompletion put: false.
+	payload at: #nullCompletionReason put: nil.
+	file writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: payload) ]
+]
+
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withNullCompletionReason: aReason [
+	| file payload accepted reason |
+	self loggingEnabled ifFalse: [ ^ self ].
+	file := self completionFileReferenceFor: aSessionId.
+	file exists ifFalse: [ ^ self ].
+	payload := STONJSON fromString: file contents.
+	accepted := payload at: #accepted ifAbsent: [ nil ].
+	(accepted isString
+		ifTrue: [ accepted trimBoth isEmpty not ]
+		ifFalse: [ accepted notNil ]) ifTrue: [ ^ self ].
+	reason := aReason
+		ifNil: [ 'closed' ]
+		ifNotNil: [ aReason asString ].
+	payload at: #nullCompletion put: true.
+	payload at: #nullCompletionReason put: reason.
+	payload at: #closedAt put: DateAndTime now asString.
+	file writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: payload) ]
 ]
 
 { #category : 'session management' }
@@ -935,30 +997,6 @@ CoPharoCopilotLogger class >> uploadSessionArchive: archiveFile [
 					at: #error put: ex description;
 					at: #archiveFile put: archiveFile fullName;
 					yourself) ]
-]
-
-{ #category : 'session management' }
-CoPharoCopilotLogger class >> writeSessionTelemetrySummaryFor: sessionDirectory archiveFile: archiveFile [
-
-	^ [
-		CoPCSessionTelemetryAnalyzer
-			writeSummaryForSessionDirectory: sessionDirectory
-			outputDirectory: self telemetryJsonDirectoryReference
-			archiveFile: archiveFile
-			sessionId: self currentSessionId
-			userId: self userId
-	] on: Error do: [ :ex |
-		Transcript
-			show: 'Could not write Copilot telemetry summary: ', ex messageText;
-			cr.
-		self
-			logBackEndEvent: 'Could not write Copilot telemetry summary'
-			details: (Dictionary new
-				at: #errorClass put: ex class name;
-				at: #error put: ex description;
-				at: #archiveFile put: (archiveFile ifNil: [ nil ] ifNotNil: [ archiveFile fullName ]);
-				yourself).
-		nil ]
 ]
 
 { #category : 'session management' }
@@ -1028,16 +1066,14 @@ CoPharoCopilotLogger class >> userIdFromDiskOrCreate [
 	^ created
 ]
 
-{ #category : 'session management' }
-CoPharoCopilotLogger class >> newSessionIdAt: aDateAndTime [
-
-	^ 'session-' , aDateAndTime asUnixTime asString , '-' , UUID new asString36
-]
-
-{ #category : 'session management' }
-CoPharoCopilotLogger class >> newUserIdAt: aDateAndTime [
-
-	^ 'user-' , UUID new asString36 , '-' , aDateAndTime asUnixTime asString
+{ #category : 'class initialization' }
+CoPharoCopilotLogger class >> writeCompletionSession: aDictionary sessionId: aSessionId [
+	| file |
+	self loggingEnabled ifFalse: [ ^ self ].
+	file := self completionFileReferenceFor: aSessionId.
+	self ensureFileExists: file.
+	file writeStreamDo: [ :stream |
+		stream nextPutAll: (STONJSON toString: aDictionary) ]
 ]
 
 { #category : 'session management' }
@@ -1070,62 +1106,26 @@ CoPharoCopilotLogger class >> writeSessionMetadataClosedAt: closedAt archivedAt:
 		stream nextPutAll: (STONJSON toString: payload) ]
 ]
 
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> updateCompletionSession: aSessionId addRejected: rejectedString [
-	| file payload rejected |
-	self loggingEnabled ifFalse: [ ^ self ].
-	file := self completionFileReferenceFor: aSessionId.
-	file exists ifFalse: [ ^ self ].
-	payload := STONJSON fromString: file contents.
-	rejected := payload at: #rejected ifAbsent: [ OrderedCollection new ].
-	rejected add: rejectedString.
-	payload at: #rejected put: rejected asArray.
-	file writeStreamDo: [ :stream |
-		stream nextPutAll: (STONJSON toString: payload) ]
-]
+{ #category : 'session management' }
+CoPharoCopilotLogger class >> writeSessionTelemetrySummaryFor: sessionDirectory archiveFile: archiveFile [
 
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withAccepted: acceptedString [
-	| file payload |
-	self loggingEnabled ifFalse: [ ^ self ].
-	file := self completionFileReferenceFor: aSessionId.
-	file exists ifFalse: [ ^ self ].
-	payload := STONJSON fromString: file contents.
-	payload at: #accepted put: acceptedString.
-	payload at: #acceptedAt put: DateAndTime now asString.
-	payload at: #nullCompletion put: false.
-	payload at: #nullCompletionReason put: nil.
-	file writeStreamDo: [ :stream |
-		stream nextPutAll: (STONJSON toString: payload) ]
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withNullCompletionReason: aReason [
-	| file payload accepted reason |
-	self loggingEnabled ifFalse: [ ^ self ].
-	file := self completionFileReferenceFor: aSessionId.
-	file exists ifFalse: [ ^ self ].
-	payload := STONJSON fromString: file contents.
-	accepted := payload at: #accepted ifAbsent: [ nil ].
-	(accepted isString
-		ifTrue: [ accepted trimBoth isEmpty not ]
-		ifFalse: [ accepted notNil ]) ifTrue: [ ^ self ].
-	reason := aReason
-		ifNil: [ 'closed' ]
-		ifNotNil: [ aReason asString ].
-	payload at: #nullCompletion put: true.
-	payload at: #nullCompletionReason put: reason.
-	payload at: #closedAt put: DateAndTime now asString.
-	file writeStreamDo: [ :stream |
-		stream nextPutAll: (STONJSON toString: payload) ]
-]
-
-{ #category : 'class initialization' }
-CoPharoCopilotLogger class >> writeCompletionSession: aDictionary sessionId: aSessionId [
-	| file |
-	self loggingEnabled ifFalse: [ ^ self ].
-	file := self completionFileReferenceFor: aSessionId.
-	self ensureFileExists: file.
-	file writeStreamDo: [ :stream |
-		stream nextPutAll: (STONJSON toString: aDictionary) ]
+	^ [
+		CoPCSessionTelemetryAnalyzer
+			writeSummaryForSessionDirectory: sessionDirectory
+			outputDirectory: self telemetryJsonDirectoryReference
+			archiveFile: archiveFile
+			sessionId: self currentSessionId
+			userId: self userId
+	] on: Error do: [ :ex |
+		Transcript
+			show: 'Could not write Copilot telemetry summary: ', ex messageText;
+			cr.
+		self
+			logBackEndEvent: 'Could not write Copilot telemetry summary'
+			details: (Dictionary new
+				at: #errorClass put: ex class name;
+				at: #error put: ex description;
+				at: #archiveFile put: (archiveFile ifNil: [ nil ] ifNotNil: [ archiveFile fullName ]);
+				yourself).
+		nil ]
 ]

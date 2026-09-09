@@ -72,6 +72,22 @@ CopilotSettings class >> allOllamaOptions [
 	^ options
 ]
 
+{ #category : 'research telemetry' }
+CopilotSettings class >> anonymousResearchTelemetryEnabled [
+	"Settings UI accessor. Unknown, missing, or declined consent is always OFF."
+
+	^ self researchTelemetryAccepted
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> anonymousResearchTelemetryEnabled: aBoolean [
+	"Settings UI mutator. Enabling requires a fresh explicit confirmation."
+
+	aBoolean = true
+		ifTrue: [ ^ self requestEnableAnonymousResearchTelemetry ].
+	^ self requestDisableAnonymousResearchTelemetry
+]
+
 { #category : 'accessing' }
 CopilotSettings class >> attemptAutoInstallForModelNamed: aModelName usingInitialResponse: response [
 
@@ -297,6 +313,13 @@ CopilotSettings class >> customParameters: aDictionary [
 
 	customParameters := aDictionary ifNil: [ Dictionary new ].
 	self autoSaveSettings
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> declineResearchTelemetryIfNotAsked [
+
+	self researchTelemetryNotAsked ifTrue: [
+		self recordResearchTelemetryConsentAccepted: false ]
 ]
 
 { #category : 'accessing' }
@@ -652,29 +675,6 @@ CopilotSettings class >> imageCloseSurveyEnabled: aBoolean [
 
 	imageCloseSurveyEnabled := aBoolean.
 	self autoSaveSettings
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> anonymousResearchTelemetryEnabled [
-	"Settings UI accessor. Unknown, missing, or declined consent is always OFF."
-
-	^ self researchTelemetryAccepted
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> anonymousResearchTelemetryEnabled: aBoolean [
-	"Settings UI mutator. Enabling requires a fresh explicit confirmation."
-
-	aBoolean = true
-		ifTrue: [ ^ self requestEnableAnonymousResearchTelemetry ].
-	^ self requestDisableAnonymousResearchTelemetry
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> declineResearchTelemetryIfNotAsked [
-
-	self researchTelemetryNotAsked ifTrue: [
-		self recordResearchTelemetryConsentAccepted: false ]
 ]
 
 { #category : 'class initialization' }
@@ -1744,260 +1744,6 @@ CopilotSettings class >> recordResearchTelemetryConsentAccepted: aBoolean [
 	^ consentRecord
 ]
 
-{ #category : 'research telemetry' }
-CopilotSettings class >> researchTelemetryAccepted [
-
-	^ self researchTelemetryConsentState = #accepted
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> researchTelemetryConsentState [
-	"Answer the persisted consent state. Anything unknown is treated as declined."
-
-	| normalized |
-	normalized := researchTelemetryConsentState ifNil: [ #notAsked ].
-	normalized := [ normalized asSymbol ] on: Error do: [ ^ #declined ].
-	(#(#notAsked #declined #accepted) includes: normalized) ifFalse: [ ^ #declined ].
-	^ normalized
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> researchTelemetryDeclined [
-
-	^ self researchTelemetryConsentState = #declined
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> researchTelemetryDisabledStatusText [
-
-	^ 'Anonymous research telemetry is disabled.', String cr,
-		'Pharo Copilot is not sending research telemetry about your IDE interactions.'
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> researchTelemetryEnabledStatusText [
-
-	^ 'Anonymous research telemetry is enabled.', String cr,
-		'Pharo Copilot is contributing anonymous interaction events to the Pharo usage research project.', String cr,
-		'The data is sent to an Inria-hosted research server and may become part of a public research dataset.'
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> researchTelemetryFirstLaunchText [
-
-	^ 'Pharo researchers and engineers are studying how developers use Pharo and its development tools.', String cr,
-		'With your permission, Pharo Copilot can send anonymous interaction events about IDE tool usage to an Inria-hosted research server.', String cr,
-		String cr,
-		'- Participation is voluntary.', String cr,
-		'- Telemetry is OFF by default.', String cr,
-		'- No research telemetry is sent unless you explicitly agree.', String cr,
-		'- Events describe tool interactions, not your source-code contents.', String cr,
-		'- Anonymous submitted data may become part of a public research dataset.', String cr,
-		'- You can disable telemetry later in Settings.'
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> researchTelemetryLearnMoreText [
-
-	^ 'About the Pharo Usage Research Project', String cr,
-		String cr,
-		'Why collect this data?', String cr,
-		'Researchers have limited quantitative information about how Pharo development tools are used in real projects. Anonymous telemetry can help improve existing tools, evaluate new features, and support reproducible software-engineering research.', String cr,
-		String cr,
-		'What may be collected?', String cr,
-		'Anonymous interaction events such as opening development tools, opening debugger windows, using debugger actions and buttons, browsing code, using IDE commands, copy/paste interaction events, interacting with Pharo libraries and tools, and using newly introduced Pharo features.', String cr,
-		String cr,
-		'Events may include a UTC timestamp, a randomly generated identifier, an interaction type, and references linking related events when necessary.', String cr,
-		String cr,
-		'What is not intended to be collected?', String cr,
-		'Your name, email address, account credentials, passwords, authentication tokens, sensitive personal information, or source-code contents.', String cr,
-		String cr,
-		'Where does the data go?', String cr,
-		'If you agree, telemetry is transmitted to infrastructure hosted by Inria. The collected data may be used to create an anonymous public research dataset about Pharo development practices.', String cr,
-		String cr,
-		'Can you withdraw?', String cr,
-		'Yes. You can disable telemetry at any time from Pharo Copilot settings. Disabling telemetry stops future collection and transmission. Because submitted events are anonymous, previously submitted events may not be individually removable.', String cr,
-		String cr,
-		'Who is responsible?', String cr,
-		'Members of the Pharo Consortium and researchers from Inria''s EVREF team.', String cr,
-		String cr,
-		'Questions: dpo@inria.fr'
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> researchTelemetryNotAsked [
-
-	^ self researchTelemetryConsentState = #notAsked
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> requestDisableAnonymousResearchTelemetry [
-
-	self researchTelemetryAccepted ifFalse: [
-		self recordResearchTelemetryConsentAccepted: false.
-		^ false ].
-
-	(self confirmViaUIManager: self researchTelemetryDisablePrompt) = true ifFalse: [ ^ true ].
-	self recordResearchTelemetryConsentAccepted: false.
-	self notifyUser: 'Anonymous research telemetry disabled', String cr,
-		'Pharo Copilot will no longer collect or transmit research telemetry.'.
-	^ false
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> requestEnableAnonymousResearchTelemetry [
-
-	(self confirmViaUIManager: self researchTelemetryEnablePrompt) = true ifFalse: [
-		self declineResearchTelemetryIfNotAsked.
-		^ false ].
-	self recordResearchTelemetryConsentAccepted: true.
-	self notifyUser: 'Thank you for participating', String cr,
-		'Anonymous research telemetry is now enabled.', String cr,
-		'You can disable it at any time from Pharo Copilot settings.'.
-	^ true
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> researchTelemetryDisablePrompt [
-
-	^ 'Disable anonymous research telemetry?', String cr,
-		String cr,
-		'Pharo Copilot will stop collecting and transmitting future research telemetry.', String cr,
-		'Data already anonymously submitted may remain in the research dataset because it cannot be linked back to you.'
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> researchTelemetryEnablePrompt [
-
-	^ 'Enable anonymous research telemetry?', String cr,
-		String cr,
-		'By enabling this option, you agree that Pharo Copilot may collect anonymous interaction events describing how you use Pharo development tools.', String cr,
-		'The data will be transmitted to an Inria-hosted research server and may later become part of a public research dataset.', String cr,
-		'Participation is voluntary and you can disable telemetry again at any time.', String cr,
-		'Data already anonymously submitted may not be individually removable because it cannot be linked back to you.'
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> showResearchTelemetryStudyInformation [
-
-	| message uiClass uiManager |
-	message := self researchTelemetryLearnMoreText.
-	uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
-	uiClass ifNotNil: [
-		(uiClass respondsTo: #default) ifTrue: [
-			uiManager := uiClass default.
-			(uiManager respondsTo: #longMessage:title:)
-				ifTrue: [
-					^ uiManager
-						longMessage: message
-						title: 'Anonymous Usage Research' ].
-			(uiManager respondsTo: #inform:)
-				ifTrue: [ ^ uiManager inform: message ] ] ].
-
-	self notifyViaTranscript: message
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> showResearchTelemetryStudyInformationSetting [
-
-	^ false
-]
-
-{ #category : 'research telemetry' }
-CopilotSettings class >> showResearchTelemetryStudyInformationSetting: aBoolean [
-
-	aBoolean ifTrue: [ self showResearchTelemetryStudyInformation ]
-]
-
-{ #category : 'screen recording' }
-CopilotSettings class >> screenRecordingAccepted [
-
-	^ self screenRecordingConsentState = #accepted
-]
-
-{ #category : 'screen recording' }
-CopilotSettings class >> screenRecordingConsentState [
-	"Answer the persisted screen recording consent state. Anything unknown is treated as declined."
-
-	| normalized |
-	normalized := screenRecordingConsentState ifNil: [ #notAsked ].
-	normalized := [ normalized asSymbol ] on: Error do: [ ^ #declined ].
-	(#(#notAsked #declined #accepted) includes: normalized) ifFalse: [ ^ #declined ].
-	^ normalized
-]
-
-{ #category : 'screen recording' }
-CopilotSettings class >> screenRecordingDeclined [
-
-	^ self screenRecordingConsentState = #declined
-]
-
-{ #category : 'screen recording' }
-CopilotSettings class >> screenRecordingDisabledStatusText [
-
-	^ 'Screen recording is disabled.', String cr,
-	'Pharo Copilot is not recording your screen.'
-]
-
-{ #category : 'screen recording' }
-CopilotSettings class >> screenRecordingEnabledStatusText [
-
-	^ 'Screen recording is enabled.', String cr,
-	'Screen recordings may help researchers understand how developers work with AI code completion.',
-	'A recording may capture source code or other information visible in your Pharo environment.',
-	String cr,
-	'Raw videos are stored on Inria-hosted research infrastructure and are not made public.'
-]
-
-{ #category : 'screen recording' }
-CopilotSettings class >> screenRecordingFirstLaunchText [
-
-	^ 'Screen recordings can help researchers understand how developers work with AI code completion in real coding sessions.', String cr,
-	String cr,
-	'- Screen recording is optional.', String cr,
-	'- A recording may capture source code or other information visible in your Pharo environment.', String cr,
-	'- If you agree, videos are stored on Inria-hosted research infrastructure.', String cr,
-	'- Access to raw videos is limited to authorized members of the Pharo Consortium and Inria EVREF team.', String cr,
-	'- Raw videos will not be made public.', String cr,
-	'- Screen recording is not enabled unless you explicitly agree.', String cr,
-	'- You can disable screen recording later in Settings.'
-]
-
-{ #category : 'screen recording' }
-CopilotSettings class >> screenRecordingLearnMoreText [
-
-	^ 'About Screen Recording', String cr,
-	String cr,
-	'Why record the screen?', String cr,
-	'Screen recordings help researchers observe how developers interact with AI code completion during real coding sessions. This qualitative data complements the anonymous interaction telemetry.', String cr,
-	String cr,
-	'What may be visible in a recording?', String cr,
-	'A screen recording captures whatever is visible on your Pharo screen during the session. This may include source code, variable names, comments, and other on-screen information.', String cr,
-	String cr,
-	'What is not intended to be collected?', String cr,
-	'Your name, email address, account credentials, passwords, or authentication tokens.', String cr,
-	String cr,
-	'Where are recordings stored and who can see them?', String cr,
-	'If you agree, screen recordings are transmitted to and stored on Inria-hosted research infrastructure. Access to the raw video files is limited to authorized members of the Pharo Consortium and Inria EVREF team who need them for research analysis, data handling, or infrastructure operations.', String cr,
-	String cr,
-	'Will recordings be made public?', String cr,
-	'No. The raw screen recording videos will not be made public and will not be included in a public dataset. Research publications or shared datasets may use aggregated findings or anonymized derived data, but not the video files themselves.', String cr,
-	String cr,
-	'Can you withdraw?', String cr,
-	'Yes. You can disable screen recording at any time from Pharo Copilot settings. Disabling screen recording stops future recordings. Previously recorded sessions may already have been processed.', String cr,
-	String cr,
-	'Who is responsible?', String cr,
-	'Members of the Pharo Consortium and researchers from Inria''s EVREF team.', String cr,
-	String cr,
-	'Questions: dpo@inria.fr'
-]
-
-{ #category : 'screen recording' }
-CopilotSettings class >> screenRecordingNotAsked [
-
-	^ self screenRecordingConsentState = #notAsked
-]
-
 { #category : 'screen recording' }
 CopilotSettings class >> recordScreenRecordingConsentAccepted: aBoolean [
 
@@ -2104,6 +1850,33 @@ CopilotSettings class >> repeatPenalty: aNumber [
 	self autoSaveSettings
 ]
 
+{ #category : 'research telemetry' }
+CopilotSettings class >> requestDisableAnonymousResearchTelemetry [
+
+	self researchTelemetryAccepted ifFalse: [
+		self recordResearchTelemetryConsentAccepted: false.
+		^ false ].
+
+	(self confirmViaUIManager: self researchTelemetryDisablePrompt) = true ifFalse: [ ^ true ].
+	self recordResearchTelemetryConsentAccepted: false.
+	self notifyUser: 'Anonymous research telemetry disabled', String cr,
+		'Pharo Copilot will no longer collect or transmit research telemetry.'.
+	^ false
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> requestEnableAnonymousResearchTelemetry [
+
+	(self confirmViaUIManager: self researchTelemetryEnablePrompt) = true ifFalse: [
+		self declineResearchTelemetryIfNotAsked.
+		^ false ].
+	self recordResearchTelemetryConsentAccepted: true.
+	self notifyUser: 'Thank you for participating', String cr,
+		'Anonymous research telemetry is now enabled.', String cr,
+		'You can disable it at any time from Pharo Copilot settings.'.
+	^ true
+]
+
 { #category : 'settings' }
 CopilotSettings class >> requestTimeoutSeconds [
 
@@ -2115,6 +1888,112 @@ CopilotSettings class >> requestTimeoutSeconds: anObject [
 
 	requestTimeoutSeconds := anObject.
 	self autoSaveSettings
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryAccepted [
+
+	^ self researchTelemetryConsentState = #accepted
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryConsentState [
+	"Answer the persisted consent state. Anything unknown is treated as declined."
+
+	| normalized |
+	normalized := researchTelemetryConsentState ifNil: [ #notAsked ].
+	normalized := [ normalized asSymbol ] on: Error do: [ ^ #declined ].
+	(#(#notAsked #declined #accepted) includes: normalized) ifFalse: [ ^ #declined ].
+	^ normalized
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryDeclined [
+
+	^ self researchTelemetryConsentState = #declined
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryDisablePrompt [
+
+	^ 'Disable anonymous research telemetry?', String cr,
+		String cr,
+		'Pharo Copilot will stop collecting and transmitting future research telemetry.', String cr,
+		'Data already anonymously submitted may remain in the research dataset because it cannot be linked back to you.'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryDisabledStatusText [
+
+	^ 'Anonymous research telemetry is disabled.', String cr,
+		'Pharo Copilot is not sending research telemetry about your IDE interactions.'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryEnablePrompt [
+
+	^ 'Enable anonymous research telemetry?', String cr,
+		String cr,
+		'By enabling this option, you agree that Pharo Copilot may collect anonymous interaction events describing how you use Pharo development tools.', String cr,
+		'The data will be transmitted to an Inria-hosted research server and may later become part of a public research dataset.', String cr,
+		'Participation is voluntary and you can disable telemetry again at any time.', String cr,
+		'Data already anonymously submitted may not be individually removable because it cannot be linked back to you.'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryEnabledStatusText [
+
+	^ 'Anonymous research telemetry is enabled.', String cr,
+		'Pharo Copilot is contributing anonymous interaction events to the Pharo usage research project.', String cr,
+		'The data is sent to an Inria-hosted research server and may become part of a public research dataset.'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryFirstLaunchText [
+
+	^ 'Pharo researchers and engineers are studying how developers use Pharo and its development tools.', String cr,
+		'With your permission, Pharo Copilot can send anonymous interaction events about IDE tool usage to an Inria-hosted research server.', String cr,
+		String cr,
+		'- Participation is voluntary.', String cr,
+		'- Telemetry is OFF by default.', String cr,
+		'- No research telemetry is sent unless you explicitly agree.', String cr,
+		'- Events describe tool interactions, not your source-code contents.', String cr,
+		'- Anonymous submitted data may become part of a public research dataset.', String cr,
+		'- You can disable telemetry later in Settings.'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryLearnMoreText [
+
+	^ 'About the Pharo Usage Research Project', String cr,
+		String cr,
+		'Why collect this data?', String cr,
+		'Researchers have limited quantitative information about how Pharo development tools are used in real projects. Anonymous telemetry can help improve existing tools, evaluate new features, and support reproducible software-engineering research.', String cr,
+		String cr,
+		'What may be collected?', String cr,
+		'Anonymous interaction events such as opening development tools, opening debugger windows, using debugger actions and buttons, browsing code, using IDE commands, copy/paste interaction events, interacting with Pharo libraries and tools, and using newly introduced Pharo features.', String cr,
+		String cr,
+		'Events may include a UTC timestamp, a randomly generated identifier, an interaction type, and references linking related events when necessary.', String cr,
+		String cr,
+		'What is not intended to be collected?', String cr,
+		'Your name, email address, account credentials, passwords, authentication tokens, sensitive personal information, or source-code contents.', String cr,
+		String cr,
+		'Where does the data go?', String cr,
+		'If you agree, telemetry is transmitted to infrastructure hosted by Inria. The collected data may be used to create an anonymous public research dataset about Pharo development practices.', String cr,
+		String cr,
+		'Can you withdraw?', String cr,
+		'Yes. You can disable telemetry at any time from Pharo Copilot settings. Disabling telemetry stops future collection and transmission. Because submitted events are anonymous, previously submitted events may not be individually removable.', String cr,
+		String cr,
+		'Who is responsible?', String cr,
+		'Members of the Pharo Consortium and researchers from Inria''s EVREF team.', String cr,
+		String cr,
+		'Questions: dpo@inria.fr'
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> researchTelemetryNotAsked [
+
+	^ self researchTelemetryConsentState = #notAsked
 ]
 
 { #category : 'accessing' }
@@ -2271,6 +2150,95 @@ CopilotSettings class >> saveSettingsToFile [
 		stream truncate.
 		stream nextPutAll: stonString
 	].
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingAccepted [
+
+	^ self screenRecordingConsentState = #accepted
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingConsentState [
+	"Answer the persisted screen recording consent state. Anything unknown is treated as declined."
+
+	| normalized |
+	normalized := screenRecordingConsentState ifNil: [ #notAsked ].
+	normalized := [ normalized asSymbol ] on: Error do: [ ^ #declined ].
+	(#(#notAsked #declined #accepted) includes: normalized) ifFalse: [ ^ #declined ].
+	^ normalized
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingDeclined [
+
+	^ self screenRecordingConsentState = #declined
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingDisabledStatusText [
+
+	^ 'Screen recording is disabled.', String cr,
+	'Pharo Copilot is not recording your screen.'
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingEnabledStatusText [
+
+	^ 'Screen recording is enabled.', String cr,
+	'Screen recordings may help researchers understand how developers work with AI code completion.',
+	'A recording may capture source code or other information visible in your Pharo environment.',
+	String cr,
+	'Raw videos are stored on Inria-hosted research infrastructure and are not made public.'
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingFirstLaunchText [
+
+	^ 'Screen recordings can help researchers understand how developers work with AI code completion in real coding sessions.', String cr,
+	String cr,
+	'- Screen recording is optional.', String cr,
+	'- A recording may capture source code or other information visible in your Pharo environment.', String cr,
+	'- If you agree, videos are stored on Inria-hosted research infrastructure.', String cr,
+	'- Access to raw videos is limited to authorized members of the Pharo Consortium and Inria EVREF team.', String cr,
+	'- Raw videos will not be made public.', String cr,
+	'- Screen recording is not enabled unless you explicitly agree.', String cr,
+	'- You can disable screen recording later in Settings.'
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingLearnMoreText [
+
+	^ 'About Screen Recording', String cr,
+	String cr,
+	'Why record the screen?', String cr,
+	'Screen recordings help researchers observe how developers interact with AI code completion during real coding sessions. This qualitative data complements the anonymous interaction telemetry.', String cr,
+	String cr,
+	'What may be visible in a recording?', String cr,
+	'A screen recording captures whatever is visible on your Pharo screen during the session. This may include source code, variable names, comments, and other on-screen information.', String cr,
+	String cr,
+	'What is not intended to be collected?', String cr,
+	'Your name, email address, account credentials, passwords, or authentication tokens.', String cr,
+	String cr,
+	'Where are recordings stored and who can see them?', String cr,
+	'If you agree, screen recordings are transmitted to and stored on Inria-hosted research infrastructure. Access to the raw video files is limited to authorized members of the Pharo Consortium and Inria EVREF team who need them for research analysis, data handling, or infrastructure operations.', String cr,
+	String cr,
+	'Will recordings be made public?', String cr,
+	'No. The raw screen recording videos will not be made public and will not be included in a public dataset. Research publications or shared datasets may use aggregated findings or anonymized derived data, but not the video files themselves.', String cr,
+	String cr,
+	'Can you withdraw?', String cr,
+	'Yes. You can disable screen recording at any time from Pharo Copilot settings. Disabling screen recording stops future recordings. Previously recorded sessions may already have been processed.', String cr,
+	String cr,
+	'Who is responsible?', String cr,
+	'Members of the Pharo Consortium and researchers from Inria''s EVREF team.', String cr,
+	String cr,
+	'Questions: dpo@inria.fr'
+]
+
+{ #category : 'screen recording' }
+CopilotSettings class >> screenRecordingNotAsked [
+
+	^ self screenRecordingConsentState = #notAsked
 ]
 
 { #category : 'ollama' }
@@ -2719,6 +2687,38 @@ CopilotSettings class >> showModelConfirmsInstalled: aModelName usingClient: cli
 
 	response ifNil: [ ^ false ].
 	^ (self pullResultIndicatesFailure: response) not
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> showResearchTelemetryStudyInformation [
+
+	| message uiClass uiManager |
+	message := self researchTelemetryLearnMoreText.
+	uiClass := Smalltalk globals at: #UIManager ifAbsent: [ nil ].
+	uiClass ifNotNil: [
+		(uiClass respondsTo: #default) ifTrue: [
+			uiManager := uiClass default.
+			(uiManager respondsTo: #longMessage:title:)
+				ifTrue: [
+					^ uiManager
+						longMessage: message
+						title: 'Anonymous Usage Research' ].
+			(uiManager respondsTo: #inform:)
+				ifTrue: [ ^ uiManager inform: message ] ] ].
+
+	self notifyViaTranscript: message
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> showResearchTelemetryStudyInformationSetting [
+
+	^ false
+]
+
+{ #category : 'research telemetry' }
+CopilotSettings class >> showResearchTelemetryStudyInformationSetting: aBoolean [
+
+	aBoolean ifTrue: [ self showResearchTelemetryStudyInformation ]
 ]
 
 { #category : 'settings' }

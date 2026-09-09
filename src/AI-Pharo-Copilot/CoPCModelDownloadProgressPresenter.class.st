@@ -307,6 +307,20 @@ CoPCModelDownloadProgressPresenter >> handlePullEvent: event forModel: modelName
 	]
 ]
 
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter >> indeterminateProgressEnd [
+
+	models isEmptyOrNil ifTrue: [ ^ 1 ].
+	^ (((completed + 1) asFloat / models size) min: 1) max: 0
+]
+
+{ #category : 'progress' }
+CoPCModelDownloadProgressPresenter >> indeterminateProgressStart [
+
+	models isEmptyOrNil ifTrue: [ ^ 0 ].
+	^ ((completed asFloat / models size) min: 1) max: 0
+]
+
 { #category : 'initialization' }
 CoPCModelDownloadProgressPresenter >> initializePresenters [
 
@@ -327,20 +341,6 @@ CoPCModelDownloadProgressPresenter >> initializePresenters [
 	failed := OrderedCollection new.
 	statusByModel := Dictionary new.
 	lastPercent := -1
-]
-
-{ #category : 'progress' }
-CoPCModelDownloadProgressPresenter >> indeterminateProgressEnd [
-
-	models isEmptyOrNil ifTrue: [ ^ 1 ].
-	^ (((completed + 1) asFloat / models size) min: 1) max: 0
-]
-
-{ #category : 'progress' }
-CoPCModelDownloadProgressPresenter >> indeterminateProgressStart [
-
-	models isEmptyOrNil ifTrue: [ ^ 0 ].
-	^ ((completed asFloat / models size) min: 1) max: 0
 ]
 
 { #category : 'initialization' }

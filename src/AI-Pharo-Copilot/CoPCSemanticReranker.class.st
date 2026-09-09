@@ -265,22 +265,6 @@ CoPCSemanticReranker >> selectorCandidateForEntry: anEntry [
 ]
 
 { #category : 'classification' }
-CoPCSemanticReranker >> selectorForEntry: anEntry [
-
-	^ (self selectorCandidateForEntry: anEntry)
-		at: #selector
-		ifAbsent: [ '' ]
-]
-
-{ #category : 'classification' }
-CoPCSemanticReranker >> selectorForCompletionString: aString [
-
-	^ (self selectorCandidateFrom: self token , (aString ifNil: [ '' ] ifNotNil: [ aString asString ]))
-		at: #selector
-		ifAbsent: [ '' ]
-]
-
-{ #category : 'classification' }
 CoPCSemanticReranker >> selectorCandidateFrom: aString [
 
 	| text first index wordEnd word firstPart selector |
@@ -319,6 +303,22 @@ CoPCSemanticReranker >> selectorCandidateFrom: aString [
 		at: #selector put: selector;
 		at: #firstPart put: firstPart;
 		yourself
+]
+
+{ #category : 'classification' }
+CoPCSemanticReranker >> selectorForCompletionString: aString [
+
+	^ (self selectorCandidateFrom: self token , (aString ifNil: [ '' ] ifNotNil: [ aString asString ]))
+		at: #selector
+		ifAbsent: [ '' ]
+]
+
+{ #category : 'classification' }
+CoPCSemanticReranker >> selectorForEntry: anEntry [
+
+	^ (self selectorCandidateForEntry: anEntry)
+		at: #selector
+		ifAbsent: [ '' ]
 ]
 
 { #category : 'testing' }

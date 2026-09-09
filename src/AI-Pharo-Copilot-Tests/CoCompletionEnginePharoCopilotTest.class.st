@@ -78,7 +78,7 @@ CoCompletionEnginePharoCopilotTest >> testSpecConfigurationAccessorsAreStored [
 ]
 
 { #category : 'tests' }
-CoCompletionEnginePharoCopilotTest >> testStandaloneTokenUsesFallbackWhenScriptingComesFromEngine [
+CoCompletionEnginePharoCopilotTest >> testStandaloneTokenKeepsFallbackWhenScriptingComesFromEngine [
 
 	| engine context builder |
 	engine := CoPharoCopilotCompletionEngine new

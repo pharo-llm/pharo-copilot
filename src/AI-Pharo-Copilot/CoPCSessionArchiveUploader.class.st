@@ -16,22 +16,24 @@ Class {
 	#package : 'AI-Pharo-Copilot'
 }
 
-{ #category : 'defaults' }
-CoPCSessionArchiveUploader class >> defaultPublicUploadUrl [
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> addCandidateUploadUrl: aString to: urls [
 
-	^ 'http://193.49.213.134:9092/api/sessions'
+	| value |
+	value := aString ifNil: [ '' ] ifNotNil: [ aString asString trimBoth ].
+	value isEmpty ifTrue: [ ^ self ].
+	(self shouldReplaceUploadUrlForPublicReceiver: value) ifTrue: [
+		value := self defaultPublicUploadUrl ].
+	(urls includes: value) ifFalse: [ urls add: value ]
 ]
 
-{ #category : 'defaults' }
-CoPCSessionArchiveUploader class >> defaultTimeoutSeconds [
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> addRawCandidateUploadUrl: aString to: urls [
 
-	^ 3
-]
-
-{ #category : 'defaults' }
-CoPCSessionArchiveUploader class >> defaultUploadUrl [
-
-	^ self uploadUrlFromEnvironmentOrDefault
+	| value |
+	value := aString ifNil: [ '' ] ifNotNil: [ aString asString trimBoth ].
+	value isEmpty ifTrue: [ ^ self ].
+	(urls includes: value) ifFalse: [ urls add: value ]
 ]
 
 { #category : 'connection' }
@@ -84,10 +86,22 @@ CoPCSessionArchiveUploader class >> connectionRegistrationUrl [
 	^ self uploadUrlForEndpoint: '/api/connections/register'
 ]
 
-{ #category : 'connection' }
-CoPCSessionArchiveUploader class >> telemetrySummaryUploadUrl [
+{ #category : 'defaults' }
+CoPCSessionArchiveUploader class >> defaultPublicUploadUrl [
 
-	^ self uploadUrlForEndpoint: '/api/session-telemetry'
+	^ 'http://193.49.213.134:9092/api/sessions'
+]
+
+{ #category : 'defaults' }
+CoPCSessionArchiveUploader class >> defaultTimeoutSeconds [
+
+	^ 3
+]
+
+{ #category : 'defaults' }
+CoPCSessionArchiveUploader class >> defaultUploadUrl [
+
+	^ self uploadUrlFromEnvironmentOrDefault
 ]
 
 { #category : 'accessing' }
@@ -103,31 +117,19 @@ CoPCSessionArchiveUploader class >> enabled: aBoolean [
 ]
 
 { #category : 'accessing' }
+CoPCSessionArchiveUploader class >> ensureInternetUploadUrl [
+
+	(self shouldReplaceUploadUrlForPublicReceiver: self uploadUrl) ifTrue: [
+		self uploadUrl: self defaultPublicUploadUrl ].
+	^ self uploadUrl
+]
+
+{ #category : 'accessing' }
 CoPCSessionArchiveUploader class >> ensureUploadToken [
 
 	^ self uploadToken ifNil: [
 		self uploadToken: self newUploadToken.
 		uploadToken ]
-]
-
-{ #category : 'connection' }
-CoPCSessionArchiveUploader class >> addCandidateUploadUrl: aString to: urls [
-
-	| value |
-	value := aString ifNil: [ '' ] ifNotNil: [ aString asString trimBoth ].
-	value isEmpty ifTrue: [ ^ self ].
-	(self shouldReplaceUploadUrlForPublicReceiver: value) ifTrue: [
-		value := self defaultPublicUploadUrl ].
-	(urls includes: value) ifFalse: [ urls add: value ]
-]
-
-{ #category : 'connection' }
-CoPCSessionArchiveUploader class >> addRawCandidateUploadUrl: aString to: urls [
-
-	| value |
-	value := aString ifNil: [ '' ] ifNotNil: [ aString asString trimBoth ].
-	value isEmpty ifTrue: [ ^ self ].
-	(urls includes: value) ifFalse: [ urls add: value ]
 ]
 
 { #category : 'connection' }
@@ -145,14 +147,6 @@ CoPCSessionArchiveUploader class >> logConnectionAuthorizationError: anException
 ]
 
 { #category : 'accessing' }
-CoPCSessionArchiveUploader class >> ensureInternetUploadUrl [
-
-	(self shouldReplaceUploadUrlForPublicReceiver: self uploadUrl) ifTrue: [
-		self uploadUrl: self defaultPublicUploadUrl ].
-	^ self uploadUrl
-]
-
-{ #category : 'accessing' }
 CoPCSessionArchiveUploader class >> newUploadToken [
 
 	^ 'cpc-' , UUID new asString36 , '-' , UUID new asString36
@@ -165,6 +159,37 @@ CoPCSessionArchiveUploader class >> resetDefaults [
 	uploadUrl := nil.
 	uploadToken := nil.
 	timeoutSeconds := nil
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> saveUploadToken: aString [
+
+	| file |
+	file := self uploadTokenFileReference.
+	file parent ifNotNil: [ :parent | parent ensureCreateDirectory ].
+	file ensureCreateFile.
+	file writeStreamDo: [ :stream |
+		stream truncate.
+		stream nextPutAll: aString ]
+]
+
+{ #category : 'private' }
+CoPCSessionArchiveUploader class >> shouldReplaceUploadUrlForPublicReceiver: aString [
+
+	| value |
+	value := aString ifNil: [ '' ] ifNotNil: [ aString asString trimBoth ].
+	value isEmpty ifTrue: [ ^ true ].
+	^ (value includesSubstring: '127.0.0.1:3000')
+		or: [ (value includesSubstring: 'localhost:3000')
+		or: [ (value includesSubstring: 'rmod-xp.lille.inria.fr:3000')
+		or: [ (value includesSubstring: '193.49.213.134:3000')
+		or: [ value includesSubstring: '193.49.213.134:9093' ] ] ] ]
+]
+
+{ #category : 'connection' }
+CoPCSessionArchiveUploader class >> telemetrySummaryUploadUrl [
+
+	^ self uploadUrlForEndpoint: '/api/session-telemetry'
 ]
 
 { #category : 'accessing' }
@@ -251,6 +276,16 @@ CoPCSessionArchiveUploader class >> uploadUrl: aString [
 	uploadUrl := aString
 ]
 
+{ #category : 'private' }
+CoPCSessionArchiveUploader class >> uploadUrlForEndpoint: endpointPath [
+
+	| base |
+	base := self uploadUrl asString.
+	(base includesSubstring: '/api/sessions') ifTrue: [
+		^ base copyReplaceAll: '/api/sessions' with: endpointPath ].
+	^ base , endpointPath
+]
+
 { #category : 'accessing' }
 CoPCSessionArchiveUploader class >> uploadUrlFromEnvironmentOrDefault [
 
@@ -267,41 +302,6 @@ CoPCSessionArchiveUploader class >> uploadUrlFromEnvironmentOrDefault [
 			^ url asString trimBoth ] ].
 
 	^ self defaultPublicUploadUrl
-]
-
-{ #category : 'private' }
-CoPCSessionArchiveUploader class >> shouldReplaceUploadUrlForPublicReceiver: aString [
-
-	| value |
-	value := aString ifNil: [ '' ] ifNotNil: [ aString asString trimBoth ].
-	value isEmpty ifTrue: [ ^ true ].
-	^ (value includesSubstring: '127.0.0.1:3000')
-		or: [ (value includesSubstring: 'localhost:3000')
-		or: [ (value includesSubstring: 'rmod-xp.lille.inria.fr:3000')
-		or: [ (value includesSubstring: '193.49.213.134:3000')
-		or: [ value includesSubstring: '193.49.213.134:9093' ] ] ] ]
-]
-
-{ #category : 'private' }
-CoPCSessionArchiveUploader class >> uploadUrlForEndpoint: endpointPath [
-
-	| base |
-	base := self uploadUrl asString.
-	(base includesSubstring: '/api/sessions') ifTrue: [
-		^ base copyReplaceAll: '/api/sessions' with: endpointPath ].
-	^ base , endpointPath
-]
-
-{ #category : 'accessing' }
-CoPCSessionArchiveUploader class >> saveUploadToken: aString [
-
-	| file |
-	file := self uploadTokenFileReference.
-	file parent ifNotNil: [ :parent | parent ensureCreateDirectory ].
-	file ensureCreateFile.
-	file writeStreamDo: [ :stream |
-		stream truncate.
-		stream nextPutAll: aString ]
 ]
 
 { #category : 'connection' }
@@ -354,18 +354,10 @@ CoPCSessionArchiveUploader >> newJsonClientForUrl: aUrlString [
 ]
 
 { #category : 'uploading' }
-CoPCSessionArchiveUploader >> newUploadClientForFile: file sessionId: sessionId userId: userId [
+CoPCSessionArchiveUploader >> newTelemetrySummaryUploadClientForFile: file sessionId: sessionId userId: userId [
 
 	| client token |
-	client := ZnClient new
-		url: self class uploadUrl;
-		method: #POST;
-		yourself.
-
-	(client respondsTo: #timeout:) ifTrue: [
-		client timeout: self class timeoutSeconds ].
-
-	client headerAt: 'Content-Type' put: 'application/zip'.
+	client := self newJsonClientForUrl: self class telemetrySummaryUploadUrl.
 	client headerAt: 'X-File-Name' put: file basename.
 	token := self class ensureUploadToken.
 	client headerAt: 'Authorization' put: 'Bearer ' , token.
@@ -378,10 +370,18 @@ CoPCSessionArchiveUploader >> newUploadClientForFile: file sessionId: sessionId 
 ]
 
 { #category : 'uploading' }
-CoPCSessionArchiveUploader >> newTelemetrySummaryUploadClientForFile: file sessionId: sessionId userId: userId [
+CoPCSessionArchiveUploader >> newUploadClientForFile: file sessionId: sessionId userId: userId [
 
 	| client token |
-	client := self newJsonClientForUrl: self class telemetrySummaryUploadUrl.
+	client := ZnClient new
+		url: self class uploadUrl;
+		method: #POST;
+		yourself.
+
+	(client respondsTo: #timeout:) ifTrue: [
+		client timeout: self class timeoutSeconds ].
+
+	client headerAt: 'Content-Type' put: 'application/zip'.
 	client headerAt: 'X-File-Name' put: file basename.
 	token := self class ensureUploadToken.
 	client headerAt: 'Authorization' put: 'Bearer ' , token.

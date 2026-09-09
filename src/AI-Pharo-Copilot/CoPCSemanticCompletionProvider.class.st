@@ -1,7 +1,7 @@
 "
-Thin adapter around Complishon's AST heuristic completion builder.
-This is the local semantic lane for Pharo Copilot; callers should not reach
-directly into CoASTHeuristicsResultSetBuilder unless they need compatibility.
+Thin adapter over Complishon's local AST/heuristic completion lane.
+It lets Pharo Copilot keep normal local completions available while model
+suggestions are requested in the background.
 "
 Class {
 	#name : 'CoPCSemanticCompletionProvider',
@@ -16,13 +16,6 @@ Class {
 	#category : 'AI-Pharo-Copilot',
 	#package : 'AI-Pharo-Copilot'
 }
-
-{ #category : 'initialization' }
-CoPCSemanticCompletionProvider >> initialize [
-
-	super initialize.
-	limit := 10
-]
 
 { #category : 'accessing' }
 CoPCSemanticCompletionProvider >> builder [
@@ -50,21 +43,25 @@ CoPCSemanticCompletionProvider >> cacheEntries: entries locationKey: locationKey
 { #category : 'completion' }
 CoPCSemanticCompletionProvider >> entriesFor: aContext [
 
-	| locationKey token cacheKey cached result count entries |
+	| locationKey token key cached result rawEntries entries |
+	aContext ifNil: [ ^ #() ].
+
 	locationKey := self locationKeyFor: aContext.
 	token := self tokenFor: aContext locationKey: locationKey.
-	cacheKey := self entryCacheKeyForLocationKey: locationKey token: token.
-	cached := self entryCache at: cacheKey ifAbsent: [ nil ].
+	key := self entryCacheKeyForLocationKey: locationKey token: token.
+	cached := self entryCache at: key ifAbsent: [ nil ].
 	cached ifNotNil: [ ^ cached ].
 
-	result := self resultSetFor: aContext locationKey: locationKey token: token.
-	result ifNil: [ ^ #() ].
+	result := self
+		resultSetFor: aContext
+		locationKey: locationKey
+		token: token.
+	result ifNil: [ ^ self cacheEntries: #() locationKey: locationKey token: token ].
 
-	count := self limit.
-	entries := [ result first: count ]
+	rawEntries := [ result first: self limit ]
 		on: Error
 		do: [ #() ].
-	entries := self rankedEntries: entries.
+	entries := self rankedEntries: rawEntries.
 	^ self cacheEntries: entries locationKey: locationKey token: token
 ]
 
@@ -81,6 +78,13 @@ CoPCSemanticCompletionProvider >> entryCacheKeyForLocationKey: locationKey token
 	^ {
 		locationKey.
 		tokenString ifNil: [ '' ] ifNotNil: [ tokenString asString ] }
+]
+
+{ #category : 'initialization' }
+CoPCSemanticCompletionProvider >> initialize [
+
+	super initialize.
+	limit := 10
 ]
 
 { #category : 'accessing' }
@@ -166,26 +170,11 @@ CoPCSemanticCompletionProvider >> receiverFor: aContext prefix: prefixString [
 { #category : 'completion' }
 CoPCSemanticCompletionProvider >> resultSetFor: aContext locationKey: locationKey token: tokenString [
 
-	((lastResultSet notNil and: [ lastLocationKey = locationKey ])
-		and: [ lastResultSet respondsTo: #replaceFilterWith: ])
-			ifTrue: [
-				[
-					lastResultSet replaceFilterWith: tokenString.
-					^ lastResultSet ]
-					on: Error
-					do: [ ] ].
-
-	builder ifNotNil: [
-		builder
-			logOldCompletionLookupFor: aContext
-			reason: #semanticHelperLookup ].
-	lastResultSet := [
+	^ [
 		(CoASTHeuristicsResultSetBuilder initializeOnContext: aContext)
 			buildCompletion ]
 		on: Error
-		do: [ nil ].
-	lastLocationKey := locationKey.
-	^ lastResultSet
+		do: [ nil ]
 ]
 
 { #category : 'completion' }

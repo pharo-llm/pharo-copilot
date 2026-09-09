@@ -36,11 +36,27 @@ CoCopilotEntry class >> contents: aString description: aDescriptionString [
 { #category : 'accessing' }
 CoCopilotEntry >> activateOn: aCoCompletionContext [
 
-	| editor applied evaluatorClass insertionStart |
+	| editor engine applied evaluatorClass insertionStart |
 	aCoCompletionContext ifNil: [ Error signal: 'Completion context is nil' ].
 
 	applied := false.
 	insertionStart := nil.
+
+	(aCoCompletionContext respondsTo: #replaceTokenInEditorWith:) ifTrue: [
+		[
+			aCoCompletionContext replaceTokenInEditorWith: self contents.
+			applied := true ]
+			on: Error
+			do: [ applied := false ] ].
+
+	(applied not and: [ aCoCompletionContext respondsTo: #engine ]) ifTrue: [
+		engine := [ aCoCompletionContext engine ] on: Error do: [ nil ].
+		(engine notNil and: [ engine respondsTo: #replaceTokenInEditorWith: ]) ifTrue: [
+			[
+				engine replaceTokenInEditorWith: self contents.
+				applied := true ]
+				on: Error
+				do: [ applied := false ] ] ].
 
 	editor := (aCoCompletionContext respondsTo: #editor)
 		          ifTrue: [
@@ -49,7 +65,7 @@ CoCopilotEntry >> activateOn: aCoCompletionContext [
 					          do: [ nil ] ]
 		          ifFalse: [ nil ].
 
-	editor ifNotNil: [
+	(applied not and: [ editor notNil ]) ifTrue: [
 			insertionStart := self insertionStartIn: editor.
 			(editor respondsTo: #addString:) ifTrue: [
 					editor addString: self contents.
@@ -63,10 +79,6 @@ CoCopilotEntry >> activateOn: aCoCompletionContext [
 
 			(applied and: [ insertionStart notNil ]) ifTrue: [
 					self placeCaretOf: editor at: insertionStart + self contents size ] ].
-
-	(applied not and: [ aCoCompletionContext respondsTo: #replaceTokenInEditorWith: ]) ifTrue: [
-			aCoCompletionContext replaceTokenInEditorWith: self contents.
-			applied := true ].
 
 	applied ifTrue: [
 			self sessionId ifNotNil: [
