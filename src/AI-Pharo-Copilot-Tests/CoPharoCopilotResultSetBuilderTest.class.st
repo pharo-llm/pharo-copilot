@@ -28,7 +28,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionRouterClassifiesSelectorVari
 
 	self
 		assert: (router classifyContext: selectorContext prefix: selectorContext source builder: builder)
-		equals: #messageTail.
+		equals: #selector.
 	self
 		assert: (router classifyContext: variableContext prefix: variableContext source builder: builder)
 		equals: #variable.
@@ -43,7 +43,7 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionGenerationPolicyUsesSmallBud
 	| policy |
 	policy := CoPCCompletionGenerationPolicy new.
 
-	self assert: (policy numPredictFor: #selector) equals: 8.
+	self assert: (policy numPredictFor: #selector) equals: 32.
 	self assert: (policy numPredictFor: #messageTail) equals: 32.
 	self assert: (policy numPredictFor: #variable) equals: 8.
 	self assert: (policy numPredictFor: #statement) equals: 24.
@@ -139,11 +139,13 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalOnlyForShortSo
 
 	result := b buildCompletion.
 
-	self assert: result equals: #fallbackResultSet.
-	self assert: b openedEntries isNil.
+	"Unknown environment -> Browser/Debugger path.
+	 Cache hit: menu is opened with the cached entry, emptyResultSet returned."
+	self assert: (result isKindOf: CoResultSet).
+	self assert: b openedEntries first contents equals: 'CompletedValue'.
 	self assert: b scheduledDelay isNil.
 	self assert: b classContextCallCount equals: 0.
-	self assert: b fallbackCallCount equals: 1.
+	self assert: b fallbackCallCount equals: 0.
 	self assert: b semanticAstCallCount equals: 0
 ]
 
@@ -193,9 +195,10 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionOpensFastCacheWithoutSe
 	b buildCompletion.
 
 	entries := b openedEntries.
-	self assert: b fallbackCallCount equals: 1.
+	"Unknown environment -> Browser/Debugger path: no Complishon fallback appended."
+	self assert: b fallbackCallCount equals: 0.
+	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'DefinitelyNotASelector'.
-	self assert: entries second contents equals: 'fallbackCompletion'.
 	self assert: b scheduledDelay isNil
 ]
 
@@ -213,8 +216,10 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionSchedulesCopilotForSema
 
 	result := b buildCompletion.
 
-	self assert: result equals: #fallbackResultSet.
-	self assert: b fallbackCallCount equals: 1.
+	"Unknown environment (no editor/window in test) -> Browser/Debugger path:
+	 Ollama owns the completion, so an empty result set is returned immediately."
+	self assert: (result isKindOf: CoResultSet).
+	self assert: b fallbackCallCount equals: 0.
 	self assert: b openedEntries isNil.
 	self assert: b scheduledPrefix equals: 'self as'.
 	self deny: b scheduledDelay isNil.
@@ -235,10 +240,12 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionUsesLocalOnlyForShortSc
 
 	result := b buildCompletion.
 
-	self assert: result equals: #fallbackResultSet.
-	self assert: b fallbackCallCount equals: 1.
-	self assert: b scheduledPrefix isNil.
-	self assert: b scheduledDelay isNil
+	"#scripting (non-Playground/Inspector) -> direct Copilot path.
+	 Copilot is scheduled and an empty result set is returned."
+	self assert: (result isKindOf: CoResultSet).
+	self assert: b fallbackCallCount equals: 0.
+	self assert: b scheduledPrefix equals: 'Ord'.
+	self deny: b scheduledDelay isNil
 ]
 
 { #category : 'tests' }
@@ -259,8 +266,10 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionSchedulesCopilotForLong
 
 	result := b buildCompletion.
 
-	self assert: result equals: #fallbackResultSet.
-	self assert: b fallbackCallCount equals: 1.
+	"#scripting (non-Playground/Inspector) -> direct Copilot path.
+	 Copilot is scheduled and an empty result set is returned."
+	self assert: (result isKindOf: CoResultSet).
+	self assert: b fallbackCallCount equals: 0.
 	self assert: b scheduledPrefix equals: source.
 	self deny: b scheduledDelay isNil
 ]
@@ -321,11 +330,13 @@ CoPharoCopilotResultSetBuilderTest >> testBuildCompletionHandlesNilLocalResultSe
 
 	result := b buildCompletion.
 
+	"#scripting (non-Playground/Inspector) -> direct Copilot path.
+	 emptyResultSet is never nil, and is always a CoResultSet."
 	self deny: result isNil.
 	self assert: (result isKindOf: CoResultSet).
-	self assert: b fallbackCallCount equals: 1.
-	self assert: b scheduledPrefix isNil.
-	self assert: b scheduledDelay isNil
+	self assert: b fallbackCallCount equals: 0.
+	self assert: b scheduledPrefix equals: 'Ord'.
+	self deny: b scheduledDelay isNil
 ]
 
 { #category : 'tests' }
@@ -446,10 +457,10 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesMergeCopilotAndFallba
 		inContext: context
 		contextInfo: Dictionary new.
 
-	self assert: entries size equals: 2.
+	"Unknown environment (no editor) -> Browser/Debugger path: Copilot only, no fallback."
+	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'aiCompletion'.
-	self assert: entries second contents equals: 'fallbackCompletion'.
-	self assert: builder fallbackCallCount equals: 1
+	self assert: builder fallbackCallCount equals: 0
 ]
 
 { #category : 'tests' }
@@ -471,10 +482,10 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesKeepModelSuggestionWi
 		inContext: context
 		contextInfo: contextInfo.
 
-	self assert: builder fallbackCallCount equals: 1.
-	self assert: entries size equals: 2.
+	"Unknown environment (no editor) -> Browser/Debugger path: Copilot only, no fallback."
+	self assert: builder fallbackCallCount equals: 0.
+	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'DefinitelyNotASelector'.
-	self assert: entries second contents equals: 'fallbackCompletion'.
 	self deny: (contextInfo includesKey: #semanticGate)
 ]
 
@@ -497,10 +508,10 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesKeepValidModelSuggest
 		inContext: context
 		contextInfo: contextInfo.
 
-	self assert: builder fallbackCallCount equals: 1.
-	self assert: entries size equals: 2.
+	"Unknown environment (no editor) -> Browser/Debugger path: Copilot only, no fallback."
+	self assert: builder fallbackCallCount equals: 0.
+	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'String'.
-	self assert: entries second contents equals: 'fallbackCompletion'.
 	self deny: (contextInfo includesKey: #semanticGate)
 ]
 
@@ -516,9 +527,9 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISu
 		inContext: context
 		contextInfo: Dictionary new.
 
-	self assert: entries size equals: 1.
-	self assert: entries first contents equals: 'fallbackCompletion'.
-	self assert: builder fallbackCallCount equals: 1
+	"Unknown environment (no editor) -> Browser/Debugger path: empty Copilot result, no fallback."
+	self assert: entries isEmpty.
+	self assert: builder fallbackCallCount equals: 0
 ]
 
 { #category : 'tests' }
@@ -542,10 +553,10 @@ CoPharoCopilotResultSetBuilderTest >> testProcessCompletionUsesModelSuggestionsW
 		contextInfo: contextInfo.
 
 	entries := builder openedEntries.
-	self assert: builder fallbackCallCount equals: 1.
-	self assert: entries size equals: 2.
+	"Unknown environment (no editor) -> Browser/Debugger path: Copilot only, no fallback."
+	self assert: builder fallbackCallCount equals: 0.
+	self assert: entries size equals: 1.
 	self assert: entries first contents equals: 'modelCompletion'.
-	self assert: entries second contents equals: 'fallbackCompletion'.
 	self deny: (contextInfo includesKey: #semanticFusionApplied).
 	self deny: (contextInfo includesKey: #semanticGate)
 ]

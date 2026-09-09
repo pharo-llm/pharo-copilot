@@ -211,7 +211,7 @@ CoPharoCopilotResultSetBuilder >> buildClassContextFor: methodClass selector: se
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> buildCompletion [
 
-	| context snapshot prefix suffix contextInfo delay cached |
+	| context snapshot prefix suffix contextInfo delay cached environment kind |
 	context := completionContext.
 
 	(self shouldRequestCompletionForContext: context) ifFalse: [
@@ -223,10 +223,10 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	contextInfo := self contextInfoFor: context prefix: prefix suffix: suffix.
 
 	self isLoggingEnabled ifTrue: [
-	contextInfo
-		at: #sessionId put: CoPharoCopilotLogger completionSessionId;
-		at: #timestamp put: DateAndTime now asString;
-		at: #rejected put: OrderedCollection new].
+		contextInfo
+			at: #sessionId put: CoPharoCopilotLogger completionSessionId;
+			at: #timestamp put: DateAndTime now asString;
+			at: #rejected put: OrderedCollection new ].
 
 	cached := self
 		fastCachedSuggestionsFor: context
@@ -236,7 +236,7 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 	cached ifNotNil: [
 		(self openCachedSuggestions: cached for: context prefix: prefix suffix: suffix contextInfo: contextInfo)
 			ifTrue: [ ^ self emptyResultSet ] ].
-	
+
 	delay := self requestDelayForSnapshot: snapshot.
 
 	self
@@ -246,7 +246,15 @@ CoPharoCopilotResultSetBuilder >> buildCompletion [
 		contextInfo: contextInfo
 		delayMilliseconds: delay.
 
-	^ self localCompletionResultSetFor: context
+	environment := self completionEnvironmentFor: context.
+	kind := environment at: #kind ifAbsent: [ #unknown ].
+
+	"Playground and Inspector keep the normal completion engine."
+	((kind = #playground) or: [ kind = #inspector ]) ifTrue: [
+		^ self localCompletionResultSetFor: context ].
+
+	"Browser, Debugger, etc: Ollama owns this completion."
+	^ self emptyResultSet
 ]
 
 { #category : 'new' }
@@ -562,7 +570,7 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 { #category : 'new' }
 CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inContext: aContext contextInfo: contextInfo [
 
-	| cleaned sessionId copilotEntries |
+	| cleaned sessionId copilotEntries environment kind |
 	cleaned := self
 		normalizedCompletionContentsFrom: contentCollection
 		inContext: aContext
@@ -583,10 +591,18 @@ CoPharoCopilotResultSetBuilder >> completionEntriesFrom: contentCollection inCon
 
 		entry ].
 
-	^ self
-		appendFallbackCompletionEntriesTo: copilotEntries
-		inContext: aContext
-		contextInfo: contextInfo
+	environment := self completionEnvironmentFor: aContext.
+	kind := environment at: #kind ifAbsent: [ #unknown ].
+
+	"Only Playground and Inspector fuse Complishon fallback."
+	((kind = #playground) or: [ kind = #inspector ]) ifTrue: [
+		^ self
+			appendFallbackCompletionEntriesTo: copilotEntries
+			inContext: aContext
+			contextInfo: contextInfo ].
+
+	"Browser / Debugger / normal editors: Copilot entries only."
+	^ copilotEntries asArray
 ]
 
 { #category : 'new' }
@@ -1719,8 +1735,9 @@ CoPharoCopilotResultSetBuilder >> isSuggestion: suggestionString acceptableForCo
 	kind := completionKind ifNil: [ #expression ].
 
 	kind = #messageTail ifTrue: [
-		^ (suggestion includes: Character lf) not
-			and: [ (suggestion includes: $.) not ] ].
+		"Allow a complete Smalltalk expression/sentence.
+		 Only reject multiline output here."
+		^ (suggestion includes: Character lf) not ].
 
 	^ true
 ]
