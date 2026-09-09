@@ -3189,9 +3189,10 @@ CoPharoCopilotResultSetBuilder >> selectorHeaderFor: aString [
 
 { #category : 'private' }
 CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
-	"Request Copilot for normal method contexts, and for source-only editors only
-	when the typed source is large enough to be useful."
-	| pair source pos before after hasBehavior |
+	"Playground and Inspector keep the 120-character restriction.
+	 Browser, Debugger, and every other environment launch Copilot immediately
+	 (as soon as minimumPrefixLength characters have been typed)."
+	| pair source pos before after environment kind |
 	self shouldUseCopilotSuggestions ifFalse: [ ^ false ].
 	aContext ifNil: [ ^ false ].
 
@@ -3204,17 +3205,21 @@ CoPharoCopilotResultSetBuilder >> shouldRequestCompletionForContext: aContext [
 	before := pos > 0 ifTrue: [ source at: pos ] ifFalse: [ nil ].
 	after := pos < source size ifTrue: [ source at: pos + 1 ] ifFalse: [ nil ].
 
-	"Cursor inside a word => do NOT initialize completion engine."
+	"Do not trigger while cursor is inside an existing word."
 	((self isWordChar: before) and: [ self isWordChar: after ]) ifTrue: [ ^ false ].
 
 	(self isInsideCommentOrStringIn: source position: pos) ifTrue: [ ^ false ].
 
-	hasBehavior := (self behaviorFor: aContext) notNil.
-	((self isScriptingContext: aContext) or: [ hasBehavior not ]) ifTrue: [
+	environment := self completionEnvironmentFor: aContext.
+	kind := environment at: #kind ifAbsent: [ #unknown ].
+
+	"Playground and Inspector keep the old 120-character restriction."
+	((kind = #playground) or: [ kind = #inspector ]) ifTrue: [
 		^ self
 			hasEnoughSourceOnlyDataForCopilot: source
 			position: pos ].
 
+	"Browser, Debugger and every other environment use Copilot immediately."
 	^ true
 ]
 
