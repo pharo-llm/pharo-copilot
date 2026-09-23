@@ -136,12 +136,12 @@ CoPCOAHttpTransport >> newJsonClientForPath: aPath [
 			self error: 'Operation unavailable on the private completion server' ].
 		client
 			host: CopilotSettings host;
-			https;
-			port: 443;
+			port: CopilotSettings port;
 			dontFollowRedirects;
 			loggingOff;
 			enforceHttpSuccess: true;
-			headerAt: 'Authorization' put: 'Bearer ', CopilotSettings remoteAccessToken ].
+			headerAt: 'Authorization' put: 'Bearer ', CopilotSettings remoteAccessToken.
+		CopilotSettings remoteServerSecure ifTrue: [ client https ] ].
 	self configureJsonOn: client.
 
 	^ client

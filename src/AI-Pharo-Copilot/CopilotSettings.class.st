@@ -15,6 +15,7 @@ Class {
 		'host',
 		'remoteEnabled',
 		'remoteTokenFile',
+		'remoteSecure',
 		'port',
 		'modelMetadata',
 		'ollamaClientFactory',
@@ -704,6 +705,7 @@ CopilotSettings class >> initializeDefaults [
 	modelName := self defaultCompletionModelName.
 	remoteEnabled := false.
 	remoteTokenFile := nil.
+	remoteSecure := true.
 	host := '127.0.0.1'.
 	port := 11434.
 	autoInstallModelScriptEnabled := true.
@@ -2038,6 +2040,7 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	modelName := self valueAt: #modelName from: aDictionary default: modelName.
 	remoteEnabled := self valueAt: #remoteEnabled from: aDictionary default: false.
 	remoteTokenFile := self valueAt: #remoteTokenFile from: aDictionary default: nil.
+	remoteSecure := self valueAt: #remoteSecure from: aDictionary default: true.
 	host := self valueAt: #host from: aDictionary default: host.
 	port := self valueAt: #port from: aDictionary default: port.
 	autoInstallModelScriptEnabled := self valueAt: #autoInstallModelScriptEnabled from: aDictionary default: autoInstallModelScriptEnabled.
@@ -2088,6 +2091,7 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	modelName := aDictionary at: #modelName ifAbsent: [ aDictionary at: #ModelName ifAbsent: [ nil ] ].
 	remoteEnabled := aDictionary at: #remoteEnabled ifAbsent: [ false ].
 	remoteTokenFile := aDictionary at: #remoteTokenFile ifAbsent: [ nil ].
+	remoteSecure := aDictionary at: #remoteSecure ifAbsent: [ true ].
 	host := aDictionary at: #host ifAbsent: [ aDictionary at: #Host ifAbsent: [ nil ] ].
 	port := aDictionary at: #port ifAbsent: [ aDictionary at: #Port ifAbsent: [ nil ] ].
 	modelMetadata := aDictionary at: #modelMetadata ifAbsent: [ aDictionary at: #ModelMetadata ifAbsent: [ nil ] ].
@@ -2292,6 +2296,7 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #modelName put: modelName;
 		            at: #remoteEnabled put: self remoteEnabled;
 		            at: #remoteTokenFile put: remoteTokenFile;
+		            at: #remoteSecure put: self remoteServerSecure;
 		            at: #host put: host;
 		            at: #port put: port;
 		            at: #autoInstallModelScriptEnabled put: autoInstallModelScriptEnabled;
@@ -2623,6 +2628,7 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #modelName put: modelName;
 		  at: #remoteEnabled put: self remoteEnabled;
 		  at: #remoteTokenFile put: remoteTokenFile;
+		  at: #remoteSecure put: self remoteServerSecure;
 		  at: #host put: host;
 		  at: #port put: port;
 		  at: #modelMetadata put: modelMetadata;
@@ -2927,20 +2933,32 @@ CopilotSettings class >> remoteEnabled [
 
 { #category : 'remote server' }
 CopilotSettings class >> useRemoteServer: aHost tokenFile: aPath [
-	"Only a hostname is accepted. Credentials are read from a user-owned file,
-	never written into the settings snapshot. HTTPS always uses port 443."
+	^ self useRemoteServer: aHost tokenFile: aPath secure: true
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> useRemoteServer: aHost tokenFile: aPath secure: useTls [
+	"Credentials are read from a user-owned file, never from the settings snapshot.
+	Plain HTTP sends both the credential and completion source without encryption."
 	(aHost isString and: [ aHost notEmpty and: [ aHost allSatisfy: [ :ch |
 		'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-' includes: ch ] ] ])
-		ifFalse: [ self error: 'Provide a DNS hostname without scheme, path or port' ].
+		ifFalse: [ self error: 'Provide a hostname or IPv4 address without scheme, path or port' ].
+	(useTls = true or: [ useTls = false ]) ifFalse: [ self error: 'TLS setting must be true or false' ].
 	aPath asFileReference isFile ifFalse: [ self error: 'Credential file does not exist' ].
 	host := aHost.
-	port := 443.
+	port := useTls ifTrue: [ 443 ] ifFalse: [ 8080 ].
+	remoteSecure := useTls.
 	remoteTokenFile := aPath asFileReference fullName.
 	remoteEnabled := true.
 	autoInstallModelScriptEnabled := false.
 	modelMetadata := nil.
 	CoPCModelRegistry reset.
 	self autoSaveSettings
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> remoteServerSecure [
+	^ remoteSecure ~= false
 ]
 
 { #category : 'remote server' }
@@ -2965,6 +2983,11 @@ CopilotSettings class >> remoteModelAvailable [
 
 { #category : 'remote server' }
 CopilotSettings class >> configureHostedServer: aHost accessToken: aToken model: aModelName [
+	^ self configureHostedServer: aHost accessToken: aToken model: aModelName secure: true
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> configureHostedServer: aHost accessToken: aToken model: aModelName secure: useTls [
 	"Called by the personal installer. Keep the credential outside telemetry/logs
 	and settings snapshots. Each install gets its own directory, avoiding overwrite."
 	| directory credential |
@@ -2981,7 +3004,7 @@ CopilotSettings class >> configureHostedServer: aHost accessToken: aToken model:
 	OSPlatform current isWindows ifFalse: [
 		credential permissions: (FileSystemPermission posixPermissions: 8r600) ].
 	credential writeStreamDo: [ :stream | stream nextPutAll: aToken ].
-	self useRemoteServer: aHost tokenFile: credential fullName.
+	self useRemoteServer: aHost tokenFile: credential fullName secure: useTls.
 	self modelName: aModelName.
 	self copilotEnabled: false
 ]
