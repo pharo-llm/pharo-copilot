@@ -13,6 +13,8 @@ Class {
 		'provider',
 		'modelName',
 		'host',
+		'remoteEnabled',
+		'remoteTokenFile',
 		'port',
 		'modelMetadata',
 		'ollamaClientFactory',
@@ -411,6 +413,8 @@ CopilotSettings class >> ensureOllamaInstalledBeforeUse [
 
 	| response |
 
+	self remoteEnabled ifTrue: [ ^ self remoteModelAvailable ].
+
 	response := self ensureOllamaServiceAvailable.
 	response ifNil: [ ^ false ].
 
@@ -422,6 +426,11 @@ CopilotSettings class >> ensureOllamaServiceAvailable [
 	"Verify Ollama responds. If it does not, try to launch it locally."
 
 	| response |
+
+	self remoteEnabled ifTrue: [
+		^ [ self newOllamaClient listModels ] on: Error do: [ :ex |
+			self notifyUser: 'Cannot connect to the private completion server. Check the address and credential file.'.
+			nil ] ].
 
 	[
 		response := self newOllamaClient listModels
@@ -499,6 +508,8 @@ CopilotSettings class >> ensureSelectedModelAvailable [
 	"Ensure the configured model exists in Ollama (optionally auto-install); answer true if available."
 
 	| selectedModelName response availableModels |
+
+	self remoteEnabled ifTrue: [ ^ self remoteModelAvailable ].
 	selectedModelName := self modelName.
 	(self isNullModelName: selectedModelName) ifTrue: [ ^ true ].
 
@@ -691,6 +702,8 @@ CopilotSettings class >> initializeDefaults [
 	enabled := true.
 	provider := #ollama.
 	modelName := self defaultCompletionModelName.
+	remoteEnabled := false.
+	remoteTokenFile := nil.
 	host := '127.0.0.1'.
 	port := 11434.
 	autoInstallModelScriptEnabled := true.
@@ -742,6 +755,8 @@ CopilotSettings class >> installCompletionEngineIfAvailable [
 CopilotSettings class >> installModelNamed: aModelName [
 	
 	| client pullResult |
+
+	self remoteEnabled ifTrue: [ ^ false ].
 
 	(self isPredefinedDownloadableModelName: aModelName) ifFalse: [
 		self notifyUser:
@@ -796,6 +811,8 @@ CopilotSettings class >> installModelNamedForSetup: aModelName progress: aProgre
 	block (a dictionary per Ollama status line: status, total, completed)."
 
 	| client pullResult |
+
+	self remoteEnabled ifTrue: [ ^ false ].
 
 	(self isPredefinedDownloadableModelName: aModelName) ifFalse: [
 		CoPharoCopilotLogger logBackEndEvent: 'Setup refused non-predefined model install' details: (Dictionary new
@@ -1000,6 +1017,8 @@ CopilotSettings class >> launchLocalOllamaServiceSilentlyIfPossible [
 
 	| osPlatform libc command |
 
+	self remoteEnabled ifTrue: [ ^ false ].
+
 	osPlatform := Smalltalk globals at: #OSPlatform ifAbsent: [ nil ].
 	libc := Smalltalk globals at: #LibC ifAbsent: [ nil ].
 	(osPlatform isNil or: [ libc isNil ]) ifTrue: [ ^ false ].
@@ -1025,6 +1044,8 @@ CopilotSettings class >> launchLocalOllamaServiceSilentlyIfPossible [
 CopilotSettings class >> listModelsForSetupAfterLaunchingOllamaIfNeeded [
 
 	| response |
+
+	self remoteEnabled ifTrue: [ ^ self ensureOllamaServiceAvailable ].
 
 	[
 		response := self newOllamaClient listModels
@@ -1644,6 +1665,7 @@ CopilotSettings class >> predefinedDownloadableModelNamesText [
 CopilotSettings class >> predefinedSetupModelNames [
 	"Answer the fixed plugin setup model list that must exist in Ollama."
 
+	self remoteEnabled ifTrue: [ ^ { self modelName } ].
 	^ self predefinedDownloadableModelNames asArray
 ]
 
@@ -2014,6 +2036,8 @@ CopilotSettings class >> restoreSettingsFromSerializableSnapshot: aDictionary [
 	enabled := self valueAt: #enabled from: aDictionary default: enabled.
 	provider := self valueAt: #provider from: aDictionary default: provider.
 	modelName := self valueAt: #modelName from: aDictionary default: modelName.
+	remoteEnabled := self valueAt: #remoteEnabled from: aDictionary default: false.
+	remoteTokenFile := self valueAt: #remoteTokenFile from: aDictionary default: nil.
 	host := self valueAt: #host from: aDictionary default: host.
 	port := self valueAt: #port from: aDictionary default: port.
 	autoInstallModelScriptEnabled := self valueAt: #autoInstallModelScriptEnabled from: aDictionary default: autoInstallModelScriptEnabled.
@@ -2062,6 +2086,8 @@ CopilotSettings class >> restoreSettingsFromSnapshot: aDictionary [
 	enabled := aDictionary at: #enabled ifAbsent: [ aDictionary at: #Enabled ifAbsent: [ nil ] ].
 	provider := aDictionary at: #provider ifAbsent: [ aDictionary at: #Provider ifAbsent: [ nil ] ].
 	modelName := aDictionary at: #modelName ifAbsent: [ aDictionary at: #ModelName ifAbsent: [ nil ] ].
+	remoteEnabled := aDictionary at: #remoteEnabled ifAbsent: [ false ].
+	remoteTokenFile := aDictionary at: #remoteTokenFile ifAbsent: [ nil ].
 	host := aDictionary at: #host ifAbsent: [ aDictionary at: #Host ifAbsent: [ nil ] ].
 	port := aDictionary at: #port ifAbsent: [ aDictionary at: #Port ifAbsent: [ nil ] ].
 	modelMetadata := aDictionary at: #modelMetadata ifAbsent: [ aDictionary at: #ModelMetadata ifAbsent: [ nil ] ].
@@ -2264,6 +2290,8 @@ CopilotSettings class >> serializableSettingsSnapshot [
 		            at: #enabled put: enabled;
 		            at: #provider put: provider;
 		            at: #modelName put: modelName;
+		            at: #remoteEnabled put: self remoteEnabled;
+		            at: #remoteTokenFile put: remoteTokenFile;
 		            at: #host put: host;
 		            at: #port put: port;
 		            at: #autoInstallModelScriptEnabled put: autoInstallModelScriptEnabled;
@@ -2593,6 +2621,8 @@ CopilotSettings class >> settingsSnapshot [
 		  at: #enabled put: enabled;
 		  at: #provider put: provider;
 		  at: #modelName put: modelName;
+		  at: #remoteEnabled put: self remoteEnabled;
+		  at: #remoteTokenFile put: remoteTokenFile;
 		  at: #host put: host;
 		  at: #port put: port;
 		  at: #modelMetadata put: modelMetadata;
@@ -2888,4 +2918,84 @@ CopilotSettings class >> writeMetadata: metadata toDirectory: modelDirectory mod
 					yourself)
 		]
 	]
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> remoteEnabled [
+	^ remoteEnabled = true
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> useRemoteServer: aHost tokenFile: aPath [
+	"Only a hostname is accepted. Credentials are read from a user-owned file,
+	never written into the settings snapshot. HTTPS always uses port 443."
+	(aHost isString and: [ aHost notEmpty and: [ aHost allSatisfy: [ :ch |
+		'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-' includes: ch ] ] ])
+		ifFalse: [ self error: 'Provide a DNS hostname without scheme, path or port' ].
+	aPath asFileReference isFile ifFalse: [ self error: 'Credential file does not exist' ].
+	host := aHost.
+	port := 443.
+	remoteTokenFile := aPath asFileReference fullName.
+	remoteEnabled := true.
+	autoInstallModelScriptEnabled := false.
+	modelMetadata := nil.
+	CoPCModelRegistry reset.
+	self autoSaveSettings
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> remoteAccessToken [
+	| token |
+	remoteTokenFile ifNil: [ self error: 'Configure a private server credential file' ].
+	token := remoteTokenFile asFileReference contents trimBoth.
+	(token size between: 32 and: 128) ifFalse: [ self error: 'Invalid credential file' ].
+	(token allSatisfy: [ :ch |
+		'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_' includes: ch ])
+		ifFalse: [ self error: 'Invalid credential file' ].
+	^ token
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> remoteModelAvailable [
+	| response |
+	response := self ensureOllamaServiceAvailable.
+	response ifNil: [ ^ false ].
+	^ self installedModelNames: (self modelNamesFromResponse: response) includesModelNamed: self modelName
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> configureHostedServer: aHost accessToken: aToken model: aModelName [
+	"Called by the personal installer. Keep the credential outside telemetry/logs
+	and settings snapshots. Each install gets its own directory, avoiding overwrite."
+	| directory credential |
+	(aToken isString and: [ (aToken size between: 32 and: 128) and: [
+		aToken allSatisfy: [ :ch |
+			'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_' includes: ch ] ] ])
+		ifFalse: [ self error: 'Invalid installation credential' ].
+	directory := FileLocator home / '.pharo-copilot' / UUID new asString.
+	directory ensureCreateDirectory.
+	OSPlatform current isWindows ifFalse: [
+		directory permissions: (FileSystemPermission posixPermissions: 8r700) ].
+	credential := directory / 'access.token'.
+	credential ensureCreateFile.
+	OSPlatform current isWindows ifFalse: [
+		credential permissions: (FileSystemPermission posixPermissions: 8r600) ].
+	credential writeStreamDo: [ :stream | stream nextPutAll: aToken ].
+	self useRemoteServer: aHost tokenFile: credential fullName.
+	self modelName: aModelName.
+	self copilotEnabled: false
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> hostedSetupSuccessMessage [
+	^ 'OKAY! Pharo-Copilot installed successfully!'
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> activateHostedCompletion [
+	self remoteEnabled ifFalse: [ ^ false ].
+	self remoteModelAvailable ifFalse: [ ^ false ].
+	self copilotEnabled: true.
+	self installCompletionEngineIfAvailable.
+	^ true
 ]

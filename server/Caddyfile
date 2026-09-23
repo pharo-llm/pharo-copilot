@@ -1,0 +1,24 @@
+{
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+		timeouts {
+			read_header 10s
+			read_body 15s
+			write 65s
+			idle 30s
+		}
+	}
+}
+{$COPILOT_DOMAIN} {
+	# TLS-ALPN certificate validation uses TCP 443; port 80 is unnecessary.
+	tls {
+		issuer acme {
+			disable_http_challenge
+		}
+	}
+	request_body {
+		max_size 64KB
+	}
+	reverse_proxy gateway:8080
+}

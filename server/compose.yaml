@@ -1,0 +1,50 @@
+services:
+  edge:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "443:443/tcp"
+    environment:
+      COPILOT_DOMAIN: ${COPILOT_DOMAIN:?Set COPILOT_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge, backend]
+    depends_on: [gateway]
+  gateway:
+    build: .
+    restart: unless-stopped
+    user: "${COPILOT_UID:-1000}:${COPILOT_GID:-1000}"
+    environment:
+      COPILOT_MODEL: ${COPILOT_MODEL:-pharo-llm/Qwen2.5-Coder-SFT:q4_K_M}
+      COPILOT_TOKEN_FILE: /run/copilot/tokens.json
+      OLLAMA_URL: http://ollama:11434
+    volumes:
+      - ./secrets:/run/copilot:ro
+    networks: [backend]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on: [ollama]
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_NUM_PARALLEL: "2"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_MAX_QUEUE: "4"
+    volumes:
+      - models:/root/.ollama
+    networks: [backend, downloads]
+    # For NVIDIA hosts with Container Toolkit, use compose.gpu.yaml as well.
+networks:
+  edge: {}
+  backend:
+    internal: true
+  downloads: {}
+volumes:
+  models: {}
+  caddy_data: {}
+  caddy_config: {}

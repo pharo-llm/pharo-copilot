@@ -1,0 +1,20 @@
+name: Private completion gateway
+on:
+  push:
+    paths: ['server/**', '.github/workflows/server-tests.yml']
+  pull_request:
+    paths: ['server/**', '.github/workflows/server-tests.yml']
+permissions:
+  contents: read
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r server/requirements.txt -r server/requirements-test.txt
+      - run: python -m pytest server/tests -q
+      - run: docker compose -f server/compose.yaml --env-file server/.env.example config --quiet
+      - run: docker run --rm -e COPILOT_DOMAIN=copilot.example.org -v "$PWD/server/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile

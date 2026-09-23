@@ -15,6 +15,7 @@ BaselineOfAIPharoCopilot class >> showFirstLaunchSetupIfNeeded [
 
 	<script>
 
+		Smalltalk isInteractive ifFalse: [ ^ self ].
 		(Delay forMilliseconds: 500) wait.
 		World ifNotNil: [
 						WorldMorph doOneCycle.
@@ -40,8 +41,10 @@ BaselineOfAIPharoCopilot >> baseline: spec [
 BaselineOfAIPharoCopilot >> postLoad [
 
 	CopilotSettings ensureDefaultCompletionModelSelected.
-	CopilotSettings installCompletionEngineIfAvailable.
+	(Smalltalk globals at: #CoPCHostedInstallInProgress ifAbsent: [ false ])
+		ifFalse: [ CopilotSettings installCompletionEngineIfAvailable ].
 	[ CoPharoCopilotLogger registerSessionHandler ] on: Error do: [ :ignored | ].
 	[ CoPCImageCloseSurvey registerSessionHandler ] on: Error do: [ :ignored | ].
-	self class showFirstLaunchSetupIfNeeded
+	(Smalltalk globals at: #CoPCHostedInstallInProgress ifAbsent: [ false ])
+		ifFalse: [ self class showFirstLaunchSetupIfNeeded ]
 ]

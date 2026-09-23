@@ -120,7 +120,9 @@ CoPCOAHttpTransport >> newJsonClientForPath: aPath [
 	"Create and configure a Zinc client for JSON REST calls using ZnEasy (so tests can replace it)."
 
 	| client |
-	client := ZnEasy client.
+	client := CopilotSettings remoteEnabled
+		ifTrue: [ CoPCSecureHttpClient new beOneShot; yourself ]
+		ifFalse: [ ZnEasy client ].
 	client forJsonREST.
 	client
 		host: host;
@@ -129,6 +131,17 @@ CoPCOAHttpTransport >> newJsonClientForPath: aPath [
 	(client respondsTo: #timeout:) ifTrue: [ client timeout: CopilotSettings requestTimeoutSeconds ].
 
 	self applyDefaultHeadersTo: client.
+	CopilotSettings remoteEnabled ifTrue: [
+		(#( 'api/tags' 'api/show' 'api/generate' ) includes: aPath) ifFalse: [
+			self error: 'Operation unavailable on the private completion server' ].
+		client
+			host: CopilotSettings host;
+			https;
+			port: 443;
+			dontFollowRedirects;
+			loggingOff;
+			enforceHttpSuccess: true;
+			headerAt: 'Authorization' put: 'Bearer ', CopilotSettings remoteAccessToken ].
 	self configureJsonOn: client.
 
 	^ client
@@ -162,6 +175,7 @@ CoPCOAHttpTransport >> postStreamingAt: aPath body: aDictionary timeoutSeconds: 
 	read, so long downloads survive as long as data keeps arriving."
 
 	| client entity lineStream line |
+	CopilotSettings remoteEnabled ifTrue: [ self error: 'Remote model downloads are disabled' ].
 	client := ZnEasy client.
 	client
 		host: host;

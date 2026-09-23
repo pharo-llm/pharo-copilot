@@ -43,3 +43,13 @@ venv/
 .venv/
 ENV/
 env/
+
+# Private completion server
+server/.env
+server/secrets/
+server/.venv/
+__pycache__/
+.pytest_cache/
+server/*.token
+
+server/installers/

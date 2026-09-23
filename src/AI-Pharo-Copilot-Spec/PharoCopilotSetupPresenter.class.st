@@ -135,9 +135,11 @@ PharoCopilotSetupPresenter >> handleScreenRecordingDeclined [
 PharoCopilotSetupPresenter >> continueSetupAfterConsentDecision [
 
 	self showDownloadStep.
-	statusLabel label: (CopilotSettings researchTelemetryAccepted
+	statusLabel label: (CopilotSettings remoteEnabled
+		ifTrue: [ 'Connecting to your completion server...' ]
+		ifFalse: [ CopilotSettings researchTelemetryAccepted
 		ifTrue: [ 'Authorizing server connection...' ]
-		ifFalse: [ 'Anonymous research telemetry disabled. Continuing local setup.' ]).
+		ifFalse: [ 'Anonymous research telemetry disabled. Continuing local setup.' ] ]).
 	self startSetupDownloads
 ]
 
@@ -188,6 +190,9 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 PharoCopilotSetupPresenter >> performSetupDownloads [
 
 	| response missingModels failedModels |
+
+	CopilotSettings remoteEnabled ifTrue: [
+		^ self performRemoteSetup ].
 
 	self setupProgressPercentage: 0.
 	self deferUI: [ statusLabel label: '' ].
@@ -313,7 +318,9 @@ PharoCopilotSetupPresenter >> performSetupPipeline [
 	self setupProgressPercentage: 0.
 
 	CopilotSettings researchTelemetryAccepted ifFalse: [
-		self deferUI: [ statusLabel label: 'Anonymous research telemetry disabled. Continuing local setup.' ].
+		self deferUI: [ statusLabel label: (CopilotSettings remoteEnabled
+			ifTrue: [ 'Connecting to your completion server...' ]
+			ifFalse: [ 'Anonymous research telemetry disabled. Continuing local setup.' ]) ].
 		(Delay forMilliseconds: 500) wait.
 		^ self performSetupDownloads ].
 
@@ -703,7 +710,9 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 
 	| continueButton |
 	titleLabel label: 'Welcome to Pharo-Copilot'.
-	descriptionLabel label: 'Local AI-powered code completion for Pharo.'.
+	descriptionLabel label: (CopilotSettings remoteEnabled
+		ifTrue: [ 'Code context is sent securely to your completion server.' ]
+		ifFalse: [ 'Local AI-powered code completion for Pharo.' ]).
 	statusLabel label: ''.
 
 	continueButton := self newButton
@@ -752,4 +761,36 @@ PharoCopilotSetupPresenter >> titleLabel [
 PharoCopilotSetupPresenter >> titleLabel: anObject [
 
 	titleLabel := anObject
+]
+
+{ #category : 'accessing' }
+PharoCopilotSetupPresenter >> performRemoteSetup [
+	| available |
+	self deferUI: [ statusLabel label: 'Connecting to your completion server...' ].
+	available := [ CopilotSettings activateHostedCompletion ] on: Error do: [ :ex | false ].
+	self deferUI: [
+		self setupProgressPercentage: (available ifTrue: [ 100 ] ifFalse: [ 0 ]).
+		available
+			ifTrue: [
+				statusLabel label: CopilotSettings hostedSetupSuccessMessage.
+				CopilotSettings notifyUser: CopilotSettings hostedSetupSuccessMessage.
+				self window ifNotNil: [ :window | window close ] ]
+			ifFalse: [ self showRemoteConnectionFailedStep ] ]
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> showRemoteConnectionFailedStep [
+	| retryButton |
+	titleLabel label: 'Cannot connect yet'.
+	descriptionLabel label: 'Your completion server is unavailable or your access has expired.'.
+	statusLabel label: 'Retry the connection or contact the person who provided your installer.'.
+	retryButton := self newButton
+		label: 'Retry connection';
+		action: [ self showDownloadStep. self startSetupDownloads ];
+		yourself.
+	contentContainer layout: (SpBoxLayout newTopToBottom
+		spacing: 12;
+		add: retryButton expand: false;
+		yourself).
+	self layout: self defaultLayout
 ]
