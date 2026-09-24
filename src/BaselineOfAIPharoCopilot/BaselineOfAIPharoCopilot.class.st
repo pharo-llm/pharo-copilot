@@ -41,8 +41,7 @@ BaselineOfAIPharoCopilot >> baseline: spec [
 BaselineOfAIPharoCopilot >> postLoad [
 
 	CopilotSettings ensureDefaultCompletionModelSelected.
-	(Smalltalk globals at: #CoPCHostedInstallInProgress ifAbsent: [ false ])
-		ifFalse: [ CopilotSettings installCompletionEngineIfAvailable ].
+	CopilotSettings copilotEnabled: false.
 	[ CoPharoCopilotLogger registerSessionHandler ] on: Error do: [ :ignored | ].
 	[ CoPCImageCloseSurvey registerSessionHandler ] on: Error do: [ :ignored | ].
 	(Smalltalk globals at: #CoPCHostedInstallInProgress ifAbsent: [ false ])

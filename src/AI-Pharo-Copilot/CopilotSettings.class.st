@@ -3010,6 +3010,26 @@ CopilotSettings class >> configureHostedServer: aHost accessToken: aToken model:
 ]
 
 { #category : 'remote server' }
+CopilotSettings class >> promptForHostedServer: aHost model: aModelName secure: useTls [
+	| token |
+	[
+		token := UIManager default
+			request: 'Paste the access token provided by your server administrator:'
+			initialAnswer: ''
+			title: 'Pharo Copilot server access'.
+		token ifNil: [ ^ false ].
+		token := token trimBoth.
+		token isEmpty ifTrue: [ ^ false ].
+		((token size between: 32 and: 128) and: [ token allSatisfy: [ :ch |
+			'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_' includes: ch ] ])
+			ifTrue: [
+				self configureHostedServer: aHost accessToken: token model: aModelName secure: useTls.
+				^ true ].
+		UIManager default inform: 'Invalid token format. Please paste the complete access token.'
+	] repeat
+]
+
+{ #category : 'remote server' }
 CopilotSettings class >> hostedSetupSuccessMessage [
 	^ 'OKAY! Pharo-Copilot installed successfully!'
 ]

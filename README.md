@@ -9,24 +9,17 @@
 
 Pharo-Copilot is an AI-powered code completion engine for Pharo, designed to enhance your coding experience with intelligent, context-aware suggestions.
 
-## Hosted model / private server
-
-To run the model on a central server while users run only the plugin, see the
-[private server deployment guide](server/README.md). It includes Docker deployment,
-HTTPS, per-user credentials, revocation, resource limits and Pharo configuration.
-Expose **TCP 443 only**; keep Ollama's 11434 and the gateway's 8080 private.
-Approved users control their clients, so plugin-exclusive access cannot be guaranteed.
-
-For automatic hosted installation, the administrator runs
-`./make-user-installer.sh alice` in the server repository and privately sends
-`installers/alice-install.st` to Alice. Evaluating that personal installer installs
-the plugin and configures server access automatically. After setup verifies the
-connection, it shows “OKAY! Pharo-Copilot installed successfully!”. See the
-[automatic installation guide](server/README.md#automatic-installation-for-users).
-
 ## Installation
 
-Ensure you have **Pharo** installed on your system as well as **[Ollama]([https://ollama.com/](https://ollama.com/download/windows))** for the underlying AI model hosting.
+Install this repository in Pharo. When loading finishes, a small setup window
+asks for your access token. Paste the token supplied by the administrator and
+click **Connect**. The plugin connects to `http://193.49.213.153:8080` and enables
+completion after verifying access. If the token is rejected, use **Enter access
+token** to correct it and retry.
+
+Users only need Pharo. The model runs on the server in
+`/home/oabedelk/pharo-copilot-server`, started with `./run-server.sh`.
+Tokens are stored in a file under the user's home directory.
 
 To install `pharo-copilot` in your image you can use:
 

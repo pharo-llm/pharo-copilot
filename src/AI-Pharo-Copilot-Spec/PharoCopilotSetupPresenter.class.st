@@ -171,7 +171,43 @@ PharoCopilotSetupPresenter >> initializePresenters [
 
 	contentContainer := SpPresenter new.
 
-	self showWelcomeStep
+	self showAccessTokenStep
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> showAccessTokenStep [
+	| tokenInput connectButton |
+	titleLabel label: 'Connect to Pharo Copilot'.
+	descriptionLabel label: 'Paste the access token provided by your administrator.'.
+	statusLabel label: ''.
+	tokenInput := self newTextInput.
+	connectButton := self newButton
+		label: 'Connect';
+		action: [
+			| configured |
+			configured := [
+				CopilotSettings
+					configureHostedServer: (CopilotSettings remoteEnabled
+						ifTrue: [ CopilotSettings host ] ifFalse: [ '193.49.213.153' ])
+					accessToken: tokenInput text trimBoth
+					model: 'pharo-llm/Qwen2.5-Coder-SFT:q4_K_M'
+					secure: (CopilotSettings remoteEnabled
+						ifTrue: [ CopilotSettings remoteServerSecure ] ifFalse: [ false ]).
+				true
+			] on: Error do: [ :error |
+				statusLabel label: 'Could not save the token. Check the token and try again.'.
+				false ].
+			configured ifTrue: [
+				tokenInput text: ''.
+				self showDownloadStep.
+				self startSetupDownloads ] ];
+		yourself.
+	contentContainer layout: (SpBoxLayout newTopToBottom
+		spacing: 12;
+		add: tokenInput expand: false;
+		add: connectButton expand: false;
+		yourself).
+	self layout: self defaultLayout
 ]
 
 { #category : 'initialization' }
@@ -780,17 +816,25 @@ PharoCopilotSetupPresenter >> performRemoteSetup [
 
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showRemoteConnectionFailedStep [
-	| retryButton |
+	| retryButton tokenButton |
 	titleLabel label: 'Cannot connect yet'.
 	descriptionLabel label: 'Your completion server is unavailable or your access has expired.'.
 	statusLabel label: 'Retry the connection or contact the person who provided your installer.'.
+	tokenButton := self newButton
+		label: 'Enter access token';
+		action: [
+			(CopilotSettings promptForHostedServer: CopilotSettings host
+				model: CopilotSettings modelName secure: CopilotSettings remoteServerSecure)
+				ifTrue: [ self showDownloadStep. self startSetupDownloads ] ];
+		yourself.
 	retryButton := self newButton
 		label: 'Retry connection';
 		action: [ self showDownloadStep. self startSetupDownloads ];
-		yourself.
+		 yourself.
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
 		add: retryButton expand: false;
+		add: tokenButton expand: false;
 		yourself).
 	self layout: self defaultLayout
 ]
