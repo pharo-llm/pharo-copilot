@@ -70,3 +70,21 @@ CoPCRemoteServerTest >> testAutomaticSetupDoesNotEnableCompletionWhenModelIsMiss
 		self deny: CopilotSettings copilotEnabled.
 		self assert: client pullCount equals: 0 ]
 ]
+
+{ #category : 'tests' }
+CoPCRemoteServerTest >> testRemoteUploadsUseCompletionHostOnly [
+	CopilotSettings withDefaultSettingsDo: [
+		| snapshot |
+		snapshot := CopilotSettings settingsSnapshot.
+		snapshot at: #remoteEnabled put: true;
+			at: #remoteSecure put: false;
+			at: #host put: 'copilot.example.org';
+			at: #port put: 8080.
+		CopilotSettings restoreSettingsFromSnapshot: snapshot.
+		self assert: CoPCSessionArchiveUploader uploadUrl
+			equals: 'http://copilot.example.org:8080/api/sessions'.
+		self assert: CoPCSessionArchiveUploader candidateUploadUrlsForAuthorization
+			equals: { 'http://copilot.example.org:8080/api/sessions' }.
+		self assert: CoPCSessionArchiveUploader telemetrySummaryUploadUrl
+			equals: 'http://copilot.example.org:8080/api/session-telemetry' ]
+]

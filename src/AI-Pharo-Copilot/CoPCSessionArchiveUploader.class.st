@@ -65,6 +65,7 @@ CoPCSessionArchiveUploader class >> authorizeConnectionUsingCandidateUrls [
 CoPCSessionArchiveUploader class >> candidateUploadUrlsForAuthorization [
 
 	| urls |
+	CopilotSettings remoteEnabled ifTrue: [ ^ { self uploadUrl } ].
 	urls := OrderedCollection new.
 	self addCandidateUploadUrl: self uploadUrl to: urls.
 	self addCandidateUploadUrl: self defaultPublicUploadUrl to: urls.
@@ -118,6 +119,7 @@ CoPCSessionArchiveUploader class >> enabled: aBoolean [
 
 { #category : 'accessing' }
 CoPCSessionArchiveUploader class >> ensureInternetUploadUrl [
+	CopilotSettings remoteEnabled ifTrue: [ ^ self uploadUrl ].
 
 	(self shouldReplaceUploadUrlForPublicReceiver: self uploadUrl) ifTrue: [
 		self uploadUrl: self defaultPublicUploadUrl ].
@@ -126,6 +128,7 @@ CoPCSessionArchiveUploader class >> ensureInternetUploadUrl [
 
 { #category : 'accessing' }
 CoPCSessionArchiveUploader class >> ensureUploadToken [
+	CopilotSettings remoteEnabled ifTrue: [ ^ CopilotSettings remoteAccessToken ].
 
 	^ self uploadToken ifNil: [
 		self uploadToken: self newUploadToken.
@@ -266,6 +269,9 @@ CoPCSessionArchiveUploader class >> uploadTokenFromDiskOrNil [
 
 { #category : 'accessing' }
 CoPCSessionArchiveUploader class >> uploadUrl [
+	CopilotSettings remoteEnabled ifTrue: [
+		^ (CopilotSettings remoteServerSecure ifTrue: [ 'https://' ] ifFalse: [ 'http://' ]),
+			CopilotSettings host, ':', CopilotSettings port asString, '/api/sessions' ].
 
 	^ uploadUrl ifNil: [ uploadUrl := self defaultUploadUrl ]
 ]
@@ -310,6 +316,7 @@ CoPCSessionArchiveUploader >> authorizeConnection [
 	| token client payload |
 	token := self class ensureUploadToken.
 	client := self newJsonClientForUrl: self class connectionRegistrationUrl.
+	client headerAt: 'Authorization' put: 'Bearer ' , token.
 	payload := Dictionary new
 		at: #userId put: CoPharoCopilotLogger userId;
 		at: #token put: token;
