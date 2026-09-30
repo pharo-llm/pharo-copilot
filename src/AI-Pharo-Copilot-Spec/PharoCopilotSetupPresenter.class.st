@@ -171,14 +171,46 @@ PharoCopilotSetupPresenter >> initializePresenters [
 
 	contentContainer := SpPresenter new.
 
-	self showAccessTokenStep
+	self showConnectionChoiceStep
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> showConnectionChoiceStep [
+	| cloudButton localButton |
+	titleLabel label: 'Welcome to Pharo-Copilot'.
+	descriptionLabel label: 'Choose where to run your completion model.'.
+	statusLabel label: ''.
+	cloudButton := self newButton
+		label: 'Use cloud (access token required)';
+		action: [ self showAccessTokenStep ];
+		yourself.
+	localButton := self newButton
+		label: 'Use local model (no token needed)';
+		action: [ self handleLocalModelSelected ];
+		yourself.
+	contentContainer layout: (SpBoxLayout newTopToBottom
+		spacing: 12;
+		add: (self newLabel label: 'Cloud: use a token supplied by your administrator.') expand: false;
+		add: cloudButton expand: false;
+		add: (self newLabel label: 'Local: check Ollama and download missing models.') expand: false;
+		add: localButton expand: false;
+		yourself).
+	self layout: self defaultLayout
+]
+
+{ #category : 'actions' }
+PharoCopilotSetupPresenter >> handleLocalModelSelected [
+
+	CopilotSettings useLocalModels.
+	self showDownloadStep.
+	self startSetupDownloads
 ]
 
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showAccessTokenStep [
-	| tokenInput connectButton |
-	titleLabel label: 'Connect to Pharo Copilot'.
-	descriptionLabel label: 'Paste the access token provided by your administrator.'.
+	| tokenInput connectButton backButton |
+	titleLabel label: 'Connect to Pharo-Copilot cloud'.
+	descriptionLabel label: 'Cloud access requires a token from your administrator.'.
 	statusLabel label: ''.
 	tokenInput := self newTextInput.
 	connectButton := self newButton
@@ -202,10 +234,15 @@ PharoCopilotSetupPresenter >> showAccessTokenStep [
 				self showDownloadStep.
 				self startSetupDownloads ] ];
 		yourself.
+	backButton := self newButton
+		label: 'Back';
+		action: [ self showConnectionChoiceStep ];
+		yourself.
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
 		add: tokenInput expand: false;
 		add: connectButton expand: false;
+		add: backButton expand: false;
 		yourself).
 	self layout: self defaultLayout
 ]
@@ -248,12 +285,13 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 	missingModels isEmpty ifTrue: [
 		[ CoPCModelRegistry refresh ] on: Error do: [ :ignored | ].
 		CopilotSettings ensureDefaultCompletionModelSelected.
+		CopilotSettings copilotEnabled: true.
 		CopilotSettings installCompletionEngineIfAvailable.
 		self setupProgressPercentage: 100.
 		^ self deferUI: [
 			statusLabel label: 'OKAY! Pharo-Copilot setup is complete.'.
 			CopilotSettings notifyUser: 'OKAY! Pharo-Copilot setup is complete.'.
-			self window close
+			self window ifNotNil: [ :window | window close ]
 		]
 	].
 
@@ -335,11 +373,12 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		failedModels isEmpty
 			ifTrue: [
 				CopilotSettings ensureDefaultCompletionModelSelected.
+				CopilotSettings copilotEnabled: true.
 				CopilotSettings installCompletionEngineIfAvailable.
 				self setupProgressPercentage: 100.
 				statusLabel label: 'Pharo-Copilot setup is complete.'.
 				CopilotSettings notifyUser: 'Pharo-Copilot setup is complete.'.
-				self window close ]
+				self window ifNotNil: [ :window | window close ] ]
 			ifFalse: [
 				statusLabel label:
 					('Setup finished with {1}/{2} model(s) not available in Ollama. Check the message above, Ollama logs, and ''ollama list''.'
@@ -461,7 +500,9 @@ PharoCopilotSetupPresenter >> setupProgressPercentage: aNumber [
 PharoCopilotSetupPresenter >> showDownloadStep [
 
 	titleLabel label: 'Setting up Pharo-Copilot'.
-	descriptionLabel label: 'LOADING .....'.
+	descriptionLabel label: (CopilotSettings remoteEnabled
+		ifTrue: [ 'Connecting to your completion server...' ]
+		ifFalse: [ 'Checking Ollama and installed local models...' ]).
 	statusLabel label: ''.
 
 	self setupProgressPercentage: 0.
@@ -816,7 +857,7 @@ PharoCopilotSetupPresenter >> performRemoteSetup [
 
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showRemoteConnectionFailedStep [
-	| retryButton tokenButton |
+	| retryButton tokenButton localButton |
 	titleLabel label: 'Cannot connect yet'.
 	descriptionLabel label: 'Your completion server is unavailable or your access has expired.'.
 	statusLabel label: 'Retry the connection or contact the person who provided your installer.'.
@@ -831,10 +872,15 @@ PharoCopilotSetupPresenter >> showRemoteConnectionFailedStep [
 		label: 'Retry connection';
 		action: [ self showDownloadStep. self startSetupDownloads ];
 		 yourself.
+	localButton := self newButton
+		label: 'Use local model (no token needed)';
+		action: [ self handleLocalModelSelected ];
+		yourself.
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 12;
 		add: retryButton expand: false;
 		add: tokenButton expand: false;
+		add: localButton expand: false;
 		yourself).
 	self layout: self defaultLayout
 ]

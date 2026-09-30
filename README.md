@@ -11,15 +11,20 @@ Pharo-Copilot is an AI-powered code completion engine for Pharo, designed to enh
 
 ## Installation
 
-Install this repository in Pharo. When loading finishes, a small setup window
-asks for your access token. Paste the token supplied by the administrator and
-click **Connect**. The plugin connects to `http://193.49.213.153:8080` and enables
-completion after verifying access. If the token is rejected, use **Enter access
-token** to correct it and retry.
+Install this repository in Pharo. When loading finishes, the setup window asks
+where you want to run your completion model:
 
-Users only need Pharo. The model runs on the server in
-`/home/oabedelk/pharo-copilot-server`, started with `./run-server.sh`.
-Tokens are stored in a file under the user's home directory.
+- **Use cloud (access token required)**: paste the token supplied by your
+  administrator and click **Connect**. The plugin connects to
+  `http://193.49.213.153:8080` and enables completion after verifying access.
+  You only need Pharo; the model runs on the server. Tokens are stored in a file
+  under your home directory. If access fails, retry, enter a corrected token,
+  or choose a local model.
+- **Use local model (no token needed)**: setup checks Ollama on your computer,
+  checks the installed models, and downloads any missing required models before
+  enabling completion. If Ollama is missing, setup offers its download page.
+
+Use **Back** on the cloud token screen to return to the choice.
 
 To install `pharo-copilot` in your image you can use:
 

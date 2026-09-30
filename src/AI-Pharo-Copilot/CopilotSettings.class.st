@@ -2931,6 +2931,23 @@ CopilotSettings class >> remoteEnabled [
 	^ remoteEnabled = true
 ]
 
+{ #category : 'settings' }
+CopilotSettings class >> useLocalModels [
+	"Restore local inference before checking Ollama, including after cloud setup."
+
+	remoteEnabled := false.
+	remoteTokenFile := nil.
+	remoteSecure := true.
+	host := '127.0.0.1'.
+	port := 11434.
+	modelName := self defaultCompletionModelName.
+	autoInstallModelScriptEnabled := true.
+	enabled := false.
+	self clearCachedModelMetadata.
+	CoPCModelRegistry reset.
+	self autoSaveSettings
+]
+
 { #category : 'remote server' }
 CopilotSettings class >> useRemoteServer: aHost tokenFile: aPath [
 	^ self useRemoteServer: aHost tokenFile: aPath secure: true
