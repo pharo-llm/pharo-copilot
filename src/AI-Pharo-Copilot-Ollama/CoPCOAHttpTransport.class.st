@@ -132,16 +132,16 @@ CoPCOAHttpTransport >> newJsonClientForPath: aPath [
 
 	self applyDefaultHeadersTo: client.
 	CopilotSettings remoteEnabled ifTrue: [
-		(#( 'api/tags' 'api/show' 'api/generate' ) includes: aPath) ifFalse: [
+		(#( 'api/tags' 'api/show' 'api/generate' 'api/session/heartbeat' 'api/session/close' ) includes: aPath) ifFalse: [
 			self error: 'Operation unavailable on the private completion server' ].
 		client
-			host: CopilotSettings host;
-			port: CopilotSettings port;
+			url: ((CopilotSettings remoteServerSecure ifTrue: [ 'https://' ] ifFalse: [ 'http://' ]),
+				CopilotSettings host, ':', CopilotSettings port asString, '/', aPath);
 			dontFollowRedirects;
 			loggingOff;
 			enforceHttpSuccess: true;
-			headerAt: 'Authorization' put: 'Bearer ', CopilotSettings remoteAccessToken.
-		CopilotSettings remoteServerSecure ifTrue: [ client https ] ].
+			headerAt: 'Authorization' put: 'Bearer ', CopilotSettings remoteAccessToken;
+			headerAt: 'X-Copilot-Session' put: CoPCRemoteSession identifier ].
 	self configureJsonOn: client.
 
 	^ client

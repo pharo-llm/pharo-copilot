@@ -40,6 +40,7 @@ BaselineOfAIPharoCopilot >> baseline: spec [
 { #category : 'baselines' }
 BaselineOfAIPharoCopilot >> postLoad [
 
+	CoPCRemoteSession registerSessionHandler.
 	CopilotSettings ensureDefaultCompletionModelSelected.
 	CopilotSettings copilotEnabled: false.
 	[ CoPharoCopilotLogger registerSessionHandler ] on: Error do: [ :ignored | ].

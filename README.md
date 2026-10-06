@@ -53,3 +53,12 @@ You can install the default model manually with:
 ```sh
 ollama pull pharo-llm/Qwen2.5-Coder-SFT:q4_K_M
 ```
+
+Remote access tokens are bound to one running image session. Normal image exit
+finishes telemetry upload and retires the token; crashes or disconnected clients
+expire after the server's heartbeat grace period (five minutes by default).
+Saving without quitting keeps the session. Opening the saved image starts a new
+session and requires a fresh token if the previous token was already used.
+Update client and gateway together for session support. The server administrator
+can inspect `sessions.json` and `admin-events.jsonl`; the standalone server also
+provides `scripts/show-access.sh` and `scripts/tail-completion-log.sh`.

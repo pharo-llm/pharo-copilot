@@ -19,9 +19,12 @@ services:
     environment:
       COPILOT_MODEL: ${COPILOT_MODEL:-pharo-llm/Qwen2.5-Coder-SFT:q4_K_M}
       COPILOT_TOKEN_FILE: /run/copilot/tokens.json
+      COPILOT_SESSION_FILE: /state/sessions.json
+      COPILOT_AUDIT_LOG: /state/admin-events.jsonl
       OLLAMA_URL: http://ollama:11434
     volumes:
       - ./secrets:/run/copilot:ro
+      - ./state:/state
     networks: [backend]
     read_only: true
     cap_drop: [ALL]

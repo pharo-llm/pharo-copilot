@@ -88,3 +88,55 @@ CoPCRemoteServerTest >> testRemoteUploadsUseCompletionHostOnly [
 		self assert: CoPCSessionArchiveUploader telemetrySummaryUploadUrl
 			equals: 'http://copilot.example.org:8080/api/session-telemetry' ]
 ]
+
+{ #category : 'tests' }
+CoPCRemoteServerTest >> testRemoteRequestPreservesPathAndPortForBothSchemes [
+	CopilotSettings withDefaultSettingsDo: [
+		| credential snapshot |
+		credential := FileLocator temp / UUID new asString.
+		credential writeStreamDo: [ :stream | stream nextPutAll: (String new: 40 withAll: $a) ].
+		[
+			#(true false) do: [ :secure |
+				snapshot := CopilotSettings settingsSnapshot.
+				snapshot at: #remoteEnabled put: true;
+					at: #remoteSecure put: secure;
+					at: #remoteTokenFile put: credential fullName;
+					at: #host put: 'example.org'; at: #port put: 8080.
+				CopilotSettings restoreSettingsFromSnapshot: snapshot.
+				#('api/tags' 'api/show' 'api/generate' 'api/session/heartbeat' 'api/session/close') do: [ :path |
+					| client |
+					client := CoPCOAHttpTransport new newJsonClientForPath: path.
+					self assert: client request url asString equals:
+						((secure ifTrue: [ 'https://' ] ifFalse: [ 'http://' ]), 'example.org:8080/', path).
+					self assert: (client request headers at: 'X-Copilot-Session') equals: CoPCRemoteSession identifier ] ]
+		] ensure: [ CoPCRemoteSession reset. credential ensureDelete ] ]
+]
+
+{ #category : 'tests' }
+CoPCRemoteServerTest >> testImageRestartChangesRemoteSessionIdentity [
+	| previous |
+	[ previous := CoPCRemoteSession identifier.
+	  CoPCRemoteSession reset.
+	  self deny: CoPCRemoteSession identifier equals: previous
+	] ensure: [ CoPCRemoteSession reset ]
+]
+
+{ #category : 'tests' }
+CoPCRemoteServerTest >> testSavingWithoutQuittingKeepsSession [
+	| previous |
+	[ previous := CoPCRemoteSession identifier.
+	  CoPCRemoteSession shutDown: false.
+	  CoPCRemoteSession startUp: false.
+	  self assert: CoPCRemoteSession identifier equals: previous.
+	  CoPCRemoteSession startUp: true.
+	  self deny: CoPCRemoteSession identifier equals: previous
+	] ensure: [ CoPCRemoteSession reset ]
+]
+
+{ #category : 'tests' }
+CoPCRemoteServerTest >> testHttpFailureMessagesDistinguishRoutingAndAccess [
+	CopilotSettings recordRemoteConnectionFailure:
+		(ZnHttpUnsuccessful new response: (ZnResponse notFound: '/'); yourself).
+	self assert: (CopilotSettings remoteConnectionFailure includesSubstring: 'HTTP 404').
+	self deny: (CopilotSettings remoteConnectionFailure includesSubstring: 'expired')
+]

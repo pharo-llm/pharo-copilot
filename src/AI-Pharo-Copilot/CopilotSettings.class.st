@@ -16,6 +16,7 @@ Class {
 		'remoteEnabled',
 		'remoteTokenFile',
 		'remoteSecure',
+		'remoteConnectionFailure',
 		'port',
 		'modelMetadata',
 		'ollamaClientFactory',
@@ -429,8 +430,9 @@ CopilotSettings class >> ensureOllamaServiceAvailable [
 	| response |
 
 	self remoteEnabled ifTrue: [
+		remoteConnectionFailure := nil.
 		^ [ self newOllamaClient listModels ] on: Error do: [ :ex |
-			self notifyUser: 'Cannot connect to the private completion server. Check the address and credential file.'.
+			self recordRemoteConnectionFailure: ex.
 			nil ] ].
 
 	[
@@ -2995,7 +2997,10 @@ CopilotSettings class >> remoteModelAvailable [
 	| response |
 	response := self ensureOllamaServiceAvailable.
 	response ifNil: [ ^ false ].
-	^ self installedModelNames: (self modelNamesFromResponse: response) includesModelNamed: self modelName
+	(self installedModelNames: (self modelNamesFromResponse: response) includesModelNamed: self modelName)
+		ifTrue: [ ^ true ].
+	remoteConnectionFailure := 'Connected, but the server does not offer the selected model: ', self modelName.
+	^ false
 ]
 
 { #category : 'remote server' }
@@ -3058,4 +3063,24 @@ CopilotSettings class >> activateHostedCompletion [
 	self copilotEnabled: true.
 	self installCompletionEngineIfAvailable.
 	^ true
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> recordRemoteConnectionFailure: anError [
+	| code |
+	code := (anError respondsTo: #response)
+		ifTrue: [ anError response code ] ifFalse: [ nil ].
+	remoteConnectionFailure := code
+		ifNil: [ 'Connection failed (', anError class name, '). Check the server address, network and credential file.' ]
+		ifNotNil: [
+			code = 401 ifTrue: [ 'Access token expired, was revoked, or is invalid. Ask the administrator for a new token.' ]
+			ifFalse: [ code = 409 ifTrue: [ 'This token is already bound to another image session.' ]
+			ifFalse: [ code = 404 ifTrue: [ 'Server returned HTTP 404: the API path was not found. Update the Pharo Copilot client and server.' ]
+			ifFalse: [ code = 426 ifTrue: [ 'Update Pharo Copilot: the server requires image-session support.' ]
+			ifFalse: [ 'Server returned HTTP ', code asString, '. Check the server log.' ] ] ] ] ]
+]
+
+{ #category : 'remote server' }
+CopilotSettings class >> remoteConnectionFailure [
+	^ remoteConnectionFailure ifNil: [ 'Could not verify the completion server connection.' ]
 ]

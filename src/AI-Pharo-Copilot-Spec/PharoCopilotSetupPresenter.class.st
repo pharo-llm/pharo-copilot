@@ -844,7 +844,7 @@ PharoCopilotSetupPresenter >> titleLabel: anObject [
 PharoCopilotSetupPresenter >> performRemoteSetup [
 	| available |
 	self deferUI: [ statusLabel label: 'Connecting to your completion server...' ].
-	available := [ CopilotSettings activateHostedCompletion ] on: Error do: [ :ex | false ].
+	available := [ CopilotSettings activateHostedCompletion ] on: Error do: [ :ex | CopilotSettings recordRemoteConnectionFailure: ex. false ].
 	self deferUI: [
 		self setupProgressPercentage: (available ifTrue: [ 100 ] ifFalse: [ 0 ]).
 		available
@@ -859,7 +859,7 @@ PharoCopilotSetupPresenter >> performRemoteSetup [
 PharoCopilotSetupPresenter >> showRemoteConnectionFailedStep [
 	| retryButton tokenButton localButton |
 	titleLabel label: 'Cannot connect yet'.
-	descriptionLabel label: 'Your completion server is unavailable or your access has expired.'.
+	descriptionLabel label: CopilotSettings remoteConnectionFailure.
 	statusLabel label: 'Retry the connection or contact the person who provided your installer.'.
 	tokenButton := self newButton
 		label: 'Enter access token';

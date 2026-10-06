@@ -5,9 +5,16 @@ from contextlib import asynccontextmanager
 import hashlib
 import json
 import math
+import logging
+from logging.handlers import RotatingFileHandler
+from contextlib import suppress
 import os
 from pathlib import Path
 import time
+import uuid
+
+from experiment import record_completion
+from session_state import SessionState
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -35,15 +42,51 @@ def read_tokens():
     return records
 
 
+audit = logging.getLogger('copilot.audit')
+audit.setLevel(logging.INFO)
+
+
+def event(name, **fields):
+    audit.info(json.dumps({'timestamp': time.time(), 'event': name, **fields}))
+
+
+async def expire_sessions():
+    while True:
+        await asyncio.sleep(10)
+        try:
+            app.state.sessions.expire()
+        except (OSError, ValueError):
+            event('session_store_error')
+
+
 @asynccontextmanager
 async def lifespan(app):
     read_tokens()  # Fail closed at startup if credentials are missing/malformed.
+    log_file = Path(os.getenv('COPILOT_AUDIT_LOG', str(TOKEN_FILE.parent / 'admin-events.jsonl')))
+    log_file.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    handler = (logging.FileHandler(log_file) if os.getenv('COPILOT_EXPERIMENT_DIR')
+               else RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=5))
+    log_file.chmod(0o600)
+    audit.addHandler(handler)
+    app.state.sessions = SessionState(
+        os.getenv('COPILOT_SESSION_FILE', str(TOKEN_FILE.parent / 'sessions.json')),
+        timeout=int(os.getenv('COPILOT_SESSION_TIMEOUT', '300')), emit=event)
+    event('server_started')
+    expiry_task = asyncio.create_task(expire_sessions())
     app.state.client = httpx.AsyncClient(
         base_url=os.getenv('OLLAMA_URL', 'http://ollama:11434'),
         timeout=httpx.Timeout(55, connect=5), trust_env=False,
         limits=httpx.Limits(max_connections=4))
-    yield
-    await app.state.client.aclose()
+    try:
+        yield
+    finally:
+        expiry_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await expiry_task
+        await app.state.client.aclose()
+        event('server_stopped')
+        audit.removeHandler(handler)
+        handler.close()
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -71,11 +114,24 @@ async def authenticate(request: Request, call_next):
     hits = app.state.hits.setdefault(digest, deque())
     while hits and hits[0] <= now - 60:
         hits.popleft()
-    if len(hits) >= RPM:
+    if len(hits) >= RPM and request.url.path != '/api/session/close':
         return JSONResponse({'error': 'Rate limit exceeded'}, status_code=429,
                             headers={'Retry-After': '60'})
-    hits.append(now)
+    if request.url.path != '/api/session/close':
+        hits.append(now)
     request.state.identity = digest
+    request.state.user = record.get('user')
+    if request.url.path in SESSION_PATHS:
+        try:
+            failure = app.state.sessions.touch(
+                digest, record, request.headers.get('x-copilot-session', ''),
+                request.client.host if request.client else None)
+        except (OSError, ValueError):
+            event('session_store_error')
+            return JSONResponse({'error': 'Session store unavailable'}, status_code=503)
+        if failure:
+            code, message = failure
+            return JSONResponse({'error': message}, status_code=code)
     response = await call_next(request)
     response.headers['Cache-Control'] = 'no-store'
     return response
@@ -171,13 +227,71 @@ async def generate(request: Request):
     if identity in app.state.active or len(app.state.active) >= MAX_ACTIVE:
         raise HTTPException(429, 'Model busy', headers={'Retry-After': '2'})
     app.state.active.add(identity)
+    request_id = uuid.uuid4().hex
+    started = time.monotonic()
+    details = dict(request_id=request_id, token_id=identity,
+                   user=request.state.user,
+                   session_id=request.headers.get('x-copilot-session'))
     try:
+        save_completion(event='completion_started', **details, model=MODEL,
+                        prompt=prompt, options=safe)
         result = await upstream('/api/generate', {
             'model': MODEL, 'prompt': prompt, 'raw': True, 'stream': False,
             'keep_alive': '30m', 'options': safe})
-        return {k: result[k] for k in (
+        result = {k: result[k] for k in (
             'model', 'response', 'done', 'done_reason', 'created_at',
             'total_duration', 'load_duration', 'prompt_eval_count',
             'prompt_eval_duration', 'eval_count', 'eval_duration') if k in result}
+        save_completion(event='completion_finished', **details,
+                        duration_ms=round((time.monotonic() - started) * 1000, 2), result=result)
+        return result
+    except HTTPException as error:
+        save_completion(event='completion_failed', **details, status=error.status_code,
+                        duration_ms=round((time.monotonic() - started) * 1000, 2))
+        raise
     finally:
         app.state.active.remove(identity)
+
+
+SESSION_PATHS = {
+    '/api/tags', '/api/show', '/api/generate', '/api/session/heartbeat',
+    '/api/session/close', '/api/sessions', '/api/session-telemetry',
+    '/api/connections/register', '/api/connections/ping'}
+
+
+@app.post('/api/session/heartbeat')
+async def heartbeat():
+    return {'ok': True}
+
+
+@app.post('/api/session/close')
+async def close_session(request: Request):
+    app.state.sessions.close(request.state.identity)
+    return {'ok': True, 'status': 'closed'}
+
+
+@app.middleware('http')
+async def log_request(request: Request, call_next):
+    started = time.monotonic()
+    code = 500
+    try:
+        response = await call_next(request)
+        code = response.status_code
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    finally:
+        # No authorization, body, query string or arbitrary URL goes into the audit log.
+        event('request', method=request.method,
+              path=request.url.path if request.url.path in SESSION_PATHS | {'/'} else '<unknown>',
+              status=code, duration_ms=round((time.monotonic() - started) * 1000, 2),
+              peer=request.client.host if request.client else None,
+              token_id=getattr(request.state, 'identity', None),
+              user=getattr(request.state, 'user', None))
+
+
+def save_completion(**fields):
+    try:
+        record_completion(**fields)
+    except OSError:
+        event('completion_history_write_failed')
+        raise HTTPException(503, 'Completion history storage unavailable') from None

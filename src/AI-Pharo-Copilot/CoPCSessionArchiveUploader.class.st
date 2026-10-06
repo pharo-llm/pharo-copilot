@@ -317,6 +317,8 @@ CoPCSessionArchiveUploader >> authorizeConnection [
 	token := self class ensureUploadToken.
 	client := self newJsonClientForUrl: self class connectionRegistrationUrl.
 	client headerAt: 'Authorization' put: 'Bearer ' , token.
+	CopilotSettings remoteEnabled ifTrue: [
+		client headerAt: 'X-Copilot-Session' put: CoPCRemoteSession identifier ].
 	payload := Dictionary new
 		at: #userId put: CoPharoCopilotLogger userId;
 		at: #token put: token;
@@ -368,6 +370,8 @@ CoPCSessionArchiveUploader >> newTelemetrySummaryUploadClientForFile: file sessi
 	client headerAt: 'X-File-Name' put: file basename.
 	token := self class ensureUploadToken.
 	client headerAt: 'Authorization' put: 'Bearer ' , token.
+	CopilotSettings remoteEnabled ifTrue: [
+		client headerAt: 'X-Copilot-Session' put: CoPCRemoteSession identifier ].
 	sessionId ifNotNil: [
 		client headerAt: 'X-Session-Id' put: sessionId asString ].
 	userId ifNotNil: [
@@ -392,6 +396,8 @@ CoPCSessionArchiveUploader >> newUploadClientForFile: file sessionId: sessionId 
 	client headerAt: 'X-File-Name' put: file basename.
 	token := self class ensureUploadToken.
 	client headerAt: 'Authorization' put: 'Bearer ' , token.
+	CopilotSettings remoteEnabled ifTrue: [
+		client headerAt: 'X-Copilot-Session' put: CoPCRemoteSession identifier ].
 	sessionId ifNotNil: [
 		client headerAt: 'X-Session-Id' put: sessionId asString ].
 	userId ifNotNil: [

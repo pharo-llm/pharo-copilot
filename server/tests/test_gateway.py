@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import gateway as g
 
 TOKEN = 'test-token-with-at-least-thirty-two-characters'
-AUTH = {'Authorization': 'Bearer ' + TOKEN}
+AUTH = {'Authorization': 'Bearer ' + TOKEN, 'X-Copilot-Session': 'test-image-session-0001'}
 
 
 @pytest.fixture
