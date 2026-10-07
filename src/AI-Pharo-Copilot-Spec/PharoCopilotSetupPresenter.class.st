@@ -254,7 +254,7 @@ PharoCopilotSetupPresenter >> initializeWindow: aWindowPresenter [
 
 	aWindowPresenter
 		title: 'Pharo-Copilot Setup';
-		initialExtent: 460 @ 300;
+		initialExtent: 460 @ 340;
 		centered.
 
 ]
@@ -864,7 +864,7 @@ PharoCopilotSetupPresenter >> performRemoteSetup [
 PharoCopilotSetupPresenter >> showRemoteResearchConsentStep [
 	| yesButton noButton |
 	titleLabel label: 'Optional research data collection'.
-	descriptionLabel label: 'Cloud completion sends the code context needed for your request to the server for inference. Separately, may we retain completion requests and suggestions, together with usage and timing data, in the restricted experiment data folder for research? These records are associated with your server account and image session. If you decline, the server will still process cloud requests, but it will keep only the consent decision and operational counts and timings; it will not retain your code context or suggestions.'.
+	descriptionLabel label: 'Cloud requests send the code context needed to provide a completion. Separately, may we save your requests and suggestions for research? If you agree, usage and timing data are saved too. If you decline, cloud completion still works, but your code and suggestions are not saved for research.'.
 	statusLabel label: 'Your cloud connection is ready. Choose whether to share research data.'.
 	yesButton := self newButton
 		label: 'Yes, share research data';

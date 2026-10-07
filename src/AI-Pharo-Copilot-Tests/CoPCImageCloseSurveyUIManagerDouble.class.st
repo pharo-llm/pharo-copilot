@@ -33,28 +33,20 @@ CoPCImageCloseSurveyUIManagerDouble >> comments: aCollection [
 { #category : 'accessing' }
 CoPCImageCloseSurveyUIManagerDouble >> imageCloseSurveyFormWithSpec: surveySpec [
 
-	| requiredAnswerCount response ratingAnswers task experience comment |
+	| response rating choice |
 	requests add: (Dictionary new
 		at: #surveyFormSpec put: surveySpec;
 		yourself).
 
-	requiredAnswerCount := CoPCImageCloseSurvey surveyQuestions size + 2.
-	ratings size < requiredAnswerCount ifTrue: [ ^ nil ].
-
-	ratingAnswers := Dictionary new.
-	CoPCImageCloseSurvey surveyQuestions do: [ :question |
-		ratingAnswers at: question key put: ratings removeFirst ].
-	task := ratings removeFirst.
-	experience := ratings removeFirst.
-	comment := comments isEmpty
-		ifTrue: [ '' ]
-		ifFalse: [ comments removeFirst ].
+	ratings ifEmpty: [ ^ nil ].
+	rating := ratings removeFirst.
+	choice := CoPCImageCloseSurvey feedbackChoices
+		detect: [ :each | each key = rating ]
+		ifNone: [ ^ nil ].
 
 	response := Dictionary new
-		at: #ratings put: ratingAnswers;
-		at: #task put: task;
-		at: #experienceYears put: experience;
-		at: #feedbackComment put: comment;
+		at: #rating put: rating;
+		at: #feedbackLabel put: choice value;
 		yourself.
 	^ response
 ]

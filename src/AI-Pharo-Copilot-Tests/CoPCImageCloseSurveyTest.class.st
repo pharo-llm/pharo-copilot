@@ -134,33 +134,35 @@ CoPCImageCloseSurveyTest >> testLoggerCreatesStableUserIdAndNewSessionIds [
 ]
 
 { #category : 'tests' }
-CoPCImageCloseSurveyTest >> testPromptAndRecordContinuesWithBlankOptionalComment [
+CoPCImageCloseSurveyTest >> testPromptAndRecordStoresOneChoiceWithoutCommentOrCode [
 
 	CopilotSettings withDefaultSettingsDo: [
 		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
-			| ui ratings jsonLine parsed data |
+			| ui result jsonLine parsed data |
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: { 5. 5. 5. 5. #codeCompletion. 2 }.
-			ui comments: { '' }.
-			ratings := CoPCImageCloseSurvey promptAndRecordUsing: ui.
+			ui ratings: { 2 }.
+			result := CoPCImageCloseSurvey promptAndRecordUsing: ui.
 
-			self assert: ratings isNotNil.
+			self assert: (result at: #overall) equals: 2.
 			jsonLine := tempEvalFile readStreamDo: [ :stream | stream nextLine ].
 			parsed := STONJSON fromString: jsonLine.
 			data := parsed at: #data.
 
-			self assert: (data at: #feedbackComment) equals: ''
+			self assert: (data at: #feedbackRating) equals: 2.
+			self assert: (data at: #feedbackLabel) equals: 'Too slow'.
+			self deny: (data includesKey: #feedbackComment).
+			self deny: (data includesKey: #suggestion)
 		] ]
 ]
 
 { #category : 'tests' }
-CoPCImageCloseSurveyTest >> testPromptAndRecordRequiresEveryRequiredSurveyAnswer [
+CoPCImageCloseSurveyTest >> testPromptAndRecordRequiresAFeedbackChoice [
 
 	CopilotSettings withDefaultSettingsDo: [
 		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
 			| ui ratings |
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: { 5. 5. 5. 5. #codeCompletion }.
+			ui ratings: #().
 
 			ratings := CoPCImageCloseSurvey promptAndRecordUsing: ui.
 
@@ -171,49 +173,31 @@ CoPCImageCloseSurveyTest >> testPromptAndRecordRequiresEveryRequiredSurveyAnswer
 ]
 
 { #category : 'tests' }
-CoPCImageCloseSurveyTest >> testPromptAndRecordWritesImageCloseSurveyEvent [
+CoPCImageCloseSurveyTest >> testPromptAndRecordWritesSimpleFeedbackEvent [
 
 	CopilotSettings withDefaultSettingsDo: [
 		self withIsolatedLoggerSessionDo: [ :tempDir :tempEvalFile :sessionDir :archiveFile |
-			| ui ratings jsonLine parsed data storedRatings storedTasks userProfile surveySpec |
+			| ui result jsonLine parsed data surveySpec |
 			ui := CoPCImageCloseSurveyUIManagerDouble new.
-			ui ratings: { 4. 3. 5. 4. #codeCompletion. 5 }.
-			ui comments: { 'Useful overall, but speed varied.' }.
-			ratings := CoPCImageCloseSurvey promptAndRecordUsing: ui.
+			ui ratings: { 4 }.
+			result := CoPCImageCloseSurvey promptAndRecordUsing: ui.
 
 			self assert: ui requests size equals: 1.
 			surveySpec := ui requests first at: #surveyFormSpec.
-			self assert: (surveySpec at: #questions) size equals: CoPCImageCloseSurvey surveyQuestions size.
-			self assert: (surveySpec at: #ratingValues) equals: CoPCImageCloseSurvey ratingValues.
-			self assert: ((surveySpec at: #taskQuestion) last) equals: $*.
-			self assert: ((surveySpec at: #experienceQuestion) last) equals: $*.
-			self assert: (surveySpec at: #commentQuestion) equals: CoPCImageCloseSurvey optionalCommentFormTitle.
-			self assert: (ratings at: #overall) equals: 4.
-			self assert: (ratings at: #suggestionQuality) equals: 3.
+			self assert: (surveySpec at: #choices) equals: CoPCImageCloseSurvey feedbackChoices.
+			self assert: (result at: #overall) equals: 4.
 
 			jsonLine := tempEvalFile readStreamDo: [ :stream | stream nextLine ].
 			parsed := STONJSON fromString: jsonLine.
 			data := parsed at: #data.
-			storedRatings := data at: #ratings.
-			storedTasks := data at: #tasks.
-			userProfile := data at: #userProfile.
 
 			self assert: (parsed at: #event) equals: 'image-close-survey'.
 			self assert: (parsed at: #userId) equals: 'user-test'.
 			self assert: (parsed at: #sessionId) equals: sessionDir basename.
-			self assert: (storedRatings at: #overall) equals: 4.
-			self assert: (storedRatings at: #suggestionQuality) equals: 3.
-			self assert: (storedRatings at: #speed) equals: 5.
-			self assert: (storedRatings at: #usefulness) equals: 4.
-			self assert: (storedTasks includes: #codeCompletion).
-			self assert: storedTasks size equals: 1.
-			self deny: (userProfile includesKey: #role).
-			self assert: (userProfile at: #experienceYears) equals: 5.
-			self assert: (data at: #feedbackComment) equals: 'Useful overall, but speed varied.'.
-			self assert: ((data at: #availableTasks) includesKey: #codeCompletion).
-			self deny: (data includesKey: #availableUserRoles).
-			self assert: ((data at: #availableUserExperience) includesKey: '5').
-			self assert: ((data at: #questions) includesKey: #overall).
+			self assert: (data at: #feedbackRating) equals: 4.
+			self assert: (data at: #feedbackLabel) equals: 'Good'.
+			self deny: (data includesKey: #feedbackComment).
+			self deny: (data includesKey: #suggestion).
 			self assert: (data includesKey: #timestamp).
 			self assert: (data includesKey: #modelName)
 		] ]
@@ -229,10 +213,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitAppendsEveryCloseAttempt [
 				CoPCImageCloseSurvey resetPromptState.
 
 				ui := CoPCImageCloseSurveyUIManagerDouble new.
-				ui ratings: {
-					5. 5. 4. 5. #codeCompletion. 2.
-					4. 4. 4. 4. #debugging. 5 }.
-				ui comments: { 'First session feedback'. 'Second session feedback' }.
+				ui ratings: { 5. 4 }.
 				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 
@@ -265,7 +246,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitWritesOnceAndSkipsShutdownF
 				CoPCImageCloseSurvey resetPromptState.
 
 				ui := CoPCImageCloseSurveyUIManagerDouble new.
-				ui ratings: { 5. 5. 4. 5. #codeCompletion. 10 }.
+				ui ratings: { 5 }.
 				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 				CoPCImageCloseSurvey shutDown: true.
 
@@ -294,7 +275,7 @@ CoPCImageCloseSurveyTest >> testPromptBeforeImageQuitZipsSessionFolder [
 					stream nextPutAll: 'session marker' ].
 
 				ui := CoPCImageCloseSurveyUIManagerDouble new.
-				ui ratings: { 5. 5. 5. 5. #codeCompletion. 2 }.
+				ui ratings: { 5 }.
 				CoPCImageCloseSurvey promptBeforeImageQuitUsing: ui.
 
 				self assert: archiveFile exists.
@@ -353,31 +334,22 @@ CoPCImageCloseSurveyTest >> testSurveyEnabledSettingIsPersistedInSnapshots [
 ]
 
 { #category : 'tests' }
-CoPCImageCloseSurveyTest >> testSurveyPresenterRequiresAllRequiredAnswers [
+CoPCImageCloseSurveyTest >> testSurveyPresenterRequiresOneFeedbackChoice [
 
-	| presenter selections |
+	| presenter choices result |
 	presenter := CoPCImageCloseSurveyPresenter new.
 	self assert: presenter defaultLayout isNotNil.
 	self deny: presenter isComplete.
 
-	selections := presenter instVarNamed: #ratingSelections.
-	CoPCImageCloseSurvey surveyQuestions do: [ :question |
-		selections at: question key put: 5 ].
-	self deny: presenter isComplete.
-
-	(presenter instVarNamed: #taskDropList)
-		selectItem: CoPCImageCloseSurvey taskChoices first.
-	self deny: presenter isComplete.
-
-	(presenter instVarNamed: #experienceDropList)
-		selectItem: CoPCImageCloseSurvey userExperienceChoices first.
+	choices := CoPCImageCloseSurvey feedbackChoices.
+	(presenter instVarNamed: #feedbackDropList) selectItem: choices second.
 	self assert: presenter isComplete.
 
 	presenter submit.
 	self assert: presenter isDone.
-	self assert: (((presenter result at: #ratings) at: #overall)) equals: 5.
-	self assert: (presenter result at: #task) equals: CoPCImageCloseSurvey taskChoices first key.
-	self assert: (presenter result at: #experienceYears) equals: CoPCImageCloseSurvey userExperienceChoices first key
+	result := presenter result.
+	self assert: (result at: #rating) equals: 4.
+	self assert: (result at: #feedbackLabel) equals: 'Good'
 ]
 
 { #category : 'tests' }

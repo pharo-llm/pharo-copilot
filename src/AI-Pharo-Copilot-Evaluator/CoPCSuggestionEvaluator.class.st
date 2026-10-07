@@ -316,6 +316,7 @@ CoPCSuggestionEvaluator >> recordSuggestionAccepted: aCopilotEntry context: aCom
 	
 	acceptedEntries add: evaluationEntry.
 	self updateStats: evaluationEntry.
+	self appendEvaluationEntry: evaluationEntry.
 	self savePersistentStats.
 	
 	"Notify for potential model improvement"
@@ -335,6 +336,7 @@ CoPCSuggestionEvaluator >> recordSuggestionIgnored: aCopilotEntry context: aComp
 	
 	"For ignored suggestions, we don't add to either collection but update stats"
 	self updateStats: evaluationEntry.
+	self appendEvaluationEntry: evaluationEntry.
 	self savePersistentStats.
 ]
 
@@ -351,6 +353,7 @@ CoPCSuggestionEvaluator >> recordSuggestionRejected: aCopilotEntry context: aCom
 		yourself.
 	rejectedEntries add: evaluationEntry.
 	self updateStats: evaluationEntry.
+	self appendEvaluationEntry: evaluationEntry.
 	self savePersistentStats.
 	self announceEvaluation: evaluationEntry.
 ]

@@ -85,7 +85,7 @@ CoPCImageCloseSurveyPresenter >> initializePresenters [
 		label: 'Quick feedback';
 		yourself.
 	descriptionLabel := self newLabel
-		label: CoPCImageCloseSurvey feedbackQuestionTitle, ' (your rating and session ID are sent; no code is sent)';
+		label: 'How was this session? (rating only; no code sent)';
 		yourself.
 	feedbackDropList := self newDropList
 		items: CoPCImageCloseSurvey feedbackChoices;

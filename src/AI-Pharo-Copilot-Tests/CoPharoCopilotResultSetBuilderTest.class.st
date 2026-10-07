@@ -1,10 +1,28 @@
 Class {
 	#name : 'CoPharoCopilotResultSetBuilderTest',
 	#superclass : 'TestCase',
+	#instVars : [ 'settingsBeforeTest' ],
 	#category : 'AI-Pharo-Copilot-Tests-Tests',
 	#package : 'AI-Pharo-Copilot-Tests',
 	#tag : 'Tests'
 }
+
+{ #category : 'running' }
+CoPharoCopilotResultSetBuilderTest >> setUp [
+
+	settingsBeforeTest := CopilotSettings settingsSnapshot.
+	super setUp.
+	"Baseline post-load disables Copilot for users; these tests exercise the
+	completion path, so give each test an isolated enabled default configuration."
+	CopilotSettings resetToDefaultSettings
+]
+
+{ #category : 'running' }
+CoPharoCopilotResultSetBuilderTest >> tearDown [
+
+	[ CopilotSettings restoreSettingsFromSnapshot: settingsBeforeTest ] ensure: [
+		super tearDown ]
+]
 
 { #category : 'tests' }
 CoPharoCopilotResultSetBuilderTest >> testApplyContentDoesNothingOnSnapshotMismatch [
