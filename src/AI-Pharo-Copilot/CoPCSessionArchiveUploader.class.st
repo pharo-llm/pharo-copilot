@@ -10,6 +10,7 @@ Class {
 		'enabled',
 		'uploadUrl',
 		'uploadToken',
+		'researchUploadToken',
 		'timeoutSeconds'
 	],
 	#category : 'AI-Pharo-Copilot',
@@ -161,6 +162,7 @@ CoPCSessionArchiveUploader class >> resetDefaults [
 	enabled := nil.
 	uploadUrl := nil.
 	uploadToken := nil.
+	researchUploadToken := nil.
 	timeoutSeconds := nil
 ]
 
@@ -205,6 +207,103 @@ CoPCSessionArchiveUploader class >> timeoutSeconds [
 CoPCSessionArchiveUploader class >> timeoutSeconds: aNumber [
 
 	timeoutSeconds := aNumber
+]
+
+{ #category : 'uploading' }
+CoPCSessionArchiveUploader class >> recordResearchConsentAccepted: aBoolean [
+
+	| token client payload response uploadCredential |
+	CopilotSettings remoteEnabled ifFalse: [ ^ false ].
+	token := self ensureUploadToken.
+	client := self new newJsonClientForUrl: (self uploadUrlForEndpoint: '/api/research-consent').
+	client headerAt: 'Authorization' put: 'Bearer ', token.
+	client headerAt: 'X-Copilot-Session' put: CoPCRemoteSession identifier.
+	payload := Dictionary new at: #accepted put: (aBoolean = true); yourself.
+	[
+		client entity: (ZnEntity json: (STONJSON toString: payload)).
+		client execute.
+		((client respondsTo: #isSuccess) and: [ client isSuccess ]) ifFalse: [ ^ false ].
+		aBoolean ifFalse: [
+			self researchUploadToken: nil.
+			^ true ].
+		response := [ STONJSON fromString: client contents ] on: Error do: [ Dictionary new ].
+		uploadCredential := response
+			at: 'uploadToken'
+			ifAbsent: [ response at: #uploadToken ifAbsent: [ nil ] ].
+		(uploadCredential isString and: [ uploadCredential isEmpty not ]) ifFalse: [ ^ false ].
+		self researchUploadToken: uploadCredential.
+		^ true
+	] ensure: [
+		(client respondsTo: #close) ifTrue: [ [ client close ] on: Error do: [ :ignored | ] ] ]
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> researchUploadToken [
+
+	^ researchUploadToken ifNil: [ researchUploadToken := self researchUploadTokenFromDiskOrNil ]
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> researchUploadToken: aString [
+
+	researchUploadToken := aString.
+	aString
+		ifNil: [
+			| file |
+			file := self researchUploadTokenFileReference.
+			file exists ifTrue: [ file delete ] ]
+		ifNotNil: [ self saveResearchUploadToken: aString ]
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> researchUploadTokenFileReference [
+
+	^ CoPharoCopilotLogger ensureLogsDirectory / 'server-research-upload-token.txt'
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> researchUploadTokenFromDiskOrNil [
+
+	| file value |
+	file := self researchUploadTokenFileReference.
+	(file exists and: [ file isFile ]) ifFalse: [ ^ nil ].
+	value := [ file contents trimBoth ] on: Error do: [ '' ].
+	^ value isEmpty ifTrue: [ nil ] ifFalse: [ value ]
+]
+
+{ #category : 'accessing' }
+CoPCSessionArchiveUploader class >> saveResearchUploadToken: aString [
+
+	| file |
+	file := self researchUploadTokenFileReference.
+	file parent ifNotNil: [ :parent | parent ensureCreateDirectory ].
+	OSPlatform current isWindows ifFalse: [
+		file parent permissions: (FileSystemPermission posixPermissions: 8r700) ].
+	file ensureCreateFile.
+	OSPlatform current isWindows ifFalse: [
+		file permissions: (FileSystemPermission posixPermissions: 8r600) ].
+	file writeStreamDo: [ :stream |
+		stream truncate.
+		stream nextPutAll: aString ]
+]
+
+{ #category : 'uploading' }
+CoPCSessionArchiveUploader class >> submitFeedbackRating: rating label: label sessionId: sessionId [
+
+	| client payload |
+	CopilotSettings remoteEnabled ifFalse: [ ^ false ].
+	client := self new newJsonClientForUrl: (self uploadUrlForEndpoint: '/api/feedback').
+	payload := Dictionary new
+		at: #rating put: rating;
+		at: #label put: label;
+		at: #sessionId put: sessionId;
+		yourself.
+	[
+		client entity: (ZnEntity json: (STONJSON toString: payload)).
+		client execute.
+		^ (client respondsTo: #isSuccess) and: [ client isSuccess ]
+	] on: Error do: [ :ignored | false ] ensure: [
+		(client respondsTo: #close) ifTrue: [ [ client close ] on: Error do: [ :ignored | ] ] ]
 ]
 
 { #category : 'uploading' }
@@ -368,7 +467,10 @@ CoPCSessionArchiveUploader >> newTelemetrySummaryUploadClientForFile: file sessi
 	| client token |
 	client := self newJsonClientForUrl: self class telemetrySummaryUploadUrl.
 	client headerAt: 'X-File-Name' put: file basename.
-	token := self class ensureUploadToken.
+	token := CopilotSettings remoteEnabled
+		ifTrue: [ self class researchUploadToken ]
+		ifFalse: [ self class ensureUploadToken ].
+	token ifNil: [ self error: 'Research upload credential is unavailable' ].
 	client headerAt: 'Authorization' put: 'Bearer ' , token.
 	CopilotSettings remoteEnabled ifTrue: [
 		client headerAt: 'X-Copilot-Session' put: CoPCRemoteSession identifier ].
@@ -394,7 +496,10 @@ CoPCSessionArchiveUploader >> newUploadClientForFile: file sessionId: sessionId 
 
 	client headerAt: 'Content-Type' put: 'application/zip'.
 	client headerAt: 'X-File-Name' put: file basename.
-	token := self class ensureUploadToken.
+	token := CopilotSettings remoteEnabled
+		ifTrue: [ self class researchUploadToken ]
+		ifFalse: [ self class ensureUploadToken ].
+	token ifNil: [ self error: 'Research upload credential is unavailable' ].
 	client headerAt: 'Authorization' put: 'Bearer ' , token.
 	CopilotSettings remoteEnabled ifTrue: [
 		client headerAt: 'X-Copilot-Session' put: CoPCRemoteSession identifier ].

@@ -392,6 +392,12 @@ PharoCopilotSetupPresenter >> performSetupPipeline [
 	| authorized |
 	self setupProgressPercentage: 0.
 
+	"For cloud mode, connect first and ask about retained research data only after
+	the hosted completion endpoint has been verified."
+	CopilotSettings remoteEnabled ifTrue: [
+		self deferUI: [ statusLabel label: 'Connecting to your completion server...' ].
+		^ self performSetupDownloads ].
+
 	CopilotSettings researchTelemetryAccepted ifFalse: [
 		self deferUI: [ statusLabel label: (CopilotSettings remoteEnabled
 			ifTrue: [ 'Connecting to your completion server...' ]
@@ -596,8 +602,8 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
-	titleLabel label: 'Help improve AI code completion'.
-	descriptionLabel label: 'Can we collect anonymous usage data?'.
+	titleLabel label: 'Optional research data collection'.
+	descriptionLabel label: 'Can we collect usage data to study Pharo development?'.
 	statusLabel label: ''.
 
 	contentContainer layout: (self consentLayoutWith: self telemetryButtonRow).
@@ -624,7 +630,7 @@ PharoCopilotSetupPresenter >> telemetryButtonRow [
 		yourself.
 
 	yesButton := self newButton
-		label: 'Yes, share anonymous data';
+		label: 'Yes, share research data';
 		action: [
 			self handleResearchTelemetryAccepted.
 			self showScreenRecordingConsentStep ];
@@ -756,7 +762,7 @@ PharoCopilotSetupPresenter >> showConsentSummaryStep [
 	statusLabel label: ''.
 
 	telemetryStatus := self newLabel
-		label: 'Anonymous usage data: ', (CopilotSettings researchTelemetryAccepted
+		label: 'Research data collection: ', (CopilotSettings researchTelemetryAccepted
 			ifTrue: [ 'Enabled' ]
 			ifFalse: [ 'Disabled' ]);
 		yourself.
@@ -850,9 +856,47 @@ PharoCopilotSetupPresenter >> performRemoteSetup [
 		available
 			ifTrue: [
 				statusLabel label: CopilotSettings hostedSetupSuccessMessage.
-				CopilotSettings notifyUser: CopilotSettings hostedSetupSuccessMessage.
-				self window ifNotNil: [ :window | window close ] ]
+				self showRemoteResearchConsentStep ]
 			ifFalse: [ self showRemoteConnectionFailedStep ] ]
+]
+
+{ #category : 'initialization' }
+PharoCopilotSetupPresenter >> showRemoteResearchConsentStep [
+	| yesButton noButton |
+	titleLabel label: 'Optional research data collection'.
+	descriptionLabel label: 'Cloud completion sends the code context needed for your request to the server for inference. Separately, may we retain completion requests and suggestions, together with usage and timing data, in the restricted experiment data folder for research? These records are associated with your server account and image session. If you decline, the server will still process cloud requests, but it will keep only the consent decision and operational counts and timings; it will not retain your code context or suggestions.'.
+	statusLabel label: 'Your cloud connection is ready. Choose whether to share research data.'.
+	yesButton := self newButton
+		label: 'Yes, share research data';
+		action: [ self finishRemoteResearchConsentAccepted: true ];
+		yourself.
+	noButton := self newButton
+		label: 'No, thanks';
+		action: [ self finishRemoteResearchConsentAccepted: false ];
+		yourself.
+	contentContainer layout: (SpBoxLayout newTopToBottom
+		spacing: 12;
+		add: yesButton expand: false;
+		add: noButton expand: false;
+		yourself).
+	self layout: self defaultLayout
+]
+
+{ #category : 'actions' }
+PharoCopilotSetupPresenter >> finishRemoteResearchConsentAccepted: accepted [
+	| decisionRecorded |
+	accepted
+		ifTrue: [ self handleResearchTelemetryAccepted ]
+		ifFalse: [ self handleResearchTelemetryDeclined ].
+	statusLabel label: 'Saving your choice...'.
+	decisionRecorded := [
+		CoPCSessionArchiveUploader recordResearchConsentAccepted: accepted
+	] on: Error do: [ false ].
+	self deferUI: [
+		decisionRecorded ifFalse: [
+			statusLabel label: 'Your choice is saved on this image, but the server could not record it yet. Research collection remains off on the server.'.
+			CopilotSettings notifyUser: statusLabel label ].
+		self window ifNotNil: [ :window | window close ] ]
 ]
 
 { #category : 'initialization' }

@@ -44,6 +44,11 @@ still lets setup continue.
 **If you explicitly agree, Pharo-Copilot can send anonymous IDE interaction events
 to the Inria-hosted research.**
 
+The optional end-of-session feedback prompt is separate: choosing **Send feedback**
+sends only the selected rating and random session ID, without code context. It can
+still be submitted when the completion token is expired, as long as the server is
+running.
+
 ## Troubleshooting Ollama model downloads
 
 If setup downloads a model but it does not appear in `ollama list`, verify that Pharo-Copilot and your terminal are talking to the same Ollama server and model store. On Linux, the system service often runs as the `ollama` user and stores models under `/usr/share/ollama/.ollama/models`, while an `ollama serve` process launched from Pharo can use your user account's `~/.ollama/models`. Also check whether `OLLAMA_HOST` or `OLLAMA_MODELS` differs between Pharo and your shell.

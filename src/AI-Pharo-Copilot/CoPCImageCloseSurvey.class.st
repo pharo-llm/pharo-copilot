@@ -149,18 +149,13 @@ CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> collectSurveyResponseSequentiallyUsing: uiManager [
 
-	| ratings tasks userProfile feedbackComment |
-	ratings := self collectRatingsUsing: uiManager.
-	ratings ifNil: [ ^ nil ].
-	tasks := self collectTasksUsing: uiManager.
-	userProfile := self collectUserProfileUsing: uiManager.
-	feedbackComment := self askOptionalCommentUsing: uiManager.
-
+	| rating choice |
+	rating := self askQuestion: (#overall -> self feedbackQuestionTitle) using: uiManager.
+	rating ifNil: [ ^ nil ].
+	choice := self feedbackChoices detect: [ :each | each key = rating ] ifNone: [ ^ nil ].
 	^ Dictionary new
-		at: #ratings put: ratings;
-		at: #tasks put: tasks;
-		at: #userProfile put: userProfile;
-		at: #feedbackComment put: feedbackComment;
+		at: #rating put: rating;
+		at: #feedbackLabel put: choice value;
 		yourself
 ]
 
@@ -252,19 +247,35 @@ CoPCImageCloseSurvey class >> optionalCommentWindowTitle [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> promptAndRecordUsing: uiManager [
 
-	| response ratings tasks userProfile feedbackComment |
+	| response rating |
 	response := self collectSurveyResponseUsing: uiManager.
 	response ifNil: [ ^ nil ].
-	ratings := response at: #ratings.
-	tasks := response at: #tasks.
-	userProfile := response at: #userProfile.
-	feedbackComment := response at: #feedbackComment.
-	self
-		recordRatings: ratings
-		tasks: tasks
-		userProfile: userProfile
-		feedbackComment: feedbackComment.
-	^ ratings
+	rating := response at: #rating.
+	self recordSimpleFeedback: response.
+	^ Dictionary new at: #overall put: rating; yourself
+]
+
+{ #category : 'logging' }
+CoPCImageCloseSurvey class >> recordSimpleFeedback: response [
+
+	| rating data |
+	rating := response at: #rating.
+	CoPharoCopilotLogger loggingEnabled ifTrue: [
+		data := Dictionary new
+			at: #userId put: CoPharoCopilotLogger userId;
+			at: #sessionId put: CoPharoCopilotLogger currentSessionId;
+			at: #timestamp put: DateAndTime now asString;
+			at: #modelName put: CopilotSettings modelName;
+			at: #ratings put: (Dictionary new at: #overall put: rating; yourself);
+			at: #feedbackRating put: rating;
+			at: #feedbackLabel put: (response at: #feedbackLabel);
+			yourself.
+		CoPharoCopilotLogger appendEvaluationEvent: 'image-close-survey' data: data ].
+	[ CoPCSessionArchiveUploader
+		submitFeedbackRating: rating
+		label: (response at: #feedbackLabel)
+		sessionId: CoPharoCopilotLogger currentSessionId ]
+		on: Error do: [ :ignored | false ]
 ]
 
 { #category : 'survey' }
@@ -462,7 +473,7 @@ CoPCImageCloseSurvey class >> startUp: isImageStarting [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> surveyFormDescription [
 
-	^ 'Questions marked * are required. Comment is optional.'
+	^ 'Choose one answer, or skip. No comment or extra details are requested.'
 ]
 
 { #category : 'survey' }
@@ -472,17 +483,27 @@ CoPCImageCloseSurvey class >> surveyFormSpec [
 		at: #title put: self surveyFormWindowTitle;
 		at: #heading put: self surveyFormTitle;
 		at: #description put: self surveyFormDescription;
-		at: #questions put: self surveyQuestions;
-		at: #ratingValues put: self ratingValues;
-		at: #ratingLowLabel put: self ratingLowAnchorLabel;
-		at: #ratingHighLabel put: self ratingHighAnchorLabel;
-		at: #taskQuestion put: (self requiredQuestionTitle: self taskQuestionTitle);
-		at: #taskChoices put: self taskChoices;
-		at: #experienceQuestion put: (self requiredQuestionTitle: self userExperienceQuestionTitle);
-		at: #experienceChoices put: self userExperienceChoices;
-		at: #commentQuestion put: self optionalCommentFormTitle;
-		at: #requiredMessage put: self surveyRequiredMessage;
+		at: #question put: self feedbackQuestionTitle;
+		at: #choices put: self feedbackChoices;
 		yourself
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> feedbackChoices [
+
+	^ {
+		5 -> 'Excellent'.
+		4 -> 'Good'.
+		3 -> 'Okay'.
+		2 -> 'Too slow'.
+		1 -> 'Poor'
+	}
+]
+
+{ #category : 'survey' }
+CoPCImageCloseSurvey class >> feedbackQuestionTitle [
+
+	^ 'How was Pharo-Copilot this session?'
 ]
 
 { #category : 'survey' }
@@ -547,17 +568,14 @@ CoPCImageCloseSurvey class >> surveyPayloadForRatings: aDictionary tasks: taskCo
 CoPCImageCloseSurvey class >> surveyQuestions [
 
 	^ {
-		#overall -> 'Overall, how would you rate Pharo Copilot this session?'.
-		#suggestionQuality -> 'How would you rate the quality of the suggestions?'.
-		#speed -> 'How would you rate Copilot response speed?'.
-		#usefulness -> 'How useful was Copilot for your coding this session?'
+		#overall -> self feedbackQuestionTitle
 	}
 ]
 
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> surveyRequiredMessage [
 
-	^ 'Please answer every question marked with * before submitting.'
+	^ 'Choose one answer or skip the feedback form.'
 ]
 
 { #category : 'survey' }
@@ -707,39 +725,17 @@ CoPCImageCloseSurvey class >> validatedRating: anObject [
 { #category : 'private' }
 CoPCImageCloseSurvey class >> validatedSurveyResponse: anObject [
 
-	| ratingsInput ratings rating task experience profile comment |
+	| rating label |
 	anObject ifNil: [ ^ nil ].
 	(anObject respondsTo: #at:ifAbsent:) ifFalse: [ ^ nil ].
-
-	ratingsInput := anObject at: #ratings ifAbsent: [ nil ].
-	(ratingsInput respondsTo: #at:ifAbsent:) ifFalse: [ ^ nil ].
-
-	ratings := Dictionary new.
-	self surveyQuestions do: [ :question |
-		rating := self validatedRating:
-			(ratingsInput at: question key ifAbsent: [ nil ]).
-		rating ifNil: [ ^ nil ].
-		ratings at: question key put: rating ].
-
-	task := self validatedTask:
-		(self taskValueFromSurveyResponse: anObject).
-	task ifNil: [ ^ nil ].
-
-	experience := self validatedUserExperience:
-		(self userExperienceValueFromSurveyResponse: anObject).
-	experience ifNil: [ ^ nil ].
-
-	profile := Dictionary new
-		at: #experienceYears put: experience;
-		yourself.
-	comment := self validatedOptionalComment:
-		(anObject at: #feedbackComment ifAbsent: [ '' ]).
-
+	rating := self validatedRating: (anObject at: #rating ifAbsent: [ nil ]).
+	rating ifNil: [ ^ nil ].
+	label := self feedbackChoices
+		detect: [ :choice | choice key = rating ]
+		ifNone: [ ^ nil ].
 	^ Dictionary new
-		at: #ratings put: ratings;
-		at: #tasks put: { task };
-		at: #userProfile put: profile;
-		at: #feedbackComment put: (comment ifNil: [ '' ]);
+		at: #rating put: rating;
+		at: #feedbackLabel put: (anObject at: #feedbackLabel ifAbsent: [ label value ]);
 		yourself
 ]
 

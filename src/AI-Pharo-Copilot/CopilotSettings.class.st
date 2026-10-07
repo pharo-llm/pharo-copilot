@@ -1885,6 +1885,8 @@ CopilotSettings class >> requestDisableAnonymousResearchTelemetry [
 
 	(self confirmViaUIManager: self researchTelemetryDisablePrompt) = true ifFalse: [ ^ true ].
 	self recordResearchTelemetryConsentAccepted: false.
+	self remoteEnabled ifTrue: [
+		[ CoPCSessionArchiveUploader recordResearchConsentAccepted: false ] on: Error do: [ :ignored | ] ].
 	self notifyUser: 'Anonymous research telemetry disabled', String cr,
 		'Pharo Copilot will no longer collect or transmit research telemetry.'.
 	^ false
@@ -1897,6 +1899,8 @@ CopilotSettings class >> requestEnableAnonymousResearchTelemetry [
 		self declineResearchTelemetryIfNotAsked.
 		^ false ].
 	self recordResearchTelemetryConsentAccepted: true.
+	self remoteEnabled ifTrue: [
+		[ CoPCSessionArchiveUploader recordResearchConsentAccepted: true ] on: Error do: [ :ignored | ] ].
 	self notifyUser: 'Thank you for participating', String cr,
 		'Anonymous research telemetry is now enabled.', String cr,
 		'You can disable it at any time from Pharo Copilot settings.'.
@@ -1978,13 +1982,14 @@ CopilotSettings class >> researchTelemetryEnabledStatusText [
 CopilotSettings class >> researchTelemetryFirstLaunchText [
 
 	^ 'Pharo researchers and engineers are studying how developers use Pharo and its development tools.', String cr,
-		'With your permission, Pharo Copilot can send anonymous interaction events about IDE tool usage to an Inria-hosted research server.', String cr,
+		'With your permission, Pharo Copilot can send IDE interaction events to an Inria-hosted research server. If you use cloud completion, a separate choice controls whether your completion requests and suggestions are retained for research.', String cr,
 		String cr,
 		'- Participation is voluntary.', String cr,
 		'- Telemetry is OFF by default.', String cr,
 		'- No research telemetry is sent unless you explicitly agree.', String cr,
-		'- Events describe tool interactions, not your source-code contents.', String cr,
-		'- Anonymous submitted data may become part of a public research dataset.', String cr,
+		'- IDE events do not contain source code.', String cr,
+		'- Cloud completion always sends the required code context to the server for inference; research retention of that context and generated suggestions requires a separate explicit choice after connection.', String cr,
+		'- Submitted research data is stored in restricted experiment folders.', String cr,
 		'- You can disable telemetry later in Settings.'
 ]
 
@@ -1997,18 +2002,18 @@ CopilotSettings class >> researchTelemetryLearnMoreText [
 		'Researchers have limited quantitative information about how Pharo development tools are used in real projects. Anonymous telemetry can help improve existing tools, evaluate new features, and support reproducible software-engineering research.', String cr,
 		String cr,
 		'What may be collected?', String cr,
-		'Anonymous interaction events such as opening development tools, opening debugger windows, using debugger actions and buttons, browsing code, using IDE commands, copy/paste interaction events, interacting with Pharo libraries and tools, and using newly introduced Pharo features.', String cr,
+		'IDE interaction events such as opening development tools, using debugger actions, browsing code, and using Pharo tools. If you separately agree after a successful cloud connection, the restricted experiment store may also retain the completion request context, generated suggestion, and timing metadata. These records are linked to a pseudonymous token identifier and image session; server account details are retained in access logs.', String cr,
 		String cr,
 		'Events may include a UTC timestamp, a randomly generated identifier, an interaction type, and references linking related events when necessary.', String cr,
 		String cr,
-		'What is not intended to be collected?', String cr,
-		'Your name, email address, account credentials, passwords, authentication tokens, sensitive personal information, or source-code contents.', String cr,
+		'What is not collected when you decline cloud research collection?', String cr,
+		'Cloud inference still processes the context needed to answer your request, but the research history does not retain that context or the generated suggestion. The server keeps your consent decision and operational counts and timings. Authentication tokens are never written to research history.', String cr,
 		String cr,
 		'Where does the data go?', String cr,
-		'If you agree, telemetry is transmitted to infrastructure hosted by Inria. The collected data may be used to create an anonymous public research dataset about Pharo development practices.', String cr,
+		'Accepted data is stored in the restricted experiment directory on the configured Pharo Copilot server. This setup does not publish the data.', String cr,
 		String cr,
 		'Can you withdraw?', String cr,
-		'Yes. You can disable telemetry at any time from Pharo Copilot settings. Disabling telemetry stops future collection and transmission. Because submitted events are anonymous, previously submitted events may not be individually removable.', String cr,
+		'You can disable telemetry at any time from Pharo Copilot settings. Disabling stops future research retention and archive uploads. Previously stored experiment records are not automatically removed.', String cr,
 		String cr,
 		'Who is responsible?', String cr,
 		'Members of the Pharo Consortium and researchers from Inria''s EVREF team.', String cr,
@@ -2412,7 +2417,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 					getSelector: #imageCloseSurveyEnabled;
 					setSelector: #imageCloseSurveyEnabled:;
 					default: self imageCloseSurveyEnabled;
-					description: 'Only active when anonymous usage research is enabled. When enabled, Copilot asks a short feedback form before the Pharo image quits.'.
+					description: 'When research logging is enabled, ask one optional dropdown feedback question before the Pharo image quits.'.
 
 				(aBuilder setting: #autoInstallModelScriptEnabled)
 					order: 0.4;
