@@ -720,7 +720,7 @@ CopilotSettings class >> initializeDefaults [
 	temperature := 0.2.
 	topP := 0.9.
 	topK := 40.
-	numPredict := 32.
+	numPredict := 64.
 	repeatPenalty := 1.1.
 	numCtx := 4096.
 	seed := 0.
@@ -1560,9 +1560,9 @@ CopilotSettings class >> numCtx: anIntegerOrNil [
 
 { #category : 'ollama' }
 CopilotSettings class >> numPredict [
-	"Answer the num_predict parameter for Ollama (max tokens to generate). Default: 32 keeps inline completions fast."
+	"Answer the num_predict parameter for Ollama (max tokens to generate). Default: 64 leaves room for complete Smalltalk expressions."
 
-	^ numPredict ifNil: [ numPredict := 32 ]
+	^ numPredict ifNil: [ numPredict := 64 ]
 ]
 
 { #category : 'ollama' }
@@ -2595,7 +2595,7 @@ CopilotSettings class >> settingsOn: aBuilder [
 								getSelector: #numPredict;
 								setSelector: #numPredict:;
 								default: self numPredict;
-								description: 'Maximum number of tokens to generate (1 to 2048). Default: 32. Lower values respond faster.'.
+								description: 'Maximum number of tokens to generate (1 to 2048). Default: 64. Short completions stop early; too small a limit can cut off expressions.'.
 
 							(aBuilder setting: #repeatPenalty)
 								order: 5;
@@ -2850,8 +2850,6 @@ CopilotSettings class >> upgradeLegacyCompletionDefaults [
 		completionDebounceMilliseconds := 0 ].
 	completionIdleMilliseconds = 300 ifTrue: [
 		completionIdleMilliseconds := 75 ].
-	numPredict = 64 ifTrue: [
-		numPredict := 32 ].
 	maxInstanceMethods = 10 ifTrue: [
 		maxInstanceMethods := 6 ].
 	maxClassMethods = 5 ifTrue: [

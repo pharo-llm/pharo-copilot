@@ -193,7 +193,7 @@ CopilotSettingsTest >> testFastCompletionDefaults [
 	CopilotSettings withDefaultSettingsDo: [
 		self assert: CopilotSettings completionDebounceMilliseconds equals: 0.
 		self assert: CopilotSettings completionIdleMilliseconds equals: 75.
-		self assert: CopilotSettings numPredict equals: 32.
+		self assert: CopilotSettings numPredict equals: 64.
 		self assert: CopilotSettings completionLogprobsEnabled.
 		self assert: CopilotSettings completionTopLogprobs equals: 1.
 		self assert: CopilotSettings maxInstanceMethods equals: 6.
@@ -843,7 +843,7 @@ CopilotSettingsTest >> testRestoreSerializableSettingsUpgradesLegacyCompletionDe
 
 		self assert: CopilotSettings completionDebounceMilliseconds equals: 0.
 		self assert: CopilotSettings completionIdleMilliseconds equals: 75.
-		self assert: CopilotSettings numPredict equals: 32.
+		self assert: CopilotSettings numPredict equals: 64.
 		self assert: CopilotSettings maxInstanceMethods equals: 6.
 		self assert: CopilotSettings maxClassMethods equals: 3.
 		self assert: CopilotSettings completionTopLogprobs equals: 1

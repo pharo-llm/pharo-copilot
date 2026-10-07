@@ -570,16 +570,19 @@ CoPharoCopilotResultSetBuilderTest >> testCompletionEntriesUseFallbackWhenNoAISu
 ]
 
 { #category : 'tests' }
-CoPharoCopilotResultSetBuilderTest >> testCompletionGenerationPolicyUsesSmallBudgetsForShortRoutes [
+CoPharoCopilotResultSetBuilderTest >> testCompletionGenerationPolicyRespectsConfiguredBudgetForEveryRoute [
 
-	| policy |
-	policy := CoPCCompletionGenerationPolicy new.
-
-	self assert: (policy numPredictFor: #selector) equals: 32.
-	self assert: (policy numPredictFor: #messageTail) equals: 32.
-	self assert: (policy numPredictFor: #variable) equals: 8.
-	self assert: (policy numPredictFor: #statement) equals: 24.
-	self assert: (policy numPredictFor: #unknown) equals: 24
+	CopilotSettings withDefaultSettingsDo: [
+		| builder |
+		builder := CoPharoCopilotResultSetBuilder new.
+		#( 16 64 128 ) do: [ :budget |
+			CopilotSettings numPredict: budget.
+			#( selector messageTail variable statement unknown ) do: [ :route |
+				| options |
+				options := builder generationOptionsForContextInfo:
+					(Dictionary new at: #completionRoute put: route; yourself).
+				self assert: (options at: #num_predict) equals: budget ].
+			self assert: ((builder generationOptionsForContextInfo: nil) at: #num_predict) equals: budget ] ]
 ]
 
 { #category : 'tests' }

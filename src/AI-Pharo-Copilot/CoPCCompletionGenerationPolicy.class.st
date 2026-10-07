@@ -11,12 +11,8 @@ Class {
 { #category : 'generation' }
 CoPCCompletionGenerationPolicy >> numPredictFor: completionRoute [
 
-	"selector routes cover partial message sends (e.g. `self ass`) and need
-	 enough room to finish an entire Smalltalk send such as `self assert: ...`.
-	 messageTail is kept for forward-compatibility but routes the same budget."
-	completionRoute = #selector ifTrue: [ ^ 32 ].
-	completionRoute = #messageTail ifTrue: [ ^ 32 ].
-	completionRoute = #variable ifTrue: [ ^ 8 ].
-	completionRoute = #statement ifTrue: [ ^ 24 ].
-	^ 24
+	"A textual route cannot predict the length of a complete Smalltalk expression.
+	Respect the configured budget, including for a partial variable or selector;
+	the model's FIM stop tokens can still end a short completion immediately."
+	^ CopilotSettings numPredict
 ]
