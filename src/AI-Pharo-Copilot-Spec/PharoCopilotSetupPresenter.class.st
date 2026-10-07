@@ -61,9 +61,9 @@ PharoCopilotSetupPresenter >> defaultLayout [
 		  spacing: 6;
 		  borderWidth: 8;
 		  add: titleLabel expand: false;
-		  add: descriptionLabel expand: false;
+		  add: descriptionLabel height: 60;
 		  add: contentContainer expand: true;
-		  add: statusLabel expand: false;
+		  add: statusLabel height: 48;
 		  yourself
 ]
 
@@ -135,7 +135,7 @@ PharoCopilotSetupPresenter >> handleScreenRecordingDeclined [
 PharoCopilotSetupPresenter >> continueSetupAfterConsentDecision [
 
 	self showDownloadStep.
-	statusLabel label: (CopilotSettings remoteEnabled
+	statusLabel text: (CopilotSettings remoteEnabled
 		ifTrue: [ 'Connecting to your completion server...' ]
 		ifFalse: [ CopilotSettings researchTelemetryAccepted
 		ifTrue: [ 'Authorizing server connection...' ]
@@ -152,12 +152,16 @@ PharoCopilotSetupPresenter >> initializePresenters [
 		label: 'Welcome to Pharo-Copilot';
 		yourself.
 
-	descriptionLabel := self newLabel
-		label: '';
+	descriptionLabel := self newText
+		beNotEditable;
+		beWrapWord;
+		text: '';
 		yourself.
 
-	statusLabel := self newLabel
-		label: '';
+	statusLabel := self newText
+		beNotEditable;
+		beWrapWord;
+		text: '';
 		yourself.
 
 	setupProgress := 0.
@@ -178,8 +182,8 @@ PharoCopilotSetupPresenter >> initializePresenters [
 PharoCopilotSetupPresenter >> showConnectionChoiceStep [
 	| cloudButton localButton |
 	titleLabel label: 'Welcome to Pharo-Copilot'.
-	descriptionLabel label: 'Choose where to run your completion model.'.
-	statusLabel label: ''.
+	descriptionLabel text: 'Choose where to run your completion model.'.
+	statusLabel text: ''.
 	cloudButton := self newButton
 		label: 'Use cloud (access token required)';
 		action: [ self showAccessTokenStep ];
@@ -202,16 +206,15 @@ PharoCopilotSetupPresenter >> showConnectionChoiceStep [
 PharoCopilotSetupPresenter >> handleLocalModelSelected [
 
 	CopilotSettings useLocalModels.
-	self showDownloadStep.
-	self startSetupDownloads
+	self showResearchTelemetryConsentChoiceStep
 ]
 
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showAccessTokenStep [
 	| tokenInput connectButton backButton |
 	titleLabel label: 'Connect to Pharo-Copilot cloud'.
-	descriptionLabel label: 'Cloud access requires a token from your administrator.'.
-	statusLabel label: ''.
+	descriptionLabel text: 'Cloud access requires a token from your administrator.'.
+	statusLabel text: ''.
 	tokenInput := self newTextInput.
 	connectButton := self newButton
 		label: 'Connect';
@@ -227,12 +230,11 @@ PharoCopilotSetupPresenter >> showAccessTokenStep [
 						ifTrue: [ CopilotSettings remoteServerSecure ] ifFalse: [ false ]).
 				true
 			] on: Error do: [ :error |
-				statusLabel label: 'Could not save the token. Check the token and try again.'.
+				statusLabel text: 'Could not save the token. Check the token and try again.'.
 				false ].
 			configured ifTrue: [
 				tokenInput text: ''.
-				self showDownloadStep.
-				self startSetupDownloads ] ];
+				self showResearchTelemetryConsentChoiceStep ] ];
 		yourself.
 	backButton := self newButton
 		label: 'Back';
@@ -268,14 +270,14 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		^ self performRemoteSetup ].
 
 	self setupProgressPercentage: 0.
-	self deferUI: [ statusLabel label: '' ].
+	self deferUI: [ statusLabel text: '' ].
 
 	response := CopilotSettings listModelsForSetupAfterLaunchingOllamaIfNeeded.
 
 	response ifNil: [
 		self setupProgressPercentage: 0.
 		^ self deferUI: [
-			statusLabel label: 'Cannot continue. Ollama is required.'.
+			statusLabel text: 'Cannot continue. Ollama is required.'.
 			self showMissingOllamaStep
 		]
 	].
@@ -289,7 +291,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		CopilotSettings installCompletionEngineIfAvailable.
 		self setupProgressPercentage: 100.
 		^ self deferUI: [
-			statusLabel label: 'OKAY! Pharo-Copilot setup is complete.'.
+			statusLabel text: 'OKAY! Pharo-Copilot setup is complete.'.
 			CopilotSettings notifyUser: 'OKAY! Pharo-Copilot setup is complete.'.
 			self window ifNotNil: [ :window | window close ]
 		]
@@ -299,10 +301,10 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 		self
 			beginIndeterminateProgressForIndex: 1
 			total: missingModels size.
-		descriptionLabel label:
+		descriptionLabel text:
 			('Downloading {1} model(s):'
 				format: { missingModels size }).
-		statusLabel label:
+		statusLabel text:
 			('Downloading 1/{1}: {2}'
 				format: { missingModels size. missingModels first })
 	].
@@ -316,7 +318,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 			self
 				beginIndeterminateProgressForIndex: index
 				total: missingModels size.
-			statusLabel label:
+			statusLabel text:
 				(self
 					setupDownloadingMessageFor: modelName
 					index: index
@@ -341,7 +343,7 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 
 		self deferUI: [
 			self setupProgressPercentage: ((index / missingModels size) * 100) rounded.
-			statusLabel label:
+			statusLabel text:
 				(verified
 					ifTrue: [
 						self
@@ -376,11 +378,11 @@ PharoCopilotSetupPresenter >> performSetupDownloads [
 				CopilotSettings copilotEnabled: true.
 				CopilotSettings installCompletionEngineIfAvailable.
 				self setupProgressPercentage: 100.
-				statusLabel label: 'Pharo-Copilot setup is complete.'.
+				statusLabel text: 'Pharo-Copilot setup is complete.'.
 				CopilotSettings notifyUser: 'Pharo-Copilot setup is complete.'.
 				self window ifNotNil: [ :window | window close ] ]
 			ifFalse: [
-				statusLabel label:
+				statusLabel text:
 					('Setup finished with {1}/{2} model(s) not available in Ollama. Check the message above, Ollama logs, and ''ollama list''.'
 						format: { failedModels size. missingModels size }) ]
 	]
@@ -395,17 +397,17 @@ PharoCopilotSetupPresenter >> performSetupPipeline [
 	"For cloud mode, connect first and ask about retained research data only after
 	the hosted completion endpoint has been verified."
 	CopilotSettings remoteEnabled ifTrue: [
-		self deferUI: [ statusLabel label: 'Connecting to your completion server...' ].
+		self deferUI: [ statusLabel text: 'Connecting to your completion server...' ].
 		^ self performSetupDownloads ].
 
 	CopilotSettings researchTelemetryAccepted ifFalse: [
-		self deferUI: [ statusLabel label: (CopilotSettings remoteEnabled
+		self deferUI: [ statusLabel text: (CopilotSettings remoteEnabled
 			ifTrue: [ 'Connecting to your completion server...' ]
 			ifFalse: [ 'Anonymous research telemetry disabled. Continuing local setup.' ]) ].
 		(Delay forMilliseconds: 500) wait.
 		^ self performSetupDownloads ].
 
-	self deferUI: [ statusLabel label: 'Authorizing server connection...' ].
+	self deferUI: [ statusLabel text: 'Authorizing server connection...' ].
 
 	authorized := [
 		CoPCSessionArchiveUploader ensureInternetUploadUrl.
@@ -421,13 +423,13 @@ PharoCopilotSetupPresenter >> performSetupPipeline [
 
 	authorized ifFalse: [
 		self deferUI: [
-			statusLabel label: 'Connection denied. Continuing setup.'.
+			statusLabel text: 'Connection denied. Continuing setup.'.
 			CopilotSettings notifyUser: 'Connection denied. Continuing setup.' ].
 		(Delay forMilliseconds: 500) wait.
 		^ self performSetupDownloads ].
 
 	self deferUI: [
-		statusLabel label: 'Connection authorized. Continuing setup.'.
+		statusLabel text: 'Connection authorized. Continuing setup.'.
 		CopilotSettings notifyUser: 'Connection authorized. Continuing setup.' ].
 	(Delay forMilliseconds: 500) wait.
 	self performSetupDownloads
@@ -506,10 +508,10 @@ PharoCopilotSetupPresenter >> setupProgressPercentage: aNumber [
 PharoCopilotSetupPresenter >> showDownloadStep [
 
 	titleLabel label: 'Setting up Pharo-Copilot'.
-	descriptionLabel label: (CopilotSettings remoteEnabled
+	descriptionLabel text: (CopilotSettings remoteEnabled
 		ifTrue: [ 'Connecting to your completion server...' ]
 		ifFalse: [ 'Checking Ollama and installed local models...' ]).
-	statusLabel label: ''.
+	statusLabel text: ''.
 
 	self setupProgressPercentage: 0.
 
@@ -525,13 +527,15 @@ PharoCopilotSetupPresenter >> showDownloadStep [
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showMissingOllamaStep [
 
-	| messageLabel installButton centeredRow centeredColumn |
+	| messageLabel installButton |
 	titleLabel label: 'Ollama Required'.
-	descriptionLabel label: 'Pharo-Copilot needs Ollama to continue.'.
-	statusLabel label: 'Setup could not continue without Ollama.'.
+	descriptionLabel text: 'Pharo-Copilot needs Ollama to continue.'.
+	statusLabel text: 'Setup could not continue without Ollama.'.
 
-	messageLabel := self newLabel
-		label: CopilotSettings missingOllamaSetupMessage;
+	messageLabel := self newText
+		beNotEditable;
+		beWrapWord;
+		text: CopilotSettings missingOllamaSetupMessage;
 		yourself.
 
 	installButton := self newButton
@@ -539,24 +543,11 @@ PharoCopilotSetupPresenter >> showMissingOllamaStep [
 		action: [ WebBrowser openOn: CopilotSettings ollamaDownloadPageUrl ];
 		yourself.
 
-	centeredRow := SpBoxLayout newLeftToRight
-		add: SpNullPresenter new expand: true;
-		add: (SpBoxLayout newTopToBottom
-			spacing: 12;
-			add: messageLabel expand: false;
-			add: installButton expand: false;
-			yourself)
-		expand: false;
-		add: SpNullPresenter new expand: true;
-		yourself.
-
-	centeredColumn := SpBoxLayout newTopToBottom
-		add: SpNullPresenter new expand: true;
-		add: centeredRow expand: false;
-		add: SpNullPresenter new expand: true;
-		yourself.
-
-	contentContainer layout: centeredColumn.
+	contentContainer layout: (SpBoxLayout newTopToBottom
+		spacing: 12;
+		add: messageLabel expand: true;
+		add: installButton expand: false;
+		yourself).
 	self layout: self defaultLayout
 ]
 
@@ -596,15 +587,15 @@ PharoCopilotSetupPresenter >> showPullEvent: event forModel: modelName index: in
 				total: totalModels ].
 		percent ifNotNil: [
 			self setupProgressPercentage: overall ].
-		statusLabel label: message ]
+		statusLabel text: message ]
 ]
 
 { #category : 'initialization' }
 PharoCopilotSetupPresenter >> showResearchTelemetryConsentChoiceStep [
 
 	titleLabel label: 'Optional research data collection'.
-	descriptionLabel label: 'Can we collect usage data to study Pharo development?'.
-	statusLabel label: ''.
+	descriptionLabel text: 'May we share session logs, code requests, suggestions and usage data for research? This is optional for both local and cloud models.'.
+	statusLabel text: ''.
 
 	contentContainer layout: (self consentLayoutWith: self telemetryButtonRow).
 
@@ -636,11 +627,11 @@ PharoCopilotSetupPresenter >> telemetryButtonRow [
 			self showScreenRecordingConsentStep ];
 		yourself.
 
-	^ SpBoxLayout newHorizontal
+	^ SpBoxLayout newTopToBottom
 		spacing: 10;
-		add: learnMoreButton;
-		add: noButton;
-		add: yesButton;
+		add: learnMoreButton expand: false;
+		add: noButton expand: false;
+		add: yesButton expand: false;
 		yourself
 ]
 
@@ -649,8 +640,8 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 
 	| detailsText backButton buttonRow |
 	titleLabel label: 'Anonymous Usage Research'.
-	descriptionLabel label: 'Details about the Pharo usage research project.'.
-	statusLabel label: 'Use the scroll bar to read the full study information.'.
+	descriptionLabel text: 'Details about the Pharo usage research project.'.
+	statusLabel text: 'Use the scroll bar to read the full study information.'.
 
 	detailsText := self newText.
 	detailsText
@@ -680,8 +671,8 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 PharoCopilotSetupPresenter >> showScreenRecordingConsentStep [
 
 	titleLabel label: 'Can we record your screen?'.
-	descriptionLabel label: 'Optional screen recordings help researchers understand how developers use AI code completion.'.
-	statusLabel label: ''.
+	descriptionLabel text: 'Optional screen recordings help researchers understand how developers use AI code completion.'.
+	statusLabel text: ''.
 
 	contentContainer layout: (self consentLayoutWith: self screenRecordingButtonRow).
 
@@ -713,11 +704,11 @@ PharoCopilotSetupPresenter >> screenRecordingButtonRow [
 			self showConsentSummaryStep ];
 		yourself.
 
-	^ SpBoxLayout newHorizontal
+	^ SpBoxLayout newTopToBottom
 		spacing: 10;
-		add: learnMoreButton;
-		add: noButton;
-		add: yesButton;
+		add: learnMoreButton expand: false;
+		add: noButton expand: false;
+		add: yesButton expand: false;
 		yourself
 ]
 
@@ -726,8 +717,8 @@ PharoCopilotSetupPresenter >> showScreenRecordingLearnMoreStepReturningTo: retur
 
 	| detailsText backButton buttonRow |
 	titleLabel label: 'Screen Recording'.
-	descriptionLabel label: 'Details about screen recording for research.'.
-	statusLabel label: 'Use the scroll bar to read the full information.'.
+	descriptionLabel text: 'Details about screen recording for research.'.
+	statusLabel text: 'Use the scroll bar to read the full information.'.
 
 	detailsText := self newText.
 	detailsText
@@ -758,8 +749,8 @@ PharoCopilotSetupPresenter >> showConsentSummaryStep [
 
 	| telemetryStatus recordingStatus continueButton |
 	titleLabel label: 'You''re ready to go'.
-	descriptionLabel label: 'Pharo Copilot setup is ready to continue.'.
-	statusLabel label: ''.
+	descriptionLabel text: 'Pharo Copilot setup is ready to continue.'.
+	statusLabel text: ''.
 
 	telemetryStatus := self newLabel
 		label: 'Research data collection: ', (CopilotSettings researchTelemetryAccepted
@@ -793,10 +784,10 @@ PharoCopilotSetupPresenter >> showWelcomeStep [
 
 	| continueButton |
 	titleLabel label: 'Welcome to Pharo-Copilot'.
-	descriptionLabel label: (CopilotSettings remoteEnabled
+	descriptionLabel text: (CopilotSettings remoteEnabled
 		ifTrue: [ 'Code context is sent securely to your completion server.' ]
 		ifFalse: [ 'Local AI-powered code completion for Pharo.' ]).
-	statusLabel label: ''.
+	statusLabel text: ''.
 
 	continueButton := self newButton
 		label: 'Continue';
@@ -849,14 +840,14 @@ PharoCopilotSetupPresenter >> titleLabel: anObject [
 { #category : 'accessing' }
 PharoCopilotSetupPresenter >> performRemoteSetup [
 	| available |
-	self deferUI: [ statusLabel label: 'Connecting to your completion server...' ].
+	self deferUI: [ statusLabel text: 'Connecting to your completion server...' ].
 	available := [ CopilotSettings activateHostedCompletion ] on: Error do: [ :ex | CopilotSettings recordRemoteConnectionFailure: ex. false ].
 	self deferUI: [
 		self setupProgressPercentage: (available ifTrue: [ 100 ] ifFalse: [ 0 ]).
 		available
 			ifTrue: [
-				statusLabel label: CopilotSettings hostedSetupSuccessMessage.
-				self showRemoteResearchConsentStep ]
+				statusLabel text: CopilotSettings hostedSetupSuccessMessage.
+				self finishRemoteResearchConsentAccepted: CopilotSettings researchTelemetryAccepted ]
 			ifFalse: [ self showRemoteConnectionFailedStep ] ]
 ]
 
@@ -864,8 +855,8 @@ PharoCopilotSetupPresenter >> performRemoteSetup [
 PharoCopilotSetupPresenter >> showRemoteResearchConsentStep [
 	| yesButton noButton |
 	titleLabel label: 'Optional research data collection'.
-	descriptionLabel label: 'Cloud requests send the code context needed to provide a completion. Separately, may we save your requests and suggestions for research? If you agree, usage and timing data are saved too. If you decline, cloud completion still works, but your code and suggestions are not saved for research.'.
-	statusLabel label: 'Your cloud connection is ready. Choose whether to share research data.'.
+	descriptionLabel text: 'Cloud requests send the code context needed to provide a completion. Separately, may we save your requests and suggestions for research? If you agree, usage and timing data are saved too. If you decline, cloud completion still works, but your code and suggestions are not saved for research.'.
+	statusLabel text: 'Your cloud connection is ready. Choose whether to share research data.'.
 	yesButton := self newButton
 		label: 'Yes, share research data';
 		action: [ self finishRemoteResearchConsentAccepted: true ];
@@ -888,14 +879,14 @@ PharoCopilotSetupPresenter >> finishRemoteResearchConsentAccepted: accepted [
 	accepted
 		ifTrue: [ self handleResearchTelemetryAccepted ]
 		ifFalse: [ self handleResearchTelemetryDeclined ].
-	statusLabel label: 'Saving your choice...'.
+	statusLabel text: 'Saving your choice...'.
 	decisionRecorded := [
 		CoPCSessionArchiveUploader recordResearchConsentAccepted: accepted
 	] on: Error do: [ false ].
 	self deferUI: [
 		decisionRecorded ifFalse: [
-			statusLabel label: 'Your choice is saved on this image, but the server could not record it yet. Research collection remains off on the server.'.
-			CopilotSettings notifyUser: statusLabel label ].
+			statusLabel text: 'Your choice is saved on this image, but the server could not record it yet. Research collection remains off on the server.'.
+			CopilotSettings notifyUser: statusLabel text ].
 		self window ifNotNil: [ :window | window close ] ]
 ]
 
@@ -903,8 +894,8 @@ PharoCopilotSetupPresenter >> finishRemoteResearchConsentAccepted: accepted [
 PharoCopilotSetupPresenter >> showRemoteConnectionFailedStep [
 	| retryButton tokenButton localButton |
 	titleLabel label: 'Cannot connect yet'.
-	descriptionLabel label: CopilotSettings remoteConnectionFailure.
-	statusLabel label: 'Retry the connection or contact the person who provided your installer.'.
+	descriptionLabel text: CopilotSettings remoteConnectionFailure.
+	statusLabel text: 'Retry the connection or contact the person who provided your installer.'.
 	tokenButton := self newButton
 		label: 'Enter access token';
 		action: [

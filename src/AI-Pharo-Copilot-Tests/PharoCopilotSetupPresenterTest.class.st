@@ -13,14 +13,14 @@ PharoCopilotSetupPresenterTest >> testSetupStartsWithConnectionChoiceWithoutChan
 		| presenter snapshot |
 		snapshot := CopilotSettings settingsSnapshot.
 		presenter := PharoCopilotSetupPresenter new.
-		self assert: presenter descriptionLabel label
+		self assert: presenter descriptionLabel text
 			equals: 'Choose where to run your completion model.'.
 		self assert: CopilotSettings settingsSnapshot equals: snapshot.
 		presenter showAccessTokenStep.
-		self assert: (presenter descriptionLabel label includesSubstring: 'requires a token').
+		self assert: (presenter descriptionLabel text includesSubstring: 'requires a token').
 		self assert: CopilotSettings settingsSnapshot equals: snapshot.
 		presenter showConnectionChoiceStep.
-		self assert: presenter descriptionLabel label
+		self assert: presenter descriptionLabel text
 			equals: 'Choose where to run your completion model.' ]
 ]
 
@@ -45,6 +45,11 @@ PharoCopilotSetupPresenterTest >> testLocalChoiceAfterCloudFailureChecksModelsWi
 		presenter := CoPCSetupPresenterDouble new.
 		presenter showRemoteConnectionFailedStep.
 		presenter handleLocalModelSelected.
+		self assert: presenter titleLabel label equals: 'Optional research data collection'.
+		self assert: client pullCount equals: 0.
+		presenter handleResearchTelemetryDeclined.
+		presenter handleScreenRecordingDeclined.
+		presenter handleOk.
 		self deny: CopilotSettings remoteEnabled.
 		self assert: CopilotSettings host equals: '127.0.0.1'.
 		self assert: CopilotSettings port equals: 11434.
@@ -78,6 +83,11 @@ PharoCopilotSetupPresenterTest >> testLocalChoiceDownloadsMissingModelBeforeEnab
 		CopilotSettings ollamaClientFactory: [ client ].
 		presenter := CoPCSetupPresenterDouble new.
 		presenter handleLocalModelSelected.
+		self assert: presenter titleLabel label equals: 'Optional research data collection'.
+		self assert: client pullCount equals: 0.
+		presenter handleResearchTelemetryDeclined.
+		presenter handleScreenRecordingDeclined.
+		presenter handleOk.
 		self assert: client pullCount equals: 1.
 		self assert: CopilotSettings copilotEnabled.
 		self assert: presenter progressBarValue equals: 1 ]
@@ -135,4 +145,14 @@ PharoCopilotSetupPresenterTest >> testTelemetryLearnMoreUsesReadOnlyTextForLineB
 	self assert: CopilotSettings researchTelemetryLearnMoreText lines size > 1.
 	self assert: (source includesSubstring: 'newText').
 	self assert: (source includesSubstring: 'beNotEditable')
+]
+
+{ #category : 'tests' }
+PharoCopilotSetupPresenterTest >> testSetupDescriptionsWrapWithinTheWindow [
+	| presenter |
+	presenter := PharoCopilotSetupPresenter new.
+	self assert: presenter descriptionLabel isWrapWord.
+	self assert: presenter statusLabel isWrapWord.
+	self deny: presenter descriptionLabel isEditable.
+	self deny: presenter statusLabel isEditable
 ]
