@@ -1,5 +1,5 @@
 "
-A short, optional image-close feedback prompt with one dropdown.
+A short, optional image-close feedback prompt: the task worked on and one rating.
 "
 Class {
 	#name : 'CoPCImageCloseSurveyPresenter',
@@ -7,6 +7,8 @@ Class {
 	#instVars : [
 		'titleLabel',
 		'descriptionLabel',
+		'taskLabel',
+		'taskDropList',
 		'feedbackDropList',
 		'statusLabel',
 		'submitButton',
@@ -68,6 +70,8 @@ CoPCImageCloseSurveyPresenter >> defaultLayout [
 		spacing: 12;
 		borderWidth: 16;
 		add: titleLabel expand: false;
+		add: taskLabel expand: false;
+		add: taskDropList expand: false;
 		add: descriptionLabel expand: false;
 		add: feedbackDropList expand: false;
 		add: buttons expand: false;
@@ -84,8 +88,17 @@ CoPCImageCloseSurveyPresenter >> initializePresenters [
 	titleLabel := self newLabel
 		label: 'Quick feedback';
 		yourself.
+	taskLabel := self newLabel
+		label: CoPCImageCloseSurvey taskQuestionTitle;
+		yourself.
+	taskDropList := self newDropList
+		items: CoPCImageCloseSurvey taskChoices;
+		display: [ :choice | choice value ];
+		whenSelectedItemChangedDo: [ :ignored | self updateSubmitButtonState ];
+		yourself.
+	taskDropList resetSelection.
 	descriptionLabel := self newLabel
-		label: 'How was this session? (rating only; no code sent)';
+		label: 'How was this session? (task and rating only; no code sent)';
 		yourself.
 	feedbackDropList := self newDropList
 		items: CoPCImageCloseSurvey feedbackChoices;
@@ -111,7 +124,7 @@ CoPCImageCloseSurveyPresenter >> initializeWindow: aWindowPresenter [
 	super initializeWindow: aWindowPresenter.
 	aWindowPresenter
 		title: 'Pharo-Copilot feedback';
-		initialExtent: 480 @ 250;
+		initialExtent: 480 @ 330;
 		centered.
 	(aWindowPresenter respondsTo: #whenClosedDo:) ifTrue: [
 		aWindowPresenter whenClosedDo: [
@@ -121,7 +134,8 @@ CoPCImageCloseSurveyPresenter >> initializeWindow: aWindowPresenter [
 { #category : 'testing' }
 CoPCImageCloseSurveyPresenter >> isComplete [
 
-	^ feedbackDropList notNil and: [ feedbackDropList selectedItem notNil ]
+	^ (feedbackDropList notNil and: [ feedbackDropList selectedItem notNil ])
+		and: [ taskDropList notNil and: [ taskDropList selectedItem notNil ] ]
 ]
 
 { #category : 'testing' }
@@ -139,12 +153,15 @@ CoPCImageCloseSurveyPresenter >> result [
 { #category : 'actions' }
 CoPCImageCloseSurveyPresenter >> submit [
 
-	| selection |
+	| selection task |
 	selection := feedbackDropList selectedItem.
 	selection ifNil: [ ^ self ].
+	task := taskDropList selectedItem.
+	task ifNil: [ ^ self ].
 	result := Dictionary new
 		at: #rating put: selection key;
 		at: #feedbackLabel put: selection value;
+		at: #task put: task key;
 		yourself.
 	done := true.
 	self window ifNotNil: [ :windowPresenter | windowPresenter close ]

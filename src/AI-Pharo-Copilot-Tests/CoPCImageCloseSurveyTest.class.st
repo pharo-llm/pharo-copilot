@@ -343,13 +343,33 @@ CoPCImageCloseSurveyTest >> testSurveyPresenterRequiresOneFeedbackChoice [
 
 	choices := CoPCImageCloseSurvey feedbackChoices.
 	(presenter instVarNamed: #feedbackDropList) selectItem: choices second.
+	self deny: presenter isComplete.
+	(presenter instVarNamed: #taskDropList) selectItem: CoPCImageCloseSurvey taskChoices second.
 	self assert: presenter isComplete.
 
 	presenter submit.
 	self assert: presenter isDone.
 	result := presenter result.
 	self assert: (result at: #rating) equals: 4.
-	self assert: (result at: #feedbackLabel) equals: 'Good'
+	self assert: (result at: #feedbackLabel) equals: 'Good'.
+	self assert: (result at: #task) equals: #debugging
+]
+
+{ #category : 'tests' }
+CoPCImageCloseSurveyTest >> testSurveyResponseKeepsOnlyAKnownTask [
+
+	| response |
+	response := CoPCImageCloseSurvey validatedSurveyResponse: (Dictionary new
+		at: #rating put: 4;
+		at: #task put: 'debugging';
+		yourself).
+	self assert: (response at: #task) equals: #debugging.
+
+	response := CoPCImageCloseSurvey validatedSurveyResponse: (Dictionary new
+		at: #rating put: 4;
+		at: #task put: 'somethingElse';
+		yourself).
+	self deny: (response includesKey: #task)
 ]
 
 { #category : 'tests' }

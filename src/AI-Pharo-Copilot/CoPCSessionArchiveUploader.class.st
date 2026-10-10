@@ -290,6 +290,17 @@ CoPCSessionArchiveUploader class >> saveResearchUploadToken: aString [
 { #category : 'uploading' }
 CoPCSessionArchiveUploader class >> submitFeedbackRating: rating label: label sessionId: sessionId [
 
+	^ self
+		submitFeedbackRating: rating
+		label: label
+		sessionId: sessionId
+		task: nil
+]
+
+{ #category : 'uploading' }
+CoPCSessionArchiveUploader class >> submitFeedbackRating: rating label: label sessionId: sessionId task: task [
+	"Send the rating and, when given, the kind of task the user worked on. Never code."
+
 	| client payload |
 	CopilotSettings remoteEnabled ifFalse: [ ^ false ].
 	client := self new newJsonClientForUrl: (self uploadUrlForEndpoint: '/api/feedback').
@@ -298,11 +309,14 @@ CoPCSessionArchiveUploader class >> submitFeedbackRating: rating label: label se
 		at: #label put: label;
 		at: #sessionId put: sessionId;
 		yourself.
-	[
-		client entity: (ZnEntity json: (STONJSON toString: payload)).
-		client execute.
-		^ (client respondsTo: #isSuccess) and: [ client isSuccess ]
-	] on: Error do: [ :ignored | false ] ensure: [
+	task ifNotNil: [ payload at: #task put: task asString ].
+	^ [
+		[
+			client entity: (ZnEntity json: (STONJSON toString: payload)).
+			client execute.
+			(client respondsTo: #isSuccess) and: [ client isSuccess ]
+		] on: Error do: [ :ignored | false ]
+	] ensure: [
 		(client respondsTo: #close) ifTrue: [ [ client close ] on: Error do: [ :ignored | ] ] ]
 ]
 

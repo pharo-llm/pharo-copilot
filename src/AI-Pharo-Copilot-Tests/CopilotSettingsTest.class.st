@@ -674,7 +674,6 @@ CopilotSettingsTest >> testRecordResearchTelemetryConsentWritesEvaluationJsonEnt
 			self assert: ((parsed at: #data) at: #consentState) equals: #accepted.
 			self assert: ((parsed at: #data) at: #consentSubject) equals: #anonymousResearchTelemetry.
 			self assert: ((parsed at: #data) at: #dataCollectionConsentState) equals: #accepted.
-			self assert: ((parsed at: #data) at: #screenRecordingConsentState) equals: #notAsked.
 			self assert: (((parsed at: #data) at: #consentPurpose) includesSubstring: 'Collect anonymous IDE interaction events').
 			self assert: (((parsed at: #data) at: #consentNotice) includesSubstring: 'Telemetry is OFF by default').
 			self assert: (((parsed at: #data) at: #consentDetails) includesSubstring: 'About the Pharo Usage Research Project').
@@ -690,29 +689,6 @@ CopilotSettingsTest >> testRecordResearchTelemetryConsentWritesEvaluationJsonEnt
 			CoPharoCopilotLogger instVarNamed: #sessionId put: originalSessionId.
 			CoPharoCopilotLogger instVarNamed: #sessionStartedAt put: originalStartedAt.
 			CoPharoCopilotLogger instVarNamed: #sessionArchived put: originalArchived ] ]
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testRecordScreenRecordingConsentWritesEvaluationJsonEntry [
-
-	CopilotSettings withDefaultSettingsDo: [
-		self withTemporaryEvaluationLogDo: [ :tempEvalFile :sessionDir |
-			| jsonLine parsed |
-			CopilotSettings recordScreenRecordingConsentAccepted: true.
-
-			jsonLine := tempEvalFile readStreamDo: [ :stream | stream nextLine ].
-			parsed := STONJSON fromString: jsonLine.
-			self assert: (parsed at: #event) equals: 'screen-recording-consent'.
-			self assert: (parsed at: #userId) equals: 'user-test'.
-			self assert: (parsed at: #sessionId) equals: sessionDir basename.
-			self assert: ((parsed at: #data) at: #accepted) equals: true.
-			self assert: ((parsed at: #data) at: #consentState) equals: #accepted.
-			self assert: ((parsed at: #data) at: #consentSubject) equals: #screenRecording.
-			self assert: ((parsed at: #data) at: #dataCollectionConsentState) equals: #notAsked.
-			self assert: ((parsed at: #data) at: #screenRecordingConsentState) equals: #accepted.
-			self assert: (((parsed at: #data) at: #consentNotice) includesSubstring: 'Raw videos will not be made public').
-			self assert: (((parsed at: #data) at: #consentDetails) includesSubstring: 'Will recordings be made public?').
-			self deny: CopilotSettings loggingEnabled ] ]
 ]
 
 { #category : 'tests' }
@@ -864,33 +840,6 @@ CopilotSettingsTest >> testRestoreSettingsMigratesNullModelToDefaultCompletionMo
 ]
 
 { #category : 'tests' }
-CopilotSettingsTest >> testScreenRecordingConsentAccepted [
-
-	CopilotSettings withDefaultSettingsDo: [
-		CopilotSettings recordScreenRecordingConsentAccepted: true.
-		self assert: CopilotSettings screenRecordingAccepted.
-		self assert: CopilotSettings screenRecordingConsentState equals: #accepted ]
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testScreenRecordingConsentDeclined [
-
-	CopilotSettings withDefaultSettingsDo: [
-		CopilotSettings recordScreenRecordingConsentAccepted: true.
-		CopilotSettings recordScreenRecordingConsentAccepted: false.
-		self deny: CopilotSettings screenRecordingAccepted.
-		self assert: CopilotSettings screenRecordingConsentState equals: #declined ]
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testScreenRecordingDefaultsToOff [
-
-	CopilotSettings withDefaultSettingsDo: [
-		self deny: CopilotSettings screenRecordingAccepted.
-		self assert: CopilotSettings screenRecordingConsentState equals: #notAsked ]
-]
-
-{ #category : 'tests' }
 CopilotSettingsTest >> testShouldShowDetailedSettingsReflectsCopilotEnabled [ 
     | old |
     old := CopilotSettings copilotEnabled.
@@ -935,18 +884,6 @@ CopilotSettingsTest >> testUnknownResearchTelemetryConsentStateDisablesLogging [
 		self deny: CopilotSettings anonymousResearchTelemetryEnabled.
 		self deny: CopilotSettings loggingEnabled.
 		self assert: CopilotSettings researchTelemetryConsentState equals: #declined ]
-]
-
-{ #category : 'tests' }
-CopilotSettingsTest >> testUnknownScreenRecordingConsentStateDeclined [
-
-	CopilotSettings withDefaultSettingsDo: [
-		| snapshot |
-		snapshot := CopilotSettings settingsSnapshot.
-		snapshot at: #screenRecordingConsentState put: #unexpected.
-		CopilotSettings restoreSettingsFromSnapshot: snapshot.
-		self deny: CopilotSettings screenRecordingAccepted.
-		self assert: CopilotSettings screenRecordingConsentState equals: #declined ]
 ]
 
 { #category : 'tests' }

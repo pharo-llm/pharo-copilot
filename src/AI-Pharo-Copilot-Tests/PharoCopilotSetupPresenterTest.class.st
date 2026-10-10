@@ -48,7 +48,6 @@ PharoCopilotSetupPresenterTest >> testLocalChoiceAfterCloudFailureChecksModelsWi
 		self assert: presenter titleLabel label equals: 'Optional research data collection'.
 		self assert: client pullCount equals: 0.
 		presenter handleResearchTelemetryDeclined.
-		presenter handleScreenRecordingDeclined.
 		presenter handleOk.
 		self deny: CopilotSettings remoteEnabled.
 		self assert: CopilotSettings host equals: '127.0.0.1'.
@@ -86,7 +85,6 @@ PharoCopilotSetupPresenterTest >> testLocalChoiceDownloadsMissingModelBeforeEnab
 		self assert: presenter titleLabel label equals: 'Optional research data collection'.
 		self assert: client pullCount equals: 0.
 		presenter handleResearchTelemetryDeclined.
-		presenter handleScreenRecordingDeclined.
 		presenter handleOk.
 		self assert: client pullCount equals: 1.
 		self assert: CopilotSettings copilotEnabled.
@@ -99,27 +97,12 @@ PharoCopilotSetupPresenterTest >> testSetupButtonLayoutsDoNotUseFixedWidths [
 	#(
 		consentLayoutWith:
 		telemetryButtonRow
-		screenRecordingButtonRow
 		showResearchTelemetryLearnMoreStepReturningTo:
-		showScreenRecordingLearnMoreStepReturningTo:
 		showConsentSummaryStep
 	) do: [ :selector |
 		self deny:
 			((PharoCopilotSetupPresenter sourceCodeAt: selector)
 				includesSubstring: 'width:') ]
-]
-
-{ #category : 'tests' }
-PharoCopilotSetupPresenterTest >> testShowWelcomeStepDoesNotRecordScreenRecordingDecisionWhenNotAsked [
-
-	CopilotSettings withDefaultSettingsDo: [
-		| presenter |
-		presenter := PharoCopilotSetupPresenter new.
-		presenter showWelcomeStep.
-
-		self assert: CopilotSettings screenRecordingConsentState equals: #notAsked.
-		self deny: CopilotSettings screenRecordingAccepted.
-		self deny: CopilotSettings screenRecordingDeclined ]
 ]
 
 { #category : 'tests' }

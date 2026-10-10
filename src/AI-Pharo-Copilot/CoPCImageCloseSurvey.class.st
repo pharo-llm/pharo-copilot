@@ -149,14 +149,17 @@ CoPCImageCloseSurvey class >> collectRatingsUsing: uiManager [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> collectSurveyResponseSequentiallyUsing: uiManager [
 
-	| rating choice |
+	| rating choice response task |
 	rating := self askQuestion: (#overall -> self feedbackQuestionTitle) using: uiManager.
 	rating ifNil: [ ^ nil ].
 	choice := self feedbackChoices detect: [ :each | each key = rating ] ifNone: [ ^ nil ].
-	^ Dictionary new
+	response := Dictionary new
 		at: #rating put: rating;
 		at: #feedbackLabel put: choice value;
-		yourself
+		yourself.
+	task := self askTaskUsing: uiManager.
+	task ifNotNil: [ response at: #task put: task ].
+	^ response
 ]
 
 { #category : 'survey' }
@@ -258,8 +261,10 @@ CoPCImageCloseSurvey class >> promptAndRecordUsing: uiManager [
 { #category : 'logging' }
 CoPCImageCloseSurvey class >> recordSimpleFeedback: response [
 
-	| rating data |
+	| rating data task tasks |
 	rating := response at: #rating.
+	task := self validatedTask: (self taskValueFromSurveyResponse: response).
+	tasks := task ifNil: [ #() ] ifNotNil: [ { task } ].
 	CoPharoCopilotLogger loggingEnabled ifTrue: [
 		data := Dictionary new
 			at: #userId put: CoPharoCopilotLogger userId;
@@ -269,12 +274,15 @@ CoPCImageCloseSurvey class >> recordSimpleFeedback: response [
 			at: #ratings put: (Dictionary new at: #overall put: rating; yourself);
 			at: #feedbackRating put: rating;
 			at: #feedbackLabel put: (response at: #feedbackLabel);
+			at: #availableTasks put: self availableTaskLabelsByKey;
+			at: #tasks put: tasks;
 			yourself.
 		CoPharoCopilotLogger appendEvaluationEvent: 'image-close-survey' data: data ].
 	[ CoPCSessionArchiveUploader
 		submitFeedbackRating: rating
 		label: (response at: #feedbackLabel)
-		sessionId: CoPharoCopilotLogger currentSessionId ]
+		sessionId: CoPharoCopilotLogger currentSessionId
+		task: task ]
 		on: Error do: [ :ignored | false ]
 ]
 
@@ -473,7 +481,7 @@ CoPCImageCloseSurvey class >> startUp: isImageStarting [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> surveyFormDescription [
 
-	^ 'Choose one answer, or skip. No comment or extra details are requested.'
+	^ 'Choose the task you worked on and one rating, or skip. No comment or code is requested.'
 ]
 
 { #category : 'survey' }
@@ -485,6 +493,8 @@ CoPCImageCloseSurvey class >> surveyFormSpec [
 		at: #description put: self surveyFormDescription;
 		at: #question put: self feedbackQuestionTitle;
 		at: #choices put: self feedbackChoices;
+		at: #taskQuestion put: self taskQuestionTitle;
+		at: #taskChoices put: self taskChoices;
 		yourself
 ]
 
@@ -575,7 +585,7 @@ CoPCImageCloseSurvey class >> surveyQuestions [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> surveyRequiredMessage [
 
-	^ 'Choose one answer or skip the feedback form.'
+	^ 'Choose a task and a rating, or skip the feedback form.'
 ]
 
 { #category : 'survey' }
@@ -610,7 +620,7 @@ CoPCImageCloseSurvey class >> taskLabels [
 { #category : 'survey' }
 CoPCImageCloseSurvey class >> taskQuestionTitle [
 
-	^ 'Which task did you perform this session?'
+	^ 'What type of task did you mainly work on this session?'
 ]
 
 { #category : 'private' }
@@ -725,7 +735,7 @@ CoPCImageCloseSurvey class >> validatedRating: anObject [
 { #category : 'private' }
 CoPCImageCloseSurvey class >> validatedSurveyResponse: anObject [
 
-	| rating label |
+	| rating label response task |
 	anObject ifNil: [ ^ nil ].
 	(anObject respondsTo: #at:ifAbsent:) ifFalse: [ ^ nil ].
 	rating := self validatedRating: (anObject at: #rating ifAbsent: [ nil ]).
@@ -733,10 +743,13 @@ CoPCImageCloseSurvey class >> validatedSurveyResponse: anObject [
 	label := self feedbackChoices
 		detect: [ :choice | choice key = rating ]
 		ifNone: [ ^ nil ].
-	^ Dictionary new
+	response := Dictionary new
 		at: #rating put: rating;
 		at: #feedbackLabel put: (anObject at: #feedbackLabel ifAbsent: [ label value ]);
-		yourself
+		yourself.
+	task := self validatedTask: (anObject at: #task ifAbsent: [ nil ]).
+	task ifNotNil: [ response at: #task put: task ].
+	^ response
 ]
 
 { #category : 'private' }

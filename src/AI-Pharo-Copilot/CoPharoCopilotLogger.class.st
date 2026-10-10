@@ -1109,7 +1109,6 @@ CoPharoCopilotLogger class >> writeSessionMetadataClosedAt: closedAt archivedAt:
 		at: #modelName put: CopilotSettings modelName;
 		at: #dataCollectionConsentState put: CopilotSettings researchTelemetryConsentState;
 		at: #researchTelemetryConsentState put: CopilotSettings researchTelemetryConsentState;
-		at: #screenRecordingConsentState put: CopilotSettings screenRecordingConsentState;
 		yourself.
 
 	file := self sessionMetadataFileReference.

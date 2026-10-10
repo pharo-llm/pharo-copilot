@@ -120,18 +120,6 @@ PharoCopilotSetupPresenter >> handleResearchTelemetryDeclined [
 ]
 
 { #category : 'accessing' }
-PharoCopilotSetupPresenter >> handleScreenRecordingAccepted [
-
-	CopilotSettings recordScreenRecordingConsentAccepted: true
-]
-
-{ #category : 'accessing' }
-PharoCopilotSetupPresenter >> handleScreenRecordingDeclined [
-
-	CopilotSettings recordScreenRecordingConsentAccepted: false
-]
-
-{ #category : 'accessing' }
 PharoCopilotSetupPresenter >> continueSetupAfterConsentDecision [
 
 	self showDownloadStep.
@@ -617,14 +605,14 @@ PharoCopilotSetupPresenter >> telemetryButtonRow [
 		label: 'No, thanks';
 		action: [
 			self handleResearchTelemetryDeclined.
-			self showScreenRecordingConsentStep ];
+			self showConsentSummaryStep ];
 		yourself.
 
 	yesButton := self newButton
 		label: 'Yes, share research data';
 		action: [
 			self handleResearchTelemetryAccepted.
-			self showScreenRecordingConsentStep ];
+			self showConsentSummaryStep ];
 		yourself.
 
 	^ SpBoxLayout newTopToBottom
@@ -668,98 +656,15 @@ PharoCopilotSetupPresenter >> showResearchTelemetryLearnMoreStepReturningTo: ret
 ]
 
 { #category : 'initialization' }
-PharoCopilotSetupPresenter >> showScreenRecordingConsentStep [
-
-	titleLabel label: 'Can we record your screen?'.
-	descriptionLabel text: 'Optional screen recordings help researchers understand how developers use AI code completion.'.
-	statusLabel text: ''.
-
-	contentContainer layout: (self consentLayoutWith: self screenRecordingButtonRow).
-
-	self layout: self defaultLayout
-]
-
-{ #category : 'initialization' }
-PharoCopilotSetupPresenter >> screenRecordingButtonRow [
-
-	| learnMoreButton noButton yesButton |
-	learnMoreButton := self newButton
-		label: 'Learn more';
-		action: [
-			self
-				showScreenRecordingLearnMoreStepReturningTo: [ self showScreenRecordingConsentStep ] ];
-		yourself.
-
-	noButton := self newButton
-		label: 'No, thanks';
-		action: [
-			self handleScreenRecordingDeclined.
-			self showConsentSummaryStep ];
-		yourself.
-
-	yesButton := self newButton
-		label: 'Yes, allow recording';
-		action: [
-			self handleScreenRecordingAccepted.
-			self showConsentSummaryStep ];
-		yourself.
-
-	^ SpBoxLayout newTopToBottom
-		spacing: 10;
-		add: learnMoreButton expand: false;
-		add: noButton expand: false;
-		add: yesButton expand: false;
-		yourself
-]
-
-{ #category : 'initialization' }
-PharoCopilotSetupPresenter >> showScreenRecordingLearnMoreStepReturningTo: returnBlock [
-
-	| detailsText backButton buttonRow |
-	titleLabel label: 'Screen Recording'.
-	descriptionLabel text: 'Details about screen recording for research.'.
-	statusLabel text: 'Use the scroll bar to read the full information.'.
-
-	detailsText := self newText.
-	detailsText
-		text: CopilotSettings screenRecordingLearnMoreText;
-		beNotEditable.
-
-	backButton := self newButton
-		label: 'Back';
-		action: [ returnBlock value ];
-		yourself.
-
-	buttonRow := SpBoxLayout newHorizontal
-		spacing: 10;
-		add: backButton;
-		yourself.
-
-	contentContainer layout: (SpBoxLayout newTopToBottom
-		spacing: 10;
-		add: detailsText expand: true;
-		add: buttonRow expand: false;
-		yourself).
-
-	self layout: self defaultLayout
-]
-
-{ #category : 'initialization' }
 PharoCopilotSetupPresenter >> showConsentSummaryStep [
 
-	| telemetryStatus recordingStatus continueButton |
+	| telemetryStatus continueButton |
 	titleLabel label: 'You''re ready to go'.
 	descriptionLabel text: 'Pharo Copilot setup is ready to continue.'.
 	statusLabel text: ''.
 
 	telemetryStatus := self newLabel
 		label: 'Research data collection: ', (CopilotSettings researchTelemetryAccepted
-			ifTrue: [ 'Enabled' ]
-			ifFalse: [ 'Disabled' ]);
-		yourself.
-
-	recordingStatus := self newLabel
-		label: 'Screen recording: ', (CopilotSettings screenRecordingAccepted
 			ifTrue: [ 'Enabled' ]
 			ifFalse: [ 'Disabled' ]);
 		yourself.
@@ -772,7 +677,6 @@ PharoCopilotSetupPresenter >> showConsentSummaryStep [
 	contentContainer layout: (SpBoxLayout newTopToBottom
 		spacing: 10;
 		add: telemetryStatus expand: false;
-		add: recordingStatus expand: false;
 		add: continueButton expand: false;
 		yourself).
 
