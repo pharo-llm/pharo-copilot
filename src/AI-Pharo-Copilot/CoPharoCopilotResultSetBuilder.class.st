@@ -1279,13 +1279,27 @@ CoPharoCopilotResultSetBuilder >> fuseModelSuggestions: modelSuggestions semanti
 { #category : 'generation' }
 CoPharoCopilotResultSetBuilder >> generationOptionsForContextInfo: contextInfo [
 
-	| route |
+	| route options prefix |
 	route := contextInfo
 		ifNil: [ #unknown ]
 		ifNotNil: [ contextInfo at: #completionRoute ifAbsent: [ #unknown ] ].
-	^ Dictionary new
+	options := Dictionary new
 		at: #num_predict put: (self generationPolicy numPredictFor: route);
-		yourself
+		yourself.
+	"A message tail spanning several lines is rejected as a whole, so end generation
+	at the end of the line: the answer arrives sooner and stays usable."
+	prefix := contextInfo
+		ifNil: [ nil ]
+		ifNotNil: [ contextInfo at: #prefix ifAbsent: [ nil ] ].
+	(prefix notNil and: [
+		(self
+			completionKindForSource: prefix
+			position: prefix size
+			prefix: prefix) = #messageTail ]) ifTrue: [
+		options
+			at: #stop
+			put: CoPCOllamaClient fimStopSequences , { String lf } ].
+	^ options
 ]
 
 { #category : 'generation' }

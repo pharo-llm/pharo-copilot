@@ -926,6 +926,9 @@ CoPharoCopilotLogger class >> updateCompletionSession: aSessionId addRejected: r
 	rejected add: rejectedString.
 	payload at: #rejected put: rejected asArray.
 	file writeStreamDo: [ :stream |
+		"Rewriting in place: without truncating, a shorter payload leaves the tail of
+		the previous one behind and the file is no longer valid JSON."
+		stream truncate.
 		stream nextPutAll: (STONJSON toString: payload) ]
 ]
 
@@ -941,6 +944,9 @@ CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withAccepted: 
 	payload at: #nullCompletion put: false.
 	payload at: #nullCompletionReason put: nil.
 	file writeStreamDo: [ :stream |
+		"Rewriting in place: without truncating, a shorter payload leaves the tail of
+		the previous one behind and the file is no longer valid JSON."
+		stream truncate.
 		stream nextPutAll: (STONJSON toString: payload) ]
 ]
 
@@ -962,6 +968,9 @@ CoPharoCopilotLogger class >> updateCompletionSession: aSessionId withNullComple
 	payload at: #nullCompletionReason put: reason.
 	payload at: #closedAt put: DateAndTime now asString.
 	file writeStreamDo: [ :stream |
+		"Rewriting in place: without truncating, a shorter payload leaves the tail of
+		the previous one behind and the file is no longer valid JSON."
+		stream truncate.
 		stream nextPutAll: (STONJSON toString: payload) ]
 ]
 
@@ -1073,6 +1082,9 @@ CoPharoCopilotLogger class >> writeCompletionSession: aDictionary sessionId: aSe
 	file := self completionFileReferenceFor: aSessionId.
 	self ensureFileExists: file.
 	file writeStreamDo: [ :stream |
+		"Rewriting in place: without truncating, a shorter payload leaves the tail of
+		the previous one behind and the file is no longer valid JSON."
+		stream truncate.
 		stream nextPutAll: (STONJSON toString: aDictionary) ]
 ]
 
@@ -1103,6 +1115,9 @@ CoPharoCopilotLogger class >> writeSessionMetadataClosedAt: closedAt archivedAt:
 	file := self sessionMetadataFileReference.
 	self ensureFileExists: file.
 	file writeStreamDo: [ :stream |
+		"Rewriting in place: without truncating, a shorter payload leaves the tail of
+		the previous one behind and the file is no longer valid JSON."
+		stream truncate.
 		stream nextPutAll: (STONJSON toString: payload) ]
 ]
 

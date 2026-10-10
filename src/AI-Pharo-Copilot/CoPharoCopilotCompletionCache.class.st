@@ -264,7 +264,7 @@ CoPharoCopilotCompletionCache >> touchKey: aKey [
 	clock := clock + 1.
 	timestamps at: aKey put: clock.
 
-	(oldestKey isNil or: [ oldestTime isNil ]) ifFalse: [ ^ self ].
-	oldestKey := aKey.
-	oldestTime := clock
+	"A touched entry is now the most recent one, so it can never be the eviction
+	candidate. The real oldest entry is found lazily by #oldestExistingKey."
+	oldestKey = aKey ifTrue: [ self resetOldestTracking ]
 ]

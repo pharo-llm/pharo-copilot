@@ -993,6 +993,9 @@ CoPCSessionTelemetryAnalyzer class >> writeSummaryForSessionDirectory: sessionDi
 
 	file parent ifNotNil: [ :parent | parent ensureCreateDirectory ].
 	file writeStreamDo: [ :stream |
+		"Rewriting in place: without truncating, a shorter payload leaves the tail of
+		the previous one behind and the file is no longer valid JSON."
+		stream truncate.
 		stream nextPutAll: (STONJSON toString: payload) ].
 	^ file
 ]

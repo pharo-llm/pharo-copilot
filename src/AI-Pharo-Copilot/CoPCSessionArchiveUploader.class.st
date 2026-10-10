@@ -445,10 +445,20 @@ CoPCSessionArchiveUploader >> authorizeConnection [
 ]
 
 { #category : 'connection' }
+CoPCSessionArchiveUploader >> newHttpClient [
+	"The hosted server is reached with the certificate-validating client whenever TLS
+	is on, so the credential and research data never go to an unverified peer."
+
+	^ (CopilotSettings remoteEnabled and: [ CopilotSettings remoteServerSecure ])
+		ifTrue: [ CoPCSecureHttpClient new ]
+		ifFalse: [ ZnClient new ]
+]
+
+{ #category : 'connection' }
 CoPCSessionArchiveUploader >> newJsonClientForUrl: aUrlString [
 
 	| client |
-	client := ZnClient new
+	client := self newHttpClient
 		url: aUrlString;
 		method: #POST;
 		yourself.
@@ -486,7 +496,7 @@ CoPCSessionArchiveUploader >> newTelemetrySummaryUploadClientForFile: file sessi
 CoPCSessionArchiveUploader >> newUploadClientForFile: file sessionId: sessionId userId: userId [
 
 	| client token |
-	client := ZnClient new
+	client := self newHttpClient
 		url: self class uploadUrl;
 		method: #POST;
 		yourself.
@@ -523,7 +533,11 @@ CoPCSessionArchiveUploader >> uploadArchive: archiveFile sessionId: sessionId us
 		userId: userId.
 
 	[
-		client entity: (ZnEntity bytes: bytes).
+		"Setting an entity replaces the Content-Type header with the entity's own type,
+		and the server only accepts application/zip."
+		client entity: ((ZnByteArrayEntity bytes: bytes)
+			contentType: (ZnMimeType main: 'application' sub: 'zip');
+			yourself).
 		^ client execute
 	] ensure: [
 		(client respondsTo: #close) ifTrue: [
